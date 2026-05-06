@@ -240,7 +240,7 @@ export default defineConfig({
           const address = server.httpServer?.address();
           const port = typeof address === "object" && address ? address.port : 5173;
           console.log(
-            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}?token=${ACCESS_TOKEN}\n`
+            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
           );
         });
 
