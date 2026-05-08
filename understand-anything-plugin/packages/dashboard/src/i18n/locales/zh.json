@@ -74,7 +74,10 @@
     "navigation": "导航",
     "view": "视图",
     "general": "通用",
-    "tour": "导览"
+    "tour": "导览",
+    "keyboardShortcuts": "键盘快捷键",
+    "keyboardHint": "按 ? 可随时切换此帮助",
+    "escToClose": "按 ESC 关闭"
   },
   "pathFinder": {
     "title": "依赖路径查找器",

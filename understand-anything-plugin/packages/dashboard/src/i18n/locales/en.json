@@ -74,7 +74,10 @@
     "navigation": "Navigation",
     "view": "View",
     "general": "General",
-    "tour": "Tour"
+    "tour": "Tour",
+    "keyboardShortcuts": "Keyboard Shortcuts",
+    "keyboardHint": "Press ? anytime to toggle this help",
+    "escToClose": "Press ESC to close"
   },
   "pathFinder": {
     "title": "Dependency Path Finder",
