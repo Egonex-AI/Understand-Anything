@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review]"]
+argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--publish]"]
 ---
 
 # /understand
@@ -15,6 +15,7 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--auto-update` — Enable automatic graph updates on commit (writes `autoUpdate: true` to `.understand-anything/config.json`)
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
+  - `--publish` — After saving the graph, publish to the [`looptech-ai/understand-quickly`](https://github.com/looptech-ai/understand-quickly) registry. Stamps `metadata.{tool, tool_version, generated_at, commit}` on the graph (enables drift detection); if `UNDERSTAND_QUICKLY_TOKEN` is set, also fires a `repository_dispatch` for instant resync. No-op when the env var is missing — the local graph is still stamped so a CI workflow can publish later.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
 
 ---
@@ -673,6 +674,17 @@ Pass these parameters in the dispatch prompt:
 
 5. Only automatically launch the dashboard by invoking the `/understand-dashboard` skill if final graph validation passed after normalization/review fixes.
    If final validation did not pass, report that the graph was saved with warnings and dashboard launch was skipped.
+
+6. **`--publish` flag — opt-in registry publish.**
+
+   If `--publish` is in `$ARGUMENTS`, run the publish helper bundled with this skill (located next to this SKILL.md file):
+   ```bash
+   node <SKILL_DIR>/publish-to-understand-quickly.mjs $PROJECT_ROOT
+   ```
+
+   The script stamps `metadata.{tool, tool_version, generated_at, commit}` on the saved `knowledge-graph.json` (so the registry can do drift detection), then — only if the user has exported `UNDERSTAND_QUICKLY_TOKEN` — fires a `repository_dispatch` to [`looptech-ai/understand-quickly`](https://github.com/looptech-ai/understand-quickly) asking for an instant resync. The script is best-effort: it exits 0 in every case and a publish failure must never fail the parent run. Forward its stdout to the user verbatim.
+
+   If `--publish` is **not** in `$ARGUMENTS`, skip this step entirely — there is no implicit publishing.
 
 ---
 

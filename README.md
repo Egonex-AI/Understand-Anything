@@ -252,6 +252,22 @@ git lfs track ".understand-anything/*.json"
 git add .gitattributes .understand-anything/
 ```
 
+### Publishing to the understand-quickly registry (opt-in)
+
+Once your graph is committed, you can list your repo in the public [`looptech-ai/understand-quickly`](https://github.com/looptech-ai/understand-quickly) registry — a catalogue of code-knowledge graphs with a stable `registry.json` API and an MCP server that lets agents (Claude, Codex, Cursor, anything MCP-aware) discover and consume your graph. The registry only stores pointers; the graph itself stays in your repo and is fetched from `raw.githubusercontent.com`. See the [public dashboard](https://looptech-ai.github.io/understand-quickly/) for what published graphs look like.
+
+Run with the opt-in flag:
+
+```bash
+/understand --publish
+```
+
+This stamps a `metadata` block (`tool`, `tool_version`, `generated_at`, `commit`) onto the saved `knowledge-graph.json` so the registry can do drift detection, and — if `UNDERSTAND_QUICKLY_TOKEN` is set — fires a `repository_dispatch` at the registry asking for an instant resync. Without the token the flag is a no-op apart from the metadata stamp, so a CI workflow can do the publish instead.
+
+**Token setup (optional):** create a fine-grained GitHub PAT scoped to `repository_dispatch: write` on `looptech-ai/understand-quickly` only and export it as `UNDERSTAND_QUICKLY_TOKEN`. For CI, drop in the workflow at <https://github.com/looptech-ai/understand-quickly/blob/main/docs/integrations/sample-publish-workflow.yml> and add the PAT as a repo secret. The publish step is opt-in and best-effort — failures never block the parent `/understand` run.
+
+To register the repo (once), use [the wizard](https://looptech-ai.github.io/understand-quickly/add.html) or `npx @understand-quickly/cli add`.
+
 ---
 
 ## 🔧 Under the Hood

@@ -122,3 +122,19 @@ export {
   type IgnoreFilter,
 } from "./ignore-filter.js";
 export { generateStarterIgnoreFile } from "./ignore-generator.js";
+// Opt-in publish to looptech-ai/understand-quickly registry.
+export {
+  publish,
+  stampMetadata,
+  dispatchSync,
+  parseGitRemote,
+  resolveOriginSlug,
+  resolveHeadCommit,
+  type PublishOptions,
+  type PublishResult,
+  type PublishStatus,
+  type DispatchOptions,
+  type DispatchResult,
+  type MetadataStamp,
+  type ParsedRemote,
+} from "./publish/index.js";
