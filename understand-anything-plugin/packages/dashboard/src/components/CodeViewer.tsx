@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Highlight, themes } from "prism-react-renderer";
 import { useDashboardStore } from "../store";
 
@@ -61,6 +62,7 @@ export default function CodeViewer({
   onClose,
   onExpand,
 }: CodeViewerProps) {
+  const { t } = useTranslation();
   const graph = useDashboardStore((s) => s.graph);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
   const viewMode = useDashboardStore((s) => s.viewMode);
@@ -125,7 +127,7 @@ export default function CodeViewer({
   if (!node) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-surface">
-        <p className="text-text-muted text-sm">No file selected</p>
+        <p className="text-text-muted text-sm">{t("codeViewer.noFileSelected")}</p>
       </div>
     );
   }
@@ -133,8 +135,8 @@ export default function CodeViewer({
   const source = state.source;
   const language = source?.language ?? fallbackLanguage(node.filePath);
   const lineInfo = highlightedRange
-    ? `Lines ${highlightedRange.start}-${highlightedRange.end}`
-    : "Full file";
+    ? t("codeViewer.linesRange", { start: highlightedRange.start, end: highlightedRange.end })
+    : t("codeViewer.fullFile");
   const isModal = presentation === "modal";
   const handleClose = onClose ?? closeCodeViewer;
 
@@ -170,8 +172,8 @@ export default function CodeViewer({
               type="button"
               onClick={onExpand}
               className="text-text-muted hover:text-text-primary transition-colors"
-              title="Open larger code viewer"
-              aria-label="Open larger code viewer"
+              title={t("codeViewer.openLarger")}
+              aria-label={t("codeViewer.openLarger")}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6" />
@@ -182,8 +184,8 @@ export default function CodeViewer({
             type="button"
             onClick={handleClose}
             className="text-text-muted hover:text-text-primary transition-colors"
-            title={isModal ? "Close expanded code viewer" : "Close code viewer"}
-            aria-label={isModal ? "Close expanded code viewer" : "Close code viewer"}
+            title={isModal ? t("codeViewer.closeExpanded") : t("codeViewer.close")}
+            aria-label={isModal ? t("codeViewer.closeExpanded") : t("codeViewer.close")}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -194,13 +196,13 @@ export default function CodeViewer({
 
       <div className="flex-1 min-h-0 overflow-auto bg-root">
         {state.status === "loading" && (
-          <div className="p-5 text-sm text-text-muted">Loading source...</div>
+          <div className="p-5 text-sm text-text-muted">{t("codeViewer.loading")}</div>
         )}
 
         {state.status === "error" && (
           <div className="p-5">
             <div className="rounded-lg border border-border-subtle bg-elevated p-4">
-              <div className="text-sm font-medium text-text-primary mb-2">Source unavailable</div>
+              <div className="text-sm font-medium text-text-primary mb-2">{t("codeViewer.sourceUnavailable")}</div>
               <p className="text-sm text-text-secondary leading-relaxed">{state.error}</p>
             </div>
           </div>
@@ -209,7 +211,7 @@ export default function CodeViewer({
         {source && (
           <>
             <div className="px-4 py-2 border-b border-border-subtle bg-surface text-[11px] text-text-muted flex items-center justify-between">
-              <span>{source.lineCount} lines</span>
+              <span>{t("codeViewer.lineCount", { count: source.lineCount })}</span>
               <span>{formatBytes(source.sizeBytes)}</span>
             </div>
             <Highlight code={source.content} language={language} theme={themes.vsDark}>

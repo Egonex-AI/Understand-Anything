@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { GraphNode } from "@understand-anything/core/types";
 import { useDashboardStore } from "../store";
 
@@ -139,6 +140,7 @@ function FileTreeRow({
 }
 
 export default function FileExplorer() {
+  const { t } = useTranslation();
   const graph = useDashboardStore((s) => s.graph);
   const openCodeViewer = useDashboardStore((s) => s.openCodeViewer);
   const navigateToNode = useDashboardStore((s) => s.navigateToNode);
@@ -193,7 +195,7 @@ export default function FileExplorer() {
       </div>
       <div className="flex-1 overflow-auto py-2">
         {entries.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-text-muted">No file paths found.</div>
+          <div className="px-4 py-6 text-sm text-text-muted">{t("fileExplorer.noFilePaths")}</div>
         ) : (
           entries.map((entry) => (
             <FileTreeRow

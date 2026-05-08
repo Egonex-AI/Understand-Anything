@@ -1,29 +1,26 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { GraphIssue } from "@understand-anything/core/schema";
 
 interface WarningBannerProps {
   issues: GraphIssue[];
 }
 
-function buildCopyText(issues: GraphIssue[]): string {
+function buildCopyText(issues: GraphIssue[], t: (key: string) => string): string {
   const hasFatal = issues.some((i) => i.level === "fatal");
-  // Fatal issues are dashboard rendering bugs (e.g. ELK layout failures), not
-  // LLM generation errors — route the user to file a bug report instead of
-  // asking their agent to "fix" the knowledge-graph.json.
   const lines = hasFatal
     ? [
-        "Some of these issues look like dashboard rendering bugs.",
-        "Please file an issue at github.com/Lum1104/Understand-Anything/issues with the text below.",
+        t("warning.copyTextFatal1"),
+        t("warning.copyTextFatal2"),
         "",
       ]
     : [
-        "The following issues were found in your knowledge-graph.json.",
-        "These are LLM generation errors — not a system bug.",
-        "You can ask your agent to fix these specific issues in the knowledge-graph.json file:",
+        t("warning.copyTextNonFatal1"),
+        t("warning.copyTextNonFatal2"),
+        t("warning.copyTextNonFatal3"),
         "",
       ];
 
-  // Show fatal first (most actionable for bug reports), then dropped, then auto-corrected.
   const sorted = [...issues].sort((a, b) => {
     const order: Record<string, number> = { fatal: 0, dropped: 1, "auto-corrected": 2 };
     return (order[a.level] ?? 3) - (order[b.level] ?? 3);
@@ -32,10 +29,10 @@ function buildCopyText(issues: GraphIssue[]): string {
   for (const issue of sorted) {
     const label =
       issue.level === "auto-corrected"
-        ? "Auto-corrected"
+        ? t("warning.autoCorrected")
         : issue.level === "dropped"
-          ? "Dropped"
-          : "Fatal";
+          ? t("warning.dropped")
+          : t("warning.fatal");
     lines.push(`[${label}] ${issue.message}`);
   }
 
@@ -43,6 +40,7 @@ function buildCopyText(issues: GraphIssue[]): string {
 }
 
 export default function WarningBanner({ issues }: WarningBannerProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -51,35 +49,33 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
   const dropped = issues.filter((i) => i.level === "dropped");
   const hasFatal = fatal.length > 0;
 
-  // Build summary text — only mention counts > 0
   const parts: string[] = [];
   if (fatal.length > 0) {
-    parts.push(`${fatal.length} fatal error${fatal.length !== 1 ? "s" : ""}`);
+    parts.push(t("warning.fatalError", { count: fatal.length }));
   }
   if (autoCorrected.length > 0) {
-    parts.push(`${autoCorrected.length} auto-correction${autoCorrected.length !== 1 ? "s" : ""}`);
+    parts.push(t("warning.autoCorrection", { count: autoCorrected.length }));
   }
   if (dropped.length > 0) {
-    parts.push(`${dropped.length} dropped item${dropped.length !== 1 ? "s" : ""}`);
+    parts.push(t("warning.droppedItem", { count: dropped.length }));
   }
   const summary = hasFatal
-    ? `Dashboard hit ${parts.join(", ")}`
-    : `Knowledge graph loaded with ${parts.join(" and ")}`;
+    ? t("warning.dashboardHit", { parts: parts.join(", ") })
+    : t("warning.graphLoaded", { parts: parts.join(" and ") });
 
   const handleCopy = useCallback(async () => {
-    const text = buildCopyText(issues);
+    const text = buildCopyText(issues, t);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      console.warn("Clipboard write failed — copy text manually from the expanded issue list");
+      console.warn(t("warning.clipboardFailed"));
     }
-  }, [issues]);
+  }, [issues, t]);
 
   if (issues.length === 0) return null;
 
-  // Fatal issues escalate the banner from amber (warning) to red (error).
   const containerClasses = hasFatal
     ? "bg-red-900/25 border-b border-red-700 text-red-200 text-sm"
     : "bg-amber-900/20 border-b border-amber-700 text-amber-200 text-sm";
@@ -94,8 +90,8 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
     ? "bg-red-800/40 text-red-200 hover:bg-red-800/60"
     : "bg-amber-800/40 text-amber-200 hover:bg-amber-800/60";
   const footerCopy = hasFatal
-    ? "Copy these issues and file a bug report on GitHub"
-    : "Copy these issues and ask your agent to fix them in knowledge-graph.json";
+    ? t("warning.copyFatal")
+    : t("warning.copyNonFatal");
 
   return (
     <div className={containerClasses}>
@@ -141,7 +137,7 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
         <span className="flex-1">{summary}</span>
 
         <span className={`text-xs shrink-0 ${hintClasses}`}>
-          {expanded ? "click to collapse" : "click to expand"}
+          {expanded ? t("warning.collapse") : t("warning.expand")}
         </span>
       </button>
 
@@ -154,7 +150,7 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
             {fatal.length > 0 && (
               <div>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-red-400 mb-1">
-                  Fatal ({fatal.length})
+                  {t("warning.fatal")} ({fatal.length})
                 </h4>
                 {fatal.map((issue, i) => (
                   <div
@@ -181,7 +177,7 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
             {autoCorrected.length > 0 && (
               <div className={fatal.length > 0 ? "mt-2" : ""}>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-1">
-                  Auto-corrected ({autoCorrected.length})
+                  {t("warning.autoCorrected")} ({autoCorrected.length})
                 </h4>
                 {autoCorrected.map((issue, i) => (
                   <div key={`ac-${i}`} className="flex items-start gap-2 py-0.5 pl-2 text-amber-200/80">
@@ -200,7 +196,7 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
             {dropped.length > 0 && (
               <div className={fatal.length > 0 || autoCorrected.length > 0 ? "mt-2" : ""}>
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-orange-400 mb-1">
-                  Dropped ({dropped.length})
+                  {t("warning.dropped")} ({dropped.length})
                 </h4>
                 {dropped.map((issue, i) => (
                   <div key={`dr-${i}`} className="flex items-start gap-2 py-0.5 pl-2 text-orange-300/80">
@@ -229,7 +225,7 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Copied!
+                  {t("warning.copied")}
                 </>
               ) : (
                 <>
@@ -241,7 +237,7 @@ export default function WarningBanner({ issues }: WarningBannerProps) {
                       d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                     />
                   </svg>
-                  Copy Issues
+                  {t("warning.copyIssues")}
                 </>
               )}
             </button>

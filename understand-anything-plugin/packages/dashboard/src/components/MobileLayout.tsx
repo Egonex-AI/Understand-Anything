@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "../store";
 import GraphView from "./GraphView";
@@ -35,6 +36,7 @@ export default function MobileLayout({
   allIssues,
   shortcuts,
 }: Props) {
+  const { t } = useTranslation();
   const graph = useDashboardStore((s) => s.graph);
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const tourActive = useDashboardStore((s) => s.tourActive);
@@ -96,7 +98,7 @@ export default function MobileLayout({
         </button>
 
         <h1 className="font-serif text-base flex-1 min-w-0 truncate text-center text-text-primary tracking-wide">
-          {graph?.project.name ?? "Understand Anything"}
+          {graph?.project.name ?? t("app.title")}
         </h1>
 
         <button

@@ -81,23 +81,34 @@
   },
   "pathFinder": {
     "title": "依赖路径查找器",
+    "description": "在依赖图中查找两个节点之间的最短路径。",
     "fromNode": "起始节点",
     "toNode": "目标节点",
+    "selectNode": "选择节点...",
     "findPath": "查找路径",
-    "noPath": "未找到路径",
-    "pathFound": "找到路径"
+    "searching": "搜索中...",
+    "noPath": "在这些节点之间未找到路径。",
+    "pathFound": "找到路径",
+    "nodes": "个节点"
   },
   "persona": {
     "overview": "概览",
+    "overviewDesc": "高层架构视图",
     "learn": "学习",
-    "deepDive": "深入"
+    "learnDesc": "完整仪表板与引导式学习",
+    "deepDive": "深入",
+    "deepDiveDesc": "聚焦代码与聊天"
   },
   "token": {
     "accessTokenRequired": "需要访问令牌",
     "pasteToken": "从终端复制访问令牌以访问仪表板。",
+    "pasteTokenHint": "从终端复制访问令牌。查找钥匙图标行。",
+    "pastePlaceholder": "在此粘贴令牌...",
     "invalidToken": "令牌无效，请检查后重试。",
     "validating": "验证中...",
-    "continue": "继续"
+    "continue": "继续",
+    "unexpectedResponse": "意外响应 ({{ status }})。仪表板服务器是否正在运行？",
+    "serverUnreachable": "无法连接到服务器：{{ message }}"
   },
   "warning": {
     "noGraphLoaded": "未加载图形",
@@ -108,7 +119,28 @@
     "issues": "问题",
     "autoCorrected": "已自动修复",
     "dropped": "已丢弃",
-    "copy": "复制"
+    "fatal": "致命",
+    "copy": "复制",
+    "fatalError": "{{count}} 个致命错误",
+    "fatalError_plural": "{{count}} 个致命错误",
+    "autoCorrection": "{{count}} 个自动修复",
+    "autoCorrection_plural": "{{count}} 个自动修复",
+    "droppedItem": "{{count}} 个已丢弃项目",
+    "droppedItem_plural": "{{count}} 个已丢弃项目",
+    "dashboardHit": "仪表板遇到 {{parts}}",
+    "graphLoaded": "知识图谱已加载，包含 {{parts}}",
+    "expand": "点击展开",
+    "collapse": "点击收起",
+    "copied": "已复制！",
+    "copyIssues": "复制问题",
+    "copyFatal": "复制这些问题并在 GitHub 上提交 bug 报告",
+    "copyNonFatal": "复制这些问题并让 agent 修复 knowledge-graph.json 中的问题",
+    "clipboardFailed": "剪贴板写入失败——请从展开的问题列表中手动复制文本",
+    "copyTextFatal1": "其中一些问题看起来是仪表板渲染 bug。",
+    "copyTextFatal2": "请在 github.com/Lum1104/Understand-Anything/issues 提交问题，并附上以下文本。",
+    "copyTextNonFatal1": "在您的 knowledge-graph.json 中发现以下问题。",
+    "copyTextNonFatal2": "这些是 LLM 生成错误——不是系统 bug。",
+    "copyTextNonFatal3": "您可以让 agent 修复 knowledge-graph.json 中的这些特定问题："
   },
   "graph": {
     "empty": "无节点可显示",
@@ -117,6 +149,7 @@
   },
   "layer": {
     "layer": "层",
+    "layersCount": "{{count}} 个层",
     "file": "文件",
     "files": "文件",
     "clickToExplore": "点击探索"
@@ -124,5 +157,32 @@
   "theme": {
     "theme": "主题",
     "accentColor": "强调色"
+  },
+  "common": {
+    "close": "关闭"
+  },
+  "codeViewer": {
+    "noFileSelected": "未选择文件",
+    "linesRange": "第 {{start}}-{{end}} 行",
+    "fullFile": "完整文件",
+    "openLarger": "打开更大的代码查看器",
+    "close": "关闭代码查看器",
+    "closeExpanded": "关闭展开的代码查看器",
+    "loading": "加载源码中...",
+    "sourceUnavailable": "源码不可用",
+    "lineCount": "{{count}} 行"
+  },
+  "fileExplorer": {
+    "noFilePaths": "未找到文件路径。"
+  },
+  "diff": {
+    "diff": "差异",
+    "on": "开",
+    "off": "关",
+    "hideOverlay": "隐藏差异覆盖层",
+    "showOverlay": "显示差异覆盖层",
+    "noData": "无差异数据",
+    "changed": "已更改",
+    "affected": "受影响"
   }
 }

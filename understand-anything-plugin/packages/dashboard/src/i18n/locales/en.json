@@ -81,23 +81,34 @@
   },
   "pathFinder": {
     "title": "Dependency Path Finder",
+    "description": "Find the shortest path between two nodes in the dependency graph.",
     "fromNode": "From Node",
     "toNode": "To Node",
+    "selectNode": "Select a node...",
     "findPath": "Find Path",
-    "noPath": "No path found",
-    "pathFound": "Path found"
+    "searching": "Searching...",
+    "noPath": "No path found between these nodes.",
+    "pathFound": "Path Found",
+    "nodes": "nodes"
   },
   "persona": {
     "overview": "Overview",
+    "overviewDesc": "High-level architecture view",
     "learn": "Learn",
-    "deepDive": "Deep Dive"
+    "learnDesc": "Full dashboard with guided learning",
+    "deepDive": "Deep Dive",
+    "deepDiveDesc": "Code-focused with chat"
   },
   "token": {
     "accessTokenRequired": "Access Token Required",
     "pasteToken": "Paste the access token from your terminal to access the dashboard.",
+    "pasteTokenHint": "Paste the access token from your terminal. Look for the key icon.",
+    "pastePlaceholder": "Paste token here...",
     "invalidToken": "Invalid token. Please check and try again.",
     "validating": "Validating...",
-    "continue": "Continue"
+    "continue": "Continue",
+    "unexpectedResponse": "Unexpected response ({{ status }}). Is the dashboard server running?",
+    "serverUnreachable": "Could not reach the server: {{ message }}"
   },
   "warning": {
     "noGraphLoaded": "No graph loaded",
@@ -106,9 +117,30 @@
     "graphValidationFailed": "Knowledge graph validation failed",
     "issue": "issue",
     "issues": "issues",
-    "autoCorrected": "auto-corrected",
-    "dropped": "dropped",
-    "copy": "Copy"
+    "autoCorrected": "Auto-corrected",
+    "dropped": "Dropped",
+    "fatal": "Fatal",
+    "copy": "Copy",
+    "fatalError": "{{count}} fatal error",
+    "fatalError_plural": "{{count}} fatal errors",
+    "autoCorrection": "{{count}} auto-correction",
+    "autoCorrection_plural": "{{count}} auto-corrections",
+    "droppedItem": "{{count}} dropped item",
+    "droppedItem_plural": "{{count}} dropped items",
+    "dashboardHit": "Dashboard hit {{parts}}",
+    "graphLoaded": "Knowledge graph loaded with {{parts}}",
+    "expand": "click to expand",
+    "collapse": "click to collapse",
+    "copied": "Copied!",
+    "copyIssues": "Copy Issues",
+    "copyFatal": "Copy these issues and file a bug report on GitHub",
+    "copyNonFatal": "Copy these issues and ask your agent to fix them in knowledge-graph.json",
+    "clipboardFailed": "Clipboard write failed — copy text manually from the expanded issue list",
+    "copyTextFatal1": "Some of these issues look like dashboard rendering bugs.",
+    "copyTextFatal2": "Please file an issue at github.com/Lum1104/Understand-Anything/issues with the text below.",
+    "copyTextNonFatal1": "The following issues were found in your knowledge-graph.json.",
+    "copyTextNonFatal2": "These are LLM generation errors — not a system bug.",
+    "copyTextNonFatal3": "You can ask your agent to fix these specific issues in the knowledge-graph.json file:"
   },
   "graph": {
     "empty": "No nodes to display",
@@ -117,6 +149,7 @@
   },
   "layer": {
     "layer": "Layer",
+    "layersCount": "{{count}} layers",
     "file": "file",
     "files": "files",
     "clickToExplore": "Click to explore"
@@ -124,5 +157,32 @@
   "theme": {
     "theme": "Theme",
     "accentColor": "Accent Color"
+  },
+  "common": {
+    "close": "Close"
+  },
+  "codeViewer": {
+    "noFileSelected": "No file selected",
+    "linesRange": "Lines {{start}}-{{end}}",
+    "fullFile": "Full file",
+    "openLarger": "Open larger code viewer",
+    "close": "Close code viewer",
+    "closeExpanded": "Close expanded code viewer",
+    "loading": "Loading source...",
+    "sourceUnavailable": "Source unavailable",
+    "lineCount": "{{count}} lines"
+  },
+  "fileExplorer": {
+    "noFilePaths": "No file paths found."
+  },
+  "diff": {
+    "diff": "Diff",
+    "on": "ON",
+    "off": "OFF",
+    "hideOverlay": "Hide diff overlay",
+    "showOverlay": "Show diff overlay",
+    "noData": "No diff data loaded",
+    "changed": "Changed",
+    "affected": "Affected"
   }
 }

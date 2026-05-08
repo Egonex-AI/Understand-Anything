@@ -1,6 +1,8 @@
+import { useTranslation } from "react-i18next";
 import { useDashboardStore } from "../store";
 
 export default function DiffToggle() {
+  const { t } = useTranslation();
   const diffMode = useDashboardStore((s) => s.diffMode);
   const toggleDiffMode = useDashboardStore((s) => s.toggleDiffMode);
   const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
@@ -23,12 +25,12 @@ export default function DiffToggle() {
         title={
           hasDiff
             ? diffMode
-              ? "Hide diff overlay"
-              : "Show diff overlay"
-            : "No diff data loaded"
+              ? t("diff.hideOverlay")
+              : t("diff.showOverlay")
+            : t("diff.noData")
         }
       >
-        Diff {diffMode && hasDiff ? "ON" : "OFF"}
+        {t("diff.diff")} {diffMode && hasDiff ? t("diff.on") : t("diff.off")}
       </button>
 
       {diffMode && hasDiff && (
@@ -39,7 +41,7 @@ export default function DiffToggle() {
               style={{ backgroundColor: "var(--color-diff-changed)" }}
             />
             <span className="text-text-secondary text-[11px]">
-              Changed
+              {t("diff.changed")}
               <span className="text-text-muted ml-0.5">
                 ({changedNodeIds.size})
               </span>
@@ -51,7 +53,7 @@ export default function DiffToggle() {
               style={{ backgroundColor: "var(--color-diff-affected)" }}
             />
             <span className="text-text-secondary text-[11px]">
-              Affected
+              {t("diff.affected")}
               <span className="text-text-muted ml-0.5">
                 ({affectedNodeIds.size})
               </span>
