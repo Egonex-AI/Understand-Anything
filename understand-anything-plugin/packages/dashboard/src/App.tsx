@@ -22,6 +22,7 @@ import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import type { KeyboardShortcut } from "./hooks/useKeyboardShortcuts";
 import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
+import { LanguagePicker } from "./components/LanguagePicker";
 import type { ThemeConfig } from "./themes/index.ts";
 
 // Lazy-load heavy / optional components so they ship in separate chunks.
@@ -505,6 +506,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
             <span className="hidden md:inline">Path</span>
           </button>
           <ThemePicker />
+          <LanguagePicker />
           <button
             onClick={() => setShowKeyboardHelp(true)}
             className="text-text-muted hover:text-accent transition-colors"
