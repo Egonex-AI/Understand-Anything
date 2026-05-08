@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useDashboardStore } from "../store";
 
 const typeBadgeColors: Record<string, string> = {
@@ -21,6 +22,7 @@ const typeBadgeColors: Record<string, string> = {
 };
 
 export default function SearchBar() {
+  const { t } = useTranslation();
   const searchQuery = useDashboardStore((s) => s.searchQuery);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const graph = useDashboardStore((s) => s.graph);
@@ -104,7 +106,7 @@ export default function SearchBar() {
           value={searchQuery}
           onChange={handleInputChange}
           onFocus={() => setDropdownOpen(true)}
-          placeholder="Search nodes by name, summary, or tags..."
+          placeholder={t("search.placeholder")}
           className="flex-1 min-w-0 bg-elevated text-text-primary text-sm rounded-lg px-3 py-1.5 border border-border-subtle focus:outline-none focus:border-accent/50 placeholder-text-muted"
         />
         <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 shrink-0">
@@ -116,7 +118,7 @@ export default function SearchBar() {
                 : "text-text-muted hover:text-text-secondary"
             }`}
           >
-            Fuzzy
+            {t("search.fuzzy")}
           </button>
           <button
             onClick={() => setSearchMode("semantic")}
@@ -126,7 +128,7 @@ export default function SearchBar() {
                 : "text-text-muted hover:text-text-secondary"
             }`}
           >
-            Semantic
+            {t("search.semantic")}
           </button>
         </div>
         {searchQuery.trim() && (
