@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useDashboardStore } from "../store";
 import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
@@ -301,6 +302,7 @@ function DomainNodeDetails({ node, graph }: { node: GraphNode; graph: KnowledgeG
 }
 
 export default function NodeInfo() {
+  const { t } = useTranslation();
   const graph = useDashboardStore((s) => s.graph);
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const nodeHistory = useDashboardStore((s) => s.nodeHistory);
@@ -327,7 +329,7 @@ export default function NodeInfo() {
   if (!node) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-surface">
-        <p className="text-text-muted text-sm">Select a node to see details</p>
+        <p className="text-text-muted text-sm">{t("nodeInfo.selectNode")}</p>
       </div>
     );
   }
@@ -369,7 +371,7 @@ export default function NodeInfo() {
             className="text-[10px] font-semibold text-gold hover:text-gold-bright transition-colors flex items-center gap-1"
           >
             <span>←</span>
-            <span>Back</span>
+            <span>{t("nodeInfo.back")}</span>
           </button>
           <span className="text-text-muted text-[10px]">│</span>
           {historyNodes.slice(-3).map((h, i, arr) => (
@@ -419,7 +421,7 @@ export default function NodeInfo() {
               : "text-text-muted border border-border-subtle hover:text-gold hover:border-gold/30"
           }`}
         >
-          {focusNodeId === node.id ? "Unfocus" : "Focus"}
+          {focusNodeId === node.id ? t("nodeInfo.unfocus") : t("nodeInfo.focus")}
         </button>
       </div>
 
@@ -431,7 +433,7 @@ export default function NodeInfo() {
         <div className="text-xs text-text-secondary mb-4 rounded-lg border border-border-subtle bg-elevated/60 p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="font-medium text-text-muted mb-1">File</div>
+              <div className="font-medium text-text-muted mb-1">{t("nodeInfo.file")}</div>
               <div className="font-mono truncate" title={node.filePath}>
                 {node.filePath}
                 {node.lineRange && (
@@ -446,7 +448,7 @@ export default function NodeInfo() {
               onClick={() => openCodeViewer(node.id)}
               className="shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded border border-accent/30 text-accent hover:text-accent-bright hover:border-accent/60 transition-colors"
             >
-              Open code
+              {t("nodeInfo.openCode")}
             </button>
           </div>
         </div>
@@ -466,7 +468,7 @@ export default function NodeInfo() {
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            Language Concepts
+            {t("nodeInfo.languageConcepts")}
           </button>
           {languageExpanded && (
             <div className="bg-accent/5 border border-accent/20 rounded-lg p-3">
@@ -481,7 +483,7 @@ export default function NodeInfo() {
       {node.tags.length > 0 && (
         <div className="mb-4">
           <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
-            Tags
+            {t("nodeInfo.tags")}
           </h3>
           <div className="flex flex-wrap gap-1.5">
             {node.tags.map((tag) => (
@@ -510,7 +512,7 @@ export default function NodeInfo() {
       {childNodes.length > 0 && (
         <div className="mb-4">
           <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">
-            Defined in this file ({childNodes.length})
+            {t("nodeInfo.definedInThisFile")} ({childNodes.length})
           </h3>
           <div className="space-y-1">
             {childNodes.map((child) => {
@@ -548,7 +550,7 @@ export default function NodeInfo() {
       {otherConnections.length > 0 && (
         <div>
           <h3 className="text-[11px] font-semibold text-gold uppercase tracking-wider mb-2">
-            Connections ({otherConnections.length})
+            {t("nodeInfo.connections")} ({otherConnections.length})
           </h3>
           <div className="space-y-1.5">
             {otherConnections.map((edge, i) => {
