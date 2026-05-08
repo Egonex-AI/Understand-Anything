@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "代码库理解工具",
+    "info": "信息",
+    "files": "文件",
+    "domain": "领域",
+    "structural": "结构",
+    "filter": "筛选",
+    "export": "导出",
+    "path": "路径",
+    "keyboardShortcuts": "按 ? 查看键盘快捷键",
+    "pathFinder": "查找节点间的路径 (P)"
+  },
+  "tour": {
+    "noTourAvailable": "无可用导览",
+    "generateTour": "运行 /understand 生成导览",
+    "projectTour": "项目导览",
+    "startTour": "开始导览",
+    "exitTour": "退出导览",
+    "guidedWalkthrough": "代码库导览",
+    "languageLesson": "语言知识点",
+    "referencedComponents": "引用组件",
+    "prev": "上一步",
+    "next": "下一步",
+    "finish": "完成",
+    "step": "步",
+    "steps": "步"
+  },
+  "nodeInfo": {
+    "selectNode": "选择一个节点查看详情",
+    "file": "文件",
+    "back": "返回",
+    "focus": "聚焦",
+    "unfocus": "取消聚焦",
+    "openCode": "打开代码",
+    "languageConcepts": "语言概念",
+    "tags": "标签",
+    "definedInThisFile": "在此文件中定义",
+    "connections": "连接",
+    "analyzed": "已分析",
+    "files": "个文件"
+  },
+  "filter": {
+    "nodeTypes": "节点类型",
+    "complexity": "复杂度",
+    "layers": "架构层",
+    "edgeCategories": "边类型",
+    "resetAll": "重置全部"
+  },
+  "export": {
+    "exportAsPng": "导出为 PNG",
+    "exportAsSvg": "导出为 SVG",
+    "exportAsJson": "导出为 JSON",
+    "noNodesToExport": "无节点可导出",
+    "graphNotReady": "图形未准备好导出"
+  },
+  "search": {
+    "placeholder": "搜索节点...",
+    "fuzzy": "模糊",
+    "semantic": "语义",
+    "results": "个结果"
+  },
+  "keyboard": {
+    "showShortcuts": "显示键盘快捷键",
+    "closePanels": "关闭面板和弹窗 / 返回概览",
+    "focusSearch": "聚焦搜索栏",
+    "nextTourStep": "下一步",
+    "prevTourStep": "上一步",
+    "toggleDiff": "切换差异模式",
+    "toggleFilter": "切换筛选面板",
+    "toggleExport": "切换导出菜单",
+    "openPathFinder": "打开路径查找器",
+    "navigation": "导航",
+    "view": "视图",
+    "general": "通用",
+    "tour": "导览"
+  },
+  "pathFinder": {
+    "title": "依赖路径查找器",
+    "fromNode": "起始节点",
+    "toNode": "目标节点",
+    "findPath": "查找路径",
+    "noPath": "未找到路径",
+    "pathFound": "找到路径"
+  },
+  "persona": {
+    "overview": "概览",
+    "learn": "学习",
+    "deepDive": "深入"
+  },
+  "token": {
+    "accessTokenRequired": "需要访问令牌",
+    "pasteToken": "从终端复制访问令牌以访问仪表板。",
+    "invalidToken": "令牌无效，请检查后重试。",
+    "validating": "验证中...",
+    "continue": "继续"
+  },
+  "warning": {
+    "noGraphLoaded": "未加载图形",
+    "loadingSource": "加载中...",
+    "sourceUnavailable": "源不可用",
+    "graphValidationFailed": "知识图谱验证失败",
+    "issue": "问题",
+    "issues": "问题",
+    "autoCorrected": "已自动修复",
+    "dropped": "已丢弃",
+    "copy": "复制"
+  },
+  "graph": {
+    "empty": "无节点可显示",
+    "computingLayout": "计算布局中...",
+    "showingNeighborhood": "显示邻居节点"
+  },
+  "layer": {
+    "layer": "层",
+    "file": "文件",
+    "files": "文件",
+    "clickToExplore": "点击探索"
+  },
+  "theme": {
+    "theme": "主题",
+    "accentColor": "强调色"
+  }
+}

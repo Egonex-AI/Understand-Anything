@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Understand Anything",
+    "info": "Info",
+    "files": "Files",
+    "domain": "Domain",
+    "structural": "Structural",
+    "filter": "Filter",
+    "export": "Export",
+    "path": "Path",
+    "keyboardShortcuts": "Press ? for keyboard shortcuts",
+    "pathFinder": "Find path between nodes (P)"
+  },
+  "tour": {
+    "noTourAvailable": "No tour available",
+    "generateTour": "Generate a tour by running /understand first",
+    "projectTour": "Project Tour",
+    "startTour": "Start Tour",
+    "exitTour": "Exit Tour",
+    "guidedWalkthrough": "Guided walkthrough of the codebase",
+    "languageLesson": "Language Lesson",
+    "referencedComponents": "Referenced Components",
+    "prev": "Prev",
+    "next": "Next",
+    "finish": "Finish",
+    "step": "step",
+    "steps": "steps"
+  },
+  "nodeInfo": {
+    "selectNode": "Select a node to see details",
+    "file": "File",
+    "back": "Back",
+    "focus": "Focus",
+    "unfocus": "Unfocus",
+    "openCode": "Open code",
+    "languageConcepts": "Language Concepts",
+    "tags": "Tags",
+    "definedInThisFile": "Defined in this file",
+    "connections": "Connections",
+    "analyzed": "Analyzed",
+    "files": "files"
+  },
+  "filter": {
+    "nodeTypes": "Node Types",
+    "complexity": "Complexity",
+    "layers": "Layers",
+    "edgeCategories": "Edge Categories",
+    "resetAll": "Reset All"
+  },
+  "export": {
+    "exportAsPng": "Export as PNG",
+    "exportAsSvg": "Export as SVG",
+    "exportAsJson": "Export as JSON",
+    "noNodesToExport": "No nodes to export",
+    "graphNotReady": "Graph not ready for export"
+  },
+  "search": {
+    "placeholder": "Search nodes...",
+    "fuzzy": "Fuzzy",
+    "semantic": "Semantic",
+    "results": "results"
+  },
+  "keyboard": {
+    "showShortcuts": "Show keyboard shortcuts",
+    "closePanels": "Close panels and modals / go back to overview",
+    "focusSearch": "Focus search bar",
+    "nextTourStep": "Next tour step",
+    "prevTourStep": "Previous tour step",
+    "toggleDiff": "Toggle diff mode",
+    "toggleFilter": "Toggle filter panel",
+    "toggleExport": "Toggle export menu",
+    "openPathFinder": "Open path finder",
+    "navigation": "Navigation",
+    "view": "View",
+    "general": "General",
+    "tour": "Tour"
+  },
+  "pathFinder": {
+    "title": "Dependency Path Finder",
+    "fromNode": "From Node",
+    "toNode": "To Node",
+    "findPath": "Find Path",
+    "noPath": "No path found",
+    "pathFound": "Path found"
+  },
+  "persona": {
+    "overview": "Overview",
+    "learn": "Learn",
+    "deepDive": "Deep Dive"
+  },
+  "token": {
+    "accessTokenRequired": "Access Token Required",
+    "pasteToken": "Paste the access token from your terminal to access the dashboard.",
+    "invalidToken": "Invalid token. Please check and try again.",
+    "validating": "Validating...",
+    "continue": "Continue"
+  },
+  "warning": {
+    "noGraphLoaded": "No graph loaded",
+    "loadingSource": "Loading source...",
+    "sourceUnavailable": "Source unavailable",
+    "graphValidationFailed": "Knowledge graph validation failed",
+    "issue": "issue",
+    "issues": "issues",
+    "autoCorrected": "auto-corrected",
+    "dropped": "dropped",
+    "copy": "Copy"
+  },
+  "graph": {
+    "empty": "No nodes to display",
+    "computingLayout": "Computing layout...",
+    "showingNeighborhood": "Showing neighborhood of"
+  },
+  "layer": {
+    "layer": "Layer",
+    "file": "file",
+    "files": "files",
+    "clickToExplore": "Click to explore"
+  },
+  "theme": {
+    "theme": "Theme",
+    "accentColor": "Accent Color"
+  }
+}
