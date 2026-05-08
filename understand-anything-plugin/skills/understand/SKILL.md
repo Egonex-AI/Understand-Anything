@@ -331,6 +331,10 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 
 Append the language/framework context and the following additional context to the agent's prompt:
 
+> **IMPORTANT — Content Language:** Generate all `summary`, `tags`, `name`, and descriptive text content in the **same language as the project codebase** (e.g., Chinese content for Chinese codebases, English for English codebases). This ensures the knowledge graph displays content in the language the developer naturally uses.
+>
+> **IMPORTANT — Content Language:** Generate all layer descriptions and names in the **same language as the project codebase**. Match Chinese code → Chinese descriptions, English code → English descriptions.
+>
 > **Additional context from main session:**
 >
 > Frameworks detected: `<frameworks from Phase 1>`
@@ -422,6 +426,8 @@ Pass these parameters in the dispatch prompt:
 > Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/tour.json`
 > Project: `<projectName>` — `<projectDescription>`
 > Languages: `<languages>`
+>
+> **IMPORTANT — Content Language:** Generate all tour titles, descriptions, and language lessons in the **same language as the project codebase**. Match Chinese code → Chinese content, English code → English content.
 >
 > Nodes (all file-level nodes — includes code files, config, document, service, pipeline, table, schema, resource, endpoint):
 > ```json
