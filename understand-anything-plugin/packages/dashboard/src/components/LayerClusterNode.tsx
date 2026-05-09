@@ -72,7 +72,7 @@ function LayerClusterNode({
         </div>
 
         {/* Layer name */}
-        <div className="text-lg font-serif text-text-primary mb-1">
+        <div className="text-lg font-heading text-text-primary mb-1">
           {data.layerName}
         </div>
 

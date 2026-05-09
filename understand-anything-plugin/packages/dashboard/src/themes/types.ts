@@ -22,9 +22,12 @@ export interface ThemePreset {
   defaultAccentId: string;
 }
 
+export type HeadingFont = "serif" | "sans" | "mono";
+
 export interface ThemeConfig {
   presetId: PresetId;
   accentId: string;
+  headingFont?: HeadingFont;
 }
 
 export const DEFAULT_THEME_CONFIG: ThemeConfig = {

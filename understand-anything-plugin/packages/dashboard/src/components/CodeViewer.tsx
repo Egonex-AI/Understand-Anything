@@ -157,7 +157,7 @@ export default function CodeViewer({
             </span>
             <span className="text-[10px] text-text-muted">{lineInfo}</span>
           </div>
-          <div className="text-sm font-serif text-text-primary truncate" title={node.name}>
+          <div className="text-sm font-heading text-text-primary truncate" title={node.name}>
             {node.name}
           </div>
           {node.filePath && (

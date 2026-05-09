@@ -107,7 +107,7 @@ export default function MobileDrawer({
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
               Controls
             </span>
-            <h2 className="font-serif text-lg text-text-primary mt-0.5 leading-none">
+            <h2 className="font-heading text-lg text-text-primary mt-0.5 leading-none">
               {graph?.project.name ?? "Dashboard"}
             </h2>
           </div>

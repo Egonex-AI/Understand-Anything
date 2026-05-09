@@ -59,7 +59,7 @@ export default function ProjectOverview() {
   return (
     <div className="h-full w-full overflow-auto p-5 animate-fade-slide-in">
       {/* Project name */}
-      <h2 className="font-serif text-2xl text-text-primary mb-1">{project.name}</h2>
+      <h2 className="font-heading text-2xl text-text-primary mb-1">{project.name}</h2>
       <p className="text-sm text-text-secondary leading-relaxed mb-6">{project.description}</p>
 
       {/* Stats grid */}

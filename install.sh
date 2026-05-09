@@ -34,6 +34,7 @@ opencode|$HOME/.agents/skills|per-skill
 pi|$HOME/.agents/skills|per-skill
 openclaw|$HOME/.openclaw/skills|folder
 antigravity|$HOME/.gemini/antigravity/skills|folder
+vibe|$HOME/.vibe/skills|per-skill
 vscode|$HOME/.copilot/skills|per-skill
 EOF
 }

@@ -80,7 +80,10 @@
   --font-serif: 'DM Serif Display', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-heading: var(--font-serif);
 }
+
+.font-heading { font-family: var(--font-heading); }
 
 /* Base styles */
 html {

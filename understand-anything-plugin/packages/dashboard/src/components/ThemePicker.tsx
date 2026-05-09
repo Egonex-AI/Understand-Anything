@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme, PRESETS } from "../themes/index.ts";
+import type { HeadingFont } from "../themes/index.ts";
 
 export function ThemePicker() {
-  const { config, preset, setPreset, setAccent } = useTheme();
+  const { config, preset, setPreset, setAccent, setHeadingFont } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -133,6 +134,40 @@ export function ThemePicker() {
                   style={{ backgroundColor: swatch.accent }}
                   title={swatch.name}
                 />
+              ))}
+            </div>
+          </div>
+
+          {/* Heading font */}
+          <div>
+            <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">
+              Heading Font
+            </div>
+            <div className="flex gap-1">
+              {([
+                { id: "serif" as HeadingFont, label: "Serif", sample: "Aa" },
+                { id: "sans" as HeadingFont, label: "Sans", sample: "Aa" },
+                { id: "mono" as HeadingFont, label: "Mono", sample: "Aa" },
+              ]).map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setHeadingFont(opt.id)}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs transition-colors ${
+                    (config.headingFont ?? "serif") === opt.id
+                      ? "bg-accent/15 text-accent"
+                      : "text-text-secondary hover:text-text-primary hover:bg-elevated"
+                  }`}
+                  style={{
+                    fontFamily:
+                      opt.id === "serif"
+                        ? "var(--font-serif)"
+                        : opt.id === "mono"
+                          ? "var(--font-mono)"
+                          : "var(--font-sans)",
+                  }}
+                >
+                  {opt.label}
+                </button>
               ))}
             </div>
           </div>

@@ -69,7 +69,7 @@ export default function NodeTooltip({
         </div>
 
         {/* Name */}
-        <h4 className="text-sm font-serif text-text-primary mb-2 break-words">
+        <h4 className="text-sm font-heading text-text-primary mb-2 break-words">
           {data.label}
         </h4>
 

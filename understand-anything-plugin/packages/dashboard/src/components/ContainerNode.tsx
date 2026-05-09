@@ -59,7 +59,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
       }}
     >
       <div
-        className="flex items-center justify-between font-serif"
+        className="flex items-center justify-between font-heading"
         style={{
           padding: "12px 16px",
           color: color.label,

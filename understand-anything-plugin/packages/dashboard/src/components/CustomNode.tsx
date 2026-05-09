@@ -156,7 +156,7 @@ function CustomNodeComponent({
           </span>
         </div>
 
-        <div className="text-sm font-serif text-text-primary truncate" title={data.label}>
+        <div className="text-sm font-heading text-text-primary truncate" title={data.label}>
           {truncatedName}
         </div>
 

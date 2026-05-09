@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { PresetId, ThemeConfig, ThemePreset } from "./types.ts";
+import type { HeadingFont, PresetId, ThemeConfig, ThemePreset } from "./types.ts";
 import { DEFAULT_THEME_CONFIG } from "./types.ts";
 import { getPreset } from "./presets.ts";
 import { applyTheme } from "./theme-engine.ts";
@@ -19,6 +19,7 @@ interface ThemeContextValue {
   preset: ThemePreset;
   setPreset: (presetId: PresetId) => void;
   setAccent: (accentId: string) => void;
+  setHeadingFont: (font: HeadingFont) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -85,10 +86,14 @@ export function ThemeProvider({ metaTheme, children }: ThemeProviderProps) {
     setConfig((prev) => ({ ...prev, accentId }));
   }, []);
 
+  const setHeadingFont = useCallback((font: HeadingFont) => {
+    setConfig((prev) => ({ ...prev, headingFont: font }));
+  }, []);
+
   const preset = getPreset(config.presetId);
 
   return (
-    <ThemeContext.Provider value={{ config, preset, setPreset, setAccent }}>
+    <ThemeContext.Provider value={{ config, preset, setPreset, setAccent, setHeadingFont }}>
       {children}
     </ThemeContext.Provider>
   );

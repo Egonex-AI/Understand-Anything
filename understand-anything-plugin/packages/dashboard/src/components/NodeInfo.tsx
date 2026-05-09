@@ -412,7 +412,7 @@ export default function NodeInfo() {
       </div>
 
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-serif text-text-primary">{node.name}</h2>
+        <h2 className="text-lg font-heading text-text-primary">{node.name}</h2>
         <button
           onClick={() => setFocusNode(focusNodeId === node.id ? null : node.id)}
           className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded transition-colors ${

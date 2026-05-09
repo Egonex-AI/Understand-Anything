@@ -53,4 +53,13 @@ export function applyTheme(config: ThemeConfig): void {
 
   // 4. Set data-theme for CSS-only selectors
   document.documentElement.setAttribute("data-theme", preset.isDark ? "dark" : "light");
+
+  // 5. Apply heading font preference
+  const fontMap: Record<string, string> = {
+    serif: "var(--font-serif)",
+    sans: "var(--font-sans)",
+    mono: "var(--font-mono)",
+  };
+  const headingFont = config.headingFont ?? "serif";
+  style.setProperty("--font-heading", fontMap[headingFont] ?? fontMap.serif);
 }

@@ -404,7 +404,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
       <header className="flex items-center px-3 sm:px-5 py-3 bg-surface border-b border-border-subtle shrink-0 gap-2 sm:gap-4">
         {/* Left — fixed */}
         <div className="flex items-center gap-3 sm:gap-5 shrink-0 min-w-0">
-          <h1 className="font-serif text-base sm:text-lg text-text-primary tracking-wide truncate max-w-[160px] sm:max-w-[220px] lg:max-w-none">
+          <h1 className="font-heading text-base sm:text-lg text-text-primary tracking-wide truncate max-w-[160px] sm:max-w-[220px] lg:max-w-none">
             {graph?.project.name ?? "Understand Anything"}
           </h1>
           <div className="w-px h-5 bg-border-subtle hidden sm:block" />

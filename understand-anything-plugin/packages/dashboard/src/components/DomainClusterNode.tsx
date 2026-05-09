@@ -33,7 +33,7 @@ function DomainClusterNode({ data }: NodeProps<DomainClusterFlowNode>) {
       <Handle type="target" position={Position.Left} className="!bg-accent/60 !w-2 !h-2" />
       <Handle type="source" position={Position.Right} className="!bg-accent/60 !w-2 !h-2" />
 
-      <div className="font-serif text-sm text-accent font-semibold mb-1 truncate">
+      <div className="font-heading text-sm text-accent font-semibold mb-1 truncate">
         {data.label}
       </div>
       <div className="text-[11px] text-text-secondary line-clamp-2 mb-2">

@@ -114,7 +114,7 @@ export default function LearnPanel() {
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {/* Step title */}
-        <h2 className="text-lg font-serif text-text-primary mb-3">{step.title}</h2>
+        <h2 className="text-lg font-heading text-text-primary mb-3">{step.title}</h2>
 
         {/* Description via ReactMarkdown */}
         <div className="text-sm text-text-secondary leading-relaxed mb-4 tour-markdown">
