@@ -41,6 +41,9 @@ export class ProtobufParser implements AnalyzerPlugin {
         lineRange: [startLine, endLine],
         fields,
       });
+      if (fields.length === 0) {
+        console.warn(`[protobuf-parser] Message "${match[1]}" has no fields detected (line ${startLine})`);
+      }
     }
 
     // Match enum definitions
