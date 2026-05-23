@@ -201,19 +201,47 @@ export class PascalExtractor implements LanguageExtractor {
         }
       }
 
-      // Record calls — exprCall has an 'entity' child (the callee expression)
-      if (node.type === "exprCall" && stack.length > 0) {
-        const entity = node.childForFieldName?.("entity") ?? null;
-        const calleeText = entity
-          ? entity.text
-          : (findChild(node, "identifier")?.text ??
-            findChild(node, "exprDot")?.text);
-        if (calleeText) {
-          entries.push({
-            caller: stack[stack.length - 1],
-            callee: calleeText,
-            lineNumber: node.startPosition.row + 1,
-          });
+      // Record calls. Pascal has TWO call shapes:
+      //   (a) Parenthesized: `Foo(arg)` → tree-sitter `exprCall` with field `entity`.
+      //   (b) Bare-identifier: `Foo;` (zero-arg procedure call) → tree-sitter
+      //       emits a `statement` whose sole semantic child is an `identifier`
+      //       or `exprDot` (for qualified `Self.Foo` / `Obj.Foo`). The grammar
+      //       can't distinguish a zero-arg procedure call from a reference at
+      //       parse time, so we treat any such statement as a candidate call.
+      if (stack.length > 0) {
+        if (node.type === "exprCall") {
+          const entity = node.childForFieldName?.("entity") ?? null;
+          const calleeText = entity
+            ? entity.text
+            : (findChild(node, "identifier")?.text ??
+              findChild(node, "exprDot")?.text);
+          if (calleeText) {
+            entries.push({
+              caller: stack[stack.length - 1],
+              callee: calleeText,
+              lineNumber: node.startPosition.row + 1,
+            });
+          }
+        } else if (node.type === "statement") {
+          // Bare procedure-call statement: a statement whose only meaningful
+          // child is an identifier (or exprDot for qualified calls). Exclude
+          // assignment/if/while/etc. by checking the child is a leaf
+          // identifier or a dot-expression with no call sub-tree of its own.
+          const ident = findChild(node, "identifier");
+          const dotted = findChild(node, "exprDot");
+          const calleeText = ident?.text ?? dotted?.text;
+          if (
+            calleeText &&
+            !findChild(node, "exprCall") &&
+            !findChild(node, "exprBinary") &&
+            !findChild(node, "exprAssign")
+          ) {
+            entries.push({
+              caller: stack[stack.length - 1],
+              callee: calleeText,
+              lineNumber: node.startPosition.row + 1,
+            });
+          }
         }
       }
 
