@@ -179,70 +179,59 @@ Extract from (in priority order):
 4. `pyproject.toml` -- check `[project].name` first, then `[tool.poetry].name`
 5. Directory name of project root
 
-**Step 9 -- Import Resolution**
+**Step 9 -- Import Resolution (bundled script)**
 
-For each **code-category** file in the discovered list (`fileCategory === "code"`), extract and resolve relative import statements. The goal is to produce a map from each file's path to the list of project-internal files it imports. External package imports are ignored.
+After your discovery script has produced the file list (Steps 1-8), invoke the bundled `extract-import-map.mjs` script for deterministic import extraction across all supported code languages. The bundled script replaces inline import-resolution patterns: it uses tree-sitter for parsing and applies language-specific resolution rules in code (see `<SKILL_DIR>/extract-import-map.mjs`).
 
-**Non-code files** (config, docs, infra, data, script, markup) should have an empty array `[]` in the import map — they do not participate in code-level import resolution.
+**Do not** attempt to re-implement import patterns in your discovery script. Your discovery script's job ends at producing the file list with `path`/`language`/`fileCategory`; the bundled script takes that list and produces the `importMap`.
 
-For each code file, read its content and extract import paths using language-appropriate patterns:
+Write the input JSON for the bundled script:
 
-| Language | Import patterns to match |
-|---|---|
-| TypeScript/JavaScript | Relative: `import ... from './...'` or `'../'`, `require('./...')` or `require('../...')`. **Plus path aliases** from `tsconfig.json` `compilerOptions.paths` and `baseUrl` (e.g. `@/foo` → `<baseUrl>/foo`, `~/foo` → `<baseUrl>/foo`). Read tsconfig.json (if present) and resolve every alias prefix against the discovered file list with the standard extension probes. |
-| Python | Both relative AND absolute. Relative: `from .x import y`, `from ..x import y`, `from . import x`. Absolute: `import a.b.c`, `from a.b.c import x[, y, ...]` — try every dotted path against the discovered file list (see resolution algorithm below) and keep matches; non-matches are external packages and are dropped. |
-| Go | Paths in `import (...)` blocks that start with the module path from `go.mod` |
-| Rust | `use crate::`, `use super::`, `mod x` (within the same crate) |
-| Java | `import com.example.foo.Bar;` — try `**/com/example/foo/Bar.java` against the discovered file list; keep matches |
-| Kotlin | `import com.example.foo.Bar` — try `**/com/example/foo/Bar.kt` against the discovered file list; keep matches |
-| Ruby | Relative: `require_relative '...'` paths. **Plus** `require 'foo/bar'` (load-path) — try `lib/foo/bar.rb`, `app/foo/bar.rb`, `foo/bar.rb` against the discovered file list. |
-| PHP | `use Vendor\Pkg\Class;` — read `composer.json` `autoload.psr-4` map (e.g. `"App\\": "src/"`), translate the namespace prefix to its directory, then try `<dir>/Pkg/Class.php` against the discovered file list. Skip imports whose namespace prefix isn't in the autoload map. |
-| C / C++ | `#include "foo.h"` (relative to the includer's directory) and `#include <foo.h>` — for both, also probe `include/foo.h`, `src/foo.h`, and the bare path against the discovered file list. Match `.h`, `.hpp`, `.hxx`, `.cuh`. |
+```bash
+mkdir -p $PROJECT_ROOT/.understand-anything/tmp
+cat > $PROJECT_ROOT/.understand-anything/tmp/ua-import-map-input.json << 'ENDJSON'
+{
+  "projectRoot": "<absolute-project-root>",
+  "files": [
+    {"path": "src/index.ts", "language": "typescript", "fileCategory": "code"},
+    {"path": "README.md", "language": "markdown", "fileCategory": "docs"}
+  ]
+}
+ENDJSON
+```
 
-For each extracted import path:
-1. Compute the resolved file path relative to project root:
-   - For relative imports (`./x`, `../x`): resolve from the importing file's directory
-   - Try these extension variants in order if the import has no extension: `.ts`, `.tsx`, `.js`, `.jsx`, `/index.ts`, `/index.js`, `/index.tsx`, `/index.jsx`, `.py`, `.go`, `.rs`, `.rb`
-2. Check if the resolved path exists in the discovered file list
-3. If yes: add to this file's resolved imports list
-4. If no: skip (external, unresolvable, or dynamic import)
+Then run:
 
-**Python absolute imports — resolution algorithm.** This is the dominant import style in real Python projects, so it MUST be handled:
+```bash
+node <SKILL_DIR>/extract-import-map.mjs \
+  $PROJECT_ROOT/.understand-anything/tmp/ua-import-map-input.json \
+  $PROJECT_ROOT/.understand-anything/tmp/ua-import-map-output.json
+```
 
-For `import a.b.c`, try (in order, take first match in the discovered file list):
-- `a/b/c.py`
-- `a/b/c/__init__.py`
+The output JSON has shape:
 
-For `from a.b.c import x, y, z`, try (in order, take first match for the module path):
-- `a/b/c.py`
-- `a/b/c/__init__.py`
-
-If the module path matched as a package (`__init__.py`), additionally probe each imported name `x`/`y`/`z` against:
-- `a/b/c/x.py`
-- `a/b/c/x/__init__.py`
-
-so that `from package import submodule` resolves to the submodule file. Skip names that don't match (they're class/function imports from inside the package, already covered by the `__init__.py` match).
-
-If NO probe matches, the import is external — drop it.
-
-**Worked example.** Discovered files include `src/utils/formatter.py`, `src/utils/__init__.py`. The line `from src.utils import formatter` resolves to `src/utils/__init__.py` (module match) AND `src/utils/formatter.py` (submodule probe). Both are added to the importer's resolved list.
-
-Output format in the script result:
 ```json
-"importMap": {
-  "src/index.ts": ["src/utils.ts", "src/config.ts"],
-  "src/utils.ts": [],
-  "README.md": [],
-  "Dockerfile": [],
-  "src/components/App.tsx": ["src/hooks/useAuth.ts", "src/store/index.ts"]
+{
+  "scriptCompleted": true,
+  "stats": { "filesScanned": 314, "filesWithImports": 142, "totalEdges": 487 },
+  "importMap": {
+    "src/index.ts": ["src/utils.ts", "src/config.ts"],
+    "src/utils.ts": [],
+    "README.md": [],
+    "Dockerfile": []
+  }
 }
 ```
 
-Keys are project-relative paths. Values are arrays of resolved project-relative paths. Every key in the file list must appear in `importMap` (use an empty array `[]` if no imports were resolved). External packages and unresolvable imports are omitted entirely.
+Read the output JSON and merge the `importMap` field directly into your final scan-result.json (under the same key — `importMap`). The format matches the project-scanner contract: every input file has an entry; non-code files have empty arrays; resolved internal paths only (external packages are dropped).
+
+**Capture stderr** when you run the bundled script. Any line starting with `Warning:` should be appended to phase warnings — the SKILL.md orchestrator captures these for the final report. The script also writes a one-line summary `extract-import-map: filesScanned=… filesWithImports=… totalEdges=…` on completion; you can ignore that line or surface it as informational.
+
+**Languages supported.** The bundled script natively handles import resolution for: TypeScript, JavaScript (including CJS `require()`), Python (relative + absolute + `__init__.py`), Go (go.mod prefix stripping), Rust (`use crate::`, `use super::`, `use self::`, and `mod x;` declarations), Java, Kotlin, C#, Ruby (`require` + `require_relative`), PHP (composer.json PSR-4 autoload), C, and C++ (`#include` with relative + include/ + src/ probes). Languages outside this set get empty arrays — there is no LLM-based fallback.
 
 ### Script Output Format
 
-The script must write this exact JSON structure to the output file:
+The discovery script must write this exact JSON structure to its output file. Note that `importMap` is **not** produced by the discovery script — it comes from the bundled `extract-import-map.mjs` script in Step 9 and is merged in during Phase 2.
 
 ```json
 {
@@ -260,14 +249,7 @@ The script must write this exact JSON structure to the output file:
   ],
   "totalFiles": 42,
   "filteredByIgnore": 0,
-  "estimatedComplexity": "moderate",
-  "importMap": {
-    "src/index.ts": ["src/utils.ts", "src/config.ts"],
-    "src/utils.ts": [],
-    "README.md": [],
-    "Dockerfile": [],
-    "package.json": []
-  }
+  "estimatedComplexity": "moderate"
 }
 ```
 
@@ -282,11 +264,10 @@ The script must write this exact JSON structure to the output file:
 - `totalFiles` (integer) -- must equal `files.length`
 - `filteredByIgnore` (integer) -- count of files removed by `.understandignore` patterns in Step 2.5; 0 if no `.understandignore` file exists
 - `estimatedComplexity` (string) -- one of `small`, `moderate`, `large`, `very-large`
-- `importMap` (object) -- map from every file path to its list of resolved project-internal import paths; empty array for non-code files and files with no resolved imports; external packages excluded
 
 ### Executing the Script
 
-After writing the script, execute it. `$PROJECT_ROOT` is the project root directory provided in your dispatch prompt:
+After writing the discovery script, execute it. `$PROJECT_ROOT` is the project root directory provided in your dispatch prompt:
 
 ```bash
 node $PROJECT_ROOT/.understand-anything/tmp/ua-project-scan.js "$PROJECT_ROOT" "$PROJECT_ROOT/.understand-anything/tmp/ua-scan-results.json"
@@ -296,13 +277,19 @@ node $PROJECT_ROOT/.understand-anything/tmp/ua-project-scan.js "$PROJECT_ROOT" "
 
 If the script exits with a non-zero code, read stderr, diagnose the issue, fix the script, and re-run. You have up to 2 retry attempts.
 
+Then run the **bundled import-resolution script** as described in Step 9. Both outputs feed into the Phase 2 final assembly below.
+
 ---
 
 ## Phase 2 -- Description and Final Assembly
 
-After the script completes, read `$PROJECT_ROOT/.understand-anything/tmp/ua-scan-results.json`. Do NOT re-run file discovery commands or re-count lines -- trust the script's results entirely.
+After both the discovery script AND the bundled `extract-import-map.mjs` script have completed, read:
+1. `$PROJECT_ROOT/.understand-anything/tmp/ua-scan-results.json` — output of the discovery script (file list + languages + frameworks + complexity).
+2. `$PROJECT_ROOT/.understand-anything/tmp/ua-import-map-output.json` — output of the bundled import-map script (the `importMap` field).
 
-**IMPORTANT:** The final output must NOT contain the `scriptCompleted`, `rawDescription`, or `readmeHead` fields. These are intermediate script fields only. Strip them when assembling the final JSON. All other fields — including `importMap` — MUST be preserved exactly as output by the script.
+Do NOT re-run file discovery commands or re-count lines -- trust the discovery script's results entirely. Do NOT re-implement import resolution -- trust the bundled script's `importMap` entirely.
+
+**IMPORTANT:** The final output must NOT contain the `scriptCompleted`, `rawDescription`, or `readmeHead` fields from the discovery script, nor the `scriptCompleted`/`stats` fields from the bundled script. These are intermediate script fields only. Strip them when assembling the final JSON. The final `importMap` MUST equal the `importMap` field from the bundled script verbatim (do not edit, re-sort, or filter it).
 
 Your only task in this phase is to produce the final `description` field:
 
@@ -334,25 +321,26 @@ Then assemble the final output JSON:
 ```
 
 **Field requirements:**
-- `name` (string): directly from script output
+- `name` (string): directly from discovery script output
 - `description` (string): your synthesized 1-2 sentence description
-- `languages` (string[]): directly from script output
-- `frameworks` (string[]): directly from script output
-- `files` (object[]): directly from script output, including `fileCategory` per file
-- `totalFiles` (integer): directly from script output
-- `filteredByIgnore` (integer): directly from script output
-- `estimatedComplexity` (string): directly from script output
-- `importMap` (object): directly from script output
+- `languages` (string[]): directly from discovery script output
+- `frameworks` (string[]): directly from discovery script output
+- `files` (object[]): directly from discovery script output, including `fileCategory` per file
+- `totalFiles` (integer): directly from discovery script output
+- `filteredByIgnore` (integer): directly from discovery script output
+- `estimatedComplexity` (string): directly from discovery script output
+- `importMap` (object): directly from the bundled `extract-import-map.mjs` output's `importMap` field
 
 ## Critical Constraints
 
-- NEVER invent or guess file paths. Every `path` in the `files` array must come from the script's file discovery, which in turn comes from `git ls-files` or a real directory listing.
+- NEVER invent or guess file paths. Every `path` in the `files` array must come from the discovery script's file discovery, which in turn comes from `git ls-files` or a real directory listing.
 - NEVER include files that do not exist on disk.
 - ALWAYS validate that `totalFiles` matches the actual length of the `files` array.
 - ALWAYS sort `files` by `path` for deterministic output.
 - Include ALL discovered project files in `files` -- code, configs, docs, infrastructure, and data files. Only exclude binaries, lock files, generated files, and dependency directories.
 - Every file MUST have a `fileCategory` field with one of: `code`, `config`, `docs`, `infra`, `data`, `script`, `markup`.
-- Trust the script's output for all structural data. Your only contribution is the `description` field.
+- Trust the discovery script's output for file discovery + language detection + framework detection + line counts + complexity. Trust the bundled `extract-import-map.mjs` output for `importMap`. Your only contribution is the `description` field.
+- Do NOT attempt to re-implement import resolution in your discovery script. The bundled `extract-import-map.mjs` handles all 12 supported code languages (TS, JS, Python, Go, Rust, Java, Kotlin, C#, Ruby, PHP, C, C++) deterministically via tree-sitter + per-language resolvers.
 
 ## Writing Results
 
