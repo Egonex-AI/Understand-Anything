@@ -281,6 +281,8 @@ If the scan result includes `filteredByIgnore > 0`, report:
 
 Batch the file list from Phase 1 into groups of **20-30 files each** (aim for ~25 files per batch for balanced sizes).
 
+**Line budget — cap each batch at ~2,500 total source lines.** Output token usage scales with input size, not file count. A batch of 25 files at 400 lines each can blow past output token limits on output-constrained models (e.g. Opus on Bedrock) and trigger the "output limit exceeded" retry loop. When summing `sizeLines` from `$FILE_LIST` for a planned batch would exceed ~2,500 lines, close the batch early (even if it has fewer than 20 files) and start a new one. The 20-30 file target is a ceiling, not a floor.
+
 **Batching strategy for non-code files:**
 - Group related non-code files together in the same batch when possible:
   - Dockerfile + docker-compose.yml + .dockerignore → same batch
@@ -775,6 +777,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 ## Error Handling
 
 - If any subagent dispatch fails, retry **once** with the same prompt plus additional context about the failure.
+- **Output-limit failures are the exception — split, don't just retry.** When a `file-analyzer` batch fails because the response exceeded the model's output token cap (signals: "output limit exceeded", "max_tokens reached", truncated JSON), do **not** burn the retry budget by re-running the same batch verbatim. Split the failing batch in half by file list, dispatch each half as a fresh batch with new `batchIndex` values (so output files don't collide), and treat each half as a normal batch (including its own one retry on unrelated failures). If a half-sized batch hits the same limit, split again. Only fall back to "skip and continue" after the batch has been split down to a single file and still fails.
 - Track all warnings and errors from each phase in a `$PHASE_WARNINGS` list. When using `--review`, pass this list to the graph-reviewer in Phase 6. On the default path, include accumulated warnings in the Phase 7 final report.
 - If it fails a second time, skip that phase and continue with partial results.
 - ALWAYS save partial results — a partial graph is better than no graph.
