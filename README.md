@@ -107,6 +107,7 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 ```bash
 /plugin marketplace add Lum1104/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 ### 2. Analyze your codebase
@@ -132,8 +133,6 @@ The `--language` parameter affects:
 - Guided tour explanations
 
 ### 3. Explore the dashboard
-
-> **Note:** If Claude Code doesn't recognize `/understand-dashboard` (or any other `/understand-*` command), run `/reload-plugins` once to pick up the newly installed plugin in your current session.
 
 ```bash
 /understand-dashboard
