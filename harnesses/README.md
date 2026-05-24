@@ -92,8 +92,56 @@ The client works with any OpenAI-compatible API:
 | LiteLLM-Proxy | `http://localhost:4000` | Default, routes to any backend |
 | OpenAI direct | `https://api.openai.com` | Set LITELLM_API_KEY to your OpenAI key |
 | Azure OpenAI | `https://YOUR.openai.azure.com` | Use LiteLLM-Proxy for header translation |
-| Ollama | `http://localhost:11434` | Set LITELLM_MODEL to your local model |
+| LM Studio | `http://localhost:1234` | Use `--local` flag |
+| Ollama | `http://localhost:11434` | Use `--ollama` flag |
 | vLLM | `http://localhost:8000` | Any vLLM-served model |
+
+## Local LLM Inference
+
+### LM Studio
+
+1. Open [LM Studio](https://lmstudio.ai/) and load a model (recommended: any 7B+ instruct model)
+2. Start the local server (default port 1234)
+3. Run:
+   ```bash
+   ./harnesses/kiro/run-understand.sh /path/to/project --local
+   ```
+
+That's it. The `--local` flag sets `LITELLM_BASE_URL=http://localhost:1234` automatically.
+
+To use a custom port:
+```bash
+./harnesses/kiro/run-understand.sh /path/to/project --port 8080 --local
+```
+
+### Ollama
+
+1. Install [Ollama](https://ollama.ai/) and pull a model:
+   ```bash
+   ollama pull llama3
+   ```
+
+2. Run with the `--ollama` flag:
+   ```bash
+   # Uses llama3 by default
+   ./harnesses/kiro/run-understand.sh /path/to/project --ollama
+
+   # Specify a different model
+   ./harnesses/kiro/run-understand.sh /path/to/project --ollama codellama
+
+   # Custom port
+   ./harnesses/kiro/run-understand.sh /path/to/project --port 11435 --ollama
+   ```
+
+### Other Local Servers (vLLM, llama.cpp, etc.)
+
+Any server that exposes an OpenAI-compatible `/v1/chat/completions` endpoint works:
+
+```bash
+export LITELLM_BASE_URL=http://localhost:8000
+export LITELLM_MODEL=my-local-model
+./harnesses/kiro/run-understand.sh /path/to/project
+```
 
 ## Codex / Other Platforms
 

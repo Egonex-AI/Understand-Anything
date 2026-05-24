@@ -273,6 +273,12 @@ export LITELLM_MODEL=gpt-4o
 
 # Or skip LLM entirely (structure-only graph, no summaries)
 ./harnesses/kiro/run-understand.sh /path/to/project --no-llm
+
+# Use a local LLM (LM Studio)
+./harnesses/kiro/run-understand.sh /path/to/project --local
+
+# Use Ollama
+./harnesses/kiro/run-understand.sh /path/to/project --ollama llama3
 ```
 
 See [`harnesses/README.md`](harnesses/README.md) for full documentation on Kiro, Codex, and LiteLLM integration.

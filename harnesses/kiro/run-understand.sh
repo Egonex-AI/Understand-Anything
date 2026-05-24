@@ -13,8 +13,11 @@
 # Options:
 #   --full            Force full rebuild
 #   --no-llm          Skip LLM-dependent steps (summaries, layers, tours)
+#   --local           Use local LLM (LM Studio on localhost:1234)
+#   --ollama [MODEL]  Use Ollama (localhost:11434, default model: llama3)
 #   --language LANG   Language for generated content (default: en)
 #   --model MODEL     Override LITELLM_MODEL
+#   --port PORT       Override the local LLM port
 #
 # Environment:
 #   LITELLM_BASE_URL, LITELLM_API_KEY, LITELLM_MODEL (see harnesses/litellm/)
@@ -31,13 +34,30 @@ PROJECT_DIR=""
 FULL_REBUILD=false
 NO_LLM=false
 LANGUAGE="en"
+LOCAL_PORT=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --full) FULL_REBUILD=true; shift ;;
     --no-llm) NO_LLM=true; shift ;;
+    --local)
+      export LITELLM_BASE_URL="http://localhost:${LOCAL_PORT:-1234}"
+      export LITELLM_API_KEY="${LITELLM_API_KEY:-lm-studio}"
+      export LITELLM_MODEL="${LITELLM_MODEL:-local-model}"
+      shift ;;
+    --ollama)
+      export LITELLM_BASE_URL="http://localhost:${LOCAL_PORT:-11434}"
+      export LITELLM_API_KEY="${LITELLM_API_KEY:-ollama}"
+      # Check if next arg is a model name (not a flag)
+      if [[ "${2:-}" != "" && "${2:-}" != --* ]]; then
+        export LITELLM_MODEL="$2"; shift
+      else
+        export LITELLM_MODEL="${LITELLM_MODEL:-llama3}"
+      fi
+      shift ;;
     --language) LANGUAGE="$2"; shift 2 ;;
     --model) export LITELLM_MODEL="$2"; shift 2 ;;
+    --port) LOCAL_PORT="$2"; shift 2 ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
     *) PROJECT_DIR="$1"; shift ;;
   esac
