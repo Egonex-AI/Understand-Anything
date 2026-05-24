@@ -225,6 +225,14 @@ describe('compute-batches.mjs — non-code grouping', () => {
     ]);
   });
 
+  it('Group C: .gitlab-ci.yml + .circleci/* in one batch', () => {
+    const ciBatch = batches.batches.find(b =>
+      b.files.some(f => f.path === '.gitlab-ci.yml'));
+    expect(ciBatch).toBeDefined();
+    const ciPaths = ciBatch.files.map(f => f.path).sort();
+    expect(ciPaths).toEqual(['.circleci/config.yml', '.gitlab-ci.yml']);
+  });
+
   it('Group D: SQL migrations under migrations/ in one batch', () => {
     const migBatch = batches.batches.find(b =>
       b.files.some(f => f.path.startsWith('migrations/')));
@@ -245,5 +253,46 @@ describe('compute-batches.mjs — non-code grouping', () => {
     const maxCodeIdx = Math.max(...codeBatches.map(b => b.batchIndex));
     const minNonCodeIdx = Math.min(...nonCodeBatches.map(b => b.batchIndex));
     expect(minNonCodeIdx).toBeGreaterThan(maxCodeIdx);
+  });
+});
+
+describe('compute-batches.mjs — Group E MAX_E split', () => {
+  let root;
+
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('splits 25 .md files under docs/ into [20, 5]', () => {
+    root = mkdtempSync(join(tmpdir(), 'ua-cb-maxe-'));
+    mkdirSync(join(root, '.understand-anything', 'intermediate'), { recursive: true });
+
+    const files = [];
+    const importMap = {};
+    for (let i = 0; i < 25; i++) {
+      const p = `docs/page${String(i).padStart(2, '0')}.md`;
+      files.push({ path: p, language: 'markdown', sizeLines: 10, fileCategory: 'docs' });
+      importMap[p] = [];
+    }
+    const scan = {
+      name: 'maxe-test', description: '',
+      languages: ['markdown'], frameworks: [],
+      files, totalFiles: 25, filteredByIgnore: 0,
+      estimatedComplexity: 'small', importMap,
+    };
+    writeFileSync(
+      join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
+      JSON.stringify(scan));
+
+    const result = runScript(root);
+    expect(result.status).toBe(0);
+
+    const batches = readBatches(root);
+    // All 25 docs/ files go through Group E with MAX_E = 20, split into [20, 5].
+    const docsBatches = batches.batches.filter(b =>
+      b.files.every(f => f.path.startsWith('docs/')));
+    expect(docsBatches.length).toBe(2);
+    const sizes = docsBatches.map(b => b.files.length).sort((a, b) => b - a);
+    expect(sizes).toEqual([20, 5]);
   });
 });

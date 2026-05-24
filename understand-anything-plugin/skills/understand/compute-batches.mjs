@@ -105,7 +105,7 @@ function buildNonCodeBatches(nonCodeFiles) {
       .filter(p => baseOf(p) === 'Dockerfile')
       .map(dirOf),
   );
-  for (const dir of dirsWithDockerfile) {
+  for (const dir of [...dirsWithDockerfile].sort()) {
     const inDir = [...byPath.keys()].filter(p => dirOf(p) === dir);
     const cluster = inDir.filter(p => {
       const b = baseOf(p);
@@ -138,7 +138,9 @@ function buildNonCodeBatches(nonCodeFiles) {
     ciFiles.forEach(p => consumed.add(p));
   }
 
-  // Group D: SQL migrations per migrations/ or migration/ directory
+  // Group D: SQL migrations per migrations/ or migration/ directory.
+  // Defensive consumed.has check: no upstream group consumes SQL today, but
+  // future Group additions could; keep the check for forward-compat.
   const migrationDirs = new Set(
     [...byPath.keys()]
       .filter(p => p.endsWith('.sql'))
@@ -163,6 +165,7 @@ function buildNonCodeBatches(nonCodeFiles) {
     if (!remainingByDir.has(dir)) remainingByDir.set(dir, []);
     remainingByDir.get(dir).push(p);
   }
+  // Per design spec: max files per parent-dir batch for Group E.
   const MAX_E = 20;
   for (const [, paths] of remainingByDir) {
     for (let i = 0; i < paths.length; i += MAX_E) {
