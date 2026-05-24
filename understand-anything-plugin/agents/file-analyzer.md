@@ -478,6 +478,19 @@ Use these hints for common edge patterns:
 
 ## Writing Results — single or multi-part
 
+### Output File Naming — STRICT
+
+**For EVERY batch in your input, write a separate output file using ONLY one of these two filename patterns:**
+
+- `batch-<batchIndex>.json` — single-part output for batch `<batchIndex>`
+- `batch-<batchIndex>-part-<k>.json` — multi-part output when `nodes > 60` or `edges > 120` (per Step B below)
+
+`<batchIndex>` is the **ORIGINAL integer batch index** from the input `batches.json`. Even if your dispatch prompt fused multiple batches into one call (e.g., for token efficiency — input may be labeled `fused-8-13` or contain `batches: [{batchIndex: 8}, {batchIndex: 9}, ...]`), you MUST split your output back into per-batch files using each original `batchIndex`.
+
+**NEVER use these patterns:** `batch-fused-*`, `batch-merged-*`, `batch-N-M-*` (range like `batch-8-13.json`), `batches-*`, or any other variant. The downstream merge script (`merge-batch-graphs.py`) requires the regex `batch-(\d+)(?:-part-(\d+))?\.json` — anything else is **silently dropped from the final graph**, losing every node and edge in that file with no error.
+
+**Example.** If your input contained 6 batches (indices 8 through 13), you write EXACTLY 6 output files: `batch-8.json`, `batch-9.json`, `batch-10.json`, `batch-11.json`, `batch-12.json`, `batch-13.json`. Not one combined `batch-fused-8-13.json`. Not one `batch-8-13.json`. Six files, one per original `batchIndex`. Run Steps A–F below independently for each batch's nodes/edges.
+
 **Step A — Compute totals.**
 ```
 nodeCount = nodes.length
