@@ -113,71 +113,33 @@ function dirOf(p) {
 // ---------------------------------------------------------------------------
 
 /**
- * Load tsconfig.json from the project root and extract `compilerOptions.paths`
- * and `baseUrl`. Returns `{ baseUrl: string, paths: Map<string, string[]> }`.
+ * Parse a single tsconfig.json file content and return
+ * `{ baseUrl: string, paths: Map<string, string[]> }` or `null` if both the
+ * comment-stripped and raw parses fail. Centralizes the "JSONC-then-raw"
+ * fallback so callers can iterate many tsconfigs without duplicating the
+ * try/catch ladder.
  *
- * `paths` keys keep their trailing `*` wildcards intact (e.g. `"@/*"`); the
- * resolver matches them by prefix. Values are arrays because tsconfig allows
- * multiple targets per alias.
- *
- * Returns the empty default if tsconfig is missing — tsconfig is optional
- * and many JS-only projects don't have one. On parse failure (both the
- * comment-stripped and raw text fail), emits a Warning: to stderr.
- *
- * Parse strategy:
- *   1. Try the comment-stripped text (handles JSONC-style tsconfigs, which
- *      is the common case for hand-authored tsconfig.json).
- *   2. If that fails, retry the ORIGINAL raw text — this recovers the case
- *      where the stripper damaged something inside a string literal (e.g. a
- *      paths value like `"//foo/*": ["src/*"]`). Plain JSON without comments
- *      always parses cleanly here.
- *   3. If both fail, warn and return the empty default — path aliases will
- *      not be applied; relative imports still resolve.
+ * Returning `null` (rather than throwing) lets the caller emit a Warning:
+ * with the exact tsconfig path that failed; bubbling the error would
+ * conceal which file was at fault when many tsconfigs are loaded.
  */
-function loadTsConfig(projectRoot) {
-  const candidatePath = join(projectRoot, 'tsconfig.json');
-  const empty = { baseUrl: '.', paths: new Map() };
-  if (!existsSync(candidatePath)) return empty;
-
-  let raw;
-  try {
-    raw = readFileSync(candidatePath, 'utf-8');
-  } catch (err) {
-    process.stderr.write(
-      `Warning: extract-import-map: tsconfig.json at ${candidatePath} ` +
-      `failed to read (${err.message}) — path aliases will not be applied ` +
-      `— relative imports only\n`,
-    );
-    return empty;
-  }
-
+function parseTsConfigText(raw) {
   // tsconfig.json often contains JSONC-style comments; strip line and block
   // comments before parsing. The strip is naive (it doesn't honor string
   // contents), so we fall back to the raw text on failure.
   const stripped = raw
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
-
   let parsed;
   try {
     parsed = JSON.parse(stripped);
   } catch {
-    // Retry with the original raw text — handles the case where the strip
-    // damaged a string literal containing `//` or `/* */`.
     try {
       parsed = JSON.parse(raw);
-    } catch (err2) {
-      // Surface the raw-parse error since it's a true JSON grammar issue;
-      // the strip-pass error is just the symptom.
-      process.stderr.write(
-        `Warning: extract-import-map: tsconfig.json at ${candidatePath} ` +
-        `failed to parse (${err2.message}) — path aliases will not be ` +
-        `applied — relative imports only\n`,
-      );
-      return empty;
+    } catch {
+      return null;
     }
   }
-
   const compilerOptions = parsed?.compilerOptions ?? {};
   const baseUrl = compilerOptions.baseUrl ?? '.';
   const paths = new Map();
@@ -189,6 +151,66 @@ function loadTsConfig(projectRoot) {
     }
   }
   return { baseUrl, paths };
+}
+
+/**
+ * Load every `tsconfig.json` discovered in the input file list and parse
+ * each. Returns `Map<dirPath, { baseUrl, paths }>` keyed by the
+ * project-relative POSIX directory containing the tsconfig (empty string
+ * for a root-level tsconfig.json).
+ *
+ * `paths` keys keep their trailing `*` wildcards intact (e.g. `"@/*"`); the
+ * resolver matches them by prefix. Values are arrays because tsconfig
+ * allows multiple targets per alias.
+ *
+ * WHY plural: pnpm/yarn workspace monorepos commonly carry per-package
+ * tsconfig.json files with package-scoped `paths` aliases. Loading only
+ * the root tsconfig would (1) miss aliases defined in sub-packages and
+ * (2) erroneously apply root aliases to files in sub-packages that
+ * redefine them. Per-importer walk-up is the only correct behavior.
+ *
+ * Returns an empty map if no tsconfigs are found — many JS-only projects
+ * have none, and relative imports still resolve without one. On parse
+ * failure for a specific tsconfig, emits a Warning: pointing at the bad
+ * file and skips it (the rest of the project keeps working).
+ *
+ * Parse strategy (per-file, in parseTsConfigText):
+ *   1. Try the comment-stripped text (handles JSONC-style tsconfigs).
+ *   2. If that fails, retry the ORIGINAL raw text — recovers the case
+ *      where the stripper damaged a string literal containing `//`.
+ *   3. If both fail, warn and skip — that tsconfig contributes no aliases.
+ */
+function loadTsConfigs(projectRoot, files) {
+  const out = new Map();
+  for (const f of files) {
+    const p = toPosix(f.path);
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (base !== 'tsconfig.json') continue;
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    let raw;
+    try {
+      raw = readFileSync(absPath, 'utf-8');
+    } catch (err) {
+      process.stderr.write(
+        `Warning: extract-import-map: tsconfig.json at ${absPath} failed ` +
+        `to read (${err.message}) — path aliases from this config will ` +
+        `not be applied — relative imports unaffected\n`,
+      );
+      continue;
+    }
+    const parsed = parseTsConfigText(raw);
+    if (!parsed) {
+      process.stderr.write(
+        `Warning: extract-import-map: tsconfig.json at ${absPath} failed ` +
+        `to parse — path aliases from this config will not be applied ` +
+        `— relative imports unaffected\n`,
+      );
+      continue;
+    }
+    out.set(dirOf(p), parsed);
+  }
+  return out;
 }
 
 /**
@@ -272,10 +294,10 @@ function findNearestConfigDir(startDir, configMap) {
 /**
  * Resolution context shared across all per-file resolver calls. Holds:
  *  - fileSet: Set<string> of every input file's posix path
- *  - tsConfig: parsed tsconfig.json (paths + baseUrl)
+ *  - tsConfigs: Map<dir, { baseUrl, paths }> from every tsconfig.json in
+ *    `files[]`. Per-import resolution walks up from the importer to the
+ *    nearest enclosing tsconfig.
  *  - goModules: Map<dir, moduleName> from every go.mod in `files[]`.
- *    Per-import resolution walks up from the importer to the nearest
- *    enclosing module.
  *  - phpAutoload: PSR-4 namespace -> directory map from composer.json
  *  - goFilesByDir: Map<dir, string[]> of .go files per directory (built
  *    once so Go's package-level import dispatch doesn't re-scan the file
@@ -285,7 +307,7 @@ function findNearestConfigDir(startDir, configMap) {
  */
 function buildResolutionContext(projectRoot, files) {
   const fileSet = new Set(files.map(f => toPosix(f.path)));
-  const tsConfig = loadTsConfig(projectRoot);
+  const tsConfigs = loadTsConfigs(projectRoot, files);
   const goModules = loadGoModules(projectRoot, files);
 
   // Index .go files by their parent directory so the Go resolver can
@@ -313,7 +335,7 @@ function buildResolutionContext(projectRoot, files) {
   return {
     projectRoot,
     fileSet,
-    tsConfig,
+    tsConfigs,
     goModules,
     goFilesByDir,
     javaIndex,
@@ -365,6 +387,11 @@ function probeWithExtensions(basePath, fileSet) {
 /**
  * Resolve a TypeScript / JavaScript import. Returns project-relative resolved
  * path or null. External packages return null.
+ *
+ * Path-alias resolution walks up from the importer's directory to find the
+ * nearest enclosing tsconfig.json (monorepo-friendly). `baseUrl`-relative
+ * targets are anchored at THAT tsconfig's directory, matching the way the
+ * TypeScript compiler resolves nested project configs.
  */
 export function resolveTsJsImport(rawImport, file, ctx) {
   if (!rawImport || typeof rawImport !== 'string') return null;
@@ -373,27 +400,41 @@ export function resolveTsJsImport(rawImport, file, ctx) {
 
   const importerDir = dirOf(toPosix(file.path));
 
-  // Relative imports: ./foo, ../foo
+  // Relative imports: ./foo, ../foo — tsconfig has no bearing here.
   if (src.startsWith('./') || src.startsWith('../')) {
     const base = resolveRelative(importerDir, src);
     return probeWithExtensions(base, ctx.fileSet);
   }
 
-  // tsconfig path aliases (e.g. "@/foo" with paths { "@/*": ["src/*"] })
-  const { baseUrl, paths } = ctx.tsConfig;
-  if (paths && paths.size > 0) {
-    for (const [alias, targets] of paths) {
-      const aliasMatch = matchTsAlias(alias, src);
-      if (aliasMatch === null) continue;
-      for (const target of targets) {
-        const mapped = applyTsAlias(target, aliasMatch);
-        // baseUrl is project-root-relative; '.', './', '' all mean the root.
-        const baseDir = baseUrl === '.' || baseUrl === '' ? '' : toPosix(baseUrl);
-        const candidate = baseDir
-          ? posix.join(baseDir, mapped)
-          : mapped;
-        const probed = probeWithExtensions(candidate, ctx.fileSet);
-        if (probed) return probed;
+  // tsconfig path aliases. Walk up from the importer to find the nearest
+  // tsconfig.json; resolve targets relative to THAT tsconfig's directory.
+  // Without the walk-up, a root tsconfig would either swallow aliases that
+  // belong to a sub-package or fail to apply sub-package-defined aliases.
+  const tsConfigDir = findNearestConfigDir(importerDir, ctx.tsConfigs);
+  if (tsConfigDir !== undefined) {
+    const tsConfig = ctx.tsConfigs.get(tsConfigDir);
+    const { baseUrl, paths } = tsConfig;
+    if (paths && paths.size > 0) {
+      for (const [alias, targets] of paths) {
+        const aliasMatch = matchTsAlias(alias, src);
+        if (aliasMatch === null) continue;
+        for (const target of targets) {
+          const mapped = applyTsAlias(target, aliasMatch);
+          // baseUrl is tsconfig-dir-relative; '.', './', '' all mean the
+          // tsconfig's own directory. We anchor at tsConfigDir so a nested
+          // tsconfig's `baseUrl: '.'` maps to its package, not project root.
+          const normalizedBase = baseUrl === '.' || baseUrl === ''
+            ? ''
+            : toPosix(baseUrl);
+          const relativeToConfig = normalizedBase
+            ? posix.join(normalizedBase, mapped)
+            : mapped;
+          const candidate = tsConfigDir
+            ? posix.join(tsConfigDir, relativeToConfig)
+            : relativeToConfig;
+          const probed = probeWithExtensions(candidate, ctx.fileSet);
+          if (probed) return probed;
+        }
       }
     }
   }

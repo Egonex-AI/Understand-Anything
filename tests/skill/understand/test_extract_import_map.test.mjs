@@ -183,6 +183,60 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
       'src/config.js',
     ]);
   });
+
+  it('resolves per-package tsconfig paths in a monorepo without cross-package leakage', () => {
+    // Two pnpm-workspace packages, each carrying its own tsconfig with its
+    // own `paths`. The resolver MUST dispatch per-importer to the nearest
+    // tsconfig — and aliases from one package must NOT resolve files in
+    // another package (each tsconfig anchors its baseUrl at its own dir).
+    projectRoot = setupTree({
+      'packages/foo/tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@foo/*': ['src/*'] },
+        },
+      }),
+      'packages/foo/src/x.ts': `import { y } from '@foo/y';\nexport const x = y;\n`,
+      'packages/foo/src/y.ts': `export const y = 1;\n`,
+      'packages/bar/tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@bar/*': ['src/*'] },
+        },
+      }),
+      'packages/bar/src/x.ts':
+        `import { y } from '@bar/y';\n` +
+        `import { fy } from '@foo/y';\n` +   // must NOT resolve from bar
+        `export const x = y;\n`,
+      'packages/bar/src/y.ts': `export const y = 2;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'packages/foo/tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'packages/foo/src/x.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'packages/foo/src/y.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'packages/bar/tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'packages/bar/src/x.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'packages/bar/src/y.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // foo/x sees its own @foo/y -> foo/src/y.ts only.
+    expect(result.output.importMap['packages/foo/src/x.ts']).toEqual([
+      'packages/foo/src/y.ts',
+    ]);
+    // bar/x sees its own @bar/y -> bar/src/y.ts. The cross-package @foo/y
+    // import does NOT resolve because bar's tsconfig has no @foo/* alias.
+    expect(result.output.importMap['packages/bar/src/x.ts']).toEqual([
+      'packages/bar/src/y.ts',
+    ]);
+    expect(result.output.importMap['packages/bar/src/x.ts']).not.toContain(
+      'packages/foo/src/y.ts',
+    );
+  });
 });
 
 describe('extract-import-map.mjs — Python resolver', () => {
@@ -1120,7 +1174,9 @@ describe('extract-import-map.mjs — tsconfig parse resilience', () => {
     expect(result.stderr).toMatch(
       /Warning: extract-import-map: tsconfig\.json at .* failed to parse/,
     );
-    expect(result.stderr).toMatch(/path aliases will not be applied/);
+    // Phrased "from this config" in the plural-tsconfigs implementation
+    // because per-file walk-up now identifies the specific bad tsconfig.
+    expect(result.stderr).toMatch(/path aliases.*will not be applied/);
     // Aliased import unresolved; relative import still resolves.
     expect(result.output.importMap['src/index.ts']).toEqual(['src/sibling.ts']);
   });
