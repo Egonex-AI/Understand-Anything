@@ -1023,7 +1023,40 @@ def main() -> None:
         print("Error: no batch-*.json files found in intermediate/", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Found {len(batch_files)} batch files:", file=sys.stderr)
+    # Group by logical batch index so the report distinguishes single-batch
+    # files from multi-part file-analyzer outputs.
+    from collections import defaultdict as _dd
+    by_batch = _dd(list)
+    for f in batch_files:
+        m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
+        if m:
+            by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
+
+    logical_count = len(by_batch)
+    multi_part = sum(1 for entries in by_batch.values() if len(entries) > 1)
+    print(
+        f"Found {len(batch_files)} batch files "
+        f"({logical_count} logical batches, {multi_part} multi-part):",
+        file=sys.stderr,
+    )
+
+    # Missing-part detection: for any logical batch with parts (len > 1), the
+    # set of part numbers MUST be contiguous starting at 1. Gaps suggest a
+    # truncated write — emit a visible warning so the user can investigate.
+    for idx, entries in by_batch.items():
+        part_nums = [p for (_n, p) in entries if p is not None]
+        if not part_nums:
+            continue
+        present = set(part_nums)
+        expected = set(range(1, max(part_nums) + 1))
+        missing = sorted(expected - present)
+        if missing:
+            print(
+                f"Warning: merge: batch {idx} has parts {sorted(present)} but "
+                f"missing part {missing} — possible truncated write — "
+                f"affected nodes/edges may be lost",
+                file=sys.stderr,
+            )
 
     # Load batches
     batches: list[dict[str, Any]] = []
