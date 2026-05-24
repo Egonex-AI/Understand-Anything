@@ -192,50 +192,101 @@ function loadTsConfig(projectRoot) {
 }
 
 /**
- * Load go.mod from the project root and extract the `module` declaration.
- * The first non-comment `module <path>` line wins; returns '' if missing.
+ * Load every `go.mod` discovered in the input file list and extract its
+ * `module <name>` line. Returns `Map<dirPath, moduleName>` where `dirPath`
+ * is the project-relative POSIX directory containing the go.mod (empty
+ * string for a root-level go.mod).
+ *
+ * WHY plural: multi-service / multi-module repositories (e.g. Google's
+ * microservices-demo) have one go.mod per service. The resolver dispatches
+ * per importer by walking up to the nearest go.mod, so a single root-only
+ * lookup misses every file that lives inside a sub-module.
+ *
+ * Files outside the discovered `files[]` are ignored — the project-scanner
+ * is the single source of truth for what the user considers part of the
+ * project. On read failure for a discovered go.mod we silently skip that
+ * entry; the per-file resolver will surface the "no ancestor go.mod" warning
+ * if it matters for any importer.
  *
  * Example go.mod:
  *   module github.com/foo/bar
  *   go 1.21
  *
- * The resolver uses this prefix to translate `import "github.com/foo/bar/x"`
- * into the project-internal `x/<file>.go`.
+ * The resolver uses each module's prefix to translate
+ * `import "github.com/foo/bar/x"` into the project-internal `x/<file>.go`.
  */
-function loadGoModule(projectRoot) {
-  const path = join(projectRoot, 'go.mod');
-  if (!existsSync(path)) return '';
-  let raw;
-  try {
-    raw = readFileSync(path, 'utf-8');
-  } catch {
-    return '';
+function loadGoModules(projectRoot, files) {
+  const out = new Map();
+  for (const f of files) {
+    const p = toPosix(f.path);
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (base !== 'go.mod') continue;
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    let raw;
+    try {
+      raw = readFileSync(absPath, 'utf-8');
+    } catch {
+      continue;
+    }
+    let moduleName = '';
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.replace(/\/\/.*$/, '').trim();
+      if (!trimmed.startsWith('module ')) continue;
+      moduleName = trimmed.slice('module '.length).trim();
+      break;
+    }
+    if (!moduleName) continue;
+    out.set(dirOf(p), moduleName);
   }
-  // `module foo` lines are simple — strip line comments, then parse.
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.replace(/\/\/.*$/, '').trim();
-    if (!trimmed.startsWith('module ')) continue;
-    return trimmed.slice('module '.length).trim();
+  return out;
+}
+
+/**
+ * Walk up from `startDir` (project-relative POSIX, '' for project root)
+ * and return the DEEPEST ancestor directory that exists as a key in
+ * `configMap`, or undefined if no ancestor matches.
+ *
+ * Determinism: ancestors are inspected from deepest to shallowest, so the
+ * deepest match is always picked. This matches the way TS/JS / PHP / Go
+ * tools resolve nearest config in the wild ("nearest enclosing").
+ *
+ * Defensive note: if multiple distinct keys somehow share a depth (cannot
+ * happen with proper directory paths, but a malformed input could), the
+ * caller is expected to have normalized the keys. We do not re-sort here
+ * because the iteration order is determined by depth alone.
+ */
+function findNearestConfigDir(startDir, configMap) {
+  if (configMap.size === 0) return undefined;
+  // Walk ancestors from the importer's directory up to the project root.
+  // Slicing the parts array gives every prefix; we test each from longest
+  // to shortest so the deepest match wins.
+  const parts = startDir ? startDir.split('/').filter(Boolean) : [];
+  for (let i = parts.length; i >= 0; i--) {
+    const ancestor = parts.slice(0, i).join('/');
+    if (configMap.has(ancestor)) return ancestor;
   }
-  return '';
+  return undefined;
 }
 
 /**
  * Resolution context shared across all per-file resolver calls. Holds:
  *  - fileSet: Set<string> of every input file's posix path
  *  - tsConfig: parsed tsconfig.json (paths + baseUrl)
- *  - goModule: module path from go.mod (e.g. 'github.com/foo/bar')
+ *  - goModules: Map<dir, moduleName> from every go.mod in `files[]`.
+ *    Per-import resolution walks up from the importer to the nearest
+ *    enclosing module.
  *  - phpAutoload: PSR-4 namespace -> directory map from composer.json
- *  - goFilesByDir: Map<dir, string[]> of .go files per directory (built once
- *    so Go's package-level import dispatch doesn't re-scan the file set per
- *    import).
+ *  - goFilesByDir: Map<dir, string[]> of .go files per directory (built
+ *    once so Go's package-level import dispatch doesn't re-scan the file
+ *    set per import).
  *
  * Build once; pass everywhere.
  */
 function buildResolutionContext(projectRoot, files) {
   const fileSet = new Set(files.map(f => toPosix(f.path)));
   const tsConfig = loadTsConfig(projectRoot);
-  const goModule = loadGoModule(projectRoot);
+  const goModules = loadGoModules(projectRoot, files);
 
   // Index .go files by their parent directory so the Go resolver can
   // expand a package-level import to all member .go files in O(1).
@@ -263,15 +314,16 @@ function buildResolutionContext(projectRoot, files) {
     projectRoot,
     fileSet,
     tsConfig,
-    goModule,
+    goModules,
     goFilesByDir,
     javaIndex,
     kotlinIndex,
     csIndex,
     phpAutoload,
-    // Dedupe Set for one-time-per-file warnings (currently: Rust crate-root
-    // misses). Keyed by importer file path. Mutated by resolvers.
+    // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
+    // path. Mutated by resolvers.
     _warnedNoRustCrateRoot: new Set(),
+    _warnedNoGoModule: new Set(),
   };
 }
 
@@ -554,39 +606,74 @@ function resolvePythonProbe(moduleParts, specifiers, ctx) {
 // Go resolver
 //
 // Tree-sitter's Go extractor emits the literal import path (without quotes).
-// Resolution: strip the go.mod module prefix; the remainder maps to a
-// directory in the project. Go imports are package-level (not file-level),
-// so a single `import "github.com/foo/bar/util"` produces edges to every
-// .go file inside `util/`.
+// Resolution: walk up from the importer's directory to find the nearest
+// enclosing `go.mod` (multi-module monorepos are the norm). Strip that
+// module's prefix; the remainder maps to a directory RELATIVE TO THAT
+// MODULE'S DIRECTORY in the project. Go imports are package-level (not
+// file-level), so a single `import "github.com/foo/bar/util"` produces edges
+// to every .go file inside that module's `util/`.
+//
+// Cross-module imports (`github.com/foo/bar/X` from a file under a module
+// that declares `github.com/foo/baz`) are correctly classified as external —
+// they refer to a different Go module, which from this module's perspective
+// is a third-party dependency.
 //
 // Inputs:
 //   - rawImport: 'github.com/foo/bar/util' (no quotes)
-//   - ctx.goModule: 'github.com/foo/bar'
+//   - file.path: importer's project-relative path
+//   - ctx.goModules: Map<dir, moduleName> of every go.mod discovered.
 //
-// Result: array of every `util/*.go` path in the project (deduped by caller).
+// Result: array of every `<moduleDir>/util/*.go` path in the project
+// (deduped by caller).
 // ---------------------------------------------------------------------------
 
-export function resolveGoImport(rawImport, _file, ctx) {
+export function resolveGoImport(rawImport, file, ctx) {
   if (!rawImport || typeof rawImport !== 'string') return [];
   const src = rawImport.trim();
   if (!src) return [];
-  if (!ctx.goModule) return [];
+
+  const importerPath = toPosix(file.path);
+  const importerDir = dirOf(importerPath);
+
+  const nearestModuleDir = findNearestConfigDir(importerDir, ctx.goModules);
+  if (nearestModuleDir === undefined) {
+    // Warn once per importer file — a single .go file can import several
+    // module-prefixed paths, so suppress duplicates.
+    if (!ctx._warnedNoGoModule.has(importerPath)) {
+      ctx._warnedNoGoModule.add(importerPath);
+      process.stderr.write(
+        `Warning: extract-import-map: Go file ${importerPath} has no ` +
+        `ancestor go.mod — import ${src} unresolvable — module-prefix ` +
+        `imports skipped\n`,
+      );
+    }
+    return [];
+  }
+
+  const moduleName = ctx.goModules.get(nearestModuleDir);
 
   // Strip module prefix; require a `/` boundary so 'githubXcom...' does not
   // accidentally match 'github.com...'.
   let remainder;
-  if (src === ctx.goModule) {
+  if (src === moduleName) {
     remainder = '';
-  } else if (src.startsWith(ctx.goModule + '/')) {
-    remainder = src.slice(ctx.goModule.length + 1);
+  } else if (src.startsWith(moduleName + '/')) {
+    remainder = src.slice(moduleName.length + 1);
   } else {
-    // External package (stdlib or 3rd-party module)
+    // External package (stdlib, 3rd-party module, OR a different in-tree
+    // module — the latter is intentional: from this module's perspective,
+    // a sibling module is an external dependency).
     return [];
   }
 
-  // Map to a directory in the project (POSIX style)
-  const dir = toPosix(remainder);
-  const files = ctx.goFilesByDir.get(dir);
+  // Map to a directory in the project (POSIX style). Anchor at the module's
+  // own directory, so a sub-module's `<module>/sub` resolves under that
+  // module's tree rather than under project root.
+  const subDir = toPosix(remainder);
+  const targetDir = nearestModuleDir
+    ? (subDir ? `${nearestModuleDir}/${subDir}` : nearestModuleDir)
+    : subDir;
+  const files = ctx.goFilesByDir.get(targetDir);
   return files ? [...files] : [];
 }
 

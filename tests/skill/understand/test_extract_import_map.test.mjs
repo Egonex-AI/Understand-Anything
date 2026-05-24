@@ -315,6 +315,77 @@ describe('extract-import-map.mjs — Go resolver', () => {
       'util/world.go',
     ]);
   });
+
+  it('resolves per-service imports in a multi-go.mod monorepo', () => {
+    // Mirrors Google's microservices-demo layout: every service ships its
+    // own go.mod, so the resolver MUST dispatch per-importer to the nearest
+    // ancestor module. Imports of a SIBLING module (a's file importing b's
+    // package) must be classified as external — from a's perspective, b is
+    // a third-party dependency.
+    projectRoot = setupTree({
+      'src/a/go.mod': `module github.com/org/a\n\ngo 1.21\n`,
+      'src/a/main.go':
+        `package main\n\nimport (\n\t"github.com/org/a/sub"\n\t"github.com/org/b/sub"\n)\n\nfunc main() { sub.X() }\n`,
+      'src/a/sub/sub.go':
+        `package sub\n\nfunc X() {}\n`,
+      'src/b/go.mod': `module github.com/org/b\n\ngo 1.21\n`,
+      'src/b/main.go':
+        `package main\n\nimport (\n\t"github.com/org/b/sub"\n)\n\nfunc main() { sub.Y() }\n`,
+      'src/b/sub/sub.go':
+        `package sub\n\nfunc Y() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/a/go.mod', language: 'config', fileCategory: 'config' },
+        { path: 'src/a/main.go', language: 'go', fileCategory: 'code' },
+        { path: 'src/a/sub/sub.go', language: 'go', fileCategory: 'code' },
+        { path: 'src/b/go.mod', language: 'config', fileCategory: 'config' },
+        { path: 'src/b/main.go', language: 'go', fileCategory: 'code' },
+        { path: 'src/b/sub/sub.go', language: 'go', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // a/main resolves its own a/sub but NOT b/sub (b is external from a's
+    // module's perspective — different go.mod).
+    expect(result.output.importMap['src/a/main.go']).toEqual([
+      'src/a/sub/sub.go',
+    ]);
+    // b/main resolves its own b/sub.
+    expect(result.output.importMap['src/b/main.go']).toEqual([
+      'src/b/sub/sub.go',
+    ]);
+  });
+
+  it('emits a one-time Warning: when a .go file has no ancestor go.mod', () => {
+    // A .go file outside any module. Multiple module-prefix imports should
+    // produce ONE warning (deduped by importer path), and the importMap
+    // entry stays empty.
+    projectRoot = setupTree({
+      'orphan/main.go':
+        `package main\n\nimport (\n\t"github.com/foo/bar/util"\n\t"github.com/foo/bar/db"\n)\n\nfunc main() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'orphan/main.go', language: 'go', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['orphan/main.go']).toEqual([]);
+    const goModWarnings = result.stderr
+      .split('\n')
+      .filter(l => l.includes('no ancestor go.mod'));
+    expect(goModWarnings).toHaveLength(1);
+    expect(goModWarnings[0]).toMatch(
+      /Warning: extract-import-map: Go file orphan\/main\.go has no ancestor go\.mod/,
+    );
+    expect(goModWarnings[0]).toMatch(/module-prefix imports skipped/);
+  });
 });
 
 describe('extract-import-map.mjs — Java resolver', () => {
