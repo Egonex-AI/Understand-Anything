@@ -40,12 +40,21 @@ import louvain from 'graphology-communities-louvain';
  * Returns Map<path, string[]>.
  */
 async function extractExports(projectRoot, codeFiles) {
-  const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
-  const tsPlugin = new TreeSitterPlugin(tsConfigs);
-  await tsPlugin.init();
-  const registry = new PluginRegistry();
-  registry.register(tsPlugin);
-  registerAllParsers(registry);
+  let registry;
+  try {
+    const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
+    const tsPlugin = new TreeSitterPlugin(tsConfigs);
+    await tsPlugin.init();
+    registry = new PluginRegistry();
+    registry.register(tsPlugin);
+    registerAllParsers(registry);
+  } catch (err) {
+    process.stderr.write(
+      `Warning: compute-batches: tree-sitter init failed (${err.message}) ` +
+      `— all symbols=[] in neighborMap — cross-batch edges limited to file-level\n`,
+    );
+    return new Map(codeFiles.map(f => [f.path, []]));
+  }
 
   const exportsByPath = new Map();
   for (const file of codeFiles) {
@@ -69,7 +78,7 @@ async function extractExports(projectRoot, codeFiles) {
     } catch (err) {
       process.stderr.write(
         `Warning: compute-batches: exports extraction failed for ${file.path} ` +
-        `(${err.message}) — symbols=[] in neighborMap — ` +
+        `(analyze error: ${err.message}) — symbols=[] in neighborMap — ` +
         `cross-batch edges to this file limited to file-level\n`,
       );
       exportsByPath.set(file.path, []);

@@ -151,4 +151,33 @@ describe('compute-batches.mjs — exports extraction', () => {
     expect(batches.exportsByPath['src/b.ts']).toEqual(
       expect.arrayContaining(['helper']));
   });
+
+  it('emits warning when file is missing from disk (read error path)', () => {
+    root = mkdtempSync(join(tmpdir(), 'ua-cb-exp-err-'));
+    mkdirSync(join(root, '.understand-anything', 'intermediate'), { recursive: true });
+    // Note: NOT creating the file on disk — scan-result.json references it,
+    // but the file doesn't exist, so the read branch fires.
+    const scan = {
+      name: 'missing-file-test',
+      description: '',
+      languages: ['typescript'],
+      frameworks: [],
+      files: [
+        { path: 'src/missing.ts', language: 'typescript', sizeLines: 1, fileCategory: 'code' },
+      ],
+      totalFiles: 1, filteredByIgnore: 0, estimatedComplexity: 'small',
+      importMap: { 'src/missing.ts': [] },
+    };
+    writeFileSync(
+      join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
+      JSON.stringify(scan));
+
+    const result = runScript(root);
+    expect(result.status).toBe(0);  // script must still succeed
+    expect(result.stderr).toMatch(
+      /Warning: compute-batches: exports extraction failed for src\/missing\.ts \(read error:/);
+
+    const batches = readBatches(root);
+    expect(batches.exportsByPath['src/missing.ts']).toEqual([]);
+  });
 });
