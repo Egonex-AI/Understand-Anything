@@ -12,15 +12,12 @@
  * Output: <project-root>/.understand-anything/intermediate/batches.json
  */
 
-import { readFileSync, existsSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import Graph from 'graphology';
 import louvain from 'graphology-communities-louvain';
-
-const TOO_LARGE_THRESHOLD = 35;  // becomes MAX_COMMUNITY_SIZE in Task 4
-const TOO_SMALL_THRESHOLD = 5;   // informational only — small communities are kept (no merge), see Task 6/7 design
 
 // ── Skeleton main: load → Louvain → print sizes ───────────────────────────
 async function main() {
@@ -57,19 +54,42 @@ async function main() {
   // Run Louvain
   const communities = louvain(g);  // { nodeId: communityId }
 
-  // Print size distribution
-  const sizeByCommunity = new Map();
-  for (const [, cid] of Object.entries(communities)) {
-    sizeByCommunity.set(cid, (sizeByCommunity.get(cid) || 0) + 1);
+  // Group files by community id, sorted by largest first for stable assignment
+  const filesByCommunity = new Map();
+  for (const [path, cid] of Object.entries(communities)) {
+    if (!filesByCommunity.has(cid)) filesByCommunity.set(cid, []);
+    filesByCommunity.get(cid).push(path);
   }
-  const sizes = [...sizeByCommunity.values()].sort((a, b) => b - a);
-  process.stderr.write(
-    `Louvain produced ${sizes.length} communities. Size distribution: [${sizes.join(', ')}]\n`,
-  );
-  process.stderr.write(
-    `Max community size: ${sizes[0] ?? 0}, min: ${sizes.at(-1) ?? 0}, ` +
-    `>${TOO_LARGE_THRESHOLD}: ${sizes.filter(s => s > TOO_LARGE_THRESHOLD).length}, <${TOO_SMALL_THRESHOLD}: ${sizes.filter(s => s < TOO_SMALL_THRESHOLD).length}\n`,
-  );
+
+  // Sort communities by size desc, then by min-path asc for determinism
+  const sortedCommunities = [...filesByCommunity.entries()]
+    .sort((a, b) => {
+      if (b[1].length !== a[1].length) return b[1].length - a[1].length;
+      const minA = [...a[1]].sort()[0];
+      const minB = [...b[1]].sort()[0];
+      return minA.localeCompare(minB);
+    });
+
+  // Build per-batch file list with full file metadata from scan
+  const fileMetaByPath = new Map(scan.files.map(f => [f.path, f]));
+  const batches = sortedCommunities.map(([, paths], idx) => ({
+    batchIndex: idx + 1,
+    files: paths.sort().map(p => fileMetaByPath.get(p)),
+    batchImportData: {},
+    neighborMap: {},
+  }));
+
+  const output = {
+    schemaVersion: 1,
+    algorithm: 'louvain',
+    totalFiles: scan.files.length,
+    totalBatches: batches.length,
+    batches,
+  };
+
+  const outPath = join(projectRoot, '.understand-anything', 'intermediate', 'batches.json');
+  writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
+  process.stderr.write(`Wrote ${batches.length} batches to ${outPath}\n`);
 }
 
 // ---------------------------------------------------------------------------
