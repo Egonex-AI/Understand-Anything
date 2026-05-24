@@ -2,7 +2,7 @@
 <p align="center">
   <strong>将任意代码库、知识库或文档转化为可探索、可搜索、可对话的交互式知识图谱</strong>
   <br />
-  <em>支持 Claude Code、Codex、Cursor、Copilot、Gemini CLI 等多平台。</em>
+  <em>支持 Claude Code、Codex、Cursor、Copilot、Antigravity CLI 等多平台。</em>
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
-  <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
+  <a href="#antigravity-cli"><img src="https://img.shields.io/badge/Antigravity_CLI-4285F4" alt="Antigravity CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/项目主页-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/在线演示-00c853" alt="Live Demo" /></a>
@@ -181,7 +181,7 @@ Understand-Anything 可在多个 AI 编码平台上运行。
 /plugin install understand-anything
 ```
 
-### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI）
+### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI）
 
 **macOS / Linux：**
 ```bash
@@ -229,7 +229,7 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | OpenCode | ✅ 支持 | `install.sh opencode` |
 | OpenClaw | ✅ 支持 | `install.sh openclaw` |
 | Antigravity | ✅ 支持 | `install.sh antigravity` |
-| Gemini CLI | ✅ 支持 | `install.sh gemini` |
+| Antigravity CLI | ✅ 支持 | `install.sh antigravity` |
 | Pi Agent | ✅ 支持 | `install.sh pi` |
 | Vibe CLI | ✅ 支持 | `install.sh vibe` |
 | Hermes | ✅ 支持 | `install.sh hermes` |

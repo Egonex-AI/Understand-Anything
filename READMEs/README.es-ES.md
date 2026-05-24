@@ -2,7 +2,7 @@
 <p align="center">
   <strong>Convierte cualquier código fuente, base de conocimiento o documentación en un grafo de conocimiento interactivo que puedes explorar, buscar y consultar.</strong>
   <br />
-  <em>Compatible con Claude Code, Codex, Cursor, Copilot, Gemini CLI y más.</em>
+  <em>Compatible con Claude Code, Codex, Cursor, Copilot, Antigravity CLI y más.</em>
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
-  <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
+  <a href="#antigravity-cli"><img src="https://img.shields.io/badge/Antigravity_CLI-4285F4" alt="Antigravity CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Página_Principal-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Demo_en_Vivo-00c853" alt="Live Demo" /></a>
@@ -181,7 +181,7 @@ Understand-Anything funciona en múltiples plataformas de codificación con IA.
 /plugin install understand-anything
 ```
 
-### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI)
+### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI)
 
 **macOS / Linux:**
 ```bash
@@ -229,7 +229,7 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | OpenCode | ✅ Soportado | `install.sh opencode` |
 | OpenClaw | ✅ Soportado | `install.sh openclaw` |
 | Antigravity | ✅ Soportado | `install.sh antigravity` |
-| Gemini CLI | ✅ Soportado | `install.sh gemini` |
+| Antigravity CLI | ✅ Soportado | `install.sh antigravity` |
 | Pi Agent | ✅ Soportado | `install.sh pi` |
 | Vibe CLI | ✅ Soportado | `install.sh vibe` |
 | Hermes | ✅ Soportado | `install.sh hermes` |
