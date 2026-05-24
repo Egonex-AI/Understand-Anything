@@ -72,6 +72,9 @@ async function main() {
 
   // Build per-batch file list with full file metadata from scan
   const fileMetaByPath = new Map(scan.files.map(f => [f.path, f]));
+  // Safe: every path in a community is a graph node, and graph nodes are a
+  // subset of scan.files (see addNode loop above). fileMetaByPath.get() can
+  // never return undefined here.
   const batches = sortedCommunities.map(([, paths], idx) => ({
     batchIndex: idx + 1,
     files: paths.sort().map(p => fileMetaByPath.get(p)),
@@ -89,7 +92,12 @@ async function main() {
 
   const outPath = join(projectRoot, '.understand-anything', 'intermediate', 'batches.json');
   writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
-  process.stderr.write(`Wrote ${batches.length} batches to ${outPath}\n`);
+  const batchSizes = batches.map(b => b.files.length);
+  const maxSize = batchSizes.length ? Math.max(...batchSizes) : 0;
+  const minSize = batchSizes.length ? Math.min(...batchSizes) : 0;
+  process.stderr.write(
+    `Wrote ${batches.length} batches (sizes: max=${maxSize}, min=${minSize}) to ${outPath}\n`,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,6 +37,10 @@ describe('compute-batches.mjs — Louvain basic', () => {
     projectRoot = setupProject('scan-result-3-cliques.json');
   });
 
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
   it('produces 3 batches for 3 disjoint cliques', () => {
     const result = runScript(projectRoot);
     expect(result.status).toBe(0);
@@ -45,6 +49,9 @@ describe('compute-batches.mjs — Louvain basic', () => {
     expect(batches.algorithm).toBe('louvain');
     expect(batches.totalFiles).toBe(9);
     expect(batches.batches.length).toBe(3);
+    expect(batches.schemaVersion).toBe(1);
+    expect(batches.totalBatches).toBe(3);
+    expect(batches.batches.map(b => b.batchIndex)).toEqual([1, 2, 3]);
 
     // Each batch should contain exactly one clique (3 files)
     for (const b of batches.batches) {
@@ -52,5 +59,23 @@ describe('compute-batches.mjs — Louvain basic', () => {
       const dirs = new Set(b.files.map(f => f.path.split('/')[1]));
       expect(dirs.size).toBe(1); // all files in the batch share src/<dir>/
     }
+  });
+
+  it('produces deterministic output across runs', () => {
+    const r1 = runScript(projectRoot);
+    expect(r1.status).toBe(0);
+    const json1 = readFileSync(
+      join(projectRoot, '.understand-anything', 'intermediate', 'batches.json'),
+      'utf-8',
+    );
+
+    const r2 = runScript(projectRoot);
+    expect(r2.status).toBe(0);
+    const json2 = readFileSync(
+      join(projectRoot, '.understand-anything', 'intermediate', 'batches.json'),
+      'utf-8',
+    );
+
+    expect(json1).toBe(json2);
   });
 });
