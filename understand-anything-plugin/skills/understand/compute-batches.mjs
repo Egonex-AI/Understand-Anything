@@ -279,8 +279,14 @@ function mergeSmallBatches(bareBatches) {
     miscBatches.push({ files: pooledFiles.slice(i, i + MAX_MERGE_TARGET) });
   }
 
+  // Use `Info:` rather than `Warning:` — singleton consolidation is a
+  // routine optimization, not a fallback/degrade path. Per
+  // [[feedback_visible_warnings]] only fallbacks should bubble as Warning:
+  // to the Phase 7 final report. Real warnings would get drowned out if
+  // every normal Louvain run with singletons (i.e. almost every run) added
+  // a Warning: line.
   process.stderr.write(
-    `Warning: compute-batches: merged ${smallMergeable.length} small batches ` +
+    `Info: compute-batches: merged ${smallMergeable.length} small batches ` +
     `(${pooledFiles.length} files) into ${miscBatches.length} misc batches ` +
     `— singletons and orphans consolidated\n`,
   );

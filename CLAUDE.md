@@ -35,7 +35,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - `pnpm --filter @understand-anything/core build` — Build the core package
 - `pnpm --filter @understand-anything/core test` — Run core tests
 - `pnpm --filter @understand-anything/skill build` — Build the plugin package
-- `pnpm --filter @understand-anything/skill test` — Run plugin tests
+- `pnpm test` — Run all tests (skill tests live at repo-root `tests/skill/`, picked up by root `vitest.config.ts`)
 - `pnpm --filter @understand-anything/dashboard build` — Build the dashboard
 - `pnpm dev:dashboard` — Start dashboard dev server
 - `pnpm lint` — Run ESLint across the project

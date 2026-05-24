@@ -1065,6 +1065,9 @@ def main() -> None:
     # Missing-part detection: for any logical batch with parts (len > 1), the
     # set of part numbers MUST be contiguous starting at 1. Gaps suggest a
     # truncated write — emit a visible warning so the user can investigate.
+    # Collect into `missing_part_warnings` so they also surface in the final
+    # phase report; stderr alone gets buried under the per-batch load lines.
+    missing_part_warnings: list[str] = []
     for idx, entries in by_batch.items():
         part_nums = [p for (_n, p) in entries if p is not None]
         if not part_nums:
@@ -1073,12 +1076,13 @@ def main() -> None:
         expected = set(range(1, max(part_nums) + 1))
         missing = sorted(expected - present)
         if missing:
-            print(
-                f"Warning: merge: batch {idx} has parts {sorted(present)} but "
+            msg = (
+                f"batch {idx} has parts {sorted(present)} but "
                 f"missing part {missing} — possible truncated write — "
-                f"affected nodes/edges may be lost",
-                file=sys.stderr,
+                f"affected nodes/edges may be lost"
             )
+            print(f"Warning: merge: {msg}", file=sys.stderr)
+            missing_part_warnings.append(msg)
 
     # Load batches — skip unrecognized filenames so they don't pollute the
     # merged graph with content the agent labeled incorrectly.
@@ -1100,6 +1104,20 @@ def main() -> None:
 
     # Merge and normalize
     assembled, report = merge_and_normalize(batches)
+
+    # Surface missing multi-part files to the phase report (parallel to
+    # unrecognized-filename handling below). Stderr lines emitted during
+    # batch discovery get buried under per-batch load output — re-emitting
+    # via the report list ensures the Phase 4 review and final summary see
+    # the data-loss signal.
+    if missing_part_warnings:
+        report.append("")
+        report.append(
+            f"Warning: {len(missing_part_warnings)} batch(es) with missing parts "
+            f"— some nodes/edges silently dropped:"
+        )
+        for w in missing_part_warnings:
+            report.append(f"  - {w}")
 
     # Surface unrecognized-filename drops to the phase report so the
     # downstream review step sees them, not just stderr.

@@ -523,9 +523,11 @@ describe('compute-batches.mjs — merge-small', () => {
       expect(b.files.length).toBe(25);
     }
 
-    // Warning emitted
+    // Info: (not Warning:) — merge-small is a routine optimization, not a
+    // fallback path. See compute-batches.mjs mergeSmallBatches WHY comment.
     expect(result.stderr).toMatch(
-      /Warning: compute-batches: merged \d+ small batches \(\d+ files\) into \d+ misc batches/);
+      /Info: compute-batches: merged \d+ small batches \(\d+ files\) into \d+ misc batches/);
+    expect(result.stderr).not.toMatch(/Warning: compute-batches: merged \d+ small batches/);
   });
 
   it('preserves non-mergeable batches: Dockerfile cluster not pooled into misc', () => {
