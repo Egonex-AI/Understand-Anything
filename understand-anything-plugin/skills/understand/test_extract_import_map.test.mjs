@@ -180,6 +180,96 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
   });
 });
 
+describe('extract-import-map.mjs — Python resolver', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('resolves python relative imports', () => {
+    projectRoot = setupTree({
+      'src/app.py': `from . import helpers\nfrom .utils import shout\nfrom ..core import boot\n`,
+      'src/helpers.py': `def help(): pass\n`,
+      'src/utils.py': `def shout(): pass\n`,
+      'core.py': `def boot(): pass\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/app.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/helpers.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/utils.py', language: 'python', fileCategory: 'code' },
+        { path: 'core.py', language: 'python', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // `from . import helpers` should resolve `helpers` as a sibling submodule
+    // by walking through resolvePythonProbe. `from .utils import shout`
+    // resolves to src/utils.py. `from ..core import boot` -> core.py.
+    expect(result.output.importMap['src/app.py']).toEqual([
+      'core.py',
+      'src/utils.py',
+    ]);
+  });
+
+  it('resolves python absolute imports and __init__.py matching', () => {
+    projectRoot = setupTree({
+      'main.py': `import src.utils.formatter\nfrom src.utils import formatter\nfrom src import config\n`,
+      'src/__init__.py': '',
+      'src/utils/__init__.py': '',
+      'src/utils/formatter.py': `def fmt(): pass\n`,
+      'src/config.py': `DEBUG = True\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'main.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/__init__.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/utils/__init__.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/utils/formatter.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/config.py', language: 'python', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // `import src.utils.formatter` -> src/utils/formatter.py
+    // `from src.utils import formatter` -> src/utils/__init__.py + src/utils/formatter.py
+    // `from src import config` -> src/__init__.py + src/config.py
+    expect(result.output.importMap['main.py']).toEqual([
+      'src/__init__.py',
+      'src/config.py',
+      'src/utils/__init__.py',
+      'src/utils/formatter.py',
+    ]);
+  });
+
+  it('drops python external package imports', () => {
+    projectRoot = setupTree({
+      'app.py': `import os\nimport sys\nimport requests\nfrom datetime import datetime\nfrom .local import thing\n`,
+      'local.py': `thing = 1\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'app.py', language: 'python', fileCategory: 'code' },
+        { path: 'local.py', language: 'python', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // os/sys/requests/datetime are external; only ./local resolves.
+    expect(result.output.importMap['app.py']).toEqual(['local.py']);
+  });
+});
+
 describe('extract-import-map.mjs — output schema invariants', () => {
   let projectRoot;
 

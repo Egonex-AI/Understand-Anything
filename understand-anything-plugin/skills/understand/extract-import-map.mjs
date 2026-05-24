@@ -316,6 +316,114 @@ function extractRequireSources(content) {
 }
 
 // ---------------------------------------------------------------------------
+// Python resolver
+//
+// Tree-sitter's Python extractor emits one entry per import statement:
+//   - `import a.b.c`          -> { source: 'a.b.c', specifiers: ['a.b.c'] }
+//   - `from a.b.c import x,y` -> { source: 'a.b.c', specifiers: ['x','y'] }
+//   - `from . import x`       -> { source: '', specifiers: ['x'] }
+//   - `from .x import y`      -> { source: '.x', specifiers: ['y'] }
+//   - `from ..pkg import y`   -> { source: '..pkg', specifiers: ['y'] }
+//
+// We can't tell relative from absolute by the source string alone — the dots
+// could be a leading-dot relative source OR a literal `.` package separator.
+// Python's lexical convention disambiguates: leading dots ALWAYS mean
+// relative. Tree-sitter preserves leading dots verbatim in the source field,
+// so we can dispatch on the prefix.
+//
+// Resolution rules:
+//   1. Relative (starts with `.`): walk up parent dirs by leading-dot count,
+//      then descend by the remaining dotted segments.
+//   2. Absolute (no leading dot): try `a/b/c.py` then `a/b/c/__init__.py`
+//      against the file set; resolve to the first match. If matched as a
+//      package, additionally probe each specifier as a submodule
+//      (`a/b/c/x.py`, `a/b/c/x/__init__.py`).
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a Python import. Unlike most resolvers this can produce multiple
+ * matches (one for the package `__init__.py` plus one per submodule
+ * specifier), so the signature differs: returns string[].
+ *
+ * Returns empty array for external/unresolved packages.
+ */
+export function resolvePythonImport(rawImport, specifiers, file, ctx) {
+  if (typeof rawImport !== 'string') return [];
+  const src = rawImport;
+  const importerDir = dirOf(toPosix(file.path));
+
+  // Count leading dots; the rest is a dotted module path
+  let dots = 0;
+  while (dots < src.length && src.charCodeAt(dots) === 0x2e /* '.' */) dots++;
+  const tail = src.slice(dots);
+  const tailSegments = tail ? tail.split('.').filter(Boolean) : [];
+
+  if (dots > 0) {
+    // Relative import. `from . import x` (dots=1, tail='') walks up zero
+    // directories (sibling level); `from .. import x` walks up one.
+    const importerParts = importerDir ? importerDir.split('/').filter(Boolean) : [];
+    const dropLevels = dots - 1;
+    if (dropLevels > importerParts.length) {
+      // Walked above the project root — unresolvable
+      return [];
+    }
+    const baseParts = importerParts.slice(0, importerParts.length - dropLevels);
+    const moduleParts = baseParts.concat(tailSegments);
+    return resolvePythonProbe(moduleParts, specifiers, ctx);
+  }
+
+  // Absolute. Walk through each successive prefix from longest to shortest.
+  // This is necessary because `from a.b import c` should probe `a/b.py` first
+  // (with c as a specifier), not just `a/b/c.py`. But we ALSO need to handle
+  // the case where `a.b` is itself a module path (no specifier dimension at
+  // all, as with bare `import a.b`).
+  return resolvePythonProbe(tailSegments, specifiers, ctx);
+}
+
+/**
+ * Given a fully-qualified module-path segment list (e.g. ['src','utils']),
+ * probe the file set for `a/b/c.py` then `a/b/c/__init__.py`. On package
+ * match, also probe each specifier as a submodule. Returns an array of
+ * resolved project-relative paths (deduped by Set in caller).
+ */
+function resolvePythonProbe(moduleParts, specifiers, ctx) {
+  if (moduleParts.length === 0) {
+    // `from . import x` case: importer's package is the implicit module;
+    // each x is a sibling module to probe directly.
+    return [];
+  }
+  const base = moduleParts.join('/');
+  const matches = [];
+
+  const moduleFile = `${base}.py`;
+  const packageInit = `${base}/__init__.py`;
+
+  if (ctx.fileSet.has(moduleFile)) {
+    matches.push(moduleFile);
+    return matches; // No further probing on a leaf module file.
+  }
+  if (ctx.fileSet.has(packageInit)) {
+    matches.push(packageInit);
+    // Package match: probe each specifier as a submodule
+    if (Array.isArray(specifiers)) {
+      for (const spec of specifiers) {
+        // Wildcard `*` and qualified specifiers (`Foo.bar`) skip; the
+        // surface name is what tree-sitter records for `from pkg import x`.
+        if (!spec || spec === '*' || spec.includes('.')) continue;
+        const subFile = `${base}/${spec}.py`;
+        const subInit = `${base}/${spec}/__init__.py`;
+        if (ctx.fileSet.has(subFile)) matches.push(subFile);
+        else if (ctx.fileSet.has(subInit)) matches.push(subInit);
+      }
+    }
+    return matches;
+  }
+
+  // No match — external package.
+  return [];
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
@@ -329,16 +437,26 @@ const TS_JS_LANGS = new Set([
 ]);
 
 /**
- * Dispatch a raw import string to the language-specific resolver. Returns
- * the resolved project-relative path or null (external / unresolvable).
+ * Dispatch a raw import to the language-specific resolver. Returns an array
+ * of resolved project-relative paths (most resolvers produce 0 or 1; Python
+ * can produce multiple when a `from pkg import a, b, c` resolves both the
+ * package's `__init__.py` and each submodule).
+ *
+ * Per-resolver contract: never throw, never read disk (read once in main()).
+ * Empty array means external/unresolved.
  */
-function resolveImport(rawImport, file, ctx) {
+function resolveImport(imp, file, ctx) {
   const lang = file.language;
+  const src = imp.source;
   if (TS_JS_LANGS.has(lang)) {
-    return resolveTsJsImport(rawImport, file, ctx);
+    const out = resolveTsJsImport(src, file, ctx);
+    return out ? [out] : [];
+  }
+  if (lang === 'python') {
+    return resolvePythonImport(src, imp.specifiers, file, ctx);
   }
   // Other languages handled in later commits
-  return null;
+  return [];
 }
 
 /**
@@ -419,17 +537,23 @@ async function main() {
       const imports = analysis?.imports ?? [];
       const resolvedSet = new Set();
       for (const imp of imports) {
-        const out = resolveImport(imp.source, file, ctx);
-        if (out && ctx.fileSet.has(out)) {
-          resolvedSet.add(out);
+        const outs = resolveImport(imp, file, ctx);
+        for (const out of outs) {
+          if (out && ctx.fileSet.has(out)) {
+            resolvedSet.add(out);
+          }
         }
       }
       // Supplemental pass for sources tree-sitter doesn't capture (e.g. CJS
       // require() calls). Dedup with the set above so we don't double-count.
       for (const extra of extractExtraImportSources(file, content)) {
-        const out = resolveImport(extra, file, ctx);
-        if (out && ctx.fileSet.has(out)) {
-          resolvedSet.add(out);
+        // Synthesize a minimal `imp`-shaped object so the dispatcher sees
+        // the same surface for both tree-sitter and supplemental sources.
+        const outs = resolveImport({ source: extra, specifiers: [] }, file, ctx);
+        for (const out of outs) {
+          if (out && ctx.fileSet.has(out)) {
+            resolvedSet.add(out);
+          }
         }
       }
       resolved = [...resolvedSet].sort((a, b) => a.localeCompare(b));
