@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SCRIPT = resolve(__dirname, 'compute-batches.mjs');
-const FIXTURES = resolve(__dirname, 'test/fixtures');
+const SCRIPT = resolve(__dirname, '../../../understand-anything-plugin/skills/understand/compute-batches.mjs');
+const FIXTURES = resolve(__dirname, 'fixtures');
 
 function runScript(projectRoot, extraArgs = []) {
   return spawnSync('node', [SCRIPT, projectRoot, ...extraArgs], {

@@ -2,8 +2,8 @@
 """
 test_merge_batch_graphs.py — Tests for the deterministic tested_by linker.
 
-Run from this directory:
-    python -m unittest test_merge_batch_graphs.py -v
+Run from the repo root:
+    python -m unittest tests.skill.understand.test_merge_batch_graphs -v
 """
 
 from __future__ import annotations
@@ -20,7 +20,14 @@ from typing import Any
 # directly. Load it via importlib so we can call its module-level helpers.
 
 _HERE = Path(__file__).resolve().parent
-_MODULE_PATH = _HERE / "merge-batch-graphs.py"
+_REPO_ROOT = _HERE.parent.parent.parent
+_MODULE_PATH = (
+    _REPO_ROOT
+    / "understand-anything-plugin"
+    / "skills"
+    / "understand"
+    / "merge-batch-graphs.py"
+)
 
 
 def _load_module() -> Any:
