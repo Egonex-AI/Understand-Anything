@@ -228,6 +228,7 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ Supported | `install.sh hermes` |
 | Cline | ✅ Supported | `install.sh cline` |
 | KIMI CLI | ✅ Supported | `install.sh kimi` |
+| Kiro CLI | ✅ Supported | `install.sh kiro` |
 
 ---
 
@@ -253,6 +254,28 @@ git lfs install
 git lfs track ".understand-anything/*.json"
 git add .gitattributes .understand-anything/
 ```
+
+---
+
+## 🔌 Standalone / LiteLLM-Proxy Usage
+
+Don't want to use Claude Code? Run the pipeline standalone with any LLM backend:
+
+```bash
+# Install LiteLLM-Proxy (routes to any model provider)
+pip install litellm[proxy]
+litellm --model gpt-4o --port 4000
+
+# Run the full pipeline
+export LITELLM_BASE_URL=http://localhost:4000
+export LITELLM_MODEL=gpt-4o
+./harnesses/kiro/run-understand.sh /path/to/project
+
+# Or skip LLM entirely (structure-only graph, no summaries)
+./harnesses/kiro/run-understand.sh /path/to/project --no-llm
+```
+
+See [`harnesses/README.md`](harnesses/README.md) for full documentation on Kiro, Codex, and LiteLLM integration.
 
 ---
 

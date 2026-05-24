@@ -62,6 +62,8 @@ Determine whether to run a full analysis or incremental update.
    SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
    COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand 2>/dev/null || readlink -f ~/.copilot/skills/understand 2>/dev/null || echo "")
    COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+   KIRO_SKILL_REAL=$(realpath ~/.kiro/skills/understand 2>/dev/null || readlink -f ~/.kiro/skills/understand 2>/dev/null || echo "")
+   KIRO_SELF_RELATIVE=$([ -n "$KIRO_SKILL_REAL" ] && cd "$KIRO_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 
    PLUGIN_ROOT=""
    for candidate in \
@@ -69,9 +71,11 @@ Determine whether to run a full analysis or incremental update.
      "$HOME/.understand-anything-plugin" \
      "$SELF_RELATIVE" \
      "$COPILOT_SELF_RELATIVE" \
+     "$KIRO_SELF_RELATIVE" \
      "$HOME/.codex/understand-anything/understand-anything-plugin" \
      "$HOME/.opencode/understand-anything/understand-anything-plugin" \
      "$HOME/.pi/understand-anything/understand-anything-plugin" \
+     "$HOME/.kiro/understand-anything/understand-anything-plugin" \
      "$HOME/understand-anything/understand-anything-plugin"; do
      if [ -n "$candidate" ] && [ -f "$candidate/package.json" ] && [ -f "$candidate/pnpm-workspace.yaml" ]; then
        PLUGIN_ROOT="$candidate"
