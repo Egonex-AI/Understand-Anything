@@ -26,14 +26,19 @@ function setupTree(files) {
  * Run the extract-import-map.mjs script. Returns
  * { status, stdout, stderr, output } where `output` is the parsed JSON
  * written by the script (or null on failure to read).
+ *
+ * `extraNodeArgs` is prepended to the node argv before the script path, so
+ * tests can pass `--import` loader hooks to force specific failure modes.
  */
-function runScript(projectRoot, input) {
+function runScript(projectRoot, input, extraNodeArgs = []) {
   const inputPath = join(projectRoot, 'ua-eim-input.json');
   const outputPath = join(projectRoot, 'ua-eim-output.json');
   writeFileSync(inputPath, JSON.stringify(input), 'utf-8');
-  const result = spawnSync('node', [SCRIPT, inputPath, outputPath], {
-    encoding: 'utf-8',
-  });
+  const result = spawnSync(
+    'node',
+    [...extraNodeArgs, SCRIPT, inputPath, outputPath],
+    { encoding: 'utf-8' },
+  );
   let output = null;
   try {
     output = JSON.parse(readFileSync(outputPath, 'utf-8'));
@@ -783,5 +788,419 @@ describe('extract-import-map.mjs — output schema invariants', () => {
     expect(r1.status).toBe(0);
     expect(r2.status).toBe(0);
     expect(JSON.stringify(r1.output)).toBe(JSON.stringify(r2.output));
+  });
+});
+
+// ===========================================================================
+// Hardening regression tests
+//
+// These tests cover the failure modes called out in code review:
+//   - graceful tree-sitter init failure (IMPORTANT 1)
+//   - tsconfig parse resilience (IMPORTANT 2)
+//   - comment-aware import regexes for JS/Ruby/Rust (MINOR 4)
+//   - tighter Kotlin import grammar (MINOR 5)
+//   - multi-match Gradle/Maven dotted-FQN behavior (MINOR 6)
+//   - composer.json malformed warning (MINOR 7)
+//   - Rust 'use crate::' with no crate root — one-time warning (MINOR 9)
+// ===========================================================================
+
+describe('extract-import-map.mjs — regex comment-strip resilience', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('JS require() inside a // line comment is NOT picked up', () => {
+    projectRoot = setupTree({
+      'src/index.js':
+        `// require('./fake');  <- commented out, must be ignored\n` +
+        `/* require('./alsofake'); also commented */\n` +
+        `const real = require('./real');\n`,
+      'src/real.js': `module.exports = { x: 1 };\n`,
+      'src/fake.js': `module.exports = { fake: true };\n`,
+      'src/alsofake.js': `module.exports = { fake: true };\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.js', language: 'javascript', fileCategory: 'code' },
+        { path: 'src/real.js', language: 'javascript', fileCategory: 'code' },
+        { path: 'src/fake.js', language: 'javascript', fileCategory: 'code' },
+        { path: 'src/alsofake.js', language: 'javascript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Only the real require survives; both commented-out requires are dropped.
+    expect(result.output.importMap['src/index.js']).toEqual(['src/real.js']);
+    expect(result.output.importMap['src/index.js']).not.toContain('src/fake.js');
+    expect(result.output.importMap['src/index.js']).not.toContain('src/alsofake.js');
+  });
+
+  it('Ruby require inside a # line comment is NOT picked up', () => {
+    projectRoot = setupTree({
+      'app.rb':
+        `# require 'fake'  -- commented out, must be ignored\n` +
+        `require 'real'\n`,
+      'lib/real.rb': `module Real; end\n`,
+      'lib/fake.rb': `module Fake; end\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'app.rb', language: 'ruby', fileCategory: 'code' },
+        { path: 'lib/real.rb', language: 'ruby', fileCategory: 'code' },
+        { path: 'lib/fake.rb', language: 'ruby', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['app.rb']).toEqual(['lib/real.rb']);
+    expect(result.output.importMap['app.rb']).not.toContain('lib/fake.rb');
+  });
+
+  it('Rust mod declarations inside // and /* */ comments are NOT picked up', () => {
+    projectRoot = setupTree({
+      'Cargo.toml': `[package]\nname = "demo"\nversion = "0.1.0"\n`,
+      'src/lib.rs':
+        `// mod fake_line;  <- commented out\n` +
+        `/* mod fake_block; */\n` +
+        `pub mod real;\n`,
+      'src/real.rs': `pub fn r() { }\n`,
+      'src/fake_line.rs': `pub fn f() { }\n`,
+      'src/fake_block.rs': `pub fn f() { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'src/lib.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/real.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/fake_line.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/fake_block.rs', language: 'rust', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/lib.rs']).toEqual(['src/real.rs']);
+    expect(result.output.importMap['src/lib.rs']).not.toContain('src/fake_line.rs');
+    expect(result.output.importMap['src/lib.rs']).not.toContain('src/fake_block.rs');
+  });
+});
+
+describe('extract-import-map.mjs — Kotlin import grammar', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('does NOT phantom-resolve `import ...` or `import .foo`', () => {
+    // Pathological inputs the tightened regex should reject. If they slipped
+    // through, the dotted resolver would turn '...' into '/.../<ext>' lookups
+    // or '.foo' into '/foo.kt' — both bogus.
+    projectRoot = setupTree({
+      'src/Main.kt':
+        `package com.example\n\n` +
+        `import ...\n` +              // garbage line
+        `import .foo\n` +              // leading-dot garbage line
+        `import com.example.real.Bar\n`,
+      'src/com/example/real/Bar.kt':
+        `package com.example.real\nclass Bar\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/Main.kt', language: 'kotlin', fileCategory: 'code' },
+        { path: 'src/com/example/real/Bar.kt', language: 'kotlin', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Only the valid import resolves. The garbage lines must not produce
+    // phantom entries.
+    expect(result.output.importMap['src/Main.kt']).toEqual([
+      'src/com/example/real/Bar.kt',
+    ]);
+  });
+});
+
+describe('extract-import-map.mjs — multi-source-root dotted FQN (Gradle/Maven)', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('returns BOTH matches when a Java FQN suffix exists in two source roots', () => {
+    // Multi-module Gradle layout: two `Bar.java` files both at .../com/foo/Bar.java
+    // but rooted in different source trees. The resolver intentionally returns
+    // both so the structural graph reflects every plausible target.
+    projectRoot = setupTree({
+      'src/main/java/com/example/App.java':
+        `package com.example;\nimport com.foo.Bar;\npublic class App { }\n`,
+      'src/main/java/com/foo/Bar.java':
+        `package com.foo;\npublic class Bar { }\n`,
+      'lib/src/main/java/com/foo/Bar.java':
+        `package com.foo;\npublic class Bar { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/main/java/com/example/App.java', language: 'java', fileCategory: 'code' },
+        { path: 'src/main/java/com/foo/Bar.java', language: 'java', fileCategory: 'code' },
+        { path: 'lib/src/main/java/com/foo/Bar.java', language: 'java', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Both source-root candidates appear, sorted via localeCompare.
+    expect(result.output.importMap['src/main/java/com/example/App.java']).toEqual([
+      'lib/src/main/java/com/foo/Bar.java',
+      'src/main/java/com/foo/Bar.java',
+    ]);
+  });
+});
+
+describe('extract-import-map.mjs — composer.json malformed', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('emits a Warning: and PHP imports fall back to empty when composer.json is broken', () => {
+    projectRoot = setupTree({
+      'composer.json': '{ "autoload": { "psr-4": { "App\\\\": "src/" }, ', // unterminated
+      'src/Http/Controller.php':
+        `<?php\nnamespace App\\Http;\n\nuse App\\Models\\User;\n\nclass Controller { }\n`,
+      'src/Models/User.php':
+        `<?php\nnamespace App\\Models;\nclass User { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'composer.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/Http/Controller.php', language: 'php', fileCategory: 'code' },
+        { path: 'src/Models/User.php', language: 'php', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Warning fired on stderr (with the parse error context).
+    expect(result.stderr).toMatch(
+      /Warning: extract-import-map: composer\.json at .* failed to parse/,
+    );
+    expect(result.stderr).toMatch(/PSR-4 namespace mapping unavailable/);
+    // Resolver returns empty for PHP imports — the autoload map is empty.
+    expect(result.output.importMap['src/Http/Controller.php']).toEqual([]);
+  });
+});
+
+describe('extract-import-map.mjs — tsconfig parse resilience', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('emits a Warning: when tsconfig.json is malformed and falls back to no aliases', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': '{ "compilerOptions": { "baseUrl": ".", ', // unterminated
+      'src/index.ts':
+        `import { foo } from '@/utils';\nimport { bar } from './sibling';\n`,
+      'src/sibling.ts': `export const bar = 1;\n`,
+      'src/utils.ts': `export const foo = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/sibling.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/utils.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(
+      /Warning: extract-import-map: tsconfig\.json at .* failed to parse/,
+    );
+    expect(result.stderr).toMatch(/path aliases will not be applied/);
+    // Aliased import unresolved; relative import still resolves.
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/sibling.ts']);
+  });
+
+  it('falls back to raw-text parse when a paths value contains "//" that the stripper would damage', () => {
+    // tsconfig with NO comments but a string literal containing "//". The
+    // naive stripper would chew the second `//` away and break the JSON;
+    // the raw-text fallback should rescue the parse.
+    const tsconfigRaw = `{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@scheme//foo/*": ["src/foo/*"]
+    }
+  }
+}
+`;
+    projectRoot = setupTree({
+      'tsconfig.json': tsconfigRaw,
+      'src/index.ts': `import { x } from '@scheme//foo/bar';\n`,
+      'src/foo/bar.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/foo/bar.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Either path: the stripper damages the string but the raw retry rescues,
+    // OR the stripper happens not to damage it. Either way, no warning fires
+    // and the alias must resolve.
+    expect(result.stderr).not.toMatch(/tsconfig\.json .* failed to parse/);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/foo/bar.ts']);
+  });
+});
+
+describe('extract-import-map.mjs — Rust crate root missing', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('emits a one-time Warning: per file when use crate:: has no crate root', () => {
+    // A Rust file that uses `crate::` but has neither src/lib.rs nor
+    // src/main.rs anywhere up its tree. Two `use crate::` statements should
+    // produce ONE warning, not two.
+    projectRoot = setupTree({
+      'Cargo.toml': `[package]\nname = "demo"\nversion = "0.1.0"\n`,
+      // No src/lib.rs and no src/main.rs — but two `use crate::` calls.
+      'app/something.rs':
+        `use crate::auth::login;\nuse crate::db::query;\nfn boot() { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'app/something.rs', language: 'rust', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Importer file gets the warning exactly once even though there are two
+    // unresolvable `use crate::` statements.
+    const crateRootWarnings = result.stderr
+      .split('\n')
+      .filter(l => l.includes('no crate root'));
+    expect(crateRootWarnings).toHaveLength(1);
+    expect(crateRootWarnings[0]).toMatch(
+      /Warning: extract-import-map: Rust file app\/something\.rs has 'use crate::' but no crate root/,
+    );
+    // And the importMap stays empty for that file.
+    expect(result.output.importMap['app/something.rs']).toEqual([]);
+  });
+});
+
+describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('emits a Warning: and produces empty importMap entries when tree-sitter init throws', () => {
+    // Force tree-sitter init to fail by intercepting the `web-tree-sitter`
+    // module load with an ESM loader hook. This simulates the real-world
+    // failure mode where the WASM grammar binaries are missing or
+    // inaccessible (cache eviction, restricted sandbox, etc.).
+    projectRoot = setupTree({
+      'src/index.ts': `import { x } from './lib';\nexport const y = x;\n`,
+      'src/lib.ts': `export const x = 1;\n`,
+    });
+
+    // Write the loader hook + register module to the temp project root.
+    const hookPath = join(projectRoot, 'ua-eim-fail-hook.mjs');
+    const loaderPath = join(projectRoot, 'ua-eim-fail-loader.mjs');
+    writeFileSync(
+      hookPath,
+      `export async function resolve(specifier, ctx, nextResolve) {\n` +
+      `  if (specifier === 'web-tree-sitter') {\n` +
+      `    throw new Error('synthetic: web-tree-sitter unavailable in test');\n` +
+      `  }\n` +
+      `  return nextResolve(specifier, ctx);\n` +
+      `}\n`,
+      'utf-8',
+    );
+    writeFileSync(
+      loaderPath,
+      `import { register } from 'node:module';\n` +
+      `import { pathToFileURL } from 'node:url';\n` +
+      `register(pathToFileURL(${JSON.stringify(hookPath)}).href);\n`,
+      'utf-8',
+    );
+
+    const result = runScript(
+      projectRoot,
+      {
+        projectRoot,
+        files: [
+          { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+          { path: 'src/lib.ts', language: 'typescript', fileCategory: 'code' },
+        ],
+      },
+      ['--import', loaderPath],
+    );
+
+    expect(result.status).toBe(0);
+    // Script completed cleanly with the documented degraded output.
+    expect(result.output.scriptCompleted).toBe(true);
+    expect(result.stderr).toMatch(
+      /Warning: extract-import-map: tree-sitter init failed/,
+    );
+    expect(result.stderr).toMatch(/structural graph will have no import edges/);
+    // Both code files get empty importMap entries.
+    expect(result.output.importMap['src/index.ts']).toEqual([]);
+    expect(result.output.importMap['src/lib.ts']).toEqual([]);
+    // Stats reflect the degraded run: no edges, no files with imports.
+    expect(result.output.stats.filesScanned).toBe(2);
+    expect(result.output.stats.filesWithImports).toBe(0);
+    expect(result.output.stats.totalEdges).toBe(0);
   });
 });

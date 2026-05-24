@@ -120,8 +120,19 @@ function dirOf(p) {
  * resolver matches them by prefix. Values are arrays because tsconfig allows
  * multiple targets per alias.
  *
- * Silently returns the empty default if tsconfig is missing or malformed —
- * tsconfig is optional and many JS-only projects don't have one.
+ * Returns the empty default if tsconfig is missing — tsconfig is optional
+ * and many JS-only projects don't have one. On parse failure (both the
+ * comment-stripped and raw text fail), emits a Warning: to stderr.
+ *
+ * Parse strategy:
+ *   1. Try the comment-stripped text (handles JSONC-style tsconfigs, which
+ *      is the common case for hand-authored tsconfig.json).
+ *   2. If that fails, retry the ORIGINAL raw text — this recovers the case
+ *      where the stripper damaged something inside a string literal (e.g. a
+ *      paths value like `"//foo/*": ["src/*"]`). Plain JSON without comments
+ *      always parses cleanly here.
+ *   3. If both fail, warn and return the empty default — path aliases will
+ *      not be applied; relative imports still resolve.
  */
 function loadTsConfig(projectRoot) {
   const candidatePath = join(projectRoot, 'tsconfig.json');
@@ -131,14 +142,18 @@ function loadTsConfig(projectRoot) {
   let raw;
   try {
     raw = readFileSync(candidatePath, 'utf-8');
-  } catch {
+  } catch (err) {
+    process.stderr.write(
+      `Warning: extract-import-map: tsconfig.json at ${candidatePath} ` +
+      `failed to read (${err.message}) — path aliases will not be applied ` +
+      `— relative imports only\n`,
+    );
     return empty;
   }
 
   // tsconfig.json often contains JSONC-style comments; strip line and block
-  // comments before parsing. The strip is conservative — it does not run
-  // inside strings, but tsconfig values are simple enough that a naive pass
-  // works for >99% of real-world configs.
+  // comments before parsing. The strip is naive (it doesn't honor string
+  // contents), so we fall back to the raw text on failure.
   const stripped = raw
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
@@ -147,7 +162,20 @@ function loadTsConfig(projectRoot) {
   try {
     parsed = JSON.parse(stripped);
   } catch {
-    return empty;
+    // Retry with the original raw text — handles the case where the strip
+    // damaged a string literal containing `//` or `/* */`.
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err2) {
+      // Surface the raw-parse error since it's a true JSON grammar issue;
+      // the strip-pass error is just the symptom.
+      process.stderr.write(
+        `Warning: extract-import-map: tsconfig.json at ${candidatePath} ` +
+        `failed to parse (${err2.message}) — path aliases will not be ` +
+        `applied — relative imports only\n`,
+      );
+      return empty;
+    }
   }
 
   const compilerOptions = parsed?.compilerOptions ?? {};
@@ -241,6 +269,9 @@ function buildResolutionContext(projectRoot, files) {
     kotlinIndex,
     csIndex,
     phpAutoload,
+    // Dedupe Set for one-time-per-file warnings (currently: Rust crate-root
+    // misses). Keyed by importer file path. Mutated by resolvers.
+    _warnedNoRustCrateRoot: new Set(),
   };
 }
 
@@ -363,11 +394,26 @@ function applyTsAlias(target, wildcard) {
  */
 const REQUIRE_LITERAL_RE = /\brequire\(\s*(['"])([^'"`\n]+?)\1\s*\)/g;
 
+/**
+ * Strip JS/TS line and block comments before running text-pattern matchers.
+ * Replaces with spaces (preserving offsets isn't critical here, but keeping
+ * roughly the same length avoids surprising the matcher with collapsed
+ * whitespace). Does not attempt to honor string contents — that's fine for
+ * the narrow patterns we run (`require('...')`, etc.) because the same
+ * comment-or-not heuristic applies uniformly to all matched literals.
+ */
+function stripJsLikeComments(content) {
+  return content
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
 function extractRequireSources(content) {
   const sources = [];
   let m;
+  const stripped = stripJsLikeComments(content);
   REQUIRE_LITERAL_RE.lastIndex = 0;
-  while ((m = REQUIRE_LITERAL_RE.exec(content)) !== null) {
+  while ((m = REQUIRE_LITERAL_RE.exec(stripped)) !== null) {
     sources.push(m[2]);
   }
   return sources;
@@ -379,8 +425,14 @@ function extractRequireSources(content) {
  * simple: one per line, `import x.y.Z` or `import x.y.Z as Alias` (or
  * `import x.y.*` for star imports). We capture the dotted FQN and let the
  * dotted resolver classify wildcards.
+ *
+ * The capture is a strict qualifiedName grammar — a leading identifier
+ * followed by zero or more `.identifier` segments and an optional trailing
+ * `.*` for star-imports. The looser `[\w.*]+` form previously here would
+ * match pathological inputs like `import ...` or `import .foo`.
  */
-const KOTLIN_IMPORT_RE = /^\s*import\s+([\w.*]+)(?:\s+as\s+\w+)?\s*$/gm;
+const KOTLIN_IMPORT_RE =
+  /^\s*import\s+(\w+(?:\.\w+)*(?:\.\*)?)(?:\s+as\s+\w+)?\s*$/gm;
 
 function extractKotlinSources(content) {
   const sources = [];
@@ -660,14 +712,25 @@ const RUBY_REQUIRE_RE =
   /\b(require_relative|require)\s*\(?\s*(['"])([^'"`\n]+?)\2/g;
 
 /**
+ * Strip Ruby line comments (`# ...` to end of line) before running the
+ * require regex. Ruby has no block comments at this scope (=begin/=end
+ * exists but is rare; tree-sitter would normally handle that). Like the JS
+ * stripper, this doesn't try to honor string contents — it's a heuristic.
+ */
+function stripRubyComments(content) {
+  return content.replace(/#[^\n]*/g, '');
+}
+
+/**
  * Return [{ kind: 'relative'|'absolute', source }] for every require /
  * require_relative call in a Ruby file.
  */
 function parseRubyImports(content) {
   const out = [];
   let m;
+  const stripped = stripRubyComments(content);
   RUBY_REQUIRE_RE.lastIndex = 0;
-  while ((m = RUBY_REQUIRE_RE.exec(content)) !== null) {
+  while ((m = RUBY_REQUIRE_RE.exec(stripped)) !== null) {
     out.push({
       kind: m[1] === 'require_relative' ? 'relative' : 'absolute',
       source: m[3],
@@ -723,6 +786,11 @@ export function resolveRubyImport({ kind, source }, file, ctx) {
  * where the prefix is normalized to include its trailing `\` and the dir is
  * a posix path without a trailing slash. Composer allows array values for
  * multiple roots, so we normalize singletons to single-element arrays.
+ *
+ * On parse failure (malformed JSON), emits a Warning: to stderr and returns
+ * the empty map — PHP `use` imports will all resolve to nothing in that case
+ * (no namespace mapping = no project-internal edges). This is preferable to
+ * the original silent-empty path which gave no signal to the operator.
  */
 function loadPhpAutoload(projectRoot) {
   const out = new Map();
@@ -731,7 +799,12 @@ function loadPhpAutoload(projectRoot) {
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(path, 'utf-8'));
-  } catch {
+  } catch (err) {
+    process.stderr.write(
+      `Warning: extract-import-map: composer.json at ${path} failed to ` +
+      `parse (${err.message}) — PSR-4 namespace mapping unavailable — ` +
+      `PHP imports will not resolve\n`,
+    );
     return out;
   }
   const psr4 = parsed?.autoload?.['psr-4'];
@@ -863,7 +936,20 @@ export function resolveRustImport(rawImport, file, ctx) {
   let baseDir;
   if (head === 'crate') {
     const crateSrc = findRustCrateSrc(importerDir, ctx.fileSet);
-    if (!crateSrc) return [];
+    if (!crateSrc) {
+      // Warn once per importer file (a single .rs file can have many
+      // `use crate::...` statements; suppress duplicate warnings).
+      const importerPath = toPosix(file.path);
+      if (!ctx._warnedNoRustCrateRoot.has(importerPath)) {
+        ctx._warnedNoRustCrateRoot.add(importerPath);
+        process.stderr.write(
+          `Warning: extract-import-map: Rust file ${importerPath} has ` +
+          `'use crate::' but no crate root (src/lib.rs or src/main.rs) ` +
+          `found — crate-relative imports unresolved\n`,
+        );
+      }
+      return [];
+    }
     baseDir = crateSrc;
   } else if (head === 'super') {
     // Walk up one directory from the importer
@@ -899,8 +985,12 @@ const RUST_MOD_RE = /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?mod\s+(\w+)\s*;\s*$/gm;
 function extractRustModSources(content) {
   const sources = [];
   let m;
+  // Rust uses the same line + block comment syntax as JS/TS, so we can reuse
+  // the same stripper. Without this, `// mod fake;` would phantom-register
+  // a submodule that doesn't exist on disk.
+  const stripped = stripJsLikeComments(content);
   RUST_MOD_RE.lastIndex = 0;
-  while ((m = RUST_MOD_RE.exec(content)) !== null) {
+  while ((m = RUST_MOD_RE.exec(stripped)) !== null) {
     // Synthesize as a `self::<name>` source so the regular Rust resolver
     // handles it (probes the importer's directory).
     sources.push(`self::${m[1]}`);
@@ -1042,15 +1132,32 @@ async function main() {
     throw new Error('Invalid input: must contain projectRoot and files array');
   }
 
-  // Create tree-sitter plugin with all configs that have WASM grammars
-  const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
-  const tsPlugin = new TreeSitterPlugin(tsConfigs);
-  await tsPlugin.init();
-
-  // Create registry and register tree-sitter + all non-code parsers
-  const registry = new PluginRegistry();
-  registry.register(tsPlugin);
-  registerAllParsers(registry);
+  // Create tree-sitter plugin with all configs that have WASM grammars.
+  //
+  // WHY graceful init: the most likely real-world failure mode is the WASM
+  // loader failing to locate or fetch the grammar binaries (cache eviction,
+  // restricted sandboxes, transient FS issues). When that happens, we still
+  // want the script to complete — producing an empty importMap for every
+  // code file — rather than crashing the whole project-scanner pipeline.
+  // The structural graph will lose import edges, but all OTHER analysis
+  // (file inventory, exports inferred from filenames, etc.) keeps working.
+  let registry = null;
+  let treeSitterReady = false;
+  try {
+    const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
+    const tsPlugin = new TreeSitterPlugin(tsConfigs);
+    await tsPlugin.init();
+    registry = new PluginRegistry();
+    registry.register(tsPlugin);
+    registerAllParsers(registry);
+    treeSitterReady = true;
+  } catch (err) {
+    process.stderr.write(
+      `Warning: extract-import-map: tree-sitter init failed ` +
+      `(${err.message}) — all importMap entries will be empty — ` +
+      `structural graph will have no import edges\n`,
+    );
+  }
 
   // Build resolution context (cached configs)
   const ctx = buildResolutionContext(projectRoot, files);
@@ -1064,6 +1171,14 @@ async function main() {
 
     // Non-code files always get an empty array
     if (file.fileCategory !== 'code') {
+      importMap[path] = [];
+      continue;
+    }
+
+    // Tree-sitter init failed earlier — produce empty importMap entries for
+    // every code file and skip the analysis path. The one-time warning was
+    // already emitted at startup.
+    if (!treeSitterReady) {
       importMap[path] = [];
       continue;
     }
