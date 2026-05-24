@@ -454,3 +454,34 @@ describe('compute-batches.mjs — neighborMap truncation', () => {
     }
   });
 });
+
+describe('compute-batches.mjs — fallback', () => {
+  let root;
+
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('falls back to count-based when Louvain throws (env-injected mock)', () => {
+    // We can't easily monkey-patch louvain mid-script in Vitest because the
+    // script runs in a subprocess. Instead, set an env var the script honors:
+    // UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW=1 → script throws inside its
+    // Louvain branch, exercising the fallback path.
+    root = setupProject('scan-result-3-cliques.json');
+    const result = spawnSync('node',
+      [SCRIPT, root],
+      { encoding: 'utf-8', env: { ...process.env, UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW: '1' } },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(
+      /Warning: compute-batches: Louvain failed.*falling back to count-based grouping/);
+    const out = readBatches(root);
+    expect(out.algorithm).toBe('count-fallback');
+    expect(out.totalFiles).toBe(9);
+    // Count-based: 12 files per batch → all 9 fit in one batch
+    const codeBatchFileCount = out.batches
+      .filter(b => b.files.every(f => f.fileCategory === 'code'))
+      .reduce((sum, b) => sum + b.files.length, 0);
+    expect(codeBatchFileCount).toBe(9);
+  });
+});

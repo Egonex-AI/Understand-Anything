@@ -189,6 +189,41 @@ function buildBatchOfMap(allBatches) {
   return m;
 }
 
+/**
+ * Returns Map<path, communityId> via Louvain. May throw — caller must catch
+ * and fall back if it does. Honors UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW=1
+ * to allow tests to exercise the fallback path.
+ */
+function runLouvain(codeFiles, importMap) {
+  if (process.env.UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW === '1') {
+    throw new Error('forced throw for test');
+  }
+  const g = new Graph({ type: 'undirected', allowSelfLoops: false });
+  for (const f of codeFiles) g.addNode(f.path);
+  for (const [src, targets] of Object.entries(importMap)) {
+    if (!g.hasNode(src)) continue;
+    for (const tgt of targets) {
+      if (!g.hasNode(tgt) || src === tgt || g.hasEdge(src, tgt)) continue;
+      g.addEdge(src, tgt);
+    }
+  }
+  const cs = louvain(g);  // { nodeId: communityId }
+  return new Map(Object.entries(cs));
+}
+
+/**
+ * Returns Map<path, communityId> via alphabetical chunking of `batchSize`
+ * files per batch. Deterministic, used as fallback when Louvain fails.
+ */
+function countBasedAssignment(codeFiles, batchSize = 12) {
+  const out = new Map();
+  const sorted = [...codeFiles].map(f => f.path).sort();
+  for (let i = 0; i < sorted.length; i++) {
+    out.set(sorted[i], `count_${Math.floor(i / batchSize)}`);
+  }
+  return out;
+}
+
 // ── Skeleton main: load → Louvain → print sizes ───────────────────────────
 async function main() {
   const projectRoot = process.argv[2];
@@ -213,52 +248,52 @@ async function main() {
 
   const exportsByPath = await extractExports(projectRoot, codeFiles);
 
-  // Build undirected import graph
-  const g = new Graph({ type: 'undirected', allowSelfLoops: false });
-  for (const f of codeFiles) g.addNode(f.path);
-  for (const [src, targets] of Object.entries(importMap)) {
-    if (!g.hasNode(src)) continue;
-    for (const tgt of targets) {
-      if (!g.hasNode(tgt) || src === tgt || g.hasEdge(src, tgt)) continue;
-      g.addEdge(src, tgt);
-    }
+  let algorithm = 'louvain';
+  let perFileCommunity;
+  try {
+    perFileCommunity = runLouvain(codeFiles, importMap);
+  } catch (err) {
+    process.stderr.write(
+      `Warning: compute-batches: Louvain failed (${err.message}) ` +
+      `— falling back to count-based grouping (12 files/batch) ` +
+      `— module semantic boundaries lost\n`,
+    );
+    perFileCommunity = countBasedAssignment(codeFiles, 12);
+    algorithm = 'count-fallback';
   }
-
-  // Run Louvain
-  const communities = louvain(g);  // { nodeId: communityId }
 
   // Group files by community id
   const filesByCommunity = new Map();
-  for (const [path, cid] of Object.entries(communities)) {
+  for (const [path, cid] of perFileCommunity) {
     if (!filesByCommunity.has(cid)) filesByCommunity.set(cid, []);
     filesByCommunity.get(cid).push(path);
   }
 
-  // Size enforcement: split any community > MAX_COMMUNITY_SIZE.
-  // Strategy: deterministic alphabetical chunking within the oversize community.
-  // Edge-betweenness would be more modularity-aware but adds dependency surface;
-  // alphabetical chunking is deterministic, locality-preserving for co-located
-  // files, and bounded by the cap. Each sub-community gets a fresh synthetic id.
+  // Size enforcement only on louvain output. count-fallback already chunked.
   const MAX_COMMUNITY_SIZE = 35;
   const splitCommunities = new Map();
   let nextSyntheticId = 0;
-  for (const [cid, paths] of filesByCommunity) {
-    if (paths.length <= MAX_COMMUNITY_SIZE) {
-      splitCommunities.set(cid, paths);
-      continue;
+  if (algorithm === 'louvain') {
+    for (const [cid, paths] of filesByCommunity) {
+      if (paths.length <= MAX_COMMUNITY_SIZE) {
+        splitCommunities.set(cid, paths);
+        continue;
+      }
+      process.stderr.write(
+        `Warning: compute-batches: community size ${paths.length} > max ${MAX_COMMUNITY_SIZE} ` +
+        `— splitting via alphabetical chunking — modularity may decrease\n`,
+      );
+      const sorted = [...paths].sort();
+      const parts = Math.ceil(paths.length / MAX_COMMUNITY_SIZE);
+      const perPart = Math.ceil(paths.length / parts);
+      for (let i = 0; i < parts; i++) {
+        const slice = sorted.slice(i * perPart, (i + 1) * perPart);
+        const synthId = `__split_${cid}_${nextSyntheticId++}`;
+        splitCommunities.set(synthId, slice);
+      }
     }
-    process.stderr.write(
-      `Warning: compute-batches: community size ${paths.length} > max ${MAX_COMMUNITY_SIZE} ` +
-      `— splitting via alphabetical chunking — modularity may decrease\n`,
-    );
-    const sorted = [...paths].sort();
-    const parts = Math.ceil(paths.length / MAX_COMMUNITY_SIZE);
-    const perPart = Math.ceil(paths.length / parts);
-    for (let i = 0; i < parts; i++) {
-      const slice = sorted.slice(i * perPart, (i + 1) * perPart);
-      const synthId = `__split_${cid}_${nextSyntheticId++}`;
-      splitCommunities.set(synthId, slice);
-    }
+  } else {
+    for (const [cid, paths] of filesByCommunity) splitCommunities.set(cid, paths);
   }
 
   // Sort communities by size desc, then by min-path asc for determinism
@@ -357,7 +392,7 @@ async function main() {
 
   const output = {
     schemaVersion: 1,
-    algorithm: 'louvain',
+    algorithm,
     totalFiles: scan.files.length,
     totalBatches: batches.length,
     exportsByPath: Object.fromEntries(exportsByPath),
