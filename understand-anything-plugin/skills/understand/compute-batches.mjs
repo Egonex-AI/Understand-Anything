@@ -177,6 +177,18 @@ function buildNonCodeBatches(nonCodeFiles) {
   return groups;
 }
 
+/**
+ * Build a lookup map from file path → batchIndex across all batches (code +
+ * non-code). Used to resolve cross-batch neighbor references in neighborMap.
+ */
+function buildBatchOfMap(allBatches) {
+  const m = new Map();
+  for (const b of allBatches) {
+    for (const f of b.files) m.set(f.path, b.batchIndex);
+  }
+  return m;
+}
+
 // ── Skeleton main: load → Louvain → print sizes ───────────────────────────
 async function main() {
   const projectRoot = process.argv[2];
@@ -264,16 +276,6 @@ async function main() {
   // subset of files (see addNode loop above). fileMetaByPath.get() can
   // never return undefined here.
 
-  // Helper: lookup batchIndex by path (any batch — code or non-code)
-  // Build it after we know batch assignments.
-  function buildBatchOfMap(allBatches) {
-    const m = new Map();
-    for (const b of allBatches) {
-      for (const f of b.files) m.set(f.path, b.batchIndex);
-    }
-    return m;
-  }
-
   // First-pass: assemble bare batches (no batchImportData/neighborMap yet)
   const codeBatchObjsBare = sortedCommunities.map(([, paths], idx) => ({
     batchIndex: idx + 1,
@@ -337,11 +339,14 @@ async function main() {
 
       if (rawCount > MAX_NEIGHBORS) {
         kept.sort((a, b2) => (NEIGHBOR_DEGREE.get(b2.path) || 0)
-                            - (NEIGHBOR_DEGREE.get(a.path) || 0));
+                            - (NEIGHBOR_DEGREE.get(a.path) || 0)
+                            || a.path.localeCompare(b2.path));  // deterministic tiebreak
+        const beforeSlice = kept.length;
         kept = kept.slice(0, MAX_NEIGHBORS);
         process.stderr.write(
-          `Warning: compute-batches: neighborMap for ${f.path} truncated from ` +
-          `${rawCount} to top ${MAX_NEIGHBORS} (by neighbor degree)\n`,
+          `Warning: compute-batches: neighborMap for ${f.path} has high 1-hop degree ${rawCount} ` +
+          `— exceeds soft cap of ${MAX_NEIGHBORS} — keeping top ${kept.length} cross-batch entries ` +
+          `(${beforeSlice - kept.length} dropped by degree sort)\n`,
         );
       }
 

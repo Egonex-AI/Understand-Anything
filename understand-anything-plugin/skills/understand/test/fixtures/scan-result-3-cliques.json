@@ -22,7 +22,7 @@
     "src/auth/session.ts": ["src/auth/tokens.ts"],
     "src/auth/tokens.ts": [],
     "src/api/handlers.ts": ["src/api/middleware.ts", "src/api/routes.ts"],
-    "src/api/middleware.ts": ["src/api/routes.ts"],
+    "src/api/middleware.ts": ["src/api/routes.ts", "src/auth/session.ts"],
     "src/api/routes.ts": [],
     "src/db/users.ts": ["src/db/queries.ts", "src/db/migrations.ts"],
     "src/db/queries.ts": ["src/db/migrations.ts"],

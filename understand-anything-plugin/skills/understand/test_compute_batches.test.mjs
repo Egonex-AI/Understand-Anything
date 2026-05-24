@@ -346,42 +346,72 @@ describe('compute-batches.mjs — neighborMap + batchImportData', () => {
   });
 
   it('neighborMap entries carry symbols when target has exports', () => {
-    // Force a/b into different batches via an asymmetric fixture inline.
     const root = mkdtempSync(join(tmpdir(), 'ua-cb-nbr-'));
     mkdirSync(join(root, '.understand-anything', 'intermediate'), { recursive: true });
-    mkdirSync(join(root, 'src'), { recursive: true });
-    writeFileSync(join(root, 'src', 'a.ts'),
+    mkdirSync(join(root, 'src', 'a'), { recursive: true });
+    mkdirSync(join(root, 'src', 'b'), { recursive: true });
+
+    // Cluster A: 3 tightly-imported files. a/core.ts exports symbols.
+    writeFileSync(join(root, 'src', 'a', 'core.ts'),
       'export function findUser(id: string) { return null; }\nexport class User {}\n');
-    writeFileSync(join(root, 'src', 'b.ts'),
-      'import { findUser } from "./a";\nexport const wrap = () => findUser("x");\n');
+    writeFileSync(join(root, 'src', 'a', 'helper1.ts'),
+      'import { findUser } from "./core";\nexport const h1 = () => findUser("x");\n');
+    writeFileSync(join(root, 'src', 'a', 'helper2.ts'),
+      'import { User } from "./core";\nimport { h1 } from "./helper1";\nexport const h2 = () => h1();\n');
+
+    // Cluster B: 3 tightly-imported files. b/entry.ts has ONE cross-cluster import to a/core.ts.
+    writeFileSync(join(root, 'src', 'b', 'entry.ts'),
+      'import { findUser } from "../a/core";\nexport const entry = () => findUser("y");\n');
+    writeFileSync(join(root, 'src', 'b', 'middle.ts'),
+      'import { entry } from "./entry";\nexport const middle = () => entry();\n');
+    writeFileSync(join(root, 'src', 'b', 'leaf.ts'),
+      'import { middle } from "./middle";\nexport const leaf = () => middle();\n');
+
+    const files = [
+      { path: 'src/a/core.ts',    language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/a/helper1.ts', language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/a/helper2.ts', language: 'typescript', sizeLines: 3, fileCategory: 'code' },
+      { path: 'src/b/entry.ts',   language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/b/middle.ts',  language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/b/leaf.ts',    language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+    ];
     const scan = {
       name: 't', description: '',
       languages: ['typescript'], frameworks: [],
-      files: [
-        { path: 'src/a.ts', language: 'typescript', sizeLines: 2, fileCategory: 'code' },
-        { path: 'src/b.ts', language: 'typescript', sizeLines: 2, fileCategory: 'code' },
-      ],
-      totalFiles: 2, filteredByIgnore: 0, estimatedComplexity: 'small',
-      importMap: { 'src/a.ts': [], 'src/b.ts': ['src/a.ts'] },
+      files,
+      totalFiles: 6, filteredByIgnore: 0, estimatedComplexity: 'small',
+      importMap: {
+        'src/a/core.ts': [],
+        'src/a/helper1.ts': ['src/a/core.ts'],
+        'src/a/helper2.ts': ['src/a/core.ts', 'src/a/helper1.ts'],
+        'src/b/entry.ts': ['src/a/core.ts'],  // CROSS-CLUSTER
+        'src/b/middle.ts': ['src/b/entry.ts'],
+        'src/b/leaf.ts': ['src/b/middle.ts'],
+      },
     };
     writeFileSync(
       join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
       JSON.stringify(scan));
+
     const result = runScript(root);
     expect(result.status).toBe(0);
     const out = readBatches(root);
-    // If Louvain puts a and b in the same community (likely for n=2 with one edge),
-    // this test asserts nothing specific (no cross-batch neighbors exist). We just
-    // assert: any cross-batch neighbor entry pointing to a.ts carries the symbols.
-    for (const b of out.batches) {
-      for (const [, neighbors] of Object.entries(b.neighborMap)) {
+
+    // Expect 2 communities (cluster A and cluster B). Verify that some batch's
+    // neighborMap entry references src/a/core.ts with its symbols.
+    let sawSymbols = false;
+    for (const batch of out.batches) {
+      for (const [, neighbors] of Object.entries(batch.neighborMap)) {
         for (const n of neighbors) {
-          if (n.path === 'src/a.ts') {
+          if (n.path === 'src/a/core.ts') {
             expect(n.symbols).toEqual(expect.arrayContaining(['findUser', 'User']));
+            sawSymbols = true;
           }
         }
       }
     }
+    expect(sawSymbols).toBe(true);
+
     rmSync(root, { recursive: true, force: true });
   });
 });
@@ -414,7 +444,8 @@ describe('compute-batches.mjs — neighborMap truncation', () => {
       JSON.stringify(scan));
     const result = runScript(root);
     expect(result.status).toBe(0);
-    expect(result.stderr).toMatch(/neighborMap for src\/hub\.ts truncated from 60 to top 50/);
+    expect(result.stderr).toMatch(
+      /neighborMap for src\/hub\.ts has high 1-hop degree 60 — exceeds soft cap of 50/);
     const out = readBatches(root);
     // Find hub.ts and confirm its neighbor list capped at 50 (in whichever batch it landed)
     for (const b of out.batches) {
