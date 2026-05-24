@@ -445,6 +445,95 @@ describe('extract-import-map.mjs — C# resolver', () => {
   });
 });
 
+describe('extract-import-map.mjs — Ruby resolver', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('resolves ruby require_relative + require load-path probes', () => {
+    projectRoot = setupTree({
+      'app/controllers/users_controller.rb':
+        `require_relative '../helpers/auth'\nrequire 'shared/logger'\nrequire 'json'\n\nclass UsersController\nend\n`,
+      'app/helpers/auth.rb':
+        `module Auth\nend\n`,
+      'lib/shared/logger.rb':
+        `module Shared\n  module Logger\n  end\nend\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'app/controllers/users_controller.rb', language: 'ruby', fileCategory: 'code' },
+        { path: 'app/helpers/auth.rb', language: 'ruby', fileCategory: 'code' },
+        { path: 'lib/shared/logger.rb', language: 'ruby', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // require_relative '../helpers/auth' -> app/helpers/auth.rb
+    // require 'shared/logger' -> lib/shared/logger.rb (load-path probe)
+    // require 'json' -> external (no project file)
+    expect(result.output.importMap['app/controllers/users_controller.rb']).toEqual([
+      'app/helpers/auth.rb',
+      'lib/shared/logger.rb',
+    ]);
+  });
+});
+
+describe('extract-import-map.mjs — PHP resolver', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('resolves php use directives via composer.json PSR-4 autoload', () => {
+    projectRoot = setupTree({
+      'composer.json': JSON.stringify({
+        autoload: {
+          'psr-4': {
+            'App\\': 'src/',
+            'App\\Tests\\': 'tests/',
+          },
+        },
+      }),
+      'src/Http/Controller.php':
+        `<?php\nnamespace App\\Http;\n\nuse App\\Models\\User;\nuse App\\Util\\Logger;\nuse Symfony\\Component\\HttpFoundation\\Request;\n\nclass Controller { }\n`,
+      'src/Models/User.php':
+        `<?php\nnamespace App\\Models;\nclass User { }\n`,
+      'src/Util/Logger.php':
+        `<?php\nnamespace App\\Util;\nclass Logger { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'composer.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/Http/Controller.php', language: 'php', fileCategory: 'code' },
+        { path: 'src/Models/User.php', language: 'php', fileCategory: 'code' },
+        { path: 'src/Util/Logger.php', language: 'php', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // App\Models\User -> src/Models/User.php (App\ -> src/)
+    // App\Util\Logger -> src/Util/Logger.php
+    // Symfony\... -> external (no autoload entry)
+    expect(result.output.importMap['src/Http/Controller.php']).toEqual([
+      'src/Models/User.php',
+      'src/Util/Logger.php',
+    ]);
+  });
+});
+
 describe('extract-import-map.mjs — output schema invariants', () => {
   let projectRoot;
 

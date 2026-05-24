@@ -229,6 +229,8 @@ function buildResolutionContext(projectRoot, files) {
   const kotlinIndex = buildSuffixIndex(files, p => p.endsWith('.kt'));
   const csIndex = buildSuffixIndex(files, p => p.endsWith('.cs'));
 
+  const phpAutoload = loadPhpAutoload(projectRoot);
+
   return {
     projectRoot,
     fileSet,
@@ -238,8 +240,7 @@ function buildResolutionContext(projectRoot, files) {
     javaIndex,
     kotlinIndex,
     csIndex,
-    // Filled in by later commits as more languages come online
-    phpAutoload: new Map(),
+    phpAutoload,
   };
 }
 
@@ -639,6 +640,152 @@ export function resolveCSharpImport(rawImport, _file, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Ruby resolver
+//
+// Two distinct Ruby import forms, with different resolution semantics:
+//   - `require_relative 'foo'`  -> resolve against the importer's directory,
+//                                  append .rb
+//   - `require 'foo/bar'`       -> load-path probe: lib/foo/bar.rb,
+//                                  app/foo/bar.rb, or foo/bar.rb (whichever
+//                                  exists)
+//
+// Tree-sitter's Ruby extractor uses a single `imports` field for both forms
+// and drops the method name, so we cannot tell them apart from the
+// extractor output alone. Instead we use a regex pass on the file content,
+// which preserves the method name as the discriminator.
+//
+// The two forms are unambiguous in source — both start with the method name
+// followed by a quoted argument — so a focused regex is reliable.
+// ---------------------------------------------------------------------------
+
+const RUBY_REQUIRE_RE =
+  /\b(require_relative|require)\s*\(?\s*(['"])([^'"`\n]+?)\2/g;
+
+/**
+ * Return [{ kind: 'relative'|'absolute', source }] for every require /
+ * require_relative call in a Ruby file.
+ */
+function parseRubyImports(content) {
+  const out = [];
+  let m;
+  RUBY_REQUIRE_RE.lastIndex = 0;
+  while ((m = RUBY_REQUIRE_RE.exec(content)) !== null) {
+    out.push({
+      kind: m[1] === 'require_relative' ? 'relative' : 'absolute',
+      source: m[3],
+    });
+  }
+  return out;
+}
+
+/**
+ * Resolve a single Ruby require. Returns array (0 or 1 match).
+ *
+ * For require_relative: append `.rb` if missing, resolve against importer dir.
+ * For require: probe lib/<src>.rb, app/<src>.rb, <src>.rb.
+ */
+export function resolveRubyImport({ kind, source }, file, ctx) {
+  if (!source) return [];
+  const importerDir = dirOf(toPosix(file.path));
+  const withExt = source.endsWith('.rb') ? source : source + '.rb';
+
+  if (kind === 'relative') {
+    const base = resolveRelative(importerDir, withExt);
+    return ctx.fileSet.has(base) ? [base] : [];
+  }
+
+  // Load-path probe order
+  const probes = [`lib/${withExt}`, `app/${withExt}`, withExt];
+  for (const p of probes) {
+    if (ctx.fileSet.has(p)) return [p];
+  }
+  return [];
+}
+
+// ---------------------------------------------------------------------------
+// PHP resolver
+//
+// PHP's `use Vendor\Pkg\Class;` is namespace-based. Composer's PSR-4
+// autoload map (`composer.json` -> autoload.psr-4) declares which directory
+// holds the files for each namespace prefix, e.g.:
+//   { "App\\": "src/" }  means App\Foo\Bar lives at src/Foo/Bar.php
+//
+// Resolution:
+//   1. Find the longest matching autoload prefix.
+//   2. Strip that prefix from the FQN.
+//   3. Translate backslashes to forward slashes.
+//   4. Append `.php` and probe the file set.
+//
+// Imports whose namespace is not declared in any autoload entry are
+// external — dropped.
+// ---------------------------------------------------------------------------
+
+/**
+ * Load composer.json autoload.psr-4 map. Returns Map<namespacePrefix, dir[]>
+ * where the prefix is normalized to include its trailing `\` and the dir is
+ * a posix path without a trailing slash. Composer allows array values for
+ * multiple roots, so we normalize singletons to single-element arrays.
+ */
+function loadPhpAutoload(projectRoot) {
+  const out = new Map();
+  const path = join(projectRoot, 'composer.json');
+  if (!existsSync(path)) return out;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return out;
+  }
+  const psr4 = parsed?.autoload?.['psr-4'];
+  if (!psr4 || typeof psr4 !== 'object') return out;
+  for (const [prefix, target] of Object.entries(psr4)) {
+    const targets = Array.isArray(target) ? target : [target];
+    // Normalize each dir to posix, strip leading `./`, strip trailing `/`
+    const normalized = targets
+      .filter(t => typeof t === 'string')
+      .map(t => toPosix(t).replace(/\/$/, ''));
+    // Ensure the prefix ends with a backslash so the longest-prefix-match
+    // does not accidentally split mid-segment ("App" vs "Application").
+    const normalizedPrefix = prefix.endsWith('\\') ? prefix : prefix + '\\';
+    out.set(normalizedPrefix, normalized);
+  }
+  return out;
+}
+
+/**
+ * Resolve a PHP `use` FQN. Returns array (0 or 1 match — the first dir in
+ * the PSR-4 target list that contains the file).
+ */
+export function resolvePhpImport(rawImport, _file, ctx) {
+  if (!rawImport || typeof rawImport !== 'string') return [];
+  // Strip leading backslash if present (PHP allows `use \Foo\Bar;`)
+  const fqn = rawImport.startsWith('\\') ? rawImport.slice(1) : rawImport;
+  if (!fqn) return [];
+
+  // Longest-prefix match across all autoload entries. Walk the map and pick
+  // the entry with the longest matching prefix, so `Foo\Bar` does not match
+  // a prefix `F\` if `Foo\` is also present.
+  let bestPrefix = '';
+  let bestDirs = null;
+  for (const [prefix, dirs] of ctx.phpAutoload) {
+    if (fqn.startsWith(prefix) && prefix.length > bestPrefix.length) {
+      bestPrefix = prefix;
+      bestDirs = dirs;
+    }
+  }
+  if (!bestDirs) return [];
+
+  // Drop the prefix (it covers the directory), translate `\` to `/`
+  const relative = fqn.slice(bestPrefix.length).replace(/\\/g, '/');
+  if (!relative) return [];
+  for (const dir of bestDirs) {
+    const candidate = dir ? `${dir}/${relative}.php` : `${relative}.php`;
+    if (ctx.fileSet.has(candidate)) return [candidate];
+  }
+  return [];
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
@@ -682,7 +829,12 @@ function resolveImport(imp, file, ctx) {
   if (lang === 'csharp') {
     return resolveCSharpImport(src, file, ctx);
   }
-  // Other languages handled in later commits
+  if (lang === 'php') {
+    return resolvePhpImport(src, file, ctx);
+  }
+  // Ruby is handled via the extra-sources pathway (see below) because its
+  // tree-sitter extractor flattens require vs require_relative into a
+  // single field, losing the discriminator the resolver needs.
   return [];
 }
 
@@ -763,26 +915,37 @@ async function main() {
     // Analyze + resolve
     let resolved;
     try {
-      const analysis = registry.analyzeFile(file.path, content);
-      const imports = analysis?.imports ?? [];
       const resolvedSet = new Set();
-      for (const imp of imports) {
-        const outs = resolveImport(imp, file, ctx);
-        for (const out of outs) {
-          if (out && ctx.fileSet.has(out)) {
-            resolvedSet.add(out);
+
+      // Ruby is the only language whose tree-sitter import field doesn't
+      // preserve the require vs require_relative discriminator, so the
+      // resolver needs the regex-parsed shape directly. All other tree-sitter
+      // languages get analyzed once and dispatched normally.
+      if (file.language === 'ruby') {
+        for (const imp of parseRubyImports(content)) {
+          for (const out of resolveRubyImport(imp, file, ctx)) {
+            if (out && ctx.fileSet.has(out)) resolvedSet.add(out);
           }
         }
-      }
-      // Supplemental pass for sources tree-sitter doesn't capture (e.g. CJS
-      // require() calls). Dedup with the set above so we don't double-count.
-      for (const extra of extractExtraImportSources(file, content)) {
-        // Synthesize a minimal `imp`-shaped object so the dispatcher sees
-        // the same surface for both tree-sitter and supplemental sources.
-        const outs = resolveImport({ source: extra, specifiers: [] }, file, ctx);
-        for (const out of outs) {
-          if (out && ctx.fileSet.has(out)) {
-            resolvedSet.add(out);
+      } else {
+        const analysis = registry.analyzeFile(file.path, content);
+        const imports = analysis?.imports ?? [];
+        for (const imp of imports) {
+          const outs = resolveImport(imp, file, ctx);
+          for (const out of outs) {
+            if (out && ctx.fileSet.has(out)) {
+              resolvedSet.add(out);
+            }
+          }
+        }
+        // Supplemental pass for sources tree-sitter doesn't capture (e.g.
+        // CJS require() calls, Kotlin imports). Dedup via the same set.
+        for (const extra of extractExtraImportSources(file, content)) {
+          const outs = resolveImport({ source: extra, specifiers: [] }, file, ctx);
+          for (const out of outs) {
+            if (out && ctx.fileSet.has(out)) {
+              resolvedSet.add(out);
+            }
           }
         }
       }
