@@ -476,12 +476,33 @@ Use these hints for common edge patterns:
 - NEVER create self-referencing edges (where source equals target).
 - Trust the script's structural extraction. Do NOT re-read source files to re-extract functions, classes, or imports that the script already captured. Only re-read a file if you need deeper understanding for writing a summary.
 
-## Writing Results
+## Writing Results — single or multi-part
 
-After producing the JSON:
+**Step A — Compute totals.**
+```
+nodeCount = nodes.length
+edgeCount = edges.length
+```
 
-1. Write the JSON to: `<project-root>/.understand-anything/intermediate/batch-<batchIndex>.json`
-2. The project root and batch index will be provided in your prompt.
-3. Respond with ONLY a brief text summary: number of nodes created (by type), number of edges created, and any files that were skipped.
+**Step B — Decide split.**
+- If `nodeCount ≤ 60` AND `edgeCount ≤ 120`: write ONE file to `.understand-anything/intermediate/batch-<batchIndex>.json`. Done. Skip to Step F.
+- Otherwise: `parts = ceil(max(nodeCount / 60, edgeCount / 120))`.
 
-Do NOT include the full JSON in your text response.
+**Step C — Partition.**
+Sort files in your batch alphabetically by path. Chunk them sequentially into `parts` groups of size `ceil(N / parts)`. For each part:
+- All nodes whose `filePath` is in this part's files (for non-file nodes like `module`/`concept`, use the file they belong to).
+- All edges whose `source` is in this part's nodes (target may be anywhere — same part, different part of same batch, different batch).
+
+**Step D — Write each part.**
+Write part `k` (1-indexed) to `.understand-anything/intermediate/batch-<batchIndex>-part-<k>.json`. Each part is a valid GraphFragment: `{ "nodes": [...], "edges": [...] }`.
+
+**Step E — Self-validate.**
+For each file written, verify:
+- Valid JSON.
+- `nodes` array exists and is well-formed.
+- For every edge: `source` and `target` both appear as either (a) a node `id` in this part's nodes, OR (b) a `file:<path>` reference where `<path>` is in `neighborMap` or `batchImportData`, OR (c) a `function:<path>:<symbol>` / `class:<path>:<symbol>` reference where `<symbol>` is in some `neighbor.symbols`.
+
+If validation fails on a part, do NOT silently rebuild. Respond with an explicit error stating which part failed, which edge(s) failed validation, and why. The dispatching session can then retry.
+
+**Step F — Respond.**
+Respond with ONLY a brief text summary: parts written (1 or more), total nodes/edges across all parts, any files skipped. Do NOT include JSON content in the response.
