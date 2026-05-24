@@ -268,12 +268,48 @@ describe('extract-import-map.mjs — Python resolver', () => {
     });
 
     expect(result.status).toBe(0);
-    // `from . import helpers` should resolve `helpers` as a sibling submodule
-    // by walking through resolvePythonProbe. `from .utils import shout`
-    // resolves to src/utils.py. `from ..core import boot` -> core.py.
+    // `from . import helpers` resolves `helpers` as a sibling submodule
+    // (`src/helpers.py`) even though `src/__init__.py` is absent — PEP 328
+    // implicit namespace packages don't require it. `from .utils import shout`
+    // resolves to `src/utils.py`. `from ..core import boot` -> `core.py`.
     expect(result.output.importMap['src/app.py']).toEqual([
       'core.py',
+      'src/helpers.py',
       'src/utils.py',
+    ]);
+  });
+
+  // Regression for Codex review #2 on PR #204: `from . import x` was
+  // dropped when no `__init__.py` was present at the importer's package
+  // dir, because resolvePythonProbe gated specifier probing on the package
+  // marker. Modern Python (PEP 420 namespace packages) commonly omits it.
+  it('resolves `from . import x` for namespace packages (no __init__.py)', () => {
+    projectRoot = setupTree({
+      'src/svc/main.py':
+        `from . import helpers, util\nfrom . import nested\n`,
+      'src/svc/helpers.py': `def help(): pass\n`,
+      'src/svc/util.py': `def u(): pass\n`,
+      'src/svc/nested/__init__.py': `# package\n`,
+      // Crucially: NO src/svc/__init__.py — namespace package
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/svc/main.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/svc/helpers.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/svc/util.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/svc/nested/__init__.py', language: 'python', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // All three siblings should resolve — helpers.py + util.py as direct
+    // .py modules, nested/ as a package via its __init__.py.
+    expect(result.output.importMap['src/svc/main.py']).toEqual([
+      'src/svc/helpers.py',
+      'src/svc/nested/__init__.py',
+      'src/svc/util.py',
     ]);
   });
 

@@ -602,6 +602,28 @@ export function resolvePythonImport(rawImport, specifiers, file, ctx) {
       return [];
     }
     const baseParts = importerParts.slice(0, importerParts.length - dropLevels);
+
+    // `from .[..] import x, y` with no dotted tail — specifiers are siblings
+    // at `baseParts`. Probe directly without requiring `<baseParts>/__init__.py`
+    // to exist: PEP 328 implicit namespace packages are common in modern
+    // Python (no `__init__.py`), and `resolvePythonProbe` would otherwise
+    // gate specifier resolution on the package marker and drop these imports.
+    if (tailSegments.length === 0) {
+      if (!Array.isArray(specifiers) || specifiers.length === 0) return [];
+      const base = baseParts.join('/');
+      const matches = [];
+      for (const spec of specifiers) {
+        // Wildcard `*` and qualified specifiers (`Foo.bar`) skip; the
+        // surface name is what tree-sitter records for `from . import x`.
+        if (!spec || spec === '*' || spec.includes('.')) continue;
+        const subFile = base ? `${base}/${spec}.py` : `${spec}.py`;
+        const subInit = base ? `${base}/${spec}/__init__.py` : `${spec}/__init__.py`;
+        if (ctx.fileSet.has(subFile)) matches.push(subFile);
+        else if (ctx.fileSet.has(subInit)) matches.push(subInit);
+      }
+      return matches;
+    }
+
     const moduleParts = baseParts.concat(tailSegments);
     return resolvePythonProbe(moduleParts, specifiers, ctx);
   }
