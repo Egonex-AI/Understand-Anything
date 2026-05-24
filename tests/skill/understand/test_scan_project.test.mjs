@@ -384,6 +384,26 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     expect(byPath(r.output, 'docker-compose.yml').fileCategory).toBe('infra');
     expect(byPath(r.output, 'docker-compose.yml').language).toBe('yaml');
   });
+
+  // Regression: path.extname returns '' for `.env` and the second segment
+  // for `.env.local` — neither hits CATEGORY_BY_EXT['.env']. Dotfile-style
+  // configs were falling through to `code` / `unknown`. Caught by Codex
+  // review on PR #204.
+  it('dotfile configs (.env, .env.local, .env.production) map to config + env language', () => {
+    projectRoot = setupTree({
+      '.env': 'API_KEY=abc\n',
+      '.env.local': 'LOCAL=1\n',
+      '.env.production': 'PROD=1\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    for (const p of ['.env', '.env.local', '.env.production']) {
+      expect(byPath(r.output, p).fileCategory).toBe('config');
+      // LANGUAGE_BY_EXT['.env'] -> 'config' (the language id itself; not
+      // a typo — the language for env files is the 'config' bucket).
+      expect(byPath(r.output, p).language).toBe('config');
+    }
+  });
 });
 
 describe('scan-project.mjs — .understandignore handling', () => {

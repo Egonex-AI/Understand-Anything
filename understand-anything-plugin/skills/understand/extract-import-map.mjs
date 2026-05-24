@@ -969,9 +969,13 @@ function parseComposerAutoloadText(raw) {
     const normalized = targets
       .filter(t => typeof t === 'string')
       .map(t => toPosix(t).replace(/\/$/, ''));
-    // Ensure the prefix ends with a backslash so the longest-prefix-match
-    // does not accidentally split mid-segment ("App" vs "Application").
-    const normalizedPrefix = prefix.endsWith('\\') ? prefix : prefix + '\\';
+    // Ensure non-empty prefixes end with a backslash so the
+    // longest-prefix-match does not accidentally split mid-segment
+    // ("App" vs "Application"). Preserve the empty prefix as-is — it's
+    // Composer's fallback mapping (`"psr-4": {"": "src/"}`) and means
+    // "any namespace resolves under this dir". Appending `\` would
+    // convert it into a prefix that matches nothing.
+    const normalizedPrefix = prefix === '' || prefix.endsWith('\\') ? prefix : prefix + '\\';
     out.set(normalizedPrefix, normalized);
   }
   return out;
@@ -1052,15 +1056,19 @@ export function resolvePhpImport(rawImport, file, ctx) {
   // Longest-prefix match across this composer.json's autoload entries.
   // Walk the map and pick the entry with the longest matching prefix, so
   // `Foo\Bar` does not match a prefix `F\` if `Foo\` is also present.
-  let bestPrefix = '';
+  // Use `null` as the sentinel rather than 0-length so the empty PSR-4
+  // fallback prefix (`""` → `src/`) can win when nothing more specific
+  // matches; otherwise `prefix.length > bestPrefix.length` would always
+  // be `0 > 0 = false` for the empty prefix.
+  let bestPrefix = null;
   let bestDirs = null;
   for (const [prefix, dirs] of autoload) {
-    if (fqn.startsWith(prefix) && prefix.length > bestPrefix.length) {
+    if (fqn.startsWith(prefix) && (bestPrefix === null || prefix.length > bestPrefix.length)) {
       bestPrefix = prefix;
       bestDirs = dirs;
     }
   }
-  if (!bestDirs) return [];
+  if (bestDirs === null) return [];
 
   // Drop the prefix (it covers the directory), translate `\` to `/`.
   const relative = fqn.slice(bestPrefix.length).replace(/\\/g, '/');

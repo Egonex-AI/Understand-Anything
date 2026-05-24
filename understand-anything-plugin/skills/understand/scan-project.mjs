@@ -225,6 +225,14 @@ export function detectLanguage(filePath) {
   // Dockerfile.dev, Dockerfile.prod, etc. — common variant form.
   if (base === 'Dockerfile' || base.startsWith('Dockerfile.')) return 'dockerfile';
 
+  // Dotfile names like .env, .env.local — path.extname returns '' for
+  // single-segment dotfiles (e.g. '.env') and the SECOND segment for
+  // compound dotfiles (e.g. '.local' for '.env.local'). Neither hits the
+  // intended LANGUAGE_BY_EXT['.env'] mapping. Try the leading dotfile
+  // portion first so `.env`, `.env.local`, `.env.production` all map.
+  const dotKey = dotfileKey(base);
+  if (dotKey && LANGUAGE_BY_EXT[dotKey]) return LANGUAGE_BY_EXT[dotKey];
+
   if (ext) {
     const byExt = LANGUAGE_BY_EXT[ext];
     if (byExt) return byExt;
@@ -237,6 +245,25 @@ export function detectLanguage(filePath) {
   if (byFilename) return byFilename;
 
   return 'unknown';
+}
+
+/**
+ * Extract the canonical dotfile "extension" from a basename, or null.
+ *
+ * `.env`          -> `.env`
+ * `.env.local`    -> `.env`
+ * `.bashrc`       -> `.bashrc`
+ * `package.json`  -> null (not a dotfile)
+ *
+ * Used by both detectLanguage and detectCategory so dotfile-style configs
+ * (e.g., `.env`, `.env.local`, `.env.production`) get their leading
+ * segment treated as the implicit extension instead of falling through
+ * to `unknown` / `code`.
+ */
+function dotfileKey(base) {
+  if (!base.startsWith('.')) return null;
+  const m = base.match(/^(\.[a-z0-9]+)/i);
+  return m ? m[1].toLowerCase() : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +398,14 @@ export function detectCategory(filePath) {
   if (ext) {
     const byExt = CATEGORY_BY_EXT[ext];
     if (byExt) return byExt;
+  }
+
+  // Rule 4.5: dotfile-style configs (.env, .env.local, .env.production).
+  // path.extname misses these — see dotfileKey docstring.
+  const dotKey = dotfileKey(base);
+  if (dotKey) {
+    const byDot = CATEGORY_BY_EXT[dotKey];
+    if (byDot) return byDot;
   }
 
   // Rule 5: filename-based config catch-all for no-extension config files

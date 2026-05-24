@@ -751,6 +751,42 @@ describe('extract-import-map.mjs — PHP resolver', () => {
       'packages/bar/src/Z.php',
     );
   });
+
+  // Regression: Composer's fallback autoload mapping `"psr-4": {"": "src/"}`
+  // means "any namespace resolves under src/". Earlier code appended `\` to
+  // every prefix (so `""` became `"\\"`, matching nothing) AND the
+  // longest-prefix loop initialized bestPrefix to `''` and required
+  // strict `>` — so even when the empty prefix WAS preserved it could
+  // never win. Both fixes are required for this test to pass. Caught by
+  // Codex review on PR #204.
+  it('resolves PSR-4 empty-prefix fallback ("": "src/")', () => {
+    projectRoot = setupTree({
+      'composer.json': JSON.stringify({
+        autoload: {
+          'psr-4': { '': 'src/' },
+        },
+      }),
+      'src/Foo/Bar.php':
+        `<?php\nnamespace Foo;\n\nuse Foo\\Baz;\n\nclass Bar { }\n`,
+      'src/Foo/Baz.php':
+        `<?php\nnamespace Foo;\nclass Baz { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'composer.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/Foo/Bar.php', language: 'php', fileCategory: 'code' },
+        { path: 'src/Foo/Baz.php', language: 'php', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Empty prefix means `Foo\Baz` -> `src/Foo/Baz.php` directly.
+    expect(result.output.importMap['src/Foo/Bar.php']).toEqual([
+      'src/Foo/Baz.php',
+    ]);
+  });
 });
 
 describe('extract-import-map.mjs — Rust resolver', () => {
