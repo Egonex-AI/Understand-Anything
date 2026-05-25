@@ -1,0 +1,28 @@
+{
+  "name": "understand-anything",
+  "version": "2.7.6",
+  "description": "AI-powered codebase understanding - analyze, visualize, and explain any project",
+  "author": {
+    "name": "Lum1104"
+  },
+  "homepage": "https://github.com/Lum1104/Understand-Anything",
+  "repository": "https://github.com/Lum1104/Understand-Anything",
+  "license": "MIT",
+  "keywords": ["codebase-analysis", "knowledge-graph", "architecture", "onboarding", "dashboard"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Understand Anything",
+    "shortDescription": "Analyze, visualize, and explain any codebase.",
+    "longDescription": "Understand Anything combines LLM analysis with static code scanning to build interactive architecture maps, onboarding guides, and codebase explanations.",
+    "developerName": "Lum1104",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/Lum1104/Understand-Anything",
+    "defaultPrompt": [
+      "Map this codebase with Understand Anything.",
+      "Explain the architecture of this project.",
+      "Build an onboarding guide for this repo."
+    ],
+    "brandColor": "#D4A574"
+  }
+}
