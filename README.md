@@ -212,6 +212,8 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 
 Cursor auto-discovers the plugin via `.cursor-plugin/plugin.json` when this repo is cloned. No manual installation needed — just clone and open in Cursor.
 
+If auto-discovery doesn't pick it up, install it manually: open **Cursor Settings → Plugins**, paste `https://github.com/Lum1104/Understand-Anything` into the search field, and add it from there.
+
 ### VS Code + GitHub Copilot
 
 VS Code with GitHub Copilot (v1.108+) auto-discovers the plugin via `.copilot-plugin/plugin.json` when this repo is cloned. No manual installation needed — just clone and open in VS Code.

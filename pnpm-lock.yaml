@@ -38,6 +38,12 @@ importers:
       '@understand-anything/core':
         specifier: workspace:*
         version: link:packages/core
+      graphology:
+        specifier: ~0.26.0
+        version: 0.26.0(graphology-types@0.24.8)
+      graphology-communities-louvain:
+        specifier: ^2.0.2
+        version: 2.0.2(graphology-types@0.24.8)
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -1858,6 +1864,11 @@ packages:
 
   graphology@0.25.4:
     resolution: {integrity: sha512-33g0Ol9nkWdD6ulw687viS8YJQBxqG5LWII6FI6nul0pq6iM2t5EKquOTFDbyTblRB3O9I+7KX4xI8u5ffekAQ==}
+    peerDependencies:
+      graphology-types: '>=0.24.0'
+
+  graphology@0.26.0:
+    resolution: {integrity: sha512-8SSImzgUUYC89Z042s+0r/vMibY7GX/Emz4LDO5e7jYXhuoWfHISPFJYjpRLUSJGq6UQ6xlenvX1p/hJdfXuXg==}
     peerDependencies:
       graphology-types: '>=0.24.0'
 
@@ -4965,6 +4976,11 @@ snapshots:
       events: 3.3.0
       graphology-types: 0.24.8
       obliterator: 2.0.5
+
+  graphology@0.26.0(graphology-types@0.24.8):
+    dependencies:
+      events: 3.3.0
+      graphology-types: 0.24.8
 
   h3@1.15.11:
     dependencies:

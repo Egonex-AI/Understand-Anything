@@ -7,7 +7,7 @@
   "scripts": {
     "prepare": "pnpm --filter @understand-anything/core build",
     "build": "pnpm -r build",
-    "test": "vitest",
+    "test": "vitest run",
     "dev:dashboard": "pnpm --filter @understand-anything/dashboard dev",
     "lint": "eslint ."
   },

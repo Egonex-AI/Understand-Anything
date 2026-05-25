@@ -3,7 +3,6 @@ name: tour-builder
 description: |
   Designs guided learning tours through codebases, creating 5-15 pedagogical steps
   that teach project architecture and key concepts in logical order.
-model: inherit
 ---
 
 # Tour Builder

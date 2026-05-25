@@ -26,7 +26,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 
 ## Agent Pipeline
 - Agents write intermediate results to `.understand-anything/intermediate/` on disk (not returned to context)
-- Agent models: all set to `inherit` for cross-platform compatibility (Claude Code, Cursor, opencode, etc.)
+- Agent model field is omitted from frontmatter so each platform falls back to its configured default — `inherit` was a Claude Code-only keyword that opencode (and similar tools) treated as a literal model id and rejected with `ProviderModelNotFoundError` (see #167)
 - `/understand` auto-triggers `/understand-dashboard` after completion
 - Intermediate files cleaned up after graph assembly
 
@@ -35,7 +35,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - `pnpm --filter @understand-anything/core build` — Build the core package
 - `pnpm --filter @understand-anything/core test` — Run core tests
 - `pnpm --filter @understand-anything/skill build` — Build the plugin package
-- `pnpm --filter @understand-anything/skill test` — Run plugin tests
+- `pnpm test` — Run all tests (skill tests live at repo-root `tests/skill/`, picked up by root `vitest.config.ts`)
 - `pnpm --filter @understand-anything/dashboard build` — Build the dashboard
 - `pnpm dev:dashboard` — Start dashboard dev server
 - `pnpm lint` — Run ESLint across the project

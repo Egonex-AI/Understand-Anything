@@ -1,0 +1,38 @@
+{
+  "name": "fixture-non-code",
+  "description": "Mix of non-code files exercising Groups A-E. The src/ clique has 3 mutually-importing files so it survives merge-small (size >= MIN_BATCH_SIZE=3) and stays a pure-code batch — required by the 'non-code batch indices follow code batches' assertion.",
+  "languages": ["typescript", "dockerfile", "yaml", "sql", "markdown"],
+  "frameworks": [],
+  "files": [
+    {"path": "src/index.ts", "language": "typescript", "sizeLines": 10, "fileCategory": "code"},
+    {"path": "src/server.ts", "language": "typescript", "sizeLines": 15, "fileCategory": "code"},
+    {"path": "src/router.ts", "language": "typescript", "sizeLines": 12, "fileCategory": "code"},
+    {"path": "Dockerfile", "language": "dockerfile", "sizeLines": 20, "fileCategory": "infra"},
+    {"path": "docker-compose.yml", "language": "yaml", "sizeLines": 15, "fileCategory": "infra"},
+    {"path": ".dockerignore", "language": "config", "sizeLines": 5, "fileCategory": "config"},
+    {"path": "services/api/Dockerfile", "language": "dockerfile", "sizeLines": 18, "fileCategory": "infra"},
+    {"path": "services/api/docker-compose.yml", "language": "yaml", "sizeLines": 12, "fileCategory": "infra"},
+    {"path": ".github/workflows/ci.yml", "language": "yaml", "sizeLines": 30, "fileCategory": "infra"},
+    {"path": ".github/workflows/deploy.yml", "language": "yaml", "sizeLines": 25, "fileCategory": "infra"},
+    {"path": ".gitlab-ci.yml", "language": "yaml", "sizeLines": 20, "fileCategory": "infra"},
+    {"path": ".circleci/config.yml", "language": "yaml", "sizeLines": 25, "fileCategory": "infra"},
+    {"path": "migrations/001_init.sql", "language": "sql", "sizeLines": 40, "fileCategory": "data"},
+    {"path": "migrations/002_users.sql", "language": "sql", "sizeLines": 20, "fileCategory": "data"},
+    {"path": "docs/getting-started.md", "language": "markdown", "sizeLines": 100, "fileCategory": "docs"},
+    {"path": "README.md", "language": "markdown", "sizeLines": 200, "fileCategory": "docs"}
+  ],
+  "totalFiles": 16,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "small",
+  "importMap": {
+    "src/index.ts": ["src/server.ts", "src/router.ts"],
+    "src/server.ts": ["src/router.ts"],
+    "src/router.ts": [],
+    "Dockerfile": [], "docker-compose.yml": [], ".dockerignore": [],
+    "services/api/Dockerfile": [], "services/api/docker-compose.yml": [],
+    ".github/workflows/ci.yml": [], ".github/workflows/deploy.yml": [],
+    ".gitlab-ci.yml": [], ".circleci/config.yml": [],
+    "migrations/001_init.sql": [], "migrations/002_users.sql": [],
+    "docs/getting-started.md": [], "README.md": []
+  }
+}

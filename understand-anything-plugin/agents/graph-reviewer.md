@@ -3,7 +3,6 @@ name: graph-reviewer
 description: |
   Validates knowledge graphs for correctness, completeness, and quality.
   Runs systematic checks and renders approval or rejection decisions.
-model: inherit
 ---
 
 # Graph Reviewer

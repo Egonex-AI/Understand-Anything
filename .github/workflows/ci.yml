@@ -33,4 +33,4 @@ jobs:
         run: pnpm --filter @understand-anything/core test
 
       - name: Test skill
-        run: pnpm --filter @understand-anything/skill test
+        run: pnpm test
