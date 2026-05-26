@@ -205,6 +205,8 @@ El instalador clona el repositorio en `~/.understand-anything/repo` y crea los e
 
 Cursor detecta automáticamente el plugin a través de `.cursor-plugin/plugin.json` cuando se clona este repositorio. No requiere instalación manual: simplemente clona y abre en Cursor.
 
+Si la detección automática no lo reconoce, instálalo manualmente: abre **Cursor Settings → Plugins**, pega `https://github.com/Lum1104/Understand-Anything` en el campo de búsqueda y añádelo desde allí.
+
 ### VS Code + GitHub Copilot
 
 VS Code con GitHub Copilot (v1.108+) detecta automáticamente el plugin a través de `.copilot-plugin/plugin.json` cuando se clona este repositorio. No requiere instalación manual: simplemente clona y abre en VS Code.

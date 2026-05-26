@@ -464,17 +464,25 @@ function toPosix(p) {
  * so the ignore filter has to do more work in the fallback path.
  */
 function enumerateViaGit(projectRoot) {
-  const result = spawnSync('git', ['ls-files', '-co', '--exclude-standard'], {
+  // -z = NUL-terminated output. Without it, `git ls-files` C-escapes non-ASCII
+  // bytes in path names — paths containing emoji, accented characters, CJK
+  // codepoints, etc. come back quoted with octal escapes (e.g.
+  // `"30. \360\237\217\227 BD-CCER/file.md"` for a path containing 🏗️).
+  // Those quoted-escaped strings then fail to round-trip back to real disk
+  // paths in downstream consumers, so files in such directories are silently
+  // dropped from the scan. The -z form emits raw bytes between NUL separators,
+  // preserving every codepoint as-is. This is the same approach git itself
+  // uses for `--null` everywhere downstream (xargs -0, etc.).
+  const result = spawnSync('git', ['ls-files', '-z', '-co', '--exclude-standard'], {
     cwd: projectRoot,
     encoding: 'utf-8',
     maxBuffer: 256 * 1024 * 1024, // 256MB — huge monorepos can produce >10MB of paths
   });
   if (result.status !== 0 || !result.stdout) return null;
-  // Each line is one path, project-relative, already POSIX on all platforms
-  // because git emits forward slashes regardless of OS.
+  // Each NUL-separated chunk is one path, project-relative, already POSIX on
+  // all platforms because git emits forward slashes regardless of OS.
   return result.stdout
-    .split('\n')
-    .map(s => s.trim())
+    .split('\0')
     .filter(Boolean)
     .map(toPosix);
 }

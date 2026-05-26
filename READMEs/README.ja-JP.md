@@ -206,6 +206,8 @@ iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/ins
 
 Cursorはこのリポジトリをクローンすると `.cursor-plugin/plugin.json` 経由でプラグインを自動検出します。手動インストールは不要です — クローンしてCursorで開くだけです。
 
+自動検出されない場合は、手動でインストールしてください：**Cursor Settings → Plugins** を開き、検索欄に `https://github.com/Lum1104/Understand-Anything` を貼り付けて追加します。
+
 ### VS Code + GitHub Copilot
 
 GitHub Copilot拡張機能（v1.108+）をインストールしたVS Codeは、`.copilot-plugin/plugin.json` 経由でプラグインを自動検出します。クローンしてVS Codeで開くだけで、手動インストールは不要です。

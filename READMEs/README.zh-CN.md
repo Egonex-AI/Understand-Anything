@@ -205,6 +205,8 @@ iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/ins
 
 克隆此仓库后，Cursor 会自动通过 `.cursor-plugin/plugin.json`文件发现插件。无需手动安装 — 只需克隆并在 Cursor 中打开即可。
 
+若自动发现未生效，可手动安装：打开 **Cursor Settings → Plugins**，在搜索框中粘贴 `https://github.com/Lum1104/Understand-Anything` 并添加。
+
 ### VS Code + GitHub Copilot
 
 安装 GitHub Copilot 扩展（v1.108+）后，VS Code 会通过 `.copilot-plugin/plugin.json` 自动发现插件，克隆后直接在 VS Code 中打开即可，无需手动安装。

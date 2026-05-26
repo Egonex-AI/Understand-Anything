@@ -430,9 +430,18 @@ export function resolveTsJsImport(rawImport, file, ctx) {
           const relativeToConfig = normalizedBase
             ? posix.join(normalizedBase, mapped)
             : mapped;
-          const candidate = tsConfigDir
-            ? posix.join(tsConfigDir, relativeToConfig)
-            : relativeToConfig;
+          // posix.normalize strips a leading "./" left over when both
+          // tsConfigDir and normalizedBase are empty (root tsconfig with
+          // `"@/*": ["./*"]`, the create-next-app default). Without this the
+          // candidate stays as "./foo" while ctx.fileSet stores "foo", and
+          // probeWithExtensions silently drops every cross-module edge.
+          const candidate = posix.normalize(
+            tsConfigDir
+              ? posix.join(tsConfigDir, relativeToConfig)
+              : relativeToConfig,
+          );
+          // Defensive: tsconfig targets shouldn't escape the project root.
+          if (candidate.startsWith('..')) continue;
           const probed = probeWithExtensions(candidate, ctx.fileSet);
           if (probed) return probed;
         }

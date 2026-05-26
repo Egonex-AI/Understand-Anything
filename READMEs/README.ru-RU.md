@@ -206,6 +206,8 @@ iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/ins
 
 Cursor автоматически обнаруживает плагин через `.cursor-plugin/plugin.json` при клонировании этого репозитория. Ручная установка не требуется — просто склонируйте и откройте в Cursor.
 
+Если автообнаружение не сработало, установите вручную: откройте **Cursor Settings → Plugins**, вставьте `https://github.com/Lum1104/Understand-Anything` в поле поиска и добавьте оттуда.
+
 ### VS Code + GitHub Copilot
 
 VS Code с GitHub Copilot (v1.108+) автоматически обнаруживает плагин через `.copilot-plugin/plugin.json` при клонировании этого репозитория. Ручная установка не требуется — просто склонируйте и откройте в VS Code.

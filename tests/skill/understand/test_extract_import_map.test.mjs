@@ -237,6 +237,111 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
       'packages/foo/src/y.ts',
     );
   });
+
+  // ── Issue #214: tsconfig path-alias targets with leading "./" ───────────
+  // create-next-app ships `"@/*": ["./*"]` as the default. With a root
+  // tsconfig the candidate would stay as "./lib/thing" while ctx.fileSet
+  // stores normalized "lib/thing", silently dropping every cross-module
+  // import edge. Three originally broken cases plus one regression guard
+  // for the already working `["*"]` form.
+
+  it('resolves tsconfig paths with leading "./" target and no baseUrl (#214)', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          paths: { '@/*': ['./*'] },
+        },
+      }),
+      'src/app.ts': `import { x } from '@/lib/thing';\nconst _ = x;\n`,
+      'lib/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
+  });
+
+  it('resolves tsconfig paths with leading "./" target and baseUrl "." (#214)', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@/*': ['./*'] },
+        },
+      }),
+      'src/app.ts': `import { x } from '@/lib/thing';\nconst _ = x;\n`,
+      'lib/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
+  });
+
+  it('resolves tsconfig paths with leading "./" target and baseUrl "src" (#214)', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: 'src',
+          paths: { '@/*': ['./*'] },
+        },
+      }),
+      'src/app.ts': `import { x } from '@/thing';\nconst _ = x;\n`,
+      'src/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('src/thing.ts');
+  });
+
+  it('keeps resolving tsconfig paths with bare "*" target (#214 regression guard)', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          paths: { '@/*': ['*'] },
+        },
+      }),
+      'src/app.ts': `import { x } from '@/lib/thing';\nconst _ = x;\n`,
+      'lib/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
+  });
 });
 
 describe('extract-import-map.mjs — Python resolver', () => {
