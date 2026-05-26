@@ -1,9 +1,9 @@
 <h1 align="center">Understand Anything</h1>
 
 <p align="center">
-  <strong>Transformez n'importe quel codebase, base de connaissances ou documentation en graphe de connaissances interactif que vous pouvez explorer, rechercher et interroger.</strong>
+  <strong>Turn any codebase, knowledge base, or docs into an interactive knowledge graph you can explore, search, and ask questions about.</strong>
   <br />
-  <em>Fonctionne avec Claude Code, Codex, Cursor, Copilot, Gemini CLI, et plus encore.</em>
+  <em>Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, and more.</em>
 </p>
 
 <p align="center">
@@ -11,12 +11,12 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a> | <a href="README.fr-FR.md">Français</a>
+  <a href="README.md">English</a> | <a href="READMEs/README.zh-CN.md">简体中文</a> | <a href="READMEs/README.zh-TW.md">繁體中文</a> | <a href="READMEs/README.ja-JP.md">日本語</a> | <a href="READMEs/README.ko-KR.md">한국어</a> | <a href="READMEs/README.es-ES.md">Español</a> | <a href="READMEs/README.tr-TR.md">Türkçe</a> | <a href="READMEs/README.ru-RU.md">Русский</a>
 </p>
 
 <p align="center">
-  <a href="#-demarrage-rapide"><img src="https://img.shields.io/badge/D%C3%A9marrage_Rapide-blue" alt="Démarrage rapide" /></a>
-  <a href="https://github.com/Lum1104/Understand-Anything/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="Licence : MIT" /></a>
+  <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-blue" alt="Quick Start" /></a>
+  <a href="https://github.com/Lum1104/Understand-Anything/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow" alt="License: MIT" /></a>
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-8A2BE2" alt="Claude Code" /></a>
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
@@ -30,191 +30,191 @@
 </p>
 
 <p align="center">
-  <img src="../assets/hero.png" alt="Understand Anything — Transformez n'importe quel codebase en graphe de connaissances interactif" width="800" />
+  <img src="assets/hero.png" alt="Understand Anything — Turn any codebase into an interactive knowledge graph" width="800" />
 </p>
 
 <p align="center">
-  <strong>💬 <a href="https://discord.gg/pydat66RY">Rejoignez la communauté Discord &rarr;</a></strong>
+  <strong>💬 <a href="https://discord.gg/pydat66RY">Join the Discord community &rarr;</a></strong>
   <br />
-  <em>Posez vos questions, partagez ce que vous avez construit et obtenez de l'aide auprès de la communauté.</em>
+  <em>Ask questions, share what you've built, get help from the community.</em>
 </p>
 
 ---
 
-**Vous venez de rejoindre une nouvelle équipe. Le codebase compte 200 000 lignes de code. Par où commencer ?**
+**You just joined a new team. The codebase is 200,000 lines of code. Where do you even start?**
 
-Understand Anything est un [plugin Claude Code](https://code.claude.com/docs/en/plugins-reference#plugins-reference) qui analyse votre projet avec un pipeline multi-agent, construit un graphe de connaissances de chaque fichier, fonction, classe et dépendance, puis vous fournit un tableau de bord interactif pour tout explorer visuellement. Arrêtez de lire le code à l'aveugle. Commencez à voir la vue d'ensemble.
+Understand Anything is a [Claude Code Plugin](https://code.claude.com/docs/en/plugins-reference#plugins-reference) that analyzes your project with a multi-agent pipeline, builds a knowledge graph of every file, function, class, and dependency, then gives you an interactive dashboard to explore it all visually. Stop reading code blind. Start seeing the big picture.
 
-> **L'objectif n'est pas de produire un graphe qui vous impressionne par la complexité de votre codebase : c'est de créer un graphe qui vous apprend discrètement comment chaque élément s'assemble.**
+> **The goal isn't a graph that wows you with how complex your codebase is — it's a graph that quietly teaches you how every piece fits together.**
 
 ---
 
-## ✨ Fonctionnalités
+## ✨ Features
 
 > [!NOTE]
-> **Vous voulez éviter la lecture ?** Essayez la [démo en direct](https://understand-anything.com/demo/) sur notre [site](https://understand-anything.com/) : un tableau de bord entièrement interactif que vous pouvez déplacer, zoomer, rechercher et explorer directement dans votre navigateur.
+> **Want to skip the reading?** Try the [live demo](https://understand-anything.com/demo/) in our [homepage](https://understand-anything.com/) — a fully interactive dashboard you can pan, zoom, search, and explore right in your browser.
 
-### Explorer le graphe structurel
+### Explore the structural graph
 
-Naviguez dans votre codebase sous forme de graphe de connaissances interactif : chaque fichier, fonction et classe est un nœud sur lequel vous pouvez cliquer, que vous pouvez rechercher et explorer. Sélectionnez n'importe quel nœud pour voir des résumés en langage clair, ses relations et des visites guidées.
+Navigate your codebase as an interactive knowledge graph — every file, function, and class is a node you can click, search, and explore. Select any node to see plain-English summaries, relationships, and guided tours.
 
-### Comprendre la logique métier
+### Understand business logic
 
-Basculez vers la vue domaine et voyez comment votre code correspond aux processus métier réels : domaines, flux et étapes disposés sous forme de graphe horizontal.
+Switch to the domain view and see how your code maps to real business processes — domains, flows, and steps laid out as a horizontal graph.
 
-### Analyser des bases de connaissances
+### Analyze knowledge bases
 
-Pointez `/understand-knowledge` vers un [wiki LLM suivant le modèle de Karpathy](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) et obtenez un graphe de connaissances force-directed avec clustering communautaire. Le parseur déterministe extrait les wikilinks et catégories depuis `index.md`, puis les agents LLM découvrent les relations implicites, extraient les entités et font remonter les affirmations : votre wiki devient un graphe navigable d'idées interconnectées.
+Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and get a force-directed knowledge graph with community clustering. The deterministic parser extracts wikilinks and categories from `index.md`, then LLM agents discover implicit relationships, extract entities, and surface claims — turning your wiki into a navigable graph of interconnected ideas.
 
 <table>
   <tr>
     <td width="50%" valign="top">
-      <h3>🧭 Visites guidées</h3>
-      <p>Parcours de l'architecture générés automatiquement, ordonnés par dépendance. Apprenez le codebase dans le bon ordre.</p>
+      <h3>🧭 Guided Tours</h3>
+      <p>Auto-generated walkthroughs of the architecture, ordered by dependency. Learn the codebase in the right order.</p>
     </td>
     <td width="50%" valign="top">
-      <h3>🔍 Recherche floue et sémantique</h3>
-      <p>Trouvez n'importe quoi par nom ou par sens. Recherchez « quelles parties gèrent l'authentification ? » et obtenez des résultats pertinents dans tout le graphe.</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>📊 Analyse d'impact des diffs</h3>
-      <p>Voyez quelles parties du système vos changements affectent avant de commit. Comprenez les effets en cascade dans tout le codebase.</p>
-    </td>
-    <td width="50%" valign="top">
-      <h3>🎭 UI adaptative selon le profil</h3>
-      <p>Le tableau de bord ajuste son niveau de détail selon votre profil : développeur junior, PM ou utilisateur avancé.</p>
+      <h3>🔍 Fuzzy & Semantic Search</h3>
+      <p>Find anything by name or by meaning. Search "which parts handle auth?" and get relevant results across the graph.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <h3>🏗️ Visualisation par couches</h3>
-      <p>Regroupement automatique par couche d'architecture : API, Service, Data, UI, Utility, avec une légende codée par couleur.</p>
+      <h3>📊 Diff Impact Analysis</h3>
+      <p>See which parts of the system your changes affect before you commit. Understand ripple effects across the codebase.</p>
     </td>
     <td width="50%" valign="top">
-      <h3>📚 Concepts de langage</h3>
-      <p>12 patterns de programmation (génériques, closures, décorateurs, etc.) expliqués en contexte partout où ils apparaissent.</p>
+      <h3>🎭 Persona-Adaptive UI</h3>
+      <p>The dashboard adjusts its detail level based on who you are — junior dev, PM, or power user.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🏗️ Layer Visualization</h3>
+      <p>Automatic grouping by architectural layer — API, Service, Data, UI, Utility — with color-coded legend.</p>
+    </td>
+    <td width="50%" valign="top">
+      <h3>📚 Language Concepts</h3>
+      <p>12 programming patterns (generics, closures, decorators, etc.) explained in context wherever they appear.</p>
     </td>
   </tr>
 </table>
 
 ---
 
-## 🚀 Démarrage rapide
+## 🚀 Quick Start
 
-### 1. Installer le plugin
+### 1. Install the plugin
 
 ```bash
 /plugin marketplace add Lum1104/Understand-Anything
 /plugin install understand-anything
 ```
 
-### 2. Analyser votre codebase
+### 2. Analyze your codebase
 
 ```bash
 /understand
 ```
 
-Un pipeline multi-agent scanne votre projet, extrait chaque fichier, fonction, classe et dépendance, puis construit un graphe de connaissances enregistré dans `.understand-anything/knowledge-graph.json`.
+A multi-agent pipeline scans your project, extracts every file, function, class, and dependency, then builds a knowledge graph saved to `.understand-anything/knowledge-graph.json`.
 
-**Sortie localisée :** utilisez `--language` pour générer du contenu dans votre langue préférée :
+**Localized output:** Use `--language` to generate content in your preferred language:
 
 ```bash
-# Générer du contenu en chinois (descriptions des nœuds du graphe de connaissances et UI du tableau de bord)
+# Generate Chinese content (知识图节点描述和 Dashboard UI)
 /understand --language zh
 
-# Langues prises en charge : en (par défaut), zh, zh-TW, ja, ko, ru
+# Supported languages: en (default), zh, zh-TW, ja, ko, ru
 ```
 
-Le paramètre `--language` affecte :
-- Les résumés et descriptions des nœuds dans le graphe de connaissances
-- Les libellés, boutons et infobulles de l'UI du tableau de bord
-- Les explications des visites guidées
+The `--language` parameter affects:
+- Node summaries and descriptions in the knowledge graph
+- Dashboard UI labels, buttons, and tooltips
+- Guided tour explanations
 
-### 3. Explorer le tableau de bord
+### 3. Explore the dashboard
 
 ```bash
 /understand-dashboard
 ```
 
-Un tableau de bord web interactif s'ouvre avec votre codebase visualisé sous forme de graphe : codé par couleur selon la couche d'architecture, recherchable et cliquable. Sélectionnez n'importe quel nœud pour voir son code, ses relations et une explication en langage clair.
+An interactive web dashboard opens with your codebase visualized as a graph — color-coded by architectural layer, searchable, and clickable. Select any node to see its code, relationships, and a plain-English explanation.
 
-### 4. Continuer à apprendre
+### 4. Keep learning
 
 ```bash
-# Poser n'importe quelle question sur le codebase
+# Ask anything about the codebase
 /understand-chat How does the payment flow work?
 
-# Analyser l'impact de vos changements actuels
+# Analyze impact of your current changes
 /understand-diff
 
-# Explorer en profondeur un fichier ou une fonction précise
+# Deep-dive into a specific file or function
 /understand-explain src/auth/login.ts
 
-# Générer un guide d'onboarding pour les nouveaux membres de l'équipe
+# Generate an onboarding guide for new team members
 /understand-onboard
 
-# Extraire les connaissances métier (domaines, flux, étapes)
+# Extract business domain knowledge (domains, flows, steps)
 /understand-domain
 
-# Analyser une base de connaissances de type wiki LLM selon le modèle de Karpathy
+# Analyze a Karpathy-pattern LLM wiki knowledge base
 /understand-knowledge ~/path/to/wiki
 
-# Relancer à tout moment : incrémental par défaut (réanalyse seulement les fichiers modifiés)
+# Re-run anytime — incremental by default (only re-analyzes changed files)
 /understand
 
-# Mise à jour automatique à chaque commit via un hook post-commit
+# Auto-update on every commit via a post-commit hook
 /understand --auto-update
 
-# Limiter l'analyse à un sous-dossier (pour les gros monorepos)
+# Scope to a subdirectory (for huge monorepos)
 /understand src/frontend
 ```
 
 ---
 
-## 🌐 Installation multi-plateforme
+## 🌐 Multi-Platform Installation
 
-Understand-Anything fonctionne sur plusieurs plateformes de codage IA.
+Understand-Anything works across multiple AI coding platforms.
 
-### Claude Code (natif)
+### Claude Code (Native)
 
 ```bash
 /plugin marketplace add Lum1104/Understand-Anything
 /plugin install understand-anything
 ```
 
-### Installation en une ligne (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae)
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae)
 
-**macOS / Linux :**
+**macOS / Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
-# ou ignorez l'invite en passant directement la plateforme :
+# or skip the prompt by passing the platform:
 curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
 ```
 
-**Windows (PowerShell) :**
+**Windows (PowerShell):**
 ```powershell
 iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
 ```
 
-L'installateur clone le dépôt dans `~/.understand-anything/repo` et crée les bons liens symboliques pour la plateforme choisie. Redémarrez ensuite votre CLI/IDE.
+The installer clones the repo to `~/.understand-anything/repo` and creates the right symlinks for the chosen platform. Restart your CLI/IDE afterwards.
 
-- Valeurs `<platform>` prises en charge: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`
-- Mettre à jour plus tard: `./install.sh --update`
-- Désinstaller: `./install.sh --uninstall <platform>`
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`
+- Update later: `./install.sh --update`
+- Uninstall: `./install.sh --uninstall <platform>`
 
 ### Cursor
 
-Cursor découvre automatiquement le plugin via `.cursor-plugin/plugin.json` lorsque ce dépôt est cloné. Aucune installation manuelle n'est nécessaire : clonez simplement le dépôt et ouvrez-le dans Cursor.
+Cursor auto-discovers the plugin via `.cursor-plugin/plugin.json` when this repo is cloned. No manual installation needed — just clone and open in Cursor.
 
-Si la découverte automatique ne fonctionne pas, installez-le manuellement : ouvrez **Cursor Settings → Plugins**, collez `https://github.com/Lum1104/Understand-Anything` dans le champ de recherche, puis ajoutez-le depuis là.
+If auto-discovery doesn't pick it up, install it manually: open **Cursor Settings → Plugins**, paste `https://github.com/Lum1104/Understand-Anything` into the search field, and add it from there.
 
 ### VS Code + GitHub Copilot
 
-VS Code avec GitHub Copilot (v1.108+) découvre automatiquement le plugin via `.copilot-plugin/plugin.json` lorsque ce dépôt est cloné. Aucune installation manuelle n'est nécessaire : clonez simplement le dépôt et ouvrez-le dans VS Code.
+VS Code with GitHub Copilot (v1.108+) auto-discovers the plugin via `.copilot-plugin/plugin.json` when this repo is cloned. No manual installation needed — just clone and open in VS Code.
 
-Pour les skills personnels (disponibles dans tous les projets), exécutez le script `install.sh` ci-dessus avec la plateforme `vscode`.
+For personal skills (available across all projects), run the `install.sh` above with the `vscode` platform.
 
 ### Copilot CLI
 
@@ -222,44 +222,44 @@ Pour les skills personnels (disponibles dans tous les projets), exécutez le scr
 copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 ```
 
-### Compatibilité des plateformes
+### Platform Compatibility
 
-| Plateforme | Statut | Méthode d'installation |
+| Platform | Status | Install Method |
 |----------|--------|----------------|
-| Claude Code | ✅ Natif | Marketplace de plugins |
-| Cursor | ✅ Pris en charge | Découverte automatiquey |
-| VS Code + GitHub Copilot | ✅ Pris en charge | Découverte automatique |
-| Copilot CLI | ✅ Pris en charge | Installation du plugin |
-| Codex | ✅ Pris en charge | `install.sh codex` |
-| OpenCode | ✅ Pris en charge | `install.sh opencode` |
-| OpenClaw | ✅ Pris en charge | `install.sh openclaw` |
-| Antigravity | ✅ Pris en charge | `install.sh antigravity` |
-| Gemini CLI | ✅ Pris en charge | `install.sh gemini` |
-| Pi Agent | ✅ Pris en charge | `install.sh pi` |
-| Vibe CLI | ✅ Pris en charge | `install.sh vibe` |
-| Hermes | ✅ Pris en charge | `install.sh hermes` |
-| Cline | ✅ Pris en charge | `install.sh cline` |
-| KIMI CLI | ✅ Pris en charge | `install.sh kimi` |
-| Trae | ✅ Pris en charge | `install.sh trae` |
+| Claude Code | ✅ Native | Plugin marketplace |
+| Cursor | ✅ Supported | Auto-discovery |
+| VS Code + GitHub Copilot | ✅ Supported | Auto-discovery |
+| Copilot CLI | ✅ Supported | Plugin install |
+| Codex | ✅ Supported | `install.sh codex` |
+| OpenCode | ✅ Supported | `install.sh opencode` |
+| OpenClaw | ✅ Supported | `install.sh openclaw` |
+| Antigravity | ✅ Supported | `install.sh antigravity` |
+| Gemini CLI | ✅ Supported | `install.sh gemini` |
+| Pi Agent | ✅ Supported | `install.sh pi` |
+| Vibe CLI | ✅ Supported | `install.sh vibe` |
+| Hermes | ✅ Supported | `install.sh hermes` |
+| Cline | ✅ Supported | `install.sh cline` |
+| KIMI CLI | ✅ Supported | `install.sh kimi` |
+| Trae | ✅ Supported | `install.sh trae` |
 
 ---
 
-## 📦 Partager le graphe avec votre équipe
+## 📦 Share the Graph with Your Team
 
-Le graphe n'est qu'un fichier JSON : **committez-le une fois, et vos coéquipiers évitent le pipeline**. Utile pour l'onboarding, les revues de PR et la documentation-as-code.
+The graph is just JSON — **commit it once, and teammates skip the pipeline**. Good for onboarding, PR reviews, and docs-as-code.
 
-> **Exemple :** [GoogleCloudPlatform/microservices-demo (fork)](https://github.com/Lum1104/microservices-demo) — référence Go / Java / Python / Node avec un graphe committé.
+> **Example:** [GoogleCloudPlatform/microservices-demo (fork)](https://github.com/Lum1104/microservices-demo) — Go / Java / Python / Node reference with a committed graph.
 
-**À commit :** tout ce qui se trouve dans `.understand-anything/`, *sauf* `intermediate/` et `diff-overlay.json` (ce sont des fichiers de travail locaux).
+**What to commit:** everything in `.understand-anything/` *except* `intermediate/` and `diff-overlay.json` (those are local scratch).
 
 ```gitignore
 .understand-anything/intermediate/
 .understand-anything/diff-overlay.json
 ```
 
-**Le garder à jour :** activez `/understand --auto-update` : un hook post-commit met à jour le graphe de façon incrémentale afin que chaque commit arrive avec un graphe correspondant. Vous pouvez aussi relancer `/understand` manuellement avant les releases.
+**Keep it fresh:** enable `/understand --auto-update` — a post-commit hook incrementally patches the graph so each commit lands with a matching graph. Or re-run `/understand` manually before releases.
 
-**Graphes volumineux (10 Mo+) :** suivez-les avec **git-lfs**.
+**Large graphs (10 MB+):** track with **git-lfs**.
 
 ```bash
 git lfs install
@@ -269,80 +269,80 @@ git add .gitattributes .understand-anything/
 
 ---
 
-## 🔧 Sous le capot
+## 🔧 Under the Hood
 
-### Hybride Tree-sitter + LLM
+### Tree-sitter + LLM hybrid
 
-L'analyse statique et les LLM font chacun ce qu'ils font le mieux :
+Static analysis and LLMs do what each does best:
 
-- **Tree-sitter (déterministe)** — parse le code source en arbre syntaxique concret et extrait des faits structurels : imports, exports, définitions de fonctions/classes, sites d'appel, héritage. Pré-résolu dans un `importMap` pendant la phase de scan et transmis aux analyseurs de fichiers afin qu'ils n'aient pas à redériver les imports depuis le code source. Même entrée → même sortie, à chaque exécution. Alimente aussi la détection de changements basée sur les empreintes pour les mises à jour incrémentales.
-- **LLM (sémantique)** — lit la structure parsée avec le code source original pour produire ce que les parseurs ne peuvent pas fournir : résumés en langage clair, tags, assignations de couches d'architecture, mapping des domaines métier, visites guidées, annotations de concepts de langage.
+- **Tree-sitter (deterministic)** — parses source into a concrete syntax tree and extracts structural facts: imports, exports, function/class definitions, call sites, inheritance. Pre-resolved into an `importMap` during the scan phase and passed to file-analyzers so they don't re-derive imports from source. Same input → same output, every run. Also powers fingerprint-based change detection for incremental updates.
+- **LLM (semantic)** — reads the parsed structure alongside the original source to produce what parsers can't: plain-English summaries, tags, architectural layer assignments, business-domain mapping, guided tours, language concept callouts.
 
-Cette séparation explique pourquoi le graphe est reproductible côté structurel (le même code produit toujours les mêmes arêtes) tout en capturant l'intention côté sémantique (à quoi sert un fichier, et pas seulement ce qu'il importe).
+This split is why the graph is reproducible on the structural side (the same code always yields the same edges) while still capturing intent on the semantic side (what a file is *for*, not just what it imports).
 
-### Pipeline multi-agent
+### Multi-Agent Pipeline
 
-La commande `/understand` orchestre 5 agents spécialisés, et `/understand-domain` en ajoute un 6e :
+The `/understand` command orchestrates 5 specialized agents, and `/understand-domain` adds a 6th:
 
-| Agent | Rôle |
+| Agent | Role |
 |-------|------|
-| `project-scanner` | Découvrir les fichiers, détecter les langages et frameworks |
-| `file-analyzer` | Extraire fonctions, classes et imports ; produire les nœuds et arêtes du graphe |
-| `architecture-analyzer` | Identifier les couches d'architecture |
-| `tour-builder` | Générer des visites guidées d'apprentissage |
-| `graph-reviewer` | Valider l'exhaustivité du graphe et son intégrité référentielle (s'exécute inline par défaut ; utilisez `--review` pour une revue LLM complète) |
-| `domain-analyzer` | Extraire les domaines métier, flux et étapes de processus (utilisé par `/understand-domain`) |
-| `article-analyzer` | Extraire les entités, affirmations et relations implicites depuis les articles de wiki (utilisé par `/understand-knowledge`) |
+| `project-scanner` | Discover files, detect languages and frameworks |
+| `file-analyzer` | Extract functions, classes, imports; produce graph nodes and edges |
+| `architecture-analyzer` | Identify architectural layers |
+| `tour-builder` | Generate guided learning tours |
+| `graph-reviewer` | Validate graph completeness and referential integrity (runs inline by default; use `--review` for full LLM review) |
+| `domain-analyzer` | Extract business domains, flows, and process steps (used by `/understand-domain`) |
+| `article-analyzer` | Extract entities, claims, and implicit relationships from wiki articles (used by `/understand-knowledge`) |
 
-Les analyseurs de fichiers s'exécutent en parallèle (jusqu'à 5 en concurrence, 20 à 30 fichiers par lot). Les mises à jour incrémentales sont prises en charge : seuls les fichiers modifiés depuis la dernière exécution sont réanalysés.
+File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 
 ---
 
-## 🎥 Communauté
+## 🎥 Community
 
-Une présentation créée par la communauté, réalisée par **Better Stack**.
+A community-made walkthrough by **Better Stack**.
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=VmIUXVlt7_I"><img src="https://img.youtube.com/vi/VmIUXVlt7_I/maxresdefault.jpg" alt="Présentation communautaire par Better Stack — regarder sur YouTube" width="480" /></a>
+  <a href="https://www.youtube.com/watch?v=VmIUXVlt7_I"><img src="https://img.youtube.com/vi/VmIUXVlt7_I/maxresdefault.jpg" alt="Community walkthrough by Better Stack — watch on YouTube" width="480" /></a>
   <br />
-  <em><a href="https://www.youtube.com/watch?v=VmIUXVlt7_I">Regarder sur YouTube &rarr;</a></em>
+  <em><a href="https://www.youtube.com/watch?v=VmIUXVlt7_I">Watch on YouTube &rarr;</a></em>
 </p>
 
-Vous avez créé une vidéo, un article de blog ou un tutoriel ? Ouvrez une issue ou une PR : nous serons ravis de le mettre en avant ici.
+Made a video, blog post, or tutorial? Open an issue or PR — happy to feature it here.
 
 ---
 
-## 🤝 Contribuer
+## 🤝 Contributing
 
-Les contributions sont les bienvenues ! Voici comment démarrer :
+Contributions are welcome! Here's how to get started:
 
-1. Forkez le dépôt
-2. Créez une branche de fonctionnalité (`git checkout -b feature/my-feature`)
-3. Lancez les tests (`pnpm --filter @understand-anything/core test`)
-4. Committez vos changements et ouvrez une pull request
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Run the tests (`pnpm --filter @understand-anything/core test`)
+4. Commit your changes and open a pull request
 
-Veuillez ouvrir une issue avant les changements majeurs afin que nous puissions discuter de l'approche.
+Please open an issue first for major changes so we can discuss the approach.
 
 ---
 
 <p align="center">
-  <strong>Arrêtez de lire le code à l'aveugle. Commencez à tout comprendre.</strong>
+  <strong>Stop reading code blind. Start understanding everything.</strong>
 </p>
 
-## Historique des étoiles
+## Star History
 
 <a href="https://www.star-history.com/?repos=Lum1104%2FUnderstand-Anything&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&theme=dark&legend=top-left" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
-   <img alt="Graphique d'historique des étoiles" src="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
  </picture>
 </a>
 
 <p align="center">
-  <em>Merci à toutes celles et ceux qui l'ont utilisé et qui ont contribué : savoir que cela fait gagner du temps aux gens est ce qui a rendu ce projet utile.</em>
+  <em>Thanks to everyone who's used and contributed — knowing this saves people time is what made it worth building.</em>
 </p>
 
 <p align="center">
-  Licence MIT &copy; <a href="https://github.com/Lum1104">Lum1104</a>
+  MIT License &copy; <a href="https://github.com/Lum1104">Lum1104</a>
 </p>
