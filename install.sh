@@ -22,10 +22,12 @@ REPO_URL="${UA_REPO_URL:-https://github.com/Lum1104/Understand-Anything.git}"
 REPO_DIR="${UA_DIR:-$HOME/.understand-anything/repo}"
 PLUGIN_LINK="$HOME/.understand-anything-plugin"
 
-# Platform table — id|skills-target-dir|style
+# Platform table — id|install-target-dir|style
 # style "per-skill": one symlink per skill into the target dir
 # style "folder":    one symlink for the whole skills/ dir into the target,
 #                    named "understand-anything"
+# style "plugin-root": one symlink for the whole plugin root into the target,
+#                      named "understand-anything-plugin"
 platforms_table() {
   cat <<EOF
 gemini|$HOME/.agents/skills|per-skill
@@ -33,7 +35,8 @@ codex|$HOME/.agents/skills|per-skill
 opencode|$HOME/.agents/skills|per-skill
 pi|$HOME/.agents/skills|per-skill
 openclaw|$HOME/.openclaw/skills|folder
-antigravity|$HOME/.gemini/antigravity/skills|folder
+antigravity|$HOME/.gemini/config/plugins|plugin-root
+antigravity-legacy|$HOME/.gemini/antigravity/skills|folder
 vibe|$HOME/.vibe/skills|per-skill
 vscode|$HOME/.copilot/skills|per-skill
 hermes|$HOME/.hermes/skills|folder
@@ -132,6 +135,10 @@ link_skills() {
       ln -sfn "$root" "$target/understand-anything"
       printf '  ✓ %s → %s\n' "$target/understand-anything" "$root"
       ;;
+    plugin-root)
+      ln -sfn "$REPO_DIR/understand-anything-plugin" "$target/understand-anything-plugin"
+      printf '  ✓ %s → %s\n' "$target/understand-anything-plugin" "$REPO_DIR/understand-anything-plugin"
+      ;;
     *)
       printf 'Unknown style: %s\n' "$style" >&2
       exit 1
@@ -163,6 +170,9 @@ unlink_skills() {
       ;;
     folder)
       [[ -L "$target/understand-anything" ]] && rm -f "$target/understand-anything"
+      ;;
+    plugin-root)
+      [[ -L "$target/understand-anything-plugin" ]] && rm -f "$target/understand-anything-plugin"
       ;;
   esac
 }
