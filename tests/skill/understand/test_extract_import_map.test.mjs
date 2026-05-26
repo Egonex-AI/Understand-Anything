@@ -1596,6 +1596,88 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
     expect(result.output.stats.filesWithImports).toBe(0);
     expect(result.output.stats.totalEdges).toBe(0);
   });
+
+  it('resolves tsconfig paths with "./" prefix in targets (Next.js/Vite default)', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: {
+            '@/*': ['./*'],
+          },
+        },
+      }),
+      'app/page.tsx': `import { cn } from '@/lib/utils';\ncn();\n`,
+      'lib/utils.ts': `export function cn(...args: string[]) { return args.join(' '); }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'app/page.tsx', language: 'typescript', fileCategory: 'code' },
+        { path: 'lib/utils.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.scriptCompleted).toBe(true);
+    expect(result.output.importMap['app/page.tsx']).toEqual(['lib/utils.ts']);
+  });
+
+  it('resolves tsconfig paths with "./src/*" prefix in targets', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: {
+            '@/*': ['./src/*'],
+          },
+        },
+      }),
+      'src/index.ts': `import { Button } from '@/components/Button';\n`,
+      'src/components/Button.tsx': `export function Button() { return null; }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/components/Button.tsx', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.scriptCompleted).toBe(true);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/components/Button.tsx']);
+  });
+
+  it('resolves tsconfig paths with multiple "./"-prefixed targets (fallback)', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: {
+            '~/*': ['./src/*', './shared/*'],
+          },
+        },
+      }),
+      'src/index.ts': `import { helper } from '~/helper';\n`,
+      'shared/helper.ts': `export function helper() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'shared/helper.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.scriptCompleted).toBe(true);
+    // helper.ts only exists in shared/, so the second target should match
+    expect(result.output.importMap['src/index.ts']).toEqual(['shared/helper.ts']);
+  });
 });
 
 describe('extract-import-map.mjs — deterministic stderr ordering across loaders', () => {
