@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>]"]
+argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>|--exclude=<pattern>]"]
 ---
 
 # /understand
@@ -16,7 +16,14 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
+  - `--exclude=<pattern>` — Exclude files matching the pattern (gitignore glob syntax, same as `.understandignore`). Can be repeated. Example: `/understand --exclude='**/*.test.*' --exclude='docs/'`
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
+
+## Notes
+
+- `--exclude` patterns are applied after `.understandignore` rules. They use the same gitignore glob syntax.
+- `--exclude` cannot override `.gitignore` in git repositories — files already excluded by `.gitignore` are filtered at enumeration time by `git ls-files` before `--exclude` is consulted.
+- `--exclude` is per-invocation. To make an exclusion stick across runs, add it to `.understand-anything/.understandignore` instead.
 
 ---
 
@@ -149,6 +156,12 @@ Determine whether to run a full analysis or incremental update.
       ```markdown
       > **Language directive**: Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in **{language}**. Maintain technical accuracy while using natural, native-level phrasing in the target language. Keep technical terms in English when no standard translation exists (e.g., "middleware", "hook", "barrel").
       ```
+
+ 3.7. **Exclude patterns:**
+    - Parse `$ARGUMENTS` for any number of `--exclude=<pattern>` flags. Each occurrence is one pattern. Patterns use the same gitignore glob syntax as `.understandignore`.
+    - Collect them into an ordered list `$EXCLUDE_FLAGS` (preserve order, allow duplicates — the underlying `ignore` matcher already de-dupes semantically).
+    - These flags do NOT touch `.understand-anything/config.json` — they are per-invocation only. To make an exclusion permanent, instruct the user to add it to `.understand-anything/.understandignore`.
+    - When dispatching the project-scanner agent in Phase 1, append each `--exclude=<pattern>` from `$EXCLUDE_FLAGS` to the bundled `scan-project.mjs` invocation. The agent's docs cover the wiring; this step just makes sure the flags are not silently dropped on the way through.
 
  4. **Check for subdomain knowledge graphs to merge:**
    List all `*knowledge-graph*.json` files in `$PROJECT_ROOT/.understand-anything/` **excluding** `knowledge-graph.json` itself (e.g. `frontend-knowledge-graph.json`, `backend-knowledge-graph.json`). If any subdomain graphs exist, run the merge script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):

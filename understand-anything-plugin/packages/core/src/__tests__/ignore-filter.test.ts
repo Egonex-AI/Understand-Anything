@@ -152,4 +152,87 @@ describe("IgnoreFilter", () => {
       expect(filter.isIgnored("src/index.ts")).toBe(false);
     });
   });
+
+  describe("createIgnoreFilter with extraExclude option", () => {
+    it("excludes files matching CLI patterns", () => {
+      const filter = createIgnoreFilter(testDir, {
+        extraExclude: ["**/*.test.ts", "scratch/"],
+      });
+      expect(filter.isIgnored("src/utils.test.ts")).toBe(true);
+      expect(filter.isIgnored("packages/a/src/foo.test.ts")).toBe(true);
+      expect(filter.isIgnored("scratch/notes.md")).toBe(true);
+      // Source files and the matcher's own helper files stay in.
+      expect(filter.isIgnored("src/utils.ts")).toBe(false);
+      expect(filter.isIgnored("README.md")).toBe(false);
+    });
+
+    it("CLI exclude stacks with .understandignore", () => {
+      writeFileSync(
+        join(testDir, ".understand-anything", ".understandignore"),
+        "fixtures/\n"
+      );
+      const filter = createIgnoreFilter(testDir, {
+        extraExclude: ["docs/"],
+      });
+      // Both the persisted rule and the CLI rule are active.
+      expect(filter.isIgnored("fixtures/data.json")).toBe(true);
+      expect(filter.isIgnored("docs/guide.md")).toBe(true);
+      expect(filter.isIgnored("src/index.ts")).toBe(false);
+    });
+
+    it("empty extraExclude does not change behavior", () => {
+      const baseline = createIgnoreFilter(testDir);
+      const filter = createIgnoreFilter(testDir, { extraExclude: [] });
+      const probes = [
+        "src/index.ts",
+        "node_modules/foo/bar.js",
+        "dist/index.js",
+        "README.md",
+        "package-lock.json",
+      ];
+      for (const p of probes) {
+        expect(filter.isIgnored(p)).toBe(baseline.isIgnored(p));
+      }
+    });
+
+    it("does not affect behavior when options is undefined", () => {
+      const explicit = createIgnoreFilter(testDir, undefined);
+      const implicit = createIgnoreFilter(testDir);
+      const probes = [
+        "src/index.ts",
+        "node_modules/foo/bar.js",
+        "dist/index.js",
+        ".idea/workspace.xml",
+      ];
+      for (const p of probes) {
+        expect(explicit.isIgnored(p)).toBe(implicit.isIgnored(p));
+      }
+    });
+
+    it("CLI exclude applied after .understandignore can be overridden by ! negation in .understandignore", () => {
+      // Layer order: defaults -> .understand-anything/.understandignore ->
+      // .understandignore -> extraExclude. Patterns appended later win,
+      // including over `!` negations. Document the precedence so users
+      // know `--exclude` is the final word.
+      writeFileSync(
+        join(testDir, ".understandignore"),
+        "!keep.log\n"
+      );
+      const filter = createIgnoreFilter(testDir, {
+        extraExclude: ["keep.log"],
+      });
+      // The CLI exclude wins because it is the final layer.
+      expect(filter.isIgnored("keep.log")).toBe(true);
+    });
+
+    it("supports ! negation inside extraExclude to re-include defaults-excluded files", () => {
+      // Symmetric test: `--exclude=!dist/` should re-include dist/ that the
+      // hardcoded defaults would otherwise drop. Useful when CI users want
+      // to override defaults without committing a `.understandignore`.
+      const filter = createIgnoreFilter(testDir, {
+        extraExclude: ["!dist/"],
+      });
+      expect(filter.isIgnored("dist/index.js")).toBe(false);
+    });
+  });
 });

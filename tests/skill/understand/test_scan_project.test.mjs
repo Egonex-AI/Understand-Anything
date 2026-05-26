@@ -60,11 +60,11 @@ const _runScriptOutputDirs = [];
  * { status, stdout, stderr, output } where `output` is the parsed JSON
  * written by the script (or null on failure).
  */
-function runScript(projectRoot) {
+function runScript(projectRoot, extraArgs = []) {
   const outputDir = mkdtempSync(join(tmpdir(), 'ua-scan-out-'));
   _runScriptOutputDirs.push(outputDir);
   const outputPath = join(outputDir, 'scan-output.json');
-  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath], {
+  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath, ...extraArgs], {
     encoding: 'utf-8',
   });
   let output = null;
@@ -734,5 +734,104 @@ describe('scan-project.mjs — output schema invariants', () => {
     const paths = r.output.files.map(f => f.path);
     const sortedPaths = [...paths].sort((a, b) => a.localeCompare(b));
     expect(paths).toEqual(sortedPaths);
+  });
+});
+
+describe('scan-project.mjs — --exclude CLI flag', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('drops files matching a single --exclude pattern and echoes appliedExclude', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const x = 1;\n',
+      'src/utils.test.ts': 'test("u", () => {});\n',
+      'src/handlers.test.ts': 'test("h", () => {});\n',
+    });
+    const r = runScript(projectRoot, ['--exclude=**/*.test.ts']);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+    expect(byPath(r.output, 'src/utils.test.ts')).toBeUndefined();
+    expect(byPath(r.output, 'src/handlers.test.ts')).toBeUndefined();
+    // appliedExclude is echoed verbatim — order preserved.
+    expect(r.output.appliedExclude).toEqual(['**/*.test.ts']);
+    // Drops are user-driven (no .understandignore involved here either).
+    expect(r.output.filteredByIgnore).toBe(2);
+  });
+
+  it('accepts multiple --exclude flags; each one is appended in order', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const x = 1;\n',
+      'src/utils.test.ts': 'test("u", () => {});\n',
+      'docs/guide.md': '# Guide\n',
+      'docs/api.md': '# API\n',
+    });
+    const r = runScript(projectRoot, [
+      '--exclude=**/*.test.ts',
+      '--exclude=docs/',
+    ]);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+    expect(byPath(r.output, 'src/utils.test.ts')).toBeUndefined();
+    expect(byPath(r.output, 'docs/guide.md')).toBeUndefined();
+    expect(byPath(r.output, 'docs/api.md')).toBeUndefined();
+    expect(r.output.appliedExclude).toEqual(['**/*.test.ts', 'docs/']);
+    expect(r.output.filteredByIgnore).toBe(3);
+  });
+
+  it('omits appliedExclude entirely when no --exclude is passed', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const x = 1;\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    // Field MUST NOT be present (back-compat for downstream consumers
+    // that snapshot the exact JSON shape).
+    expect('appliedExclude' in r.output).toBe(false);
+  });
+
+  it('treats unknown --flag tokens as forward-compat no-ops', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const x = 1;\n',
+    });
+    const r = runScript(projectRoot, ['--future-flag=value', '--exclude=src/']);
+    expect(r.status).toBe(0);
+    // Unknown flag silently ignored; --exclude still applied.
+    expect(byPath(r.output, 'src/index.ts')).toBeUndefined();
+    expect(r.output.appliedExclude).toEqual(['src/']);
+  });
+
+  it('--exclude stacks with .understandignore (both filter independently)', () => {
+    projectRoot = setupTree({
+      '.understandignore': 'fixtures/\n',
+      'src/index.ts': 'export const x = 1;\n',
+      'src/utils.test.ts': 'test("u", () => {});\n',
+      'fixtures/data.json': '{}\n',
+    });
+    const r = runScript(projectRoot, ['--exclude=**/*.test.ts']);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+    expect(byPath(r.output, 'src/utils.test.ts')).toBeUndefined();
+    expect(byPath(r.output, 'fixtures/data.json')).toBeUndefined();
+    expect(r.output.appliedExclude).toEqual(['**/*.test.ts']);
+    // Both the .understandignore drop and the --exclude drop count as
+    // user-driven.
+    expect(r.output.filteredByIgnore).toBe(2);
+  });
+
+  it('empty --exclude= value is silently dropped (no filter applied)', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const x = 1;\n',
+    });
+    const r = runScript(projectRoot, ['--exclude=']);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+    // Empty value -> no patterns collected -> field omitted.
+    expect('appliedExclude' in r.output).toBe(false);
   });
 });

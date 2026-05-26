@@ -56,8 +56,11 @@ Invoke the bundled scan script. It walks the project (preferring `git ls-files`,
 mkdir -p $PROJECT_ROOT/.understand-anything/tmp
 node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
   "$PROJECT_ROOT" \
-  "$PROJECT_ROOT/.understand-anything/tmp/ua-scan-files.json"
+  "$PROJECT_ROOT/.understand-anything/tmp/ua-scan-files.json" \
+  [--exclude=<pattern> ...]
 ```
+
+Append one `--exclude=<pattern>` per pattern in `$EXCLUDE_FLAGS` (set in SKILL.md Phase 0 step 3.7). When the user did not pass any `--exclude` flags, omit the bracketed segment entirely. Patterns must use the same gitignore glob syntax as `.understandignore` (e.g. `--exclude='**/*.test.*' --exclude='docs/'`); quote each pattern so the shell doesn't expand globs locally. The script echoes the applied patterns back as `appliedExclude` in its output so the orchestrator can verify the flags were wired through.
 
 Output JSON shape (you will read this verbatim and merge into the final scan-result):
 
@@ -73,6 +76,7 @@ Output JSON shape (you will read this verbatim and merge into the final scan-res
   "totalFiles": 42,
   "filteredByIgnore": 0,
   "estimatedComplexity": "moderate",
+  "appliedExclude": ["**/*.test.*", "docs/"],
   "stats": {
     "filesScanned": 42,
     "byCategory": {"code": 28, "config": 6, "docs": 4, "infra": 2, "script": 2},
@@ -80,6 +84,8 @@ Output JSON shape (you will read this verbatim and merge into the final scan-res
   }
 }
 ```
+
+The `appliedExclude` field is present **only** when one or more `--exclude=<pattern>` flags were passed; it is omitted entirely otherwise (no key, not an empty array). Drop it when assembling the final `scan-result.json` — it is diagnostic output for the orchestrator, not part of the agent contract.
 
 The script:
 - sorts `files` by `path.localeCompare` (deterministic)

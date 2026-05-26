@@ -75,6 +75,21 @@ export interface IgnoreFilter {
 }
 
 /**
+ * Optional knobs for createIgnoreFilter. Currently used to layer ad-hoc
+ * patterns sourced from CLI flags (e.g. `/understand --exclude=<pattern>`)
+ * on top of the persistent `.understandignore` rules.
+ */
+export interface CreateIgnoreFilterOptions {
+  /**
+   * Additional gitignore-style patterns appended after the user's
+   * `.understandignore` files. Use the same syntax as `.understandignore`
+   * (globs, `!` negation, trailing `/` for dirs). Empty/undefined leaves
+   * behavior identical to the no-options form.
+   */
+  extraExclude?: string[];
+}
+
+/**
  * Creates an IgnoreFilter that merges hardcoded defaults with user-defined
  * patterns from .understandignore files.
  *
@@ -82,8 +97,12 @@ export interface IgnoreFilter {
  * 1. Hardcoded defaults
  * 2. .understand-anything/.understandignore (if exists)
  * 3. .understandignore at project root (if exists)
+ * 4. CLI `--exclude=<pattern>` patterns (from `options.extraExclude`)
  */
-export function createIgnoreFilter(projectRoot: string): IgnoreFilter {
+export function createIgnoreFilter(
+  projectRoot: string,
+  options?: CreateIgnoreFilterOptions,
+): IgnoreFilter {
   const ig: Ignore = ignore();
 
   // Layer 1: hardcoded defaults
@@ -101,6 +120,12 @@ export function createIgnoreFilter(projectRoot: string): IgnoreFilter {
   if (existsSync(rootIgnorePath)) {
     const content = readFileSync(rootIgnorePath, "utf-8");
     ig.add(content);
+  }
+
+  // Layer 4: CLI --exclude patterns. Applied last so they can override
+  // earlier layers (including default + user .understandignore) via `!`.
+  if (options?.extraExclude && options.extraExclude.length > 0) {
+    ig.add(options.extraExclude);
   }
 
   return {

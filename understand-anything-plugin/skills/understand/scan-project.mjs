@@ -24,7 +24,12 @@
  *   - Complexity estimation (project-scanner.md Step 7 thresholds)
  *
  * Usage:
- *   node scan-project.mjs <projectRoot> <outputPath>
+ *   node scan-project.mjs <projectRoot> <outputPath> [--exclude=<pattern> ...]
+ *
+ * CLI flags:
+ *   --exclude=<pattern>   Additional gitignore-style pattern to exclude.
+ *                         Repeatable. Stacks on top of `.understandignore`.
+ *                         Example: --exclude='**​/*.test.*' --exclude='docs/'
  *
  * Output JSON (subset of what project-scanner.md Phase 1 expects — the LLM
  * agent merges this with Step A's narrative fields and Step C's importMap to
@@ -35,6 +40,7 @@
  *     "totalFiles": N,
  *     "filteredByIgnore": M,
  *     "estimatedComplexity": "small" | "moderate" | "large" | "very-large",
+ *     "appliedExclude": ["pat1", "pat2"],   // present only if --exclude was passed
  *     "stats": { "filesScanned": N, "byCategory": {...}, "byLanguage": {...} }
  *   }
  *
@@ -639,14 +645,49 @@ function countLines(absPath, posixPath) {
 }
 
 // ---------------------------------------------------------------------------
+// CLI argument parsing
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse `process.argv`-style array into positional args + recognized flags.
+ *
+ * Recognized flags:
+ *   --exclude=<pattern>   Repeatable. Collected into `excludes`.
+ *
+ * Unknown `--flag` tokens are silently ignored to keep the CLI forward-
+ * compatible with future agents that may pass extra options. Positional
+ * arguments are collected in order — first becomes `projectRoot`, second
+ * becomes `outputPath`. Argv slot 0/1 (node + script path) are skipped.
+ */
+export function parseArgs(argv) {
+  const positional = [];
+  const excludes = [];
+  for (const arg of argv.slice(2)) {
+    if (arg.startsWith('--exclude=')) {
+      const value = arg.slice('--exclude='.length);
+      // Skip empty values (`--exclude=`) — they would silently match nothing.
+      if (value) excludes.push(value);
+    } else if (!arg.startsWith('--')) {
+      positional.push(arg);
+    }
+    // Other --flag tokens: ignored for forward compatibility.
+  }
+  return {
+    projectRoot: positional[0],
+    outputPath: positional[1],
+    excludes,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const [, , projectRoot, outputPath] = process.argv;
+  const { projectRoot, outputPath, excludes } = parseArgs(process.argv);
   if (!projectRoot || !outputPath) {
     process.stderr.write(
-      'Usage: node scan-project.mjs <projectRoot> <outputPath>\n',
+      'Usage: node scan-project.mjs <projectRoot> <outputPath> [--exclude=<pattern> ...]\n',
     );
     process.exit(1);
   }
@@ -668,11 +709,17 @@ async function main() {
   // 1. Enumerate. Either git ls-files or recursive walk.
   const candidates = enumerateFiles(projectRoot);
 
-  // 2. Filter via createIgnoreFilter (defaults + user .understandignore).
-  //    Build a defaults-only filter in parallel to count user-driven drops.
-  const combined = createIgnoreFilter(projectRoot);
+  // 2. Filter via createIgnoreFilter (defaults + user .understandignore +
+  //    optional CLI --exclude patterns). Build a defaults-only filter in
+  //    parallel to count user-driven drops. The defaults-only filter never
+  //    sees CLI excludes — they count as user-driven, exactly like
+  //    .understandignore patterns.
+  const combined = createIgnoreFilter(projectRoot, {
+    extraExclude: excludes.length > 0 ? excludes : undefined,
+  });
   const userIgnoresPresent = hasUserIgnoreFile(projectRoot);
-  const defaultsOnly = userIgnoresPresent ? buildDefaultsOnlyFilter() : combined;
+  const hasUserDrivenPatterns = userIgnoresPresent || excludes.length > 0;
+  const defaultsOnly = hasUserDrivenPatterns ? buildDefaultsOnlyFilter() : combined;
 
   let filteredByIgnore = 0;
   const kept = [];
@@ -685,8 +732,8 @@ async function main() {
     // Dropped by combined filter. If defaults-only would have ALSO dropped
     // it, this is a baseline default drop — not counted. If defaults-only
     // would have KEPT it, this drop is attributable to the user's
-    // .understandignore content.
-    if (userIgnoresPresent && !defaultsOnly.isIgnored(rel)) {
+    // .understandignore content or a CLI --exclude pattern.
+    if (hasUserDrivenPatterns && !defaultsOnly.isIgnored(rel)) {
       filteredByIgnore++;
     }
   }
@@ -744,6 +791,11 @@ async function main() {
     totalFiles: fileEntries.length,
     filteredByIgnore,
     estimatedComplexity,
+    // Echo CLI --exclude patterns back so downstream consumers can verify
+    // the flag was wired through (and surface it in the dashboard later).
+    // Only emitted when at least one --exclude was passed; otherwise the
+    // field is omitted entirely so existing snapshots/tests stay byte-stable.
+    ...(excludes.length > 0 ? { appliedExclude: excludes } : {}),
     stats: {
       filesScanned: fileEntries.length,
       byCategory,
@@ -799,4 +851,5 @@ export default {
   detectLanguage,
   detectCategory,
   estimateComplexity,
+  parseArgs,
 };

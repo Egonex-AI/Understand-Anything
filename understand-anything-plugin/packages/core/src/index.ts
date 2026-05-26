@@ -120,5 +120,6 @@ export {
   createIgnoreFilter,
   DEFAULT_IGNORE_PATTERNS,
   type IgnoreFilter,
+  type CreateIgnoreFilterOptions,
 } from "./ignore-filter.js";
 export { generateStarterIgnoreFile } from "./ignore-generator.js";
