@@ -30,7 +30,7 @@ Updated (6 cards, 2 rows of 3):
 
 Update the note from Claude Code-only to multi-platform:
 - Before: "Works with Claude Code — Anthropic's official CLI for Claude."
-- After: "Works with Claude Code, Codex, OpenCode, Gemini CLI, and more."
+- After: "Works with Claude Code, Codex, OpenCode, Antigravity CLI, and more."
 
 ### 3. Footer
 

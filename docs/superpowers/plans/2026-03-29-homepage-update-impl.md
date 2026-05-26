@@ -96,7 +96,7 @@ Change:
 
 To:
 ```html
-<p class="install-note">Works with <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>OpenCode</strong>, <strong>Gemini CLI</strong>, and more.</p>
+<p class="install-note">Works with <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>OpenCode</strong>, <strong>Antigravity CLI</strong>, and more.</p>
 ```
 
 **Step 2: Commit**
