@@ -10,6 +10,7 @@ import crypto from "crypto";
 // This token is printed to the terminal and must be in the URL
 // to fetch knowledge-graph.json or diff-overlay.json.
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
+const DASHBOARD_PORT = Number(process.env.UNDERSTAND_DASHBOARD_PORT) || 5173;
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
 function graphFileCandidates(fileName: string): string[] {
@@ -186,7 +187,8 @@ export default defineConfig({
   // This blocks access from any other device on the same LAN / WiFi.
   server: {
     host: "127.0.0.1",
-    port: 5173,
+    port: DASHBOARD_PORT,
+    strictPort: true,
     open: `/?token=${ACCESS_TOKEN}`,
   },
 
@@ -238,14 +240,14 @@ export default defineConfig({
         // Print the access URL once so the developer can open it.
         server.httpServer?.once("listening", () => {
           const address = server.httpServer?.address();
-          const port = typeof address === "object" && address ? address.port : 5173;
+          const port = typeof address === "object" && address ? address.port : DASHBOARD_PORT;
           console.log(
             `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
           );
         });
 
         server.middlewares.use((req, res, next) => {
-          const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
+          const url = new URL(req.url ?? "/", "http://127.0.0.1");
           const pathname = url.pathname;
           const isProtectedEndpoint =
             pathname === "/knowledge-graph.json" ||
