@@ -21,6 +21,7 @@
  *   2   no fingerprints.json (run /understand first to baseline)
  *   3   no meta.json AND no --since given (cannot determine compare base)
  *   4   silent-load-failure guard tripped (fingerprints.json existed but loaded empty)
+ *   5   git diff failed (commit missing, shallow clone, pruned object, history rewrite)
  *   1   unexpected error
  */
 
@@ -32,11 +33,12 @@ import {
   type FingerprintStore,
 } from "../fingerprint.js";
 import { classifyUpdate, type UpdateDecision } from "../change-classifier.js";
-import { getChangedFiles } from "../staleness.js";
+import { getChangedFilesStrict } from "../staleness.js";
 import { PluginRegistry } from "../plugins/registry.js";
 import { TreeSitterPlugin } from "../plugins/tree-sitter-plugin.js";
 import { registerAllParsers } from "../plugins/parsers/index.js";
 import { createIgnoreFilter } from "../ignore-filter.js";
+import { builtinLanguageConfigs } from "../languages/configs/index.js";
 
 const SOURCE_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs",
@@ -90,7 +92,7 @@ Inputs:
                   Default: <project>/.understand-anything/intermediate/change-analysis.json.
   --json          Print only the JSON to stdout (no human-readable summary on stderr).
 
-Exit codes: 0 ok | 2 no fingerprints.json | 3 cannot determine since | 4 load-guard tripped | 1 other
+Exit codes: 0 ok | 2 no fingerprints.json | 3 cannot determine since | 4 load-guard tripped | 5 git diff failed | 1 other
 `);
 }
 
@@ -105,7 +107,12 @@ function loadJson<T>(path: string): T {
 
 async function buildRegistry(): Promise<PluginRegistry> {
   const registry = new PluginRegistry();
-  const treeSitter = new TreeSitterPlugin();
+  // Pass the full language config set so non-TS/JS file changes (Python, Go,
+  // Java, etc.) are analyzed structurally instead of falling back to a
+  // content-hash-only comparison — the default TreeSitterPlugin constructor
+  // would only load TypeScript and JavaScript, which would classify every
+  // non-TS change as STRUCTURAL and defeat the cosmetic fast path.
+  const treeSitter = new TreeSitterPlugin(builtinLanguageConfigs);
   await treeSitter.init();
   registry.register(treeSitter);
   registerAllParsers(registry);
@@ -166,7 +173,29 @@ async function main(): Promise<void> {
   if (args.changed) {
     changedFiles = args.changed;
   } else {
-    changedFiles = getChangedFiles(args.projectDir, sinceSha);
+    try {
+      changedFiles = getChangedFilesStrict(args.projectDir, sinceSha);
+    } catch (err: unknown) {
+      // Distinguish a real empty diff from a git failure. Previously the
+      // catching variant returned [], which made the hook silently SKIP
+      // when meta.json pointed at a commit not available locally (shallow
+      // clone, history rewrite, pruned object).
+      let stderr: string;
+      if (err && typeof err === "object" && "stderr" in err) {
+        const s = (err as { stderr?: unknown }).stderr;
+        stderr = typeof s === "string" ? s.trim() : String(s).trim();
+      } else if (err instanceof Error) {
+        stderr = err.message;
+      } else {
+        stderr = String(err);
+      }
+      die(
+        `could not diff from ${sinceSha}: ${stderr}\n` +
+          `  This often happens after a shallow clone, history rewrite, or pruned commit.\n` +
+          `  Re-baseline with /understand to refresh meta.json.`,
+        5,
+      );
+    }
   }
 
   // Filter to source extensions (matches the prompt's Phase 0 step 7).
