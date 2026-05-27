@@ -54,26 +54,28 @@ function findGraphFile(fileName: string): string | null {
 }
 
 // Single source of truth for relative-path validation. Rejects anything that
-// could escape the project root, plus backslashes so Windows-encoded traversal
-// attempts fail loud at the boundary instead of relying on normalize() quirks.
+// could escape the project root. Windows-style backslashes are normalized to
+// forward slashes BEFORE the traversal checks: the graph pipeline emits
+// paths via `path.relative()`, which on Windows produces "src\file.ts", and
+// the CodeViewer sends those values straight back here. Traversal attempts
+// like "..\..\etc\passwd" still get caught because they collapse to
+// "../../etc/passwd" after the rewrite and trigger the `..` check.
 function validateRelativePath(
   requestedPath: string,
 ): { ok: true; normalized: string } | { ok: false; error: string; statusCode: number } {
   if (!requestedPath) return { ok: false, error: "Missing path", statusCode: 400 };
   if (requestedPath.includes("\0")) return { ok: false, error: "Invalid path", statusCode: 400 };
-  if (requestedPath.includes("\\")) {
-    return { ok: false, error: "Invalid path (use forward slashes)", statusCode: 400 };
-  }
-  if (path.isAbsolute(requestedPath)) {
+  const requestedForward = requestedPath.replace(/\\/g, "/");
+  if (path.isAbsolute(requestedForward) || path.posix.isAbsolute(requestedForward)) {
     return { ok: false, error: "Absolute paths are not allowed", statusCode: 400 };
   }
-  const normalized = path.normalize(requestedPath);
+  const normalized = path.posix.normalize(requestedForward);
   if (
     !normalized ||
     normalized === "." ||
     normalized === ".." ||
-    normalized.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(normalized)
+    normalized.startsWith("../") ||
+    path.posix.isAbsolute(normalized)
   ) {
     return { ok: false, error: "Path must stay inside the project", statusCode: 400 };
   }
