@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Root pnpm workspace
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+      types:
+        patterns:
+          - "@types/*"
+
+  # Homepage (Astro)
+  - package-ecosystem: "npm"
+    directory: "/homepage"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
+  # GitHub Actions — keeps SHA pins fresh
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
