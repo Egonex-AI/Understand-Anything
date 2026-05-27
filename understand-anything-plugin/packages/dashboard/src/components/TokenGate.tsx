@@ -18,7 +18,12 @@ export default function TokenGate({ onTokenValid }: TokenGateProps) {
     setError(null);
 
     try {
-      const res = await fetch(`/knowledge-graph.json?token=${encodeURIComponent(token)}`);
+      // Send the candidate token via header, not query string, so the dev
+      // server's access log never sees the token value. The server accepts
+      // both, but new client code should always use the header.
+      const res = await fetch(`/knowledge-graph.json`, {
+        headers: { "X-Access-Token": token },
+      });
       if (res.ok) {
         onTokenValid(token);
       } else if (res.status === 403) {

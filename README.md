@@ -176,17 +176,50 @@ Understand-Anything works across multiple AI coding platforms.
 
 ### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI)
 
-**macOS / Linux:**
+> [!IMPORTANT]
+> The installer creates symlinks/junctions into your AI agents' skill directories (`~/.openclaw/skills/`, `~/.copilot/skills/`, `~/.agents/skills/`, etc.) and those skills are auto-loaded by every agent on next start. Pin to a tagged release rather than `main` so a supply-chain compromise of the default branch can't reach your machine. Verify the SHA256 if you use the curl-piped form.
+
+**Recommended — clone a tagged release and run the installer locally:**
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
-# or skip the prompt by passing the platform:
-curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
+# macOS / Linux / Git Bash on Windows
+git clone --branch v2.7.4 --depth 1 https://github.com/Lum1104/Understand-Anything.git ~/.understand-anything/repo
+cd ~/.understand-anything/repo
+./install.sh                  # interactive — prompts for platform
+./install.sh codex            # non-interactive
 ```
 
-**Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+# Windows (PowerShell)
+git clone --branch v2.7.4 --depth 1 https://github.com/Lum1104/Understand-Anything.git "$HOME\.understand-anything\repo"
+cd "$HOME\.understand-anything\repo"
+.\install.ps1                 # interactive
+.\install.ps1 codex           # non-interactive
 ```
+
+**Quick install (curl-piped from a tag, with SHA256 verification):**
+
+```bash
+# macOS / Linux — replace v2.7.4 with the release you want
+TAG=v2.7.4
+curl -fsSLO "https://raw.githubusercontent.com/Lum1104/Understand-Anything/${TAG}/install.sh"
+curl -fsSL  "https://raw.githubusercontent.com/Lum1104/Understand-Anything/${TAG}/SHA256SUMS" | sha256sum --ignore-missing -c -
+bash ./install.sh codex
+```
+
+```powershell
+# Windows — replace v2.7.4 with the release you want
+$Tag = 'v2.7.4'
+Invoke-WebRequest -UseBasicParsing -OutFile install.ps1 -Uri "https://raw.githubusercontent.com/Lum1104/Understand-Anything/$Tag/install.ps1"
+$expected = (Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/Lum1104/Understand-Anything/$Tag/SHA256SUMS").Content `
+  | Select-String -Pattern '^\s*([0-9a-f]+)\s+install\.ps1' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+$actual = (Get-FileHash -Algorithm SHA256 install.ps1).Hash.ToLower()
+if ($expected -ne $actual) { throw "SHA256 mismatch — refusing to run installer" }
+.\install.ps1 codex
+```
+
+> [!WARNING]
+> The previous one-line form pulled `install.sh` from `main` without verification. That is still functional, but it means **any compromise of the default branch runs on your machine**. The tagged + checksum-verified flow above is the supported path going forward.
 
 The installer clones the repo to `~/.understand-anything/repo` and creates the right symlinks for the chosen platform. Restart your CLI/IDE afterwards.
 

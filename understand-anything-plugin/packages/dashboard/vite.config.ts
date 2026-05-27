@@ -12,6 +12,10 @@ import crypto from "crypto";
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
+// Warn at most once per process about the monorepo `../../../` fallback so the
+// developer knows which graph the dashboard is serving.
+let warnedAboutFallback = false;
+
 function graphFileCandidates(fileName: string): string[] {
   const graphDir = process.env.GRAPH_DIR;
   return [
@@ -24,7 +28,51 @@ function graphFileCandidates(fileName: string): string[] {
 }
 
 function findGraphFile(fileName: string): string | null {
-  return graphFileCandidates(fileName).find((candidate) => fs.existsSync(candidate)) ?? null;
+  const candidates = graphFileCandidates(fileName);
+  for (let i = 0; i < candidates.length; i++) {
+    if (!fs.existsSync(candidates[i])) continue;
+    // The last candidate is the 3-up monorepo fallback. It exists for
+    // `pnpm dev:dashboard` from inside the repo but is ambiguous when the
+    // dashboard runs anywhere else — warn once so it's obvious which graph
+    // is being served.
+    const isFallback = i === candidates.length - 1 && !process.env.GRAPH_DIR;
+    if (isFallback && !warnedAboutFallback) {
+      warnedAboutFallback = true;
+      console.warn(
+        `[understand-anything] Using monorepo fallback graph at: ${candidates[i]}\n` +
+          `  Set GRAPH_DIR=<path-to-project-root> to pin which graph the dashboard serves.`,
+      );
+    }
+    return candidates[i];
+  }
+  return null;
+}
+
+// Single source of truth for relative-path validation. Rejects anything that
+// could escape the project root, plus backslashes so Windows-encoded traversal
+// attempts fail loud at the boundary instead of relying on normalize() quirks.
+function validateRelativePath(
+  requestedPath: string,
+): { ok: true; normalized: string } | { ok: false; error: string; statusCode: number } {
+  if (!requestedPath) return { ok: false, error: "Missing path", statusCode: 400 };
+  if (requestedPath.includes("\0")) return { ok: false, error: "Invalid path", statusCode: 400 };
+  if (requestedPath.includes("\\")) {
+    return { ok: false, error: "Invalid path (use forward slashes)", statusCode: 400 };
+  }
+  if (path.isAbsolute(requestedPath)) {
+    return { ok: false, error: "Absolute paths are not allowed", statusCode: 400 };
+  }
+  const normalized = path.normalize(requestedPath);
+  if (
+    !normalized ||
+    normalized === "." ||
+    normalized === ".." ||
+    normalized.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(normalized)
+  ) {
+    return { ok: false, error: "Path must stay inside the project", statusCode: 400 };
+  }
+  return { ok: true, normalized };
 }
 
 function projectRootFromGraphFile(candidate: string): string {
@@ -113,19 +161,9 @@ function rejectFileRequest(message: string, statusCode = 400) {
 
 function readSourceFile(url: URL) {
   const requestedPath = url.searchParams.get("path") ?? "";
-  if (!requestedPath) return rejectFileRequest("Missing path");
-  if (requestedPath.includes("\0")) return rejectFileRequest("Invalid path");
-  if (path.isAbsolute(requestedPath)) return rejectFileRequest("Absolute paths are not allowed");
-
-  const normalizedPath = path.normalize(requestedPath);
-  if (
-    normalizedPath === "." ||
-    normalizedPath.startsWith(`..${path.sep}`) ||
-    normalizedPath === ".." ||
-    path.isAbsolute(normalizedPath)
-  ) {
-    return rejectFileRequest("Path must stay inside the project");
-  }
+  const check = validateRelativePath(requestedPath);
+  if (!check.ok) return rejectFileRequest(check.error, check.statusCode);
+  const normalizedPath = check.normalized;
 
   const graphFile = findGraphFile("knowledge-graph.json");
   if (!graphFile) {
@@ -261,8 +299,13 @@ export default defineConfig({
           }
 
           // FIX 3 — require the one-time token on all data endpoints.
-          // Requests without a matching ?token= get a 403.
-          if (url.searchParams.get("token") !== ACCESS_TOKEN) {
+          // Accept either an X-Access-Token header (preferred for new clients,
+          // keeps the token out of the access log) or the legacy ?token= query
+          // (still used by the initial `open` URL we print at boot).
+          const headerToken = req.headers["x-access-token"];
+          const headerValue = Array.isArray(headerToken) ? headerToken[0] : headerToken;
+          const providedToken = headerValue ?? url.searchParams.get("token");
+          if (providedToken !== ACCESS_TOKEN) {
             sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
             return;
           }
