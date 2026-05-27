@@ -165,6 +165,7 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       startLine: fn.lineRange[0],
       endLine: fn.lineRange[1],
       params: fn.params || [],
+      ...(fn.cyclomaticComplexity ? { cyclomaticComplexity: fn.cyclomaticComplexity } : {}),
     }));
   }
 
@@ -176,6 +177,7 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       endLine: cls.lineRange[1],
       methods: cls.methods || [],
       properties: cls.properties || [],
+      ...(cls.cyclomaticComplexity ? { cyclomaticComplexity: cls.cyclomaticComplexity } : {}),
     }));
   }
 

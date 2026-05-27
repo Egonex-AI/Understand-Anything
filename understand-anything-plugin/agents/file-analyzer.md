@@ -94,10 +94,10 @@ Read `$PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<batchIndex
       "totalLines": 150,
       "nonEmptyLines": 120,
       "functions": [
-        {"name": "main", "startLine": 10, "endLine": 45, "params": ["config", "options"]}
+        {"name": "main", "startLine": 10, "endLine": 45, "params": ["config", "options"], "cyclomaticComplexity": 4}
       ],
       "classes": [
-        {"name": "App", "startLine": 50, "endLine": 140, "methods": ["init", "run"], "properties": ["config", "logger"]}
+        {"name": "App", "startLine": 50, "endLine": 140, "methods": ["init", "run"], "properties": ["config", "logger"], "cyclomaticComplexity": 7}
       ],
       "exports": [
         {"name": "App", "line": 50, "isDefault": false}
@@ -191,11 +191,11 @@ Bad: "The utils file contains utility functions."
 Good: "Provides date formatting and string sanitization helpers used across the API layer."
 
 **Complexity** (informed by script metrics):
-- `simple`: under 50 non-empty lines, minimal structure
-- `moderate`: 50-200 non-empty lines, some structure
+- `simple`: under 50 non-empty lines, minimal structure, low deterministic complexity
+- `moderate`: 50-200 non-empty lines, some structure, medium deterministic complexity
 - `complex`: over 200 non-empty lines, many definitions, deep nesting, or complex logic
 
-Use the script's metrics to inform this -- but apply judgment.
+Use the script's metrics to inform this -- but apply judgment. For function and class nodes, preserve `cyclomaticComplexity` from the script output exactly when present; it is a deterministic metric and complements the human-readable `complexity` label.
 
 **Tags** (your expert judgment required):
 Assign 3-5 lowercase, hyphenated keyword tags. Use the script's structural data to inform your choices. Choose from patterns like:
@@ -435,6 +435,7 @@ Produce a single, valid JSON block. Before writing, verify that all arrays and o
 **Conditionally required fields:**
 - `filePath` (string) -- REQUIRED for file-level nodes (file, config, document, service, pipeline, schema, resource), optional for sub-file nodes
 - `lineRange` ([number, number]) -- include for `function` and `class` nodes, sourced directly from script output
+- `cyclomaticComplexity` (number) -- include for `function` and `class` nodes when present in the script output, sourced directly from that output
 
 **Optional fields:**
 - `languageNotes` (string) -- only when there is a genuinely notable pattern

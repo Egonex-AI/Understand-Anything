@@ -45,6 +45,7 @@ export interface GraphNode {
   summary: string;
   tags: string[];
   complexity: "simple" | "moderate" | "complex";
+  cyclomaticComplexity?: number;
   languageNotes?: string;
   domainMeta?: DomainMeta;
   knowledgeMeta?: KnowledgeMeta;
@@ -167,8 +168,8 @@ export interface ReferenceResolution {
 
 // Plugin interfaces
 export interface StructuralAnalysis {
-  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string }>;
-  classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
+  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string; cyclomaticComplexity?: number }>;
+  classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[]; cyclomaticComplexity?: number }>;
   imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;
   // Non-code structural data (all optional for backward compat)
