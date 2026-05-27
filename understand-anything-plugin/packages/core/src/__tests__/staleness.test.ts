@@ -7,7 +7,12 @@ vi.mock("child_process", () => ({
 
 // Import after mocking
 import { execFileSync } from "child_process";
-import { getChangedFiles, isStale, mergeGraphUpdate } from "../staleness.js";
+import {
+  getChangedFiles,
+  getChangedFilesStrict,
+  isStale,
+  mergeGraphUpdate,
+} from "../staleness.js";
 
 const mockedExecFileSync = vi.mocked(execFileSync);
 
@@ -83,6 +88,39 @@ describe("getChangedFiles", () => {
     const result = getChangedFiles("/project", "abc123");
 
     expect(result).toEqual([]);
+  });
+});
+
+describe("getChangedFilesStrict", () => {
+  it("returns changed file list from git diff", () => {
+    mockedExecFileSync.mockReturnValue("src/index.ts\nsrc/utils.ts\n");
+
+    const result = getChangedFilesStrict("/project", "abc123");
+
+    expect(result).toEqual(["src/index.ts", "src/utils.ts"]);
+    expect(mockedExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["diff", "abc123..HEAD", "--name-only"],
+      { cwd: "/project", encoding: "utf-8" },
+    );
+  });
+
+  it("returns empty array when no changes", () => {
+    mockedExecFileSync.mockReturnValue("");
+
+    const result = getChangedFilesStrict("/project", "abc123");
+
+    expect(result).toEqual([]);
+  });
+
+  it("throws on git error instead of swallowing it", () => {
+    mockedExecFileSync.mockImplementation(() => {
+      throw new Error("fatal: bad revision");
+    });
+
+    expect(() => getChangedFilesStrict("/project", "abc123")).toThrowError(
+      /bad revision/,
+    );
   });
 });
 
