@@ -4,6 +4,9 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "ua-fingerprint-check": "bin/fingerprint-check.mjs"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
