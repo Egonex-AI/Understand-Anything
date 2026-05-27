@@ -90,6 +90,27 @@ prompt_platform() {
   printf '%s\n' "${ids[$((choice-1))]}"
 }
 
+ensure_pnpm() {
+  if command -v pnpm >/dev/null 2>&1; then
+    return 0
+  fi
+  printf -- '→ pnpm not found — installing...\n'
+  if command -v corepack >/dev/null 2>&1; then
+    corepack enable pnpm
+  elif command -v npm >/dev/null 2>&1; then
+    npm install -g pnpm
+  else
+    printf 'Error: Node.js (and npm or corepack) is required but not found.\n' >&2
+    printf 'Install Node.js ≥ 22 from https://nodejs.org, then re-run this script.\n' >&2
+    exit 1
+  fi
+  if ! command -v pnpm >/dev/null 2>&1; then
+    printf 'Error: pnpm installation failed. Install it manually: https://pnpm.io/installation\n' >&2
+    exit 1
+  fi
+  printf '✓ pnpm installed.\n'
+}
+
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
@@ -185,6 +206,7 @@ cmd_install() {
   target="$(printf '%s\n' "$row" | cut -d'|' -f2)"
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
 
+  ensure_pnpm
   clone_or_update
   printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
   link_skills "$target" "$style"

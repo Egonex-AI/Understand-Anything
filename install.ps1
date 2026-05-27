@@ -85,6 +85,22 @@ function Prompt-Platform {
 
 function Get-SkillsRoot { Join-Path $RepoDir 'understand-anything-plugin\skills' }
 
+function Ensure-Pnpm {
+    if (Get-Command pnpm -ErrorAction SilentlyContinue) { return }
+    Write-Host '→ pnpm not found — installing...'
+    if (Get-Command corepack -ErrorAction SilentlyContinue) {
+        corepack enable pnpm
+    } elseif (Get-Command npm -ErrorAction SilentlyContinue) {
+        npm install -g pnpm
+    } else {
+        Write-Error "Node.js (and npm or corepack) is required but not found.`nInstall Node.js >= 22 from https://nodejs.org, then re-run this script."
+    }
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+        Write-Error "pnpm installation failed. Install it manually: https://pnpm.io/installation"
+    }
+    Write-Host '✓ pnpm installed.'
+}
+
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
@@ -200,6 +216,7 @@ function ConvertTo-FileUri([string]$Path) {
 
 function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
+    Ensure-Pnpm
     Clone-Or-Update
     Write-Host "→ Linking skills for $Id ($($cfg.Style) → $($cfg.Target))"
     Link-Skills $cfg.Target $cfg.Style
