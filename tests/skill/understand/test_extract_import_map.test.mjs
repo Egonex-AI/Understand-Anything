@@ -142,6 +142,44 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.importMap['src/index.ts']).toEqual(['src/stuff/index.ts']);
   });
 
+  it('resolves NodeNext .js relative imports to TypeScript source when exact JavaScript target is absent', () => {
+    projectRoot = setupTree({
+      'src/a.ts':
+        `import { b } from './b.js';\n` +
+        `import { c } from './nested/c.js';\n` +
+        `import { d } from './dir/index.js';\n` +
+        `import { e } from './folder.js';\n` +
+        `import { f } from './format.mjs';\n` +
+        `b; c; d;\n`,
+      'src/b.ts': `export const b = 1;\n`,
+      'src/nested/c.tsx': `export const c = 2;\n`,
+      'src/dir/index.ts': `export const d = 3;\n`,
+      'src/folder/index.ts': `export const e = 4;\n`,
+      'src/format.ts': `export const f = 5;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/a.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/b.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/nested/c.tsx', language: 'typescriptreact', fileCategory: 'code' },
+        { path: 'src/dir/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/folder/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/format.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/a.ts']).toEqual([
+      'src/b.ts',
+      'src/dir/index.ts',
+      'src/nested/c.tsx',
+    ]);
+    expect(result.output.importMap['src/a.ts']).not.toContain('src/folder/index.ts');
+    expect(result.output.importMap['src/a.ts']).not.toContain('src/format.ts');
+  });
+
   it('drops external package imports', () => {
     projectRoot = setupTree({
       'src/index.ts': `import express from 'express';\nimport { z } from 'zod';\nimport { foo } from './local';\n`,

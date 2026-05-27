@@ -369,6 +369,13 @@ const TS_EXT_PROBES = [
   '/index.ts', '/index.tsx', '/index.js', '/index.jsx',
 ];
 
+const TS_SOURCE_PROBES_BY_JS_IMPORT_EXT = new Map([
+  ['.js', ['.ts', '.tsx']],
+  ['.jsx', ['.tsx']],
+  ['.mjs', ['.mts']],
+  ['.cjs', ['.cts']],
+]);
+
 /**
  * Try ext probes against the file set for the given base path. Returns the
  * first matching project-relative path, or null. If the base path already has
@@ -378,6 +385,15 @@ function probeWithExtensions(basePath, fileSet) {
   if (!basePath) return null;
   // Exact match (import already had an extension)
   if (fileSet.has(basePath)) return basePath;
+  const importExt = posix.extname(basePath);
+  const tsSourceProbes = TS_SOURCE_PROBES_BY_JS_IMPORT_EXT.get(importExt);
+  if (tsSourceProbes) {
+    const extensionlessBase = basePath.slice(0, -importExt.length);
+    for (const ext of tsSourceProbes) {
+      const candidate = extensionlessBase + ext;
+      if (fileSet.has(candidate)) return candidate;
+    }
+  }
   for (const ext of TS_EXT_PROBES) {
     const candidate = basePath + ext;
     if (fileSet.has(candidate)) return candidate;
