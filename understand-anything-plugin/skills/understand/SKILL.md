@@ -309,6 +309,7 @@ For each batch, dispatch a subagent using the `file-analyzer` agent definition (
 >
 > $LANGUAGE_DIRECTIVE
 
+Do not generate ad-hoc Python helper scripts for batch preparation or progress reporting in this phase. Use the already-produced `batches.json` data directly when filling each dispatch prompt. If a one-off shell-visible summary is needed, compute values in separate variables before formatting; never embed generator/set comprehensions directly inside Python f-strings.
 Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 
 > Analyze these files and produce GraphNode and GraphEdge objects.
