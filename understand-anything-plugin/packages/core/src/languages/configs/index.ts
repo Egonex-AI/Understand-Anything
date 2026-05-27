@@ -14,6 +14,7 @@ import { cppConfig } from "./cpp.js";
 import { dartConfig } from "./dart.js";
 import { csharpConfig } from "./csharp.js";
 import { luaConfig } from "./lua.js";
+import { pascalConfig } from "./pascal.js";
 // Non-code language configs
 import { markdownConfig } from "./markdown.js";
 import { yamlConfig } from "./yaml.js";
@@ -55,6 +56,7 @@ export const builtinLanguageConfigs: LanguageConfig[] = [
   swiftConfig,
   kotlinConfig,
   luaConfig,
+  pascalConfig,
   cConfig,
   cppConfig,
   dartConfig,
@@ -101,6 +103,7 @@ export {
   swiftConfig,
   kotlinConfig,
   luaConfig,
+  pascalConfig,
   cConfig,
   cppConfig,
   dartConfig,
