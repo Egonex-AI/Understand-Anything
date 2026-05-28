@@ -382,13 +382,25 @@ export const multiply = (a: number, b: number) => a * b;
 
     it("does not duplicate exports", () => {
       const { tree, parser, root } = parseTs(`
-export function doThing() {}
-export function doThing() {}
+const foo = 1;
+export { foo, foo };
 `);
       const result = extractor.extractStructure(root);
-      const names = result.exports.map((e) => e.name);
-      const unique = new Set(names);
-      expect(names.length).toBe(unique.size);
+      expect(result.exports.filter((e) => e.name === "foo")).toHaveLength(1);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("records name as 'default' for default-exported class", () => {
+      const { tree, parser, root } = parseTs(`
+export default class Handler {}
+`);
+      const result = extractor.extractStructure(root);
+
+      const defaultExport = result.exports.find((e) => e.isDefault);
+      expect(defaultExport).toBeDefined();
+      expect(defaultExport?.name).toBe("default");
 
       tree.delete();
       parser.delete();
@@ -459,7 +471,7 @@ class Service {
       const result = extractor.extractCallGraph(root);
 
       const calls = result.filter((e) => e.caller === "run");
-      expect(calls.some((e) => e.callee.includes("init"))).toBe(true);
+      expect(calls.some((e) => e.callee === "this.init")).toBe(true);
       expect(calls.some((e) => e.callee === "fetch")).toBe(true);
 
       tree.delete();
