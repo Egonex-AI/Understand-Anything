@@ -5,10 +5,6 @@ export const pascalConfig = {
   displayName: "Pascal",
   extensions: [".pas", ".dpr", ".lpr", ".pp"],
   treeSitter: {
-    // Install via: pnpm add tree-sitter-pascal@github:jimmckeeth/tree-sitter-pascal#main
-    // WASM: download from https://github.com/jimmckeeth/tree-sitter-pascal/releases
-    //        or build via: scripts/build-pascal-wasm.ps1 / build-pascal-wasm.sh
-    // The plugin degrades gracefully if the WASM is absent.
     wasmPackage: "tree-sitter-pascal",
     wasmFile: "tree-sitter-pascal.wasm",
   },

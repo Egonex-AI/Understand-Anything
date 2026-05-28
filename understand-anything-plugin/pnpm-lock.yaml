@@ -59,7 +59,7 @@ importers:
         version: 0.25.0
       tree-sitter-pascal:
         specifier: github:jimmckeeth/tree-sitter-pascal#main
-        version: https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/08c1480aeec0df84a3bed458707f7bb5e2da0356
+        version: https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/8212ff0e06010f7babeae1f1b3096d689f720e8b
       tree-sitter-php:
         specifier: ^0.23.11
         version: 0.23.12
@@ -1678,8 +1678,8 @@ packages:
       tree-sitter:
         optional: true
 
-  tree-sitter-pascal@https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/08c1480aeec0df84a3bed458707f7bb5e2da0356:
-    resolution: {gitHosted: true, integrity: sha512-RyW+eMuhYIJux8w39C7Q8gbCQToDQJicTSalBSPpdFOKWfUue5eo9smjgnMTCqpWVU1lq5Er7+o1N3ZOcUtm6Q==, tarball: https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/08c1480aeec0df84a3bed458707f7bb5e2da0356}
+  tree-sitter-pascal@https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/8212ff0e06010f7babeae1f1b3096d689f720e8b:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/8212ff0e06010f7babeae1f1b3096d689f720e8b}
     version: 0.0.0
 
   tree-sitter-php@0.23.12:
@@ -3462,7 +3462,7 @@ snapshots:
       node-addon-api: 8.7.0
       node-gyp-build: 4.8.4
 
-  tree-sitter-pascal@https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/08c1480aeec0df84a3bed458707f7bb5e2da0356: {}
+  tree-sitter-pascal@https://codeload.github.com/jimmckeeth/tree-sitter-pascal/tar.gz/8212ff0e06010f7babeae1f1b3096d689f720e8b: {}
 
   tree-sitter-php@0.23.12:
     dependencies:
