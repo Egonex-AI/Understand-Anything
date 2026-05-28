@@ -495,4 +495,74 @@ doSetup();
       parser.delete();
     });
   });
+
+  // ---- TypeScript: comprehensive ----
+
+  describe("TypeScript - comprehensive file", () => {
+    it("handles a realistic TypeScript module", () => {
+      const { tree, parser, root } = parseTs(`
+import { EventEmitter } from "events";
+import type { Logger } from "./logger";
+
+export class AuthService extends EventEmitter {
+  private logger: Logger;
+  readonly maxRetries: number;
+
+  constructor(logger: Logger) {
+    super();
+    this.logger = logger;
+    this.maxRetries = 3;
+  }
+
+  async login(username: string, password: string): Promise<boolean> {
+    this.logger.info("login attempt");
+    return this.verify(username, password);
+  }
+
+  private verify(user: string, pass: string): boolean {
+    return user.length > 0 && pass.length > 0;
+  }
+}
+
+export function createAuth(logger: Logger): AuthService {
+  return new AuthService(logger);
+}
+
+export const DEFAULT_TIMEOUT = 5000;
+`);
+      const result = extractor.extractStructure(root);
+
+      // Imports
+      expect(result.imports).toHaveLength(2);
+      expect(result.imports[0].source).toBe("events");
+      expect(result.imports[1].source).toBe("./logger");
+
+      // Classes
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("AuthService");
+      expect(result.classes[0].methods).toContain("constructor");
+      expect(result.classes[0].methods).toContain("login");
+      expect(result.classes[0].methods).toContain("verify");
+      expect(result.classes[0].properties).toContain("logger");
+      expect(result.classes[0].properties).toContain("maxRetries");
+
+      // Functions
+      const fnNames = result.functions.map((f) => f.name);
+      expect(fnNames).toContain("createAuth");
+
+      // Exports
+      const exportNames = result.exports.map((e) => e.name);
+      expect(exportNames).toContain("AuthService");
+      expect(exportNames).toContain("createAuth");
+      expect(exportNames).toContain("DEFAULT_TIMEOUT");
+
+      // Call graph
+      const calls = extractor.extractCallGraph(root);
+      const loginCalls = calls.filter((e) => e.caller === "login");
+      expect(loginCalls.some((e) => e.callee.includes("verify"))).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });
