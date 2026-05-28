@@ -118,6 +118,18 @@ clone_or_update() {
     mkdir -p "$(dirname "$REPO_DIR")"
     git clone "$REPO_URL" "$REPO_DIR"
   fi
+  # If this script is running from a local git checkout, install that same branch.
+  # Falls back gracefully when piped from curl (no git context).
+  local script_dir script_branch=""
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-}")" 2>/dev/null && pwd || true)"
+  if [[ -n "$script_dir" ]] && git -C "$script_dir" rev-parse --git-dir >/dev/null 2>&1; then
+    script_branch="$(git -C "$script_dir" branch --show-current 2>/dev/null || true)"
+  fi
+  if [[ -n "$script_branch" && "$script_branch" != "main" ]]; then
+    printf -- '→ Checking out branch: %s\n' "$script_branch"
+    git -C "$REPO_DIR" fetch origin
+    git -C "$REPO_DIR" checkout "$script_branch"
+  fi
 }
 
 skills_root() { printf '%s\n' "$REPO_DIR/understand-anything-plugin/skills"; }

@@ -109,6 +109,17 @@ function Clone-Or-Update {
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
         git clone $RepoUrl $RepoDir
     }
+    # If this script is running from a local git checkout, install that same branch.
+    # Falls back gracefully when run via curl/iwr (no git context).
+    $scriptBranch = ''
+    if (Test-Path (Join-Path $PSScriptRoot '.git')) {
+        $scriptBranch = git -C $PSScriptRoot branch --show-current 2>$null
+    }
+    if ($scriptBranch -and $scriptBranch -ne 'main') {
+        Write-Host "→ Checking out branch: $scriptBranch"
+        git -C $RepoDir fetch origin
+        git -C $RepoDir checkout $scriptBranch
+    }
 }
 
 function Get-SkillNames {
