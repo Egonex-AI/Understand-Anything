@@ -394,4 +394,105 @@ export function doThing() {}
       parser.delete();
     });
   });
+
+  // ---- TypeScript: call graph ----
+
+  describe("TypeScript - extractCallGraph", () => {
+    it("extracts calls from function declaration", () => {
+      const { tree, parser, root } = parseTs(`
+function process(data: string) {
+  validate(data);
+  transform(data);
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      const calls = result.filter((e) => e.caller === "process");
+      expect(calls.some((e) => e.callee === "validate")).toBe(true);
+      expect(calls.some((e) => e.callee === "transform")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts method calls (dot notation)", () => {
+      const { tree, parser, root } = parseTs(`
+function start() {
+  this.db.connect();
+  console.log("started");
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      const calls = result.filter((e) => e.caller === "start");
+      expect(calls.some((e) => e.callee === "this.db.connect")).toBe(true);
+      expect(calls.some((e) => e.callee === "console.log")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts calls from arrow function assigned to const", () => {
+      const { tree, parser, root } = parseTs(`
+const handler = () => {
+  doSomething();
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      const calls = result.filter((e) => e.caller === "handler");
+      expect(calls.some((e) => e.callee === "doSomething")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts calls from class methods", () => {
+      const { tree, parser, root } = parseTs(`
+class Service {
+  run() {
+    this.init();
+    fetch("url");
+  }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      const calls = result.filter((e) => e.caller === "run");
+      expect(calls.some((e) => e.callee.includes("init"))).toBe(true);
+      expect(calls.some((e) => e.callee === "fetch")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("reports correct line number for calls", () => {
+      const { tree, parser, root } = parseTs(`
+function main() {
+  foo();
+  bar();
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].lineNumber).toBe(3);
+      expect(result[1].lineNumber).toBe(4);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("ignores calls outside any function (top-level)", () => {
+      const { tree, parser, root } = parseTs(`
+doSetup();
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toHaveLength(0);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });
