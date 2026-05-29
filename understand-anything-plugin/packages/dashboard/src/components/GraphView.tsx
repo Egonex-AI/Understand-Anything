@@ -1529,7 +1529,7 @@ function GraphViewInner() {
         onMove={navigationLevel === "layer-detail" ? onMove : undefined}
         onInit={setReactFlowInstance}
         nodeTypes={nodeTypes}
-        nodesDraggable={false}
+        nodesDraggable={true}
         nodesConnectable={false}
         edgesFocusable={false}
         edgesReconnectable={false}
