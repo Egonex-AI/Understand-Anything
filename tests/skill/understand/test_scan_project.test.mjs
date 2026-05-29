@@ -439,12 +439,16 @@ describe('scan-project.mjs — .understandignore handling', () => {
     // specific file with `!keep.log`. After the override, keep.log MUST
     // appear in the output. It is NOT counted in filteredByIgnore (it
     // was re-included, not additionally filtered).
+    //
+    // gitInit:false — use the recursive walker so global gitignore rules
+    // (which may include *.log on some developer machines) don't shadow
+    // the .understandignore negation before it can take effect.
     projectRoot = setupTree({
       '.understandignore': '!keep.log\n',
       'src/index.ts': 'export const x = 1;\n',
       'keep.log': 'important diagnostic\n',
       'drop.log': 'noise\n',
-    });
+    }, { gitInit: false });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     expect(byPath(r.output, 'keep.log')).toBeDefined();

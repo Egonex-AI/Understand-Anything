@@ -1672,7 +1672,9 @@ describe('extract-import-map.mjs — Rust crate root missing', () => {
   });
 });
 
-describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
+// ESM loader hooks (--import) do not reliably intercept native module resolution
+// on Windows, so the synthetic tree-sitter failure cannot be injected there.
+describe.skipIf(process.platform === 'win32')('extract-import-map.mjs — tree-sitter init graceful failure', () => {
   let projectRoot;
 
   afterEach(() => {

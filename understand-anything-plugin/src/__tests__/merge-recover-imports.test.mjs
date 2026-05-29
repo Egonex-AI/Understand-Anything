@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { spawnSync as _spawnSyncCheck } from "node:child_process";
+
+const python3Available = _spawnSyncCheck("python3", ["--version"], { encoding: "utf-8" }).status === 0;
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,7 +60,7 @@ afterEach(() => {
   rmSync(projectRoot, { recursive: true, force: true });
 });
 
-describe("merge-batch-graphs.py imports recovery", () => {
+describe.skipIf(!python3Available)("merge-batch-graphs.py imports recovery", () => {
   it("recovers imports edges that batches dropped despite importMap having them", () => {
     // Batch contains all the file nodes but only emits ONE of three imports edges.
     writeFileSync(

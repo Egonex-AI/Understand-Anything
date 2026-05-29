@@ -62,7 +62,9 @@ afterAll(() => {
   if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
 });
 
-describe("worktree-redirect snippet (issue #133)", () => {
+// The snippet runs bash which resolves paths through MSYS on Windows, producing
+// /tmp/... paths while Node.js uses C:\...; skip rather than paper over it.
+describe.skipIf(process.platform === "win32")("worktree-redirect snippet (issue #133)", () => {
   it("leaves PROJECT_ROOT alone in a normal checkout", () => {
     expect(runResolve(mainRepo)).toBe(mainRepo);
   });
