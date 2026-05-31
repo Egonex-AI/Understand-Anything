@@ -57,6 +57,9 @@ importers:
 
   understand-anything-plugin/packages/core:
     dependencies:
+      '@repomix/tree-sitter-wasms':
+        specifier: 0.1.17
+        version: 0.1.17
       '@tree-sitter-grammars/tree-sitter-kotlin':
         specifier: 1.1.0
         version: 1.1.0
@@ -864,6 +867,9 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@repomix/tree-sitter-wasms@0.1.17':
+    resolution: {integrity: sha512-tc3HnFqdMF1pXhIMzG3aTaBDpIiHK2tPfn3fwqA6P3WTbHa+1EuuTubbKshvmN7xCHP5Ojz0/VW4R+XvR88KOw==}
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -3870,6 +3876,8 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@repomix/tree-sitter-wasms@0.1.17': {}
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 

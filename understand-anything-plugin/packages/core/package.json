@@ -37,6 +37,7 @@
     "vitest": "^3.1.0"
   },
   "dependencies": {
+    "@repomix/tree-sitter-wasms": "0.1.17",
     "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
     "fuse.js": "^7.1.0",
     "ignore": "^7.0.5",
