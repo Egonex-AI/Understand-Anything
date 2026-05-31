@@ -34,7 +34,7 @@ This Code of Conduct applies within all community spaces, and also applies when 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders via the [Discord server](https://discord.gg/pydat66RY). All complaints will be reviewed and investigated promptly and fairly.
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported to the community leaders via the [Discord server](https://discord.gg/pydat66RY) or by email at [conduct@project.example](mailto:conduct@project.example). All complaints will be reviewed and investigated promptly and fairly.
 
 ## Enforcement Guidelines
 
