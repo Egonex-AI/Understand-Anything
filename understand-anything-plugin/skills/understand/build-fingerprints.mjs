@@ -48,7 +48,7 @@ const {
   PluginRegistry,
   builtinLanguageConfigs,
   registerAllParsers,
-  buildFingerprintStore,
+  buildFingerprintStoreAsync,
   saveFingerprints,
 } = core;
 
@@ -80,7 +80,17 @@ async function main() {
   registry.register(tsPlugin);
   registerAllParsers(registry);
 
-  const store = buildFingerprintStore(projectRoot, sourceFilePaths, registry, gitCommitHash);
+  // Use the async/parallel-I/O variant: for a multi-thousand-file repo the
+  // wall time of the baseline-build step is dominated by sequential
+  // readFileSync calls; pipelining drops it ~proportional to the disk-wait
+  // share. The tree-sitter analysis still runs serially on the main thread
+  // (web-tree-sitter is single-threaded WASM), so CPU work is unchanged.
+  const store = await buildFingerprintStoreAsync(
+    projectRoot,
+    sourceFilePaths,
+    registry,
+    gitCommitHash,
+  );
   saveFingerprints(projectRoot, store);
 
   const fileCount = Object.keys(store.files).length;
