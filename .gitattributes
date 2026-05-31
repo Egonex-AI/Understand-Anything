@@ -1,0 +1,20 @@
+# Force LF line endings for all text files.
+#
+# Why: Git for Windows ships with core.autocrlf=true, which rewrites the
+# repo's LF source to CRLF on checkout. CRLF breaks shebang stripping in the
+# .mjs pipeline scripts when loaded through Vite/esbuild (vitest), and mangles
+# shell/Python tooling. Setting eol=lf here overrides autocrlf for every
+# contributor and every Windows user who installs the plugin, so the working
+# tree always matches the committed (LF) blobs.
+* text=auto eol=lf
+
+# Binary assets — never apply EOL conversion.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.wasm  binary
+*.pdf   binary

@@ -37,6 +37,16 @@ function runResolve(projectRoot, env = {}) {
   }).trim();
 }
 
+// `pwd -P` inside git-bash returns a POSIX path (/c/... or /tmp/...), while
+// Node's path.join returns C:\... on Windows — the same directory expressed in
+// two conventions. Normalise the expected value through the same `pwd -P` so the
+// redirect assertions are convention-agnostic and pass on every platform.
+function bashPath(p) {
+  return execFileSync("bash", ["-c", `cd ${JSON.stringify(p)} 2>/dev/null && pwd -P`], {
+    encoding: "utf8",
+  }).trim();
+}
+
 let tmpRoot;
 let mainRepo;
 let worktree;
@@ -68,11 +78,11 @@ describe("worktree-redirect snippet (issue #133)", () => {
   });
 
   it("redirects PROJECT_ROOT to the main repo when started in a worktree", () => {
-    expect(runResolve(worktree)).toBe(mainRepo);
+    expect(runResolve(worktree)).toBe(bashPath(mainRepo));
   });
 
   it("redirects from a subdirectory inside a worktree", () => {
-    expect(runResolve(subdir)).toBe(mainRepo);
+    expect(runResolve(subdir)).toBe(bashPath(mainRepo));
   });
 
   it("respects UNDERSTAND_NO_WORKTREE_REDIRECT=1", () => {
