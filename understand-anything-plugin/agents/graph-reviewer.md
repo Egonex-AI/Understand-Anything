@@ -53,12 +53,12 @@ Verify every **edge** has ALL required fields with correct types:
 |---|---|---|
 | `source` | string | Non-empty, references an existing node ID |
 | `target` | string | Non-empty, references an existing node ID |
-| `type` | string | One of the 29 valid edge types (see below) |
+| `type` | string | One of the 30 valid edge types (see below) |
 | `direction` | string | One of: `forward`, `backward`, `bidirectional` |
 | `weight` | number | Between 0.0 and 1.0 inclusive |
 
-**Valid edge types (29 total: 26 structural + 3 domain):**
-`imports`, `exports`, `contains`, `inherits`, `implements`, `calls`, `subscribes`, `publishes`, `middleware`, `reads_from`, `writes_to`, `transforms`, `validates`, `depends_on`, `tested_by`, `configures`, `related`, `similar_to`, `deploys`, `serves`, `migrates`, `documents`, `provisions`, `routes`, `defines_schema`, `triggers`, `contains_flow`, `flow_step`, `cross_domain`
+**Valid edge types (30 total: 27 structural + 3 domain):**
+`imports`, `exports`, `contains`, `inherits`, `implements`, `calls`, `subscribes`, `publishes`, `middleware`, `reads_from`, `writes_to`, `transforms`, `validates`, `depends_on`, `tested_by`, `configures`, `specifies`, `related`, `similar_to`, `deploys`, `serves`, `migrates`, `documents`, `provisions`, `routes`, `defines_schema`, `triggers`, `contains_flow`, `flow_step`, `cross_domain`
 
 **Check 2 -- Referential Integrity (Critical)**
 
@@ -105,7 +105,7 @@ Verify every **edge** has ALL required fields with correct types:
 
 Only warn about missing edges for nodes that have a clear expected relationship. Skip this check for nodes where the expected edge would be too broad (e.g., `.prettierrc` doesn't meaningfully "configure" a specific file).
 
-- Document nodes (type: `document`) should have at least one `documents` edge — warn if missing
+- Document nodes (type: `document`) should have at least one `documents` or `specifies` edge — warn if missing
 - Service nodes (type: `service`) should have at least one `deploys` or `depends_on` edge — warn if missing
 - Pipeline nodes (type: `pipeline`) should have at least one `triggers` edge — warn if missing
 - Table nodes (type: `table`) should have at least one `migrates` or `defines_schema` edge — warn if missing

@@ -271,6 +271,7 @@ Using the script's structural data and file categories, create edges:
 |---|---|---|---|
 | `configures` | Config file affects a code file or module (e.g., `tsconfig.json` configures TypeScript compilation, `.env` configures runtime settings) | `0.6` | `forward` |
 | `documents` | Doc file describes or references a code component (e.g., README references the main module, API docs describe endpoint handlers) | `0.5` | `forward` |
+| `specifies` | Doc file is a **normative specification** for a code component — it defines required behavior, a contract, acceptance criteria, or implementation constraints (MUST/SHOULD language, formal specs, `specs/<feature>/spec.md`, API contracts, design docs that prescribe rather than describe). Direction is `document → code`; the merge script flips inverted edges. | `0.6` | `forward` |
 | `deploys` | Infrastructure file builds/deploys code (e.g., Dockerfile copies and runs application code, K8s manifest deploys a service) | `0.7` | `forward` |
 | `migrates` | SQL migration file modifies a table/schema (e.g., ALTER TABLE, CREATE TABLE) | `0.7` | `forward` |
 | `triggers` | CI/CD config triggers a pipeline or deployment (e.g., GitHub Actions workflow deploys on push to main) | `0.6` | `forward` |
@@ -296,6 +297,7 @@ The `batchImportData` values contain only resolved project-internal paths — ex
 **Non-code edge creation guidance:**
 - **Config files:** Look at the config file's purpose. `tsconfig.json` configures all `.ts` files; `package.json` configures the build. Create `configures` edges to the most relevant entry points or directories.
 - **Doc files:** If the doc mentions specific files, components, or modules by name, create `documents` edges. README.md typically documents the project entry point.
+- **Spec / requirement docs:** If a doc *prescribes* how code must behave (formal specifications, contracts, acceptance criteria, MUST/SHOULD requirements, files under `specs/`, `*.spec.md`, API contracts), create `specifies` edges to the code it governs — `document → code`. Use `specifies` only for normative docs; ordinary explanatory docs (READMEs, guides, changelogs) stay `documents`. A doc may emit both if it is partly normative and partly explanatory. Only the LLM can judge which code a spec governs (spec docs are organized by feature, not code path), so emit these edges when you recognize the relationship — there is no path-convention fallback for specs.
 - **Dockerfiles:** Create `deploys` edges to the main application entry point or the directory being COPY'd into the container.
 - **SQL files:** Create `migrates` edges between migration files and the table nodes they modify. Create `defines_schema` edges from schema files to API handlers that serve that data.
 - **CI configs:** Create `triggers` edges to the deployment targets or test suites they invoke.

@@ -32,7 +32,7 @@ export const EDGE_CATEGORY_MAP: Record<EdgeCategory, string[]> = {
   structural: ["imports", "exports", "contains", "inherits", "implements"],
   behavioral: ["calls", "subscribes", "publishes", "middleware"],
   "data-flow": ["reads_from", "writes_to", "transforms", "validates"],
-  dependencies: ["depends_on", "tested_by", "configures"],
+  dependencies: ["depends_on", "tested_by", "configures", "specifies"],
   semantic: ["related", "similar_to"],
   infrastructure: ["deploys", "serves", "provisions", "triggers", "migrates", "documents", "routes", "defines_schema"],
   domain: ["contains_flow", "flow_step", "cross_domain"],

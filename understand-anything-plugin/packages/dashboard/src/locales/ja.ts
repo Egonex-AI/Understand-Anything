@@ -244,6 +244,7 @@ export const ja = {
     depends_on: { forward: "依存", backward: "依存される" },
     tested_by: { forward: "テストされる", backward: "テスト" },
     configures: { forward: "設定", backward: "設定される" },
+    specifies: { forward: "仕様を定義", backward: "仕様で定義される" },
     related: { forward: "関連", backward: "関連" },
     similar_to: { forward: "類似", backward: "類似" },
     deploys: { forward: "デプロイ", backward: "デプロイされる" },

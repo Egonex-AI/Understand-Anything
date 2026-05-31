@@ -244,6 +244,7 @@ export const en = {
     depends_on: { forward: "depends on", backward: "depended on by" },
     tested_by: { forward: "tested by", backward: "tests" },
     configures: { forward: "configures", backward: "configured by" },
+    specifies: { forward: "specifies", backward: "specified by" },
     related: { forward: "related to", backward: "related to" },
     similar_to: { forward: "similar to", backward: "similar to" },
     deploys: { forward: "deploys", backward: "deployed by" },

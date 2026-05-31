@@ -244,6 +244,7 @@ export const zhTW = {
     depends_on: { forward: "依賴", backward: "被依賴" },
     tested_by: { forward: "被測試", backward: "測試" },
     configures: { forward: "配置", backward: "被配置" },
+    specifies: { forward: "規範", backward: "被規範" },
     related: { forward: "相關", backward: "相關" },
     similar_to: { forward: "相似", backward: "相似" },
     deploys: { forward: "部署", backward: "被部署" },

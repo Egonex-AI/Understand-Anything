@@ -719,6 +719,169 @@ def link_tests(
     return added, dropped, tagged, swapped
 
 
+# ── Deterministic specifies linker ─────────────────────────────────────────
+# Unlike `tested_by`, spec → code links are LLM-inferred ONLY: spec documents
+# (especially feature-oriented ones like `specs/<feature>/spec.md`) are
+# organized by feature, not by code path, so there is no reliable path
+# convention to auto-pair them. This linker therefore CANONICALIZES the LLM's
+# `specifies` edges (it does NOT supplement new ones):
+#   1. Keep canonical `document → code` edges, forcing `direction: forward`.
+#   2. Flip inverted `code → document` edges (with an audit note).
+#   3. Drop edges that don't classify cleanly (doc↔doc, code↔code, or a
+#      missing / non-targetable endpoint) — they have no recoverable meaning.
+# A `document` that survives as the source of any `specifies` edge is tagged
+# `normative-spec`, which distinguishes a normative specification from ordinary
+# reference documentation (which uses `documents`).
+
+# Node types a `specifies` edge may legitimately target. The source is always a
+# `document`; the target is a concrete code / artifact node. Domain and
+# knowledge node types are intentionally excluded — specs describe code.
+SPEC_TARGET_TYPES: frozenset[str] = frozenset({
+    "file", "function", "class", "module",
+    "endpoint", "schema", "table", "config",
+    "service", "resource", "pipeline",
+})
+
+# Edge type names that mean "specifies". `specified_by` inverts direction; the
+# linker recovers the correct orientation by node-type classification, so it is
+# safe to fold it in here (the Python merge step does not apply the TS-side
+# edge-type aliases).
+SPEC_EDGE_TYPES: frozenset[str] = frozenset({"specifies", "specified_by"})
+
+
+def _swap_specifies_in_place(
+    edge: dict[str, Any], original_src: str, original_tgt: str
+) -> None:
+    """Flip an inverted `specifies` edge so source becomes the spec document
+    and target becomes the specified code node. Mutates `edge` in place and
+    appends a `[direction corrected]` audit marker to `description`.
+    """
+    edge["source"] = original_tgt
+    edge["target"] = original_src
+    edge["direction"] = "forward"
+    prev = edge.get("description")
+    edge["description"] = (
+        "Direction corrected (was code → spec)"
+        if not prev
+        else f"{prev} [direction corrected]"
+    )
+
+
+def _ensure_normative_spec_tag(node: dict[str, Any]) -> bool:
+    """Append "normative-spec" to `node["tags"]`, coercing malformed `tags` to
+    a fresh list. Returns True if the tag was newly added.
+    """
+    tags = node.get("tags")
+    if not isinstance(tags, list):
+        tags = []
+        node["tags"] = tags
+    if "normative-spec" in tags:
+        return False
+    tags.append("normative-spec")
+    return True
+
+
+def link_specs(
+    nodes_by_id: dict[str, dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> tuple[int, int, int]:
+    """Canonicalize `specifies` edges (spec document → specified code node).
+
+    Single pass (no path-convention supplement — see the module-level
+    "Deterministic specifies linker" comment for the rationale):
+
+      * Keep canonical `document → code` edges, normalizing `direction` to
+        `forward`.
+      * Flip inverted `code → document` edges so the LLM's pairing survives
+        with the right orientation.
+      * Drop edges where the endpoints don't classify cleanly as one
+        `document` and one targetable code node.
+
+    `specified_by`-typed edges are treated as inverted `specifies` edges.
+
+    Mutates `nodes_by_id` (adds the "normative-spec" tag) and `edges`
+    (rewrites in place: drops broken edges, flips inverted ones).
+
+    Returns (dropped, swapped, tagged_docs):
+      dropped: `specifies`/`specified_by` edges removed (unsalvageable)
+      swapped: edges flipped (code → document became document → code)
+      tagged_docs: document nodes newly tagged "normative-spec"
+    """
+    def _type(nid: str) -> str | None:
+        node = nodes_by_id.get(nid)
+        return node.get("type") if node else None
+
+    # `covered` tracks (doc_id, target_id) pairs kept after the pass — used to
+    # deduplicate. `pair_to_idx` lets a heavier-weight duplicate replace an
+    # earlier slot in place (mirrors `link_tests` / Step 6 weight-wins rule).
+    covered: set[tuple[str, str]] = set()
+    pair_to_idx: dict[tuple[str, str], int] = {}
+    swapped_pairs: set[tuple[str, str]] = set()
+    dropped = 0
+    write_idx = 0
+    for edge in edges:
+        if edge.get("type") not in SPEC_EDGE_TYPES:
+            edges[write_idx] = edge
+            write_idx += 1
+            continue
+
+        # Fold `specified_by` into the canonical type name; orientation is
+        # recovered below by node-type classification.
+        edge["type"] = "specifies"
+        src = edge.get("source", "")
+        tgt = edge.get("target", "")
+        src_type = _type(src)
+        tgt_type = _type(tgt)
+
+        # Exactly one endpoint must be a document, the other a targetable node.
+        if src_type == "document" and tgt_type in SPEC_TARGET_TYPES:
+            pair = (src, tgt)
+            needs_swap = False
+        elif tgt_type == "document" and src_type in SPEC_TARGET_TYPES:
+            pair = (tgt, src)
+            needs_swap = True
+        else:
+            dropped += 1
+            continue
+
+        if pair in covered:
+            existing_idx = pair_to_idx[pair]
+            existing = edges[existing_idx]
+            if _num(edge.get("weight", 0)) > _num(existing.get("weight", 0)):
+                if needs_swap:
+                    _swap_specifies_in_place(edge, src, tgt)
+                    swapped_pairs.add(pair)
+                else:
+                    edge["direction"] = "forward"
+                    swapped_pairs.discard(pair)
+                edges[existing_idx] = edge
+            dropped += 1
+            continue
+
+        if needs_swap:
+            _swap_specifies_in_place(edge, src, tgt)
+            swapped_pairs.add(pair)
+        else:
+            edge["direction"] = "forward"
+        covered.add(pair)
+        pair_to_idx[pair] = write_idx
+        edges[write_idx] = edge
+        write_idx += 1
+    del edges[write_idx:]
+    swapped = len(swapped_pairs)
+
+    # ── Tag every document that survived as the source of a specifies edge.
+    tagged = 0
+    for doc_id, _target_id in covered:
+        doc_node = nodes_by_id.get(doc_id)
+        if doc_node is None:
+            continue
+        if _ensure_normative_spec_tag(doc_node):
+            tagged += 1
+
+    return dropped, swapped, tagged
+
+
 # ── Main merge + normalize ────────────────────────────────────────────────
 
 def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
@@ -808,6 +971,10 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         nodes_by_id, all_edges
     )
 
+    # ── Step 5c: Deterministic specifies linker ──────────────────────
+    # See module-level "Deterministic specifies linker" section above.
+    spec_dropped, spec_swapped, spec_tagged = link_specs(nodes_by_id, all_edges)
+
     # ── Step 6: Deduplicate edges, drop dangling ─────────────────────
     node_ids = set(nodes_by_id.keys())
     # Direction is part of the dedup key so a `forward` edge does not silently
@@ -855,6 +1022,10 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         fixed_lines.append(f"  {tested_by_swapped:>4} × tested_by edges flipped (test → production became production → test)")
     if tested_by_dropped:
         fixed_lines.append(f"  {tested_by_dropped:>4} × tested_by edges dropped (orphan endpoint or test↔test / prod↔prod pair)")
+    if spec_swapped:
+        fixed_lines.append(f"  {spec_swapped:>4} × specifies edges flipped (code → spec became spec → code)")
+    if spec_dropped:
+        fixed_lines.append(f"  {spec_dropped:>4} × specifies edges dropped (orphan endpoint or spec↔spec / code↔code pair)")
 
     if fixed_lines:
         report.append("")
@@ -865,6 +1036,8 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             + duplicate_count
             + tested_by_swapped
             + tested_by_dropped
+            + spec_swapped
+            + spec_dropped
         )
         report.append(f"Fixed ({total_fixes} corrections):")
         report.extend(fixed_lines)
@@ -876,6 +1049,12 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         report.append("Tested-by linker:")
         report.append(f"  {tested_by_added:>4} × tested_by edges produced (path-convention supplement, production → test)")
         report.append(f"  {tested_by_tagged:>4} × production nodes tagged \"tested\"")
+
+    # Specifies linker section — net-new tagging (no supplemental edges).
+    if spec_tagged:
+        report.append("")
+        report.append("Specifies linker:")
+        report.append(f"  {spec_tagged:>4} × document nodes tagged \"normative-spec\"")
 
     # Could not fix section — unknown patterns (grouped) + individual details
     unfixable_total = (

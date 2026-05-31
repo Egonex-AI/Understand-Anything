@@ -244,6 +244,7 @@ export const zh = {
     depends_on: { forward: "依赖", backward: "被依赖" },
     tested_by: { forward: "被测试", backward: "测试" },
     configures: { forward: "配置", backward: "被配置" },
+    specifies: { forward: "规范", backward: "被规范" },
     related: { forward: "相关", backward: "相关" },
     similar_to: { forward: "相似", backward: "相似" },
     deploys: { forward: "部署", backward: "被部署" },

@@ -876,6 +876,43 @@ class MergeIntegrationTests(unittest.TestCase):
         prod_node = next(n for n in assembled["nodes"] if n["id"] == "file:src/foo.ts")
         self.assertIn("tested", prod_node["tags"])
 
+    def test_spec_linker_runs_during_merge(self) -> None:
+        batch = {
+            "nodes": [
+                {
+                    "id": "document:specs/auth.md", "type": "document",
+                    "name": "auth.md", "filePath": "specs/auth.md",
+                    "summary": "", "tags": [], "complexity": "simple",
+                },
+                {
+                    "id": "file:src/auth.ts", "type": "file",
+                    "name": "auth.ts", "filePath": "src/auth.ts",
+                    "summary": "", "tags": [], "complexity": "simple",
+                },
+            ],
+            "edges": [
+                # LLM-emitted inverted specifies edge (code → spec).
+                {
+                    "source": "file:src/auth.ts",
+                    "target": "document:specs/auth.md",
+                    "type": "specifies",
+                    "direction": "forward",
+                    "weight": 0.6,
+                },
+            ],
+        }
+
+        assembled, _report = mbg.merge_and_normalize([batch])
+
+        spec_edges = [e for e in assembled["edges"] if e["type"] == "specifies"]
+        self.assertEqual(len(spec_edges), 1)
+        self.assertEqual(spec_edges[0]["source"], "document:specs/auth.md")
+        self.assertEqual(spec_edges[0]["target"], "file:src/auth.ts")
+        self.assertEqual(spec_edges[0]["direction"], "forward")
+
+        doc_node = next(n for n in assembled["nodes"] if n["id"] == "document:specs/auth.md")
+        self.assertIn("normative-spec", doc_node["tags"])
+
 
 class NormalizeDirectionTests(unittest.TestCase):
     """`direction` canonicalization mirrors the dashboard schema validator."""
@@ -1181,6 +1218,214 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         node_ids = {n["id"] for n in assembled["nodes"]}
         self.assertNotIn("file:src/x.ts", node_ids)
         self.assertNotIn("file:src/y.ts", node_ids)
+
+
+def _doc_node(path: str, **extra: Any) -> dict[str, Any]:
+    """Build a minimal document node with the given relative path."""
+    node: dict[str, Any] = {
+        "id": f"document:{path}",
+        "type": "document",
+        "name": path.rsplit("/", 1)[-1],
+        "filePath": path,
+        "summary": "",
+        "tags": [],
+        "complexity": "simple",
+    }
+    node.update(extra)
+    return node
+
+
+class LinkSpecsTests(unittest.TestCase):
+    """Canonicalization behaviour of the specifies linker."""
+
+    def test_canonical_edge_kept_and_direction_forced_forward(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+            "file:src/auth.ts": _file_node("src/auth.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "document:specs/auth.md",
+                "target": "file:src/auth.ts",
+                "type": "specifies",
+                "direction": "backward",
+                "weight": 0.6,
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 0)
+        self.assertEqual(swapped, 0)
+        self.assertEqual(tagged, 1)
+        self.assertEqual(len(edges), 1)
+        edge = edges[0]
+        self.assertEqual(edge["source"], "document:specs/auth.md")
+        self.assertEqual(edge["target"], "file:src/auth.ts")
+        self.assertEqual(edge["direction"], "forward")
+        self.assertIn("normative-spec", nodes_by_id["document:specs/auth.md"]["tags"])
+        # The specified code node is NOT tagged (links are inferred, so absence
+        # of a spec edge is not a reliable "unspecified" signal).
+        self.assertNotIn("normative-spec", nodes_by_id["file:src/auth.ts"]["tags"])
+
+    def test_inverted_edge_is_flipped(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+            "module:auth": {
+                "id": "module:auth", "type": "module", "name": "auth",
+                "summary": "", "tags": [], "complexity": "simple",
+            },
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "module:auth",
+                "target": "document:specs/auth.md",
+                "type": "specifies",
+                "direction": "forward",
+                "weight": 0.6,
+                "description": "from LLM",
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 0)
+        self.assertEqual(swapped, 1)
+        self.assertEqual(tagged, 1)
+        self.assertEqual(len(edges), 1)
+        edge = edges[0]
+        self.assertEqual(edge["source"], "document:specs/auth.md")
+        self.assertEqual(edge["target"], "module:auth")
+        self.assertEqual(edge["direction"], "forward")
+        self.assertIn("direction corrected", edge["description"].lower())
+
+    def test_specified_by_type_is_folded_and_flipped(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+            "file:src/auth.ts": _file_node("src/auth.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:src/auth.ts",
+                "target": "document:specs/auth.md",
+                "type": "specified_by",
+                "direction": "forward",
+                "weight": 0.6,
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 0)
+        self.assertEqual(swapped, 1)
+        self.assertEqual(len(edges), 1)
+        edge = edges[0]
+        self.assertEqual(edge["type"], "specifies")
+        self.assertEqual(edge["source"], "document:specs/auth.md")
+        self.assertEqual(edge["target"], "file:src/auth.ts")
+
+    def test_doc_to_doc_and_code_to_code_dropped(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+            "document:README.md": _doc_node("README.md"),
+            "file:src/a.ts": _file_node("src/a.ts"),
+            "file:src/b.ts": _file_node("src/b.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {  # spec ↔ spec
+                "source": "document:README.md",
+                "target": "document:specs/auth.md",
+                "type": "specifies", "direction": "forward", "weight": 0.5,
+            },
+            {  # code ↔ code
+                "source": "file:src/a.ts",
+                "target": "file:src/b.ts",
+                "type": "specifies", "direction": "forward", "weight": 0.5,
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 2)
+        self.assertEqual(swapped, 0)
+        self.assertEqual(tagged, 0)
+        self.assertEqual(len(edges), 0)
+
+    def test_missing_endpoint_dropped(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "document:specs/auth.md",
+                "target": "file:src/gone.ts",
+                "type": "specifies", "direction": "forward", "weight": 0.6,
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 1)
+        self.assertEqual(len(edges), 0)
+
+    def test_duplicate_pair_keeps_heavier_weight(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+            "file:src/auth.ts": _file_node("src/auth.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "document:specs/auth.md", "target": "file:src/auth.ts",
+                "type": "specifies", "direction": "forward", "weight": 0.4,
+            },
+            {
+                "source": "document:specs/auth.md", "target": "file:src/auth.ts",
+                "type": "specifies", "direction": "forward", "weight": 0.9,
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 1)
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["weight"], 0.9)
+
+    def test_unrelated_edges_preserved(self) -> None:
+        nodes_by_id = {
+            "file:src/a.ts": _file_node("src/a.ts"),
+            "file:src/b.ts": _file_node("src/b.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:src/a.ts", "target": "file:src/b.ts",
+                "type": "imports", "direction": "forward", "weight": 1.0,
+            },
+        ]
+
+        dropped, swapped, tagged = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual((dropped, swapped, tagged), (0, 0, 0))
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["type"], "imports")
+
+    def test_idempotent(self) -> None:
+        nodes_by_id = {
+            "document:specs/auth.md": _doc_node("specs/auth.md"),
+            "file:src/auth.ts": _file_node("src/auth.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "document:specs/auth.md", "target": "file:src/auth.ts",
+                "type": "specifies", "direction": "forward", "weight": 0.6,
+            },
+        ]
+
+        mbg.link_specs(nodes_by_id, edges)
+        dropped2, swapped2, tagged2 = mbg.link_specs(nodes_by_id, edges)
+
+        self.assertEqual((dropped2, swapped2), (0, 0))
+        self.assertEqual(tagged2, 0)  # tag already present
+        self.assertEqual(len(edges), 1)
 
 
 if __name__ == "__main__":

@@ -828,16 +828,22 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 | `schema` | Schema definition (GraphQL, Protobuf, Prisma) | `schema:<relative-path>` |
 | `resource` | Infrastructure resource (Terraform, CloudFormation) | `resource:<relative-path>` |
 
-### Edge Types (26 total)
+### Edge Types (27 total)
 | Category | Types |
 |---|---|
 | Structural | `imports`, `exports`, `contains`, `inherits`, `implements` |
 | Behavioral | `calls`, `subscribes`, `publishes`, `middleware` |
 | Data flow | `reads_from`, `writes_to`, `transforms`, `validates` |
-| Dependencies | `depends_on`, `tested_by`, `configures` |
+| Dependencies | `depends_on`, `tested_by`, `configures`, `specifies` |
 | Semantic | `related`, `similar_to` |
 | Infrastructure | `deploys`, `serves`, `provisions`, `triggers` |
 | Schema/Data | `migrates`, `documents`, `routes`, `defines_schema` |
+
+`specifies` is the normative counterpart of `documents`: a spec `document` →
+the code node it governs (requirements, contract, acceptance criteria). Emit it
+only for prescriptive docs; ordinary explanatory docs use `documents`. The
+merge step canonicalizes direction (spec → code) and tags source documents
+`normative-spec`. See `agents/file-analyzer.md` for emission guidance.
 
 ### Edge Weight Conventions
 | Edge Type | Weight |
@@ -846,6 +852,6 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 | `inherits`, `implements` | 0.9 |
 | `calls`, `exports`, `defines_schema` | 0.8 |
 | `imports`, `deploys`, `migrates` | 0.7 |
-| `depends_on`, `configures`, `triggers` | 0.6 |
+| `depends_on`, `configures`, `triggers`, `specifies` | 0.6 |
 | `tested_by`, `documents`, `provisions`, `serves`, `routes` | 0.5 |
 | All others | 0.5 (default) |
