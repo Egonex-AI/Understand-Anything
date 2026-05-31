@@ -40,6 +40,7 @@
     "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
     "fuse.js": "^7.1.0",
     "ignore": "^7.0.5",
+    "tree-sitter-bash": "0.25.1",
     "tree-sitter-c-sharp": "^0.23.1",
     "tree-sitter-cpp": "^0.23.4",
     "tree-sitter-go": "^0.25.0",
