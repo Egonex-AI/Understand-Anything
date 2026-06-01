@@ -108,6 +108,7 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 ```bash
 /plugin marketplace add Lum1104/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 ### 2. Analyze your codebase

@@ -106,6 +106,7 @@ Understand Anything は [Claude Code Plugin](https://code.claude.com/docs/en/plu
 ```bash
 /plugin marketplace add Lum1104/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 ### 2. コードベースを分析
