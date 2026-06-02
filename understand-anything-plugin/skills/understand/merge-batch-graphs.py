@@ -1028,7 +1028,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
     if spec_swapped:
         fixed_lines.append(f"  {spec_swapped:>4} × specifies edges flipped (code → spec became spec → code)")
     if spec_dropped:
-        fixed_lines.append(f"  {spec_dropped:>4} × specifies edges dropped (orphan endpoint or spec↔spec / code↔code pair)")
+        fixed_lines.append(f"  {spec_dropped:>4} × specifies edges dropped (orphan/non-targetable endpoint or spec↔spec / code↔code pair)")
 
     if fixed_lines:
         report.append("")
