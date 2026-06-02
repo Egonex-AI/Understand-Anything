@@ -276,6 +276,51 @@ export class TypeScriptExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // TypeScript / JavaScript class heritage:
+    //   class X extends Y implements I1, I2 { ... }
+    // tree-sitter-typescript shape:
+    //   class_declaration → class_heritage → extends_clause | implements_clause
+    //                                                ↘ identifier/type_identifier
+    // `parents` gets the extended class (at most one for TS/JS).
+    // `interfaces` gets every implemented interface.
+    const parents: string[] = [];
+    const interfaces: string[] = [];
+    const heritage = node.children.find((c) => c.type === "class_heritage");
+    if (heritage) {
+      for (let i = 0; i < heritage.childCount; i++) {
+        const clause = heritage.child(i);
+        if (!clause) continue;
+        if (clause.type === "extends_clause") {
+          for (let j = 0; j < clause.childCount; j++) {
+            const t = clause.child(j);
+            if (!t) continue;
+            if (
+              t.type === "identifier" ||
+              t.type === "type_identifier" ||
+              t.type === "generic_type" ||
+              t.type === "member_expression" ||
+              t.type === "nested_type_identifier"
+            ) {
+              parents.push(t.text);
+            }
+          }
+        } else if (clause.type === "implements_clause") {
+          for (let j = 0; j < clause.childCount; j++) {
+            const t = clause.child(j);
+            if (!t) continue;
+            if (
+              t.type === "type_identifier" ||
+              t.type === "identifier" ||
+              t.type === "generic_type" ||
+              t.type === "nested_type_identifier"
+            ) {
+              interfaces.push(t.text);
+            }
+          }
+        }
+      }
+    }
+
     const classBody = node.children.find(
       (c) => c.type === "class_body",
     );
@@ -309,6 +354,8 @@ export class TypeScriptExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
     });
   }
 

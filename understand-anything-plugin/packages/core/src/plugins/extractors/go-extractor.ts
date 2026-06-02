@@ -283,12 +283,35 @@ export class GoExtractor implements LanguageExtractor {
     exports: StructuralAnalysis["exports"],
   ): void {
     const properties: string[] = [];
+    // Go has no class inheritance, but embedded fields (`type T struct
+    // { Inner }` — a field_declaration with a type_identifier but no
+    // field_identifier) promote the embedded type's methods, which is
+    // the closest Go has to inheritance. Surface those in `parents` so
+    // method-promotion relationships are visible in the graph.
+    const parents: string[] = [];
 
     const fieldList = findChild(structNode, "field_declaration_list");
     if (fieldList) {
       const fields = findChildren(fieldList, "field_declaration");
       for (const field of fields) {
-        // A field_declaration can have multiple names: `X, Y int`
+        // Detect embedded fields first: a field_declaration with no
+        // field_identifier child, where the type itself is the field name.
+        const hasName = findChild(field, "field_identifier") !== null;
+        if (!hasName) {
+          const embeddedType =
+            field.childForFieldName("type") ??
+            findChild(field, "type_identifier") ??
+            findChild(field, "qualified_type") ??
+            findChild(field, "pointer_type");
+          if (embeddedType) {
+            // For pointer_type `*Foo` strip the `*`; for qualified_type
+            // `pkg.Foo` use the full ref.
+            let txt = embeddedType.text;
+            if (embeddedType.type === "pointer_type") txt = txt.replace(/^\*\s*/, "");
+            parents.push(txt);
+          }
+        }
+        // Regular (named) fields contribute to properties.
         for (let i = 0; i < field.childCount; i++) {
           const child = field.child(i);
           if (child && child.type === "field_identifier") {
@@ -306,6 +329,7 @@ export class GoExtractor implements LanguageExtractor {
       ],
       methods: [], // Methods are attached later from methodsByReceiver
       properties,
+      ...(parents.length ? { parents } : {}),
     });
 
     if (isExported(nameNode.text)) {

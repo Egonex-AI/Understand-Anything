@@ -327,6 +327,32 @@ export class CppExtractor implements LanguageExtractor {
     const className = nameNode.text;
     const methods: string[] = [];
     const properties: string[] = [];
+    // C++ inheritance: `class Foo : public Bar, protected Baz { ... }`
+    // The base_class_clause sits as a child of the class_specifier; its
+    // children are pairs of (access_specifier?, type_identifier|template_type).
+    // C++ has no syntactic interface concept — abstract classes and
+    // protocol-style interfaces look the same. Surface every base in
+    // `parents`.
+    const parents: string[] = [];
+    for (let i = 0; i < node.childCount; i++) {
+      const c = node.child(i);
+      if (c && c.type === "base_class_clause") {
+        for (let j = 0; j < c.childCount; j++) {
+          const b = c.child(j);
+          if (!b) continue;
+          if (
+            b.type === "type_identifier" ||
+            b.type === "qualified_identifier"
+          ) {
+            parents.push(b.text);
+          } else if (b.type === "template_type") {
+            const inner =
+              b.childForFieldName("name") ?? findChild(b, "type_identifier");
+            parents.push(inner ? inner.text : b.text);
+          }
+        }
+      }
+    }
 
     const body = node.childForFieldName("body");
     if (body && body.type === "field_declaration_list") {
@@ -409,6 +435,7 @@ export class CppExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
     });
 
     // The class/struct name itself is an export (non-anonymous types are always exported in C/C++ headers)

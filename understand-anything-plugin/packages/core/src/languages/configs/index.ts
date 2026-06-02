@@ -13,6 +13,7 @@ import { cConfig } from "./c.js";
 import { cppConfig } from "./cpp.js";
 import { csharpConfig } from "./csharp.js";
 import { luaConfig } from "./lua.js";
+import { pascalConfig } from "./pascal.js";
 // Non-code language configs
 import { markdownConfig } from "./markdown.js";
 import { yamlConfig } from "./yaml.js";
@@ -57,6 +58,7 @@ export const builtinLanguageConfigs: LanguageConfig[] = [
   cConfig,
   cppConfig,
   csharpConfig,
+  pascalConfig,
   // Non-code languages
   markdownConfig,
   yamlConfig,
@@ -102,6 +104,7 @@ export {
   cConfig,
   cppConfig,
   csharpConfig,
+  pascalConfig,
   // Non-code languages
   markdownConfig,
   yamlConfig,

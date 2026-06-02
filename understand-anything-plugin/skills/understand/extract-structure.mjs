@@ -168,7 +168,9 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
     }));
   }
 
-  // Classes (code files)
+  // Classes (code files) — include parents/interfaces when present so the
+  // file-analyzer can emit deterministic inherits/implements edges without
+  // re-reading source.
   if (analysis.classes && analysis.classes.length > 0) {
     base.classes = analysis.classes.map(cls => ({
       name: cls.name,
@@ -176,6 +178,18 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       endLine: cls.lineRange[1],
       methods: cls.methods || [],
       properties: cls.properties || [],
+      ...(cls.parents && cls.parents.length > 0 ? { parents: cls.parents } : {}),
+      ...(cls.interfaces && cls.interfaces.length > 0 ? { interfaces: cls.interfaces } : {}),
+    }));
+  }
+
+  // Imports (code files) — surface section info (Pascal interface vs
+  // implementation uses) so file-analyzer can characterize dependency direction.
+  if (analysis.imports && analysis.imports.length > 0) {
+    base.imports = analysis.imports.map(imp => ({
+      source: imp.source,
+      line: imp.lineNumber,
+      ...(imp.section ? { section: imp.section } : {}),
     }));
   }
 
