@@ -1,7 +1,21 @@
 name: CI
 
 on:
+  # Run on every PR so a contributor's first push gets feedback.
   pull_request:
+  # Also run on direct pushes to main so the "main is green" signal is real.
+  # Without this, main can silently break for days when someone bypasses
+  # review. (#249)
+  push:
+    branches: [main]
+
+# Cancel any in-flight CI for the same ref when a new commit is pushed —
+# saves runner minutes and keeps the latest commit's status the only one
+# anyone reads. `github.ref` is a controlled value (refs/heads/* or
+# refs/pull/*/merge), not user-controlled input, so it's safe to interpolate.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:

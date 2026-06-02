@@ -34,3 +34,8 @@ npm-debug.log*
 # Test coverage
 .coverage
 htmlcov/
+.venv/
+venv/
+*.pyc
+*.pyo
+Thumbs.db
