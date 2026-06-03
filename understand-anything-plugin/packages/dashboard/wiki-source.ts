@@ -1,53 +1,12 @@
 import fs from "fs";
 import path from "path";
+import {
+  sanitizeFilePath,
+  resolvePathWithinRoot,
+} from "./src/utils/sanitize";
 
 export const MAX_WIKI_SOURCE_LINES = 200;
 export const MAX_WIKI_SOURCE_FILE_BYTES = 1024 * 1024;
-
-const UNSAFE_PATH_SEGMENT = /(^|\/)\.\.(\/|$)/;
-
-/** Relative wiki source paths — same traversal rules as wiki-api slug sanitization, but allows `/`. */
-export function sanitizeWikiSourcePath(filePath: string): string | null {
-  const trimmed = filePath.trim();
-  if (!trimmed || trimmed.includes("\0")) return null;
-  if (path.isAbsolute(trimmed)) return null;
-  if (trimmed.startsWith("/") || trimmed.startsWith("\\")) return null;
-  if (trimmed.includes("~")) return null;
-  if (UNSAFE_PATH_SEGMENT.test(trimmed.replace(/\\/g, "/"))) return null;
-
-  const normalized = path.normalize(trimmed.replace(/\\/g, "/"));
-  if (
-    normalized === "." ||
-    normalized === ".." ||
-    normalized.startsWith("../") ||
-    path.isAbsolute(normalized)
-  ) {
-    return null;
-  }
-
-  return normalized.split("/").join("/");
-}
-
-export function resolvePathWithinProjectRoot(
-  projectRoot: string,
-  filePath: string,
-): string | null {
-  const safeRelative = sanitizeWikiSourcePath(filePath);
-  if (!safeRelative) return null;
-
-  const absoluteFile = path.resolve(projectRoot, safeRelative);
-  const relativeToRoot = path.relative(projectRoot, absoluteFile);
-  if (
-    !relativeToRoot ||
-    relativeToRoot.startsWith(`..${path.sep}`) ||
-    relativeToRoot === ".." ||
-    path.isAbsolute(relativeToRoot)
-  ) {
-    return null;
-  }
-
-  return absoluteFile;
-}
 
 export function parseWikiSourceLineRange(
   startParam: string | null,
@@ -142,7 +101,7 @@ export function readWikiSourceFile(
   startParam: string | null,
   endParam: string | null,
 ): WikiSourceReadResult {
-  const safeRelative = sanitizeWikiSourcePath(filePath);
+  const safeRelative = sanitizeFilePath(filePath);
   if (!safeRelative) {
     return { statusCode: 400, payload: { error: "Invalid file path" } };
   }
@@ -152,7 +111,7 @@ export function readWikiSourceFile(
     return { statusCode: 400, payload: { error: lineRange.error } };
   }
 
-  const absoluteFile = resolvePathWithinProjectRoot(projectRoot, filePath);
+  const absoluteFile = resolvePathWithinRoot(projectRoot, filePath);
   if (!absoluteFile) {
     return { statusCode: 400, payload: { error: "Path must stay inside the project" } };
   }

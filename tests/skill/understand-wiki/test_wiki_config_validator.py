@@ -29,6 +29,7 @@ from wiki_config_validator import (  # noqa: E402
     merge_config,
     normalize_rpc_annotations,
     validate_config,
+    validate_exclude_services,
     validate_rpc_annotations,
 )
 
@@ -141,6 +142,23 @@ class TestDefaultInterfaceField(unittest.TestCase):
         self.assertEqual(DEFAULT_INTERFACE_FIELD, "value")
 
 
+class TestValidateExcludeServices(unittest.TestCase):
+    def test_valid_exclude_services_array(self):
+        valid, errors = validate_exclude_services(["common", "shared", "libs", "tools"])
+        self.assertTrue(valid)
+        self.assertEqual(errors, [])
+
+    def test_invalid_not_array(self):
+        valid, errors = validate_exclude_services("common")
+        self.assertFalse(valid)
+        self.assertTrue(any("array" in e.lower() for e in errors))
+
+    def test_invalid_non_string_entry(self):
+        valid, errors = validate_exclude_services(["common", 123])
+        self.assertFalse(valid)
+        self.assertTrue(any("excludeServices[1]" in e for e in errors))
+
+
 class TestValidateConfig(unittest.TestCase):
     def test_valid_full_config(self):
         config = {
@@ -162,6 +180,17 @@ class TestValidateConfig(unittest.TestCase):
         valid, errors = validate_config({"rpcAnnotations": None})
         self.assertFalse(valid)
         self.assertTrue(any("rpcAnnotations" in e for e in errors))
+
+    def test_valid_exclude_services_in_config(self):
+        config = {"excludeServices": ["common", "shared", "libs"]}
+        valid, errors = validate_config(config)
+        self.assertTrue(valid)
+        self.assertEqual(errors, [])
+
+    def test_null_exclude_services_invalid(self):
+        valid, errors = validate_config({"excludeServices": None})
+        self.assertFalse(valid)
+        self.assertTrue(any("excludeServices" in e for e in errors))
 
 
 class TestConfigLoading(unittest.TestCase):

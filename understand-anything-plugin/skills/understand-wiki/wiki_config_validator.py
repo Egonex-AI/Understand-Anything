@@ -21,6 +21,22 @@ DEFAULT_INTERFACE_FIELD = "value"
 _REQUIRED_ENTRY_FIELDS = ("provider", "consumer", "type")
 
 
+def validate_exclude_services(exclude_services: Any) -> tuple[bool, list[str]]:
+    """Validate an excludeServices array. Returns (is_valid, error_messages)."""
+    errors: list[str] = []
+
+    if not isinstance(exclude_services, list):
+        return False, ["excludeServices must be an array"]
+
+    for index, entry in enumerate(exclude_services):
+        if not isinstance(entry, str):
+            errors.append(f"excludeServices[{index}]: must be a string")
+        elif not entry.strip():
+            errors.append(f"excludeServices[{index}]: must be a non-empty string")
+
+    return len(errors) == 0, errors
+
+
 def validate_rpc_annotations(rpc_annotations: Any) -> tuple[bool, list[str]]:
     """Validate an rpcAnnotations array. Returns (is_valid, error_messages)."""
     errors: list[str] = []
@@ -65,18 +81,31 @@ def normalize_rpc_annotations(rpc_annotations: list[dict[str, Any]]) -> list[dic
 
 
 def validate_config(config: Any) -> tuple[bool, list[str]]:
-    """Validate config dict. rpcAnnotations is optional; other keys are not validated."""
+    """Validate config dict. rpcAnnotations and excludeServices are optional."""
     if not isinstance(config, dict):
         return False, ["config must be an object"]
 
-    if "rpcAnnotations" not in config:
-        return True, []
+    errors: list[str] = []
 
-    rpc_annotations = config["rpcAnnotations"]
-    if rpc_annotations is None:
-        return False, ["rpcAnnotations must be an array"]
+    if "rpcAnnotations" in config:
+        rpc_annotations = config["rpcAnnotations"]
+        if rpc_annotations is None:
+            errors.append("rpcAnnotations must be an array")
+        else:
+            valid, rpc_errors = validate_rpc_annotations(rpc_annotations)
+            if not valid:
+                errors.extend(rpc_errors)
 
-    return validate_rpc_annotations(rpc_annotations)
+    if "excludeServices" in config:
+        exclude_services = config["excludeServices"]
+        if exclude_services is None:
+            errors.append("excludeServices must be an array")
+        else:
+            valid, exclude_errors = validate_exclude_services(exclude_services)
+            if not valid:
+                errors.extend(exclude_errors)
+
+    return len(errors) == 0, errors
 
 
 def load_config(config_path: str | Path) -> dict[str, Any]:

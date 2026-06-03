@@ -54,6 +54,8 @@ Phase completion:
 **Rule: Default is single-service. Batch mode requires explicit `--batch` or `--service=` flag.**
 
 ```bash
+WIKI_SESSION_ID="$$-$(date +%s)"
+
 # Determine execution mode — explicit over implicit
 if echo "$ARGUMENTS" | grep -q '\-\-service='; then
   # --service=<name> implies batch context (running from parent dir targeting a child)
@@ -62,7 +64,7 @@ if echo "$ARGUMENTS" | grep -q '\-\-service='; then
   PROJECT_ROOT=$(pwd)
   SERVICE_ROOT="$PROJECT_ROOT/$SERVICE_NAME"
   if [ ! -d "$SERVICE_ROOT" ]; then
-    echo "Error: Service directory '$SERVICE_NAME' not found in $(pwd)"
+    echo "Error: Service directory \"${SERVICE_NAME}\" not found in $(pwd)"
     echo "Available directories:"
     ls -d */ 2>/dev/null | head -20
     exit 1
@@ -81,7 +83,7 @@ fi
 ```
 
 Report the detected mode:
-> `Mode: <single|batch>. Service: <name|all>. Project root: $PROJECT_ROOT`
+> `Mode: <single|batch>. Service: <name|all>. Project root: "$PROJECT_ROOT"`
 
 ### Step 2 — Worktree Redirect
 
@@ -151,6 +153,8 @@ Print the script output to the user and exit 0. See [Dry-Run Mode](#dry-run-mode
 ### Step 4 — Language Configuration
 
 ```bash
+SKILL_DIR="$PLUGIN_ROOT/skills/understand-wiki"
+
 # Parse --language flag
 OUTPUT_LANGUAGE=""
 if echo "$ARGUMENTS" | grep -q '\-\-language'; then
@@ -171,7 +175,7 @@ esac
 # Fall back to config, then default
 if [ -z "$OUTPUT_LANGUAGE" ]; then
   if [ -f "$SERVICE_ROOT/.understand-anything/config.json" ]; then
-    OUTPUT_LANGUAGE=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$SERVICE_ROOT/.understand-anything/config.json','utf8')).outputLanguage||'en')}catch(e){console.log('en')}")
+    OUTPUT_LANGUAGE=$(python3 "$SKILL_DIR/wiki_json_reader.py" "$SERVICE_ROOT/.understand-anything/config.json" "outputLanguage" "en")
   else
     OUTPUT_LANGUAGE="en"
   fi
@@ -197,6 +201,14 @@ Custom RPC frameworks are configured in `$SERVICE_ROOT/.understand-anything/conf
 | `interfaceField` | string | no | Annotation attribute that holds the RPC interface name; defaults to `"value"` |
 
 **Example `config.json`:**
+
+Parent-level batch config may also set `excludeServices` (basename list, case-sensitive) to skip shared libraries during service discovery:
+
+```json
+{ "excludeServices": ["common", "shared", "libs", "tools"] }
+```
+
+Service-level RPC annotations:
 
 ```json
 {
@@ -225,14 +237,10 @@ Or from Python: `load_and_merge_config(path)` returns `(config, valid, errors)`;
 **Resolve `$RPC_ANNOTATIONS` for dispatch:**
 
 ```bash
+SKILL_DIR="$PLUGIN_ROOT/skills/understand-wiki"
 RPC_ANNOTATIONS="null"
 if [ -f "$SERVICE_ROOT/.understand-anything/config.json" ]; then
-  RPC_ANNOTATIONS=$(node -e "
-    try {
-      const c = JSON.parse(require('fs').readFileSync('$SERVICE_ROOT/.understand-anything/config.json','utf8'));
-      console.log(JSON.stringify(c.rpcAnnotations ?? null));
-    } catch(e) { console.log('null'); }
-  ")
+  RPC_ANNOTATIONS=$(python3 "$SKILL_DIR/wiki_json_reader.py" "$SERVICE_ROOT/.understand-anything/config.json" "rpcAnnotations" "null")
 fi
 ```
 
@@ -245,23 +253,23 @@ SERVICE_UA="$SERVICE_ROOT/.understand-anything"
 
 # Check knowledge graph
 if [ ! -f "$SERVICE_UA/knowledge-graph.json" ]; then
-  echo "[understand-wiki] Service '$SERVICE_NAME' has no knowledge graph."
-  echo "[understand-wiki] Triggering /understand for $SERVICE_NAME..."
+  echo "[understand-wiki] Service \"${SERVICE_NAME}\" has no knowledge graph."
+  echo "[understand-wiki] Triggering /understand for \"${SERVICE_NAME}\"..."
   # Dispatch /understand on the service (the dispatching agent should handle this)
   # After completion, verify KG exists
   if [ ! -f "$SERVICE_UA/knowledge-graph.json" ]; then
-    echo "Error: /understand failed for $SERVICE_NAME. Cannot generate Wiki without KG."
+    echo "Error: /understand failed for \"${SERVICE_NAME}\". Cannot generate Wiki without KG."
     exit 1
   fi
 fi
 
 # Check domain graph
 if [ ! -f "$SERVICE_UA/domain-graph.json" ]; then
-  echo "[understand-wiki] Service '$SERVICE_NAME' has no domain graph."
-  echo "[understand-wiki] Triggering /understand-domain for $SERVICE_NAME..."
+  echo "[understand-wiki] Service \"${SERVICE_NAME}\" has no domain graph."
+  echo "[understand-wiki] Triggering /understand-domain for \"${SERVICE_NAME}\"..."
   # Dispatch /understand-domain on the service
   if [ ! -f "$SERVICE_UA/domain-graph.json" ]; then
-    echo "Error: /understand-domain failed for $SERVICE_NAME. Cannot generate Wiki without DG."
+    echo "Error: /understand-domain failed for \"${SERVICE_NAME}\". Cannot generate Wiki without DG."
     exit 1
   fi
 fi
@@ -289,8 +297,8 @@ for w in d.get('warnings', []):
 "
     if [ "$KG_STALE" = "true" ] || [ "$DG_STALE" = "true" ]; then
       echo "[understand-wiki] Upstream data may be stale. Regenerate before Wiki generation:"
-      [ "$KG_STALE" = "true" ] && echo "  → Run /understand on $SERVICE_NAME (knowledge graph)"
-      [ "$DG_STALE" = "true" ] && echo "  → Run /understand-domain on $SERVICE_NAME (domain graph)"
+      [ "$KG_STALE" = "true" ] && echo "  → Run /understand on \"${SERVICE_NAME}\" (knowledge graph)"
+      [ "$DG_STALE" = "true" ] && echo "  → Run /understand-domain on \"${SERVICE_NAME}\" (domain graph)"
       echo "[understand-wiki] Use --force to skip this check and proceed anyway."
       exit 1
     fi
@@ -322,17 +330,18 @@ fi
 ### Step 6 — Wiki State Check + Incremental Decision
 
 ```bash
+SKILL_DIR="$PLUGIN_ROOT/skills/understand-wiki"
 WIKI_META="$SERVICE_UA/wiki/meta.json"
 DG_SNAPSHOT="$SERVICE_UA/wiki/domain-graph.snapshot.json"
 INCREMENTAL=false
 DIRTY_DOMAINS=""
 
 if [ -f "$WIKI_META" ] && ! echo "$ARGUMENTS" | grep -q '\-\-full'; then
-  WIKI_COMMIT=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$WIKI_META','utf8')).gitCommitHash||'')}catch(e){console.log('')}")
+  WIKI_COMMIT=$(python3 "$SKILL_DIR/wiki_json_reader.py" "$WIKI_META" "gitCommitHash" "")
   CURRENT_COMMIT=$(git -C "$SERVICE_ROOT" rev-parse HEAD 2>/dev/null || echo "")
   
   if [ "$WIKI_COMMIT" = "$CURRENT_COMMIT" ] && [ -n "$WIKI_COMMIT" ]; then
-    echo "[understand-wiki] Wiki for '$SERVICE_NAME' is up to date (commit: ${WIKI_COMMIT:0:8})."
+    echo "[understand-wiki] Wiki for \"${SERVICE_NAME}\" is up to date (commit: ${WIKI_COMMIT:0:8})."
     echo "[understand-wiki] Use --full to force regeneration."
     if [ "$MODE" = "single" ]; then
       echo "Wiki is current. Options: (a) force rebuild with --full, (b) run --review only, (c) skip"
@@ -371,7 +380,15 @@ fi
 ### Step 7 — Build Service List (Batch Mode Only)
 
 ```bash
+SKILL_DIR="$PLUGIN_ROOT/skills/understand-wiki"
+
 if [ "$MODE" = "batch" ]; then
+  EXCLUDE_SERVICES="[]"
+  PARENT_CONFIG="$PROJECT_ROOT/.understand-anything/config.json"
+  if [ -f "$PARENT_CONFIG" ]; then
+    EXCLUDE_SERVICES=$(python3 "$SKILL_DIR/wiki_json_reader.py" "$PARENT_CONFIG" "excludeServices" "[]")
+  fi
+
   SERVICES=()
   for dir in "$PROJECT_ROOT"/*/; do
     dir_name=$(basename "$dir")
@@ -379,6 +396,10 @@ if [ "$MODE" = "batch" ]; then
     case "$dir_name" in
       .*|node_modules|dist|build|target|docs|scripts|tools) continue ;;
     esac
+    # Skip directories listed in parent excludeServices (basename match, case-sensitive)
+    if echo "$EXCLUDE_SERVICES" | python3 -c "import sys,json; ex=set(json.load(sys.stdin)); print('skip' if sys.argv[1] in ex else 'ok')" "$dir_name" 2>/dev/null | grep -q skip; then
+      continue
+    fi
     # Detect service indicators
     if [ -d "$dir/.understand-anything" ] || [ -f "$dir/pom.xml" ] || [ -f "$dir/package.json" ] || [ -f "$dir/go.mod" ] || [ -f "$dir/Cargo.toml" ]; then
       SERVICES+=("$dir_name")
@@ -395,7 +416,7 @@ if [ "$MODE" = "batch" ]; then
     if [ ! -f "$svc_meta" ] || echo "$ARGUMENTS" | grep -q '\-\-full'; then
       SERVICES_TO_GENERATE+=("$svc")
     else
-      svc_commit=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$svc_meta','utf8')).gitCommitHash||'')}catch(e){console.log('')}")
+      svc_commit=$(python3 "$SKILL_DIR/wiki_json_reader.py" "$svc_meta" "gitCommitHash" "")
       current=$(git -C "$PROJECT_ROOT/$svc" rev-parse HEAD 2>/dev/null || echo "unknown")
       if [ "$svc_commit" != "$current" ]; then
         SERVICES_TO_GENERATE+=("$svc")
@@ -426,7 +447,11 @@ if [ "$INCREMENTAL" = true ] && [ -n "$DIRTY_DOMAINS" ]; then
   
   for DOMAIN_ID in $DIRTY_DOMAINS; do
     echo "[understand-wiki] Regenerating domain page: $DOMAIN_ID"
-    # Dispatch wiki-worker with --domain=$DOMAIN_ID (see below)
+    FILTERED_KG=$(python3 "$SKILL_DIR/wiki_kg_filter.py" \
+      "$SERVICE_UA/knowledge-graph.json" \
+      "$SERVICE_UA/domain-graph.json" \
+      "$DOMAIN_ID" --max-nodes=200)
+    # Dispatch wiki-worker with --domain=$DOMAIN_ID and $FILTERED_KG (see below)
   done
   
   # Handle removed domains
@@ -466,14 +491,23 @@ fi
 
 ### Incremental Dispatch — Per-Domain wiki-worker Prompt
 
+Before dispatching each dirty domain, build a domain-scoped KG (avoids context overflow on large services):
+
+```bash
+FILTERED_KG=$(python3 "$SKILL_DIR/wiki_kg_filter.py" \
+  "$SERVICE_UA/knowledge-graph.json" \
+  "$SERVICE_UA/domain-graph.json" \
+  "$DOMAIN_ID" --max-nodes=200)
+```
+
 > Generate/update the Wiki page for a SINGLE domain in this microservice.
 > Project root: `$SERVICE_ROOT`
 > Service name: `$SERVICE_NAME`
 > **Target domain ID: `$DOMAIN_ID`**
 >
-> **Knowledge Graph:**
+> **Knowledge Graph (domain-scoped via `wiki_kg_filter.py`):**
 > ```json
-> <contents of $SERVICE_ROOT/.understand-anything/knowledge-graph.json>
+> $FILTERED_KG
 > ```
 >
 > **Domain Graph:**
@@ -637,7 +671,7 @@ python3 "$SKILL_DIR/wiki_quality_gate.py" \
   "$SERVICE_ROOT/.understand-anything/wiki" \
   "$SERVICE_ROOT/.understand-anything/domain-graph.json" \
   "$SERVICE_ROOT" \
-  "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-qg-result.json"
+  "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-${WIKI_SESSION_ID}-qg-result.json"
 ```
 
 Read the result:
@@ -666,7 +700,7 @@ Dispatch a subagent using the `wiki-reviewer` agent definition (at `$PLUGIN_ROOT
 > <first 200 nodes + all edges referencing them>
 > ```
 >
-> Write review report to: `$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-review-report.json`
+> Write review report to: `$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-${WIKI_SESSION_ID}-review-report.json`
 
 After the reviewer completes, read the report:
 
@@ -705,7 +739,7 @@ printf "  - %s\n" "${INTEGRATED_SERVICES[@]}"
 ### Step 2 — Run Cross-Service Matcher Script (Layer 1)
 
 ```bash
-python <SKILL_DIR>/cross-service-matcher.py "$PROJECT_ROOT" \
+python3 "$SKILL_DIR/cross-service-matcher.py" "$PROJECT_ROOT" \
   --services="${INTEGRATED_SERVICES[*]}" \
   --output="$PROJECT_ROOT/.understand-anything/tmp/cross-service-candidates.json"
 ```
@@ -842,7 +876,7 @@ Report: `[Phase 4/4] Finalizing...`
 
 1. Clean up temp files:
 ```bash
-rm -rf "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-*"
+rm -rf "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-${WIKI_SESSION_ID}-"*
 ```
 
 2. Print final summary:

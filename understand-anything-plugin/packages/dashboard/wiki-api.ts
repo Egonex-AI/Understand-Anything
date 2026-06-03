@@ -13,6 +13,7 @@ import type {
   WikiSearchResult,
   WikiTopology,
 } from "@understand-anything/core";
+import { sanitizeSlug } from "./src/utils/sanitize";
 
 interface WikiSearchDocument {
   id: string;
@@ -34,19 +35,6 @@ const SEARCH_FUSE_OPTIONS: IFuseOptions<WikiSearchDocument> = {
   includeScore: true,
   ignoreLocation: true,
 };
-
-const SAFE_SLUG = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
-
-function sanitizeSlug(input: string): string | null {
-  const slug = input
-    .replace(/^(?:wiki:)?(?:cross-domain|domain):/, "")
-    .replace(/\.json$/, "");
-  if (!slug || !SAFE_SLUG.test(slug)) return null;
-  if (slug.includes("..") || slug.includes("/") || slug.includes("\\") || slug.includes("\0")) {
-    return null;
-  }
-  return slug;
-}
 
 export class WikiDataService {
   private projectRoot: string;

@@ -1,62 +1,9 @@
-import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   MAX_WIKI_SOURCE_LINES,
   parseWikiSourceLineRange,
-  resolvePathWithinProjectRoot,
-  sanitizeWikiSourcePath,
   sliceSourceLines,
 } from "../../wiki-source";
-
-describe("sanitizeWikiSourcePath", () => {
-  it("accepts a normal relative path", () => {
-    expect(sanitizeWikiSourcePath("src/main/java/Foo.java")).toBe("src/main/java/Foo.java");
-  });
-
-  it("normalizes backslashes to forward slashes", () => {
-    expect(sanitizeWikiSourcePath("src\\main\\Foo.java")).toBe("src/main/Foo.java");
-  });
-
-  it("rejects empty paths", () => {
-    expect(sanitizeWikiSourcePath("")).toBeNull();
-    expect(sanitizeWikiSourcePath("   ")).toBeNull();
-  });
-
-  it("rejects absolute paths", () => {
-    expect(sanitizeWikiSourcePath("/etc/passwd")).toBeNull();
-    if (process.platform === "win32") {
-      expect(sanitizeWikiSourcePath("C:\\Windows\\system.ini")).toBeNull();
-    }
-  });
-
-  it("rejects parent-directory traversal", () => {
-    expect(sanitizeWikiSourcePath("../secret.txt")).toBeNull();
-    expect(sanitizeWikiSourcePath("src/../../etc/passwd")).toBeNull();
-    expect(sanitizeWikiSourcePath("..")).toBeNull();
-    expect(sanitizeWikiSourcePath(".")).toBeNull();
-  });
-
-  it("rejects null bytes", () => {
-    expect(sanitizeWikiSourcePath("src\0/evil.java")).toBeNull();
-  });
-
-  it("rejects tilde home expansion", () => {
-    expect(sanitizeWikiSourcePath("~/secret.txt")).toBeNull();
-  });
-});
-
-describe("resolvePathWithinProjectRoot", () => {
-  const root = path.resolve("/tmp/wiki-project");
-
-  it("resolves safe paths inside the project root", () => {
-    const resolved = resolvePathWithinProjectRoot(root, "src/App.java");
-    expect(resolved).toBe(path.resolve(root, "src/App.java"));
-  });
-
-  it("rejects paths that escape the project root after resolution", () => {
-    expect(resolvePathWithinProjectRoot(root, "../outside.txt")).toBeNull();
-  });
-});
 
 describe("parseWikiSourceLineRange", () => {
   it("defaults to the first max-preview window when params are missing", () => {
