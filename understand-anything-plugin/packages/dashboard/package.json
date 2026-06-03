@@ -18,6 +18,7 @@
     "d3-force": "^3.0.0",
     "devlop": "^1.1.0",
     "elkjs": "^0.9.3",
+    "fuse.js": "^7.4.1",
     "graphology": "^0.25.4",
     "graphology-communities-louvain": "^2.0.1",
     "graphology-types": "^0.24.8",

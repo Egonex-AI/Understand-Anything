@@ -203,14 +203,20 @@ interface DashboardStore {
   // Wiki view
   wikiAvailable: boolean;
   wikiIndex: { entries: Array<{ id: string; name: string; type: string; service?: string; summary: string }> } | null;
-  wikiActivePage: { type: "service" | "domain"; id: string } | null;
+  wikiActivePage: { type: "service" | "domain" | "overview" | "architecture" | "cross-domain"; id: string; service?: string } | null;
   wikiPageContent: unknown | null;
   wikiLoading: boolean;
+  wikiTopology: { hasParentWiki: boolean; services: Array<{ name: string }> } | null;
+  wikiViewScope: "global" | string; // "global" or a service name
+  wikiBreadcrumb: Array<{ label: string; page: { type: string; id: string; service?: string } | null }>;
   setWikiAvailable: (available: boolean) => void;
   setWikiIndex: (index: { entries: Array<{ id: string; name: string; type: string; service?: string; summary: string }> }) => void;
-  setWikiActivePage: (page: { type: "service" | "domain"; id: string } | null) => void;
+  setWikiActivePage: (page: { type: "service" | "domain" | "overview" | "architecture" | "cross-domain"; id: string; service?: string } | null) => void;
   setWikiPageContent: (content: unknown | null) => void;
   setWikiLoading: (loading: boolean) => void;
+  setWikiTopology: (topology: { hasParentWiki: boolean; services: Array<{ name: string }> } | null) => void;
+  setWikiViewScope: (scope: "global" | string) => void;
+  setWikiBreadcrumb: (crumbs: Array<{ label: string; page: { type: string; id: string; service?: string } | null }>) => void;
 
   // Container expand/collapse + lazy layout caches
   expandedContainers: Set<string>;
@@ -732,11 +738,17 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   wikiActivePage: null,
   wikiPageContent: null,
   wikiLoading: false,
+  wikiTopology: null,
+  wikiViewScope: "global",
+  wikiBreadcrumb: [],
   setWikiAvailable: (available) => set({ wikiAvailable: available }),
   setWikiIndex: (index) => set({ wikiIndex: index }),
   setWikiActivePage: (page) => set({ wikiActivePage: page }),
   setWikiPageContent: (content) => set({ wikiPageContent: content }),
   setWikiLoading: (loading) => set({ wikiLoading: loading }),
+  setWikiTopology: (topology) => set({ wikiTopology: topology }),
+  setWikiViewScope: (scope) => set({ wikiViewScope: scope }),
+  setWikiBreadcrumb: (crumbs) => set({ wikiBreadcrumb: crumbs }),
 
   expandedContainers: new Set<string>(),
   pendingFocusContainer: null,

@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { WikiDataService } from "./wiki-api";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -250,6 +251,19 @@ export default defineConfig({
           );
         });
 
+        // Wiki API service — lazily initialized on first request
+        let wikiService: WikiDataService | null = null;
+        function getWikiService(): WikiDataService {
+          if (!wikiService) {
+            const graphFile = findGraphFile("knowledge-graph.json");
+            const projectRoot = graphFile
+              ? projectRootFromGraphFile(graphFile)
+              : process.env.GRAPH_DIR ?? process.cwd();
+            wikiService = new WikiDataService(projectRoot);
+          }
+          return wikiService;
+        }
+
         server.middlewares.use((req, res, next) => {
           const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
           const pathname = url.pathname;
@@ -260,7 +274,8 @@ export default defineConfig({
             pathname === "/meta.json" ||
             pathname === "/config.json" ||
             pathname === "/file-content.json" ||
-            pathname.startsWith("/wiki/");
+            pathname.startsWith("/wiki/") ||
+            pathname.startsWith("/api/wiki");
 
           if (!isProtectedEndpoint) {
             next();
@@ -274,6 +289,90 @@ export default defineConfig({
             return;
           }
 
+          // --- Agent Query API: /api/wiki/* ---
+          if (pathname.startsWith("/api/wiki")) {
+            const ws = getWikiService();
+            const apiPath = pathname.slice("/api/wiki".length) || "/";
+
+            if (apiPath === "/" || apiPath === "") {
+              sendJson(res, 200, ws.getGlobalIndex());
+              return;
+            }
+            if (apiPath === "/overview") {
+              const data = ws.getOverview();
+              if (!data) { sendJson(res, 404, { error: "No parent wiki overview found" }); return; }
+              sendJson(res, 200, data);
+              return;
+            }
+            if (apiPath === "/architecture") {
+              const data = ws.getArchitecture();
+              if (!data) { sendJson(res, 404, { error: "No parent wiki architecture found" }); return; }
+              sendJson(res, 200, data);
+              return;
+            }
+            if (apiPath === "/services") {
+              sendJson(res, 200, ws.getServices());
+              return;
+            }
+            if (apiPath === "/search") {
+              const q = url.searchParams.get("q") ?? "";
+              const rawLimit = parseInt(url.searchParams.get("limit") ?? "20", 10);
+              const limit = Math.min(100, Math.max(1, Number.isNaN(rawLimit) ? 20 : rawLimit));
+              sendJson(res, 200, ws.search(q, limit));
+              return;
+            }
+
+            // /api/wiki/service/:name/domain/:d
+            const svcDomainMatch = apiPath.match(/^\/service\/([^/]+)\/domain\/([^/]+)$/);
+            if (svcDomainMatch) {
+              try {
+                const svcName = decodeURIComponent(svcDomainMatch[1]);
+                const domainId = decodeURIComponent(svcDomainMatch[2]);
+                const data = ws.getServiceDomain(svcName, domainId);
+                if (!data) { sendJson(res, 404, { error: "Service domain not found" }); return; }
+                sendJson(res, 200, data);
+              } catch { sendJson(res, 400, { error: "Invalid URL encoding" }); }
+              return;
+            }
+
+            // /api/wiki/service/:name
+            const svcMatch = apiPath.match(/^\/service\/([^/]+)$/);
+            if (svcMatch) {
+              try {
+                const svcName = decodeURIComponent(svcMatch[1]);
+                const data = ws.getServiceWiki(svcName);
+                if (!data) { sendJson(res, 404, { error: "Service wiki not found" }); return; }
+                sendJson(res, 200, data);
+              } catch { sendJson(res, 400, { error: "Invalid URL encoding" }); }
+              return;
+            }
+
+            // /api/wiki/domain/:name
+            const domainMatch = apiPath.match(/^\/domain\/([^/]+)$/);
+            if (domainMatch) {
+              try {
+                const domainName = decodeURIComponent(domainMatch[1]);
+                const data = ws.getDomain(domainName);
+                if (!data) { sendJson(res, 404, { error: "Cross-service domain not found" }); return; }
+                sendJson(res, 200, data);
+              } catch { sendJson(res, 400, { error: "Invalid URL encoding" }); }
+              return;
+            }
+
+            // /api/wiki/:id/related
+            const relatedMatch = apiPath.match(/^\/([^/]+)\/related$/);
+            if (relatedMatch) {
+              try {
+                sendJson(res, 200, ws.getRelated(decodeURIComponent(relatedMatch[1])));
+              } catch { sendJson(res, 400, { error: "Invalid URL encoding" }); }
+              return;
+            }
+
+            sendJson(res, 404, { error: `Unknown wiki API endpoint: ${apiPath}` });
+            return;
+          }
+
+          // --- Raw wiki file serving (legacy, for backward compat) ---
           if (pathname.startsWith("/wiki/")) {
             const wikiPath = pathname.slice("/wiki/".length);
             if (wikiPath.includes("..") || wikiPath.includes("~")) {

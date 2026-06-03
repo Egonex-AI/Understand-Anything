@@ -1,2 +1,15 @@
 packages:
   - "packages/*"
+allowBuilds:
+  esbuild: set this to true or false
+  tree-sitter-c: set this to true or false
+  tree-sitter-c-sharp: set this to true or false
+  tree-sitter-cpp: set this to true or false
+  tree-sitter-go: set this to true or false
+  tree-sitter-java: set this to true or false
+  tree-sitter-javascript: set this to true or false
+  tree-sitter-php: set this to true or false
+  tree-sitter-python: set this to true or false
+  tree-sitter-ruby: set this to true or false
+  tree-sitter-rust: set this to true or false
+  tree-sitter-typescript: set this to true or false

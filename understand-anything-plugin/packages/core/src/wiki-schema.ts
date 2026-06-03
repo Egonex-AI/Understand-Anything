@@ -6,6 +6,9 @@ import type {
   WikiServiceOverview,
   WikiFlow,
   WikiFlowStep,
+  WikiOverview,
+  WikiArchitecture,
+  WikiCrossDomain,
 } from "./types.js";
 
 export interface ValidationIssue {
@@ -204,6 +207,114 @@ export function validateSourceRefs(
         severity: "warning",
         message: `Referenced source file does not exist: ${ref.file}`,
       });
+    }
+  }
+  return issues;
+}
+
+export function validateParentWikiOverview(data: unknown, filePath: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!data || typeof data !== "object") {
+    issues.push({ file: filePath, severity: "error", message: "overview.json is not a valid object" });
+    return issues;
+  }
+  const overview = data as Record<string, unknown>;
+  if (!overview.name || typeof overview.name !== "string") {
+    issues.push({ file: filePath, severity: "error", message: "Missing system name" });
+  }
+  if (!overview.description || typeof overview.description !== "string") {
+    issues.push({ file: filePath, severity: "error", message: "Missing system description" });
+  }
+  if (!Array.isArray(overview.services)) {
+    issues.push({ file: filePath, severity: "error", message: "Missing services array" });
+  } else {
+    if (overview.services.length === 0) {
+      issues.push({ file: filePath, severity: "error", message: "services array is empty" });
+    }
+    for (let i = 0; i < overview.services.length; i++) {
+      const svc = overview.services[i] as Record<string, unknown>;
+      if (!svc.name || typeof svc.name !== "string") {
+        issues.push({ file: filePath, severity: "error", message: `services[${i}] missing name` });
+      }
+      if (!svc.description || typeof svc.description !== "string") {
+        issues.push({ file: filePath, severity: "warning", message: `services[${i}] missing description` });
+      }
+      if (!Array.isArray(svc.domains)) {
+        issues.push({ file: filePath, severity: "warning", message: `services[${i}] missing domains array` });
+      }
+    }
+  }
+  if (!Array.isArray(overview.techStack)) {
+    issues.push({ file: filePath, severity: "warning", message: "Missing techStack array" });
+  }
+  return issues;
+}
+
+export function validateParentWikiArchitecture(data: unknown, filePath: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!data || typeof data !== "object") {
+    issues.push({ file: filePath, severity: "error", message: "architecture.json is not a valid object" });
+    return issues;
+  }
+  const arch = data as Record<string, unknown>;
+  if (!Array.isArray(arch.crossServiceCalls)) {
+    issues.push({ file: filePath, severity: "error", message: "Missing crossServiceCalls array" });
+  } else {
+    for (let i = 0; i < arch.crossServiceCalls.length; i++) {
+      const call = arch.crossServiceCalls[i] as Record<string, unknown>;
+      if (!call.caller || typeof call.caller !== "object") {
+        issues.push({ file: filePath, severity: "error", message: `crossServiceCalls[${i}] missing caller` });
+      }
+      if (!call.callee || typeof call.callee !== "object") {
+        issues.push({ file: filePath, severity: "error", message: `crossServiceCalls[${i}] missing callee` });
+      }
+      if (!call.type || typeof call.type !== "string") {
+        issues.push({ file: filePath, severity: "error", message: `crossServiceCalls[${i}] missing type` });
+      }
+    }
+  }
+  if (!Array.isArray(arch.sharedResources)) {
+    issues.push({ file: filePath, severity: "warning", message: "Missing sharedResources array" });
+  }
+  if (!Array.isArray(arch.eventFlows)) {
+    issues.push({ file: filePath, severity: "warning", message: "Missing eventFlows array" });
+  }
+  return issues;
+}
+
+export function validateParentWikiCrossDomain(data: unknown, filePath: string): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  if (!data || typeof data !== "object") {
+    issues.push({ file: filePath, severity: "error", message: "Cross-domain page is not a valid object" });
+    return issues;
+  }
+  const page = data as Record<string, unknown>;
+  if (!page.id || typeof page.id !== "string") {
+    issues.push({ file: filePath, severity: "error", message: "Missing id" });
+  }
+  if (!page.name || typeof page.name !== "string") {
+    issues.push({ file: filePath, severity: "error", message: "Missing name" });
+  }
+  if (!page.summary || typeof page.summary !== "string") {
+    issues.push({ file: filePath, severity: "error", message: "Missing summary" });
+  }
+  if (!Array.isArray(page.services) || (page.services as unknown[]).length === 0) {
+    issues.push({ file: filePath, severity: "error", message: "Missing or empty services array" });
+  }
+  if (!Array.isArray(page.steps)) {
+    issues.push({ file: filePath, severity: "error", message: "Missing steps array" });
+  } else {
+    for (let i = 0; i < page.steps.length; i++) {
+      const step = page.steps[i] as Record<string, unknown>;
+      if (typeof step.order !== "number") {
+        issues.push({ file: filePath, severity: "error", message: `steps[${i}] missing order` });
+      }
+      if (!step.service || typeof step.service !== "string") {
+        issues.push({ file: filePath, severity: "error", message: `steps[${i}] missing service` });
+      }
+      if (!step.description || typeof step.description !== "string") {
+        issues.push({ file: filePath, severity: "warning", message: `steps[${i}] missing description` });
+      }
     }
   }
   return issues;

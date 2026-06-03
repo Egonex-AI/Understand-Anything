@@ -106,6 +106,72 @@ export interface CrossServiceCall {
   detail?: string;
 }
 
+// Parent-level Wiki types (multi-service)
+export interface WikiOverview {
+  name: string;
+  description: string;
+  services: Array<{
+    name: string;
+    description: string;
+    domains: string[];
+  }>;
+  techStack: string[];
+}
+
+export interface WikiArchitecture {
+  crossServiceCalls: CrossServiceCall[];
+  sharedResources: Array<{
+    type: "database" | "cache" | "queue" | "storage";
+    name: string;
+    services: string[];
+  }>;
+  eventFlows: Array<{
+    topic: string;
+    publisher: string;
+    subscribers: string[];
+  }>;
+}
+
+export interface WikiCrossDomainStep {
+  order: number;
+  service: string;
+  description: string;
+  wikiRef?: string;
+  crossServiceCall?: {
+    interface: string;
+    method: string;
+    type: string;
+  };
+}
+
+export interface WikiCrossDomain {
+  id: string;
+  name: string;
+  summary: string;
+  services: string[];
+  steps: WikiCrossDomainStep[];
+}
+
+export interface WikiSearchResult {
+  id: string;
+  name: string;
+  type: WikiIndexEntry["type"];
+  service?: string;
+  summary: string;
+  score: number;
+  matchSnippet?: string;
+}
+
+export interface WikiTopology {
+  hasParentWiki: boolean;
+  parentWikiDir: string | null;
+  services: Array<{
+    name: string;
+    wikiDir: string;
+    meta: WikiMeta;
+  }>;
+}
+
 // RPC annotation config
 export interface RpcAnnotationConfig {
   provider: string;
