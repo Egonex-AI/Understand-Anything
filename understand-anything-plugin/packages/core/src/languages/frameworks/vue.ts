@@ -4,7 +4,7 @@ export const vueConfig = {
   id: "vue",
   displayName: "Vue",
   languages: ["typescript", "javascript"],
-  detectionKeywords: ["vue", "@vue/cli-service", "nuxt", "vite-plugin-vue"],
+  detectionKeywords: ["\"vue\":", "@vue/cli-service", "nuxt", "vite-plugin-vue"],
   manifestFiles: ["package.json"],
   promptSnippetPath: "./frameworks/vue.md",
   entryPoints: ["src/main.ts", "src/App.vue", "src/main.js"],
