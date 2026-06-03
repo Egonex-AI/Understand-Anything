@@ -82,6 +82,10 @@ export const ja = {
   sidebar: {
     info: "情報",
     files: "ファイル",
+    moveLeft: "サイドバーを左に移動",
+    moveRight: "サイドバーを右に移動",
+    collapse: "サイドバーを折りたたむ",
+    expand: "サイドバーを展開",
   },
   mobile: {
     graph: "グラフ",
@@ -180,6 +184,7 @@ export const ja = {
     closeExpanded: "展開したコードビューアを閉じる",
     closeViewer: "コードビューアを閉じる",
     sourceUnavailable: "ソースが利用できません",
+    goBack: "戻る",
   },
   customNode: {
     tested: "テスト済み",

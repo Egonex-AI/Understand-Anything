@@ -82,6 +82,10 @@ export const ru = {
   sidebar: {
     info: "Информация",
     files: "Файлы",
+    moveLeft: "Переместить влево",
+    moveRight: "Переместить вправо",
+    collapse: "Свернуть",
+    expand: "Развернуть",
   },
   mobile: {
     graph: "Граф",
@@ -180,6 +184,7 @@ export const ru = {
     closeExpanded: "Закрыть расширенный просмотрщик кода",
     closeViewer: "Закрыть просмотрщик кода",
     sourceUnavailable: "Исходный код недоступен",
+    goBack: "Назад",
   },
   customNode: {
     tested: "Покрыт тестами",

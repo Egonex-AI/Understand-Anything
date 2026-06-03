@@ -82,6 +82,10 @@ export const zh = {
   sidebar: {
     info: "信息",
     files: "文件",
+    moveLeft: "侧边栏移至左侧",
+    moveRight: "侧边栏移至右侧",
+    collapse: "收起侧边栏",
+    expand: "展开侧边栏",
   },
   mobile: {
     graph: "图谱",
@@ -180,6 +184,7 @@ export const zh = {
     closeExpanded: "关闭展开的代码查看器",
     closeViewer: "关闭代码查看器",
     sourceUnavailable: "源码不可用",
+    goBack: "返回",
   },
   customNode: {
     tested: "已测试",
