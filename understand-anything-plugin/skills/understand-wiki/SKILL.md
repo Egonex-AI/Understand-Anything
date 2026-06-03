@@ -339,15 +339,7 @@ if [ "$INCREMENTAL" = true ] && [ -n "$DIRTY_DOMAINS" ]; then
   
   # Update meta.json commit hash
   CURRENT_COMMIT=$(git -C "$SERVICE_ROOT" rev-parse HEAD 2>/dev/null || echo "")
-  python3 -c "
-import json, sys
-with open('$SERVICE_UA/wiki/meta.json', 'r') as f:
-    meta = json.load(f)
-meta['gitCommitHash'] = '$CURRENT_COMMIT'
-meta['generatedAt'] = '$(date -u +%Y-%m-%dT%H:%M:%SZ)'
-with open('$SERVICE_UA/wiki/meta.json', 'w') as f:
-    json.dump(meta, f, indent=2)
-"
+  python3 "$SKILL_DIR/wiki_meta_update.py" "$SERVICE_UA/wiki/meta.json" "$CURRENT_COMMIT"
   
   # Cleanup snapshot
   rm -f "$DG_SNAPSHOT"
@@ -355,14 +347,7 @@ with open('$SERVICE_UA/wiki/meta.json', 'w') as f:
 elif [ "$INCREMENTAL" = true ] && [ -z "$DIRTY_DOMAINS" ]; then
   # --- No changes: only update commit hash ---
   CURRENT_COMMIT=$(git -C "$SERVICE_ROOT" rev-parse HEAD 2>/dev/null || echo "")
-  python3 -c "
-import json
-with open('$SERVICE_UA/wiki/meta.json', 'r') as f:
-    meta = json.load(f)
-meta['gitCommitHash'] = '$CURRENT_COMMIT'
-with open('$SERVICE_UA/wiki/meta.json', 'w') as f:
-    json.dump(meta, f, indent=2)
-"
+  python3 "$SKILL_DIR/wiki_meta_update.py" "$SERVICE_UA/wiki/meta.json" "$CURRENT_COMMIT"
   rm -f "$DG_SNAPSHOT"
   echo "[understand-wiki] Meta updated. No wiki pages regenerated."
   
@@ -462,114 +447,11 @@ Located between Phase 1 and Phase 2. Runs for every successfully generated servi
 Run the validation logic from `@understand-anything/core` (wiki-schema.ts). Concretely, the skill writes and executes a validation script:
 
 ```bash
-cat > "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-qg.mjs" << 'ENDSCRIPT'
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join } from 'path';
-
-const wikiDir = process.argv[2];
-const dgPath = process.argv[3];
-const outPath = process.argv[4];
-
-const issues = [];
-const warnings = [];
-
-// Read files
-const meta = JSON.parse(readFileSync(join(wikiDir, 'meta.json'), 'utf8'));
-const index = JSON.parse(readFileSync(join(wikiDir, 'index.json'), 'utf8'));
-const service = JSON.parse(readFileSync(join(wikiDir, 'service.json'), 'utf8'));
-const dg = JSON.parse(readFileSync(dgPath, 'utf8'));
-
-// Schema check: meta
-if (!meta.gitCommitHash) issues.push('meta.json: missing gitCommitHash');
-if (!meta.generatedAt) issues.push('meta.json: missing generatedAt');
-if (!meta.version) issues.push('meta.json: missing version');
-if (!meta.outputLanguage) issues.push('meta.json: missing outputLanguage');
-
-// Schema check: index
-if (!Array.isArray(index.entries) || index.entries.length === 0) {
-  issues.push('index.json: entries is empty or not an array');
-}
-
-// Schema check: service
-if (!service.name) issues.push('service.json: missing name');
-if (!service.description || service.description.length < 10) {
-  issues.push('service.json: description is missing or too short');
-}
-
-// Coverage check: domain-graph nodes vs wiki domain files
-const domainDir = join(wikiDir, 'domains');
-const domainFiles = existsSync(domainDir) ? readdirSync(domainDir).filter(f => f.endsWith('.json')) : [];
-const dgDomains = dg.nodes.filter(n => n.type === 'domain').map(n => n.id.replace('domain:', ''));
-
-for (const slug of dgDomains) {
-  if (!domainFiles.includes(`${slug}.json`)) {
-    issues.push(`Coverage: domain '${slug}' has no wiki page (expected domains/${slug}.json)`);
-  }
-}
-
-// Content non-empty check per domain page
-for (const file of domainFiles) {
-  const page = JSON.parse(readFileSync(join(domainDir, file), 'utf8'));
-  if (!page.summary || page.summary.length < 10) {
-    warnings.push(`domains/${file}: summary is empty or too short`);
-  }
-  if (!Array.isArray(page.flows) || page.flows.length === 0) {
-    issues.push(`domains/${file}: no flows defined`);
-  } else {
-    for (let i = 0; i < page.flows.length; i++) {
-      const flow = page.flows[i];
-      if (!Array.isArray(flow.steps) || flow.steps.length === 0) {
-        warnings.push(`domains/${file}: flow '${flow.name || i}' has no steps`);
-      } else {
-        for (let j = 0; j < flow.steps.length; j++) {
-          const step = flow.steps[j];
-          if (!step.description || step.description.length < 5) {
-            warnings.push(`domains/${file}: flow[${i}].step[${j}] has empty description`);
-          }
-        }
-      }
-    }
-  }
-}
-
-// Reference check: sourceRef files exist
-for (const file of domainFiles) {
-  const page = JSON.parse(readFileSync(join(domainDir, file), 'utf8'));
-  if (Array.isArray(page.flows)) {
-    for (const flow of page.flows) {
-      if (Array.isArray(flow.steps)) {
-        for (const step of flow.steps) {
-          if (step.sourceRef && step.sourceRef.file) {
-            const refPath = join(process.argv[5], step.sourceRef.file);
-            if (!existsSync(refPath)) {
-              warnings.push(`domains/${file}: sourceRef '${step.sourceRef.file}' does not exist`);
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-const result = {
-  passed: issues.length === 0,
-  issues,
-  warnings,
-  stats: {
-    domainsCovered: domainFiles.length,
-    domainsExpected: dgDomains.length,
-    coveragePercent: dgDomains.length > 0 ? Math.round((domainFiles.length / dgDomains.length) * 100) : 100
-  }
-};
-
-import('fs').then(fs => fs.writeFileSync(outPath, JSON.stringify(result, null, 2)));
-ENDSCRIPT
-
-node "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-qg.mjs" \
+python3 "$SKILL_DIR/wiki_quality_gate.py" \
   "$SERVICE_ROOT/.understand-anything/wiki" \
   "$SERVICE_ROOT/.understand-anything/domain-graph.json" \
-  "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-qg-result.json" \
-  "$SERVICE_ROOT"
+  "$SERVICE_ROOT" \
+  "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-qg-result.json"
 ```
 
 Read the result:

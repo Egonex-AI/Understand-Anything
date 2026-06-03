@@ -1,0 +1,57 @@
+"""Wiki meta.json updater — updates commit hash and timestamp.
+
+Replaces the inline Python snippets in the SKILL.md bash flow.
+
+Usage:
+    python wiki_meta_update.py <meta_json_path> <commit_hash> [timestamp]
+"""
+
+import json
+import os
+import sys
+from datetime import datetime, timezone
+
+
+def update_meta(
+    meta_path: str,
+    commit_hash: str,
+    timestamp: str | None = None,
+) -> dict:
+    """Update meta.json with new commit hash and generation timestamp.
+
+    If the file doesn't exist, creates a minimal meta.json.
+    Returns the updated meta dict.
+    """
+    if os.path.exists(meta_path):
+        with open(meta_path) as f:
+            meta = json.load(f)
+    else:
+        os.makedirs(os.path.dirname(meta_path), exist_ok=True)
+        meta = {}
+
+    meta["gitCommitHash"] = commit_hash
+    meta["generatedAt"] = timestamp or datetime.now(timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2)
+
+    return meta
+
+
+def main() -> None:
+    if len(sys.argv) < 3:
+        print(f"Usage: {sys.argv[0]} <meta_json_path> <commit_hash> [timestamp]")
+        sys.exit(1)
+
+    meta_path = sys.argv[1]
+    commit_hash = sys.argv[2]
+    timestamp = sys.argv[3] if len(sys.argv) > 3 else None
+
+    update_meta(meta_path, commit_hash, timestamp)
+    print(f"[wiki-meta-update] Updated {meta_path} (commit: {commit_hash[:8]}...)")
+
+
+if __name__ == "__main__":
+    main()
