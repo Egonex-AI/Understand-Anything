@@ -288,8 +288,14 @@ git add .gitattributes .understand-anything/
 | `architecture-analyzer` | アーキテクチャ層の特定 |
 | `tour-builder` | ガイド学習ツアーの生成 |
 | `graph-reviewer` | グラフの完全性と参照整合性の検証 |
-| `domain-analyzer` | ビジネスドメイン、フロー、処理ステップの抽出（`/understand-domain` で使用） |
+| `domain-discoverer` | 凝縮KGサマリーからビジネスドメインを識別しモジュールを割り当て（`/understand-domain` で使用） |
+| `domain-flow-extractor` | 単一ドメインのKGサブセットからビジネスフローとステップを抽出（`/understand-domain` で使用） |
+| `domain-analyzer` | レガシーモノリシックドメイン分析（discoverer + flow-extractor分割に置き換え） |
 | `article-analyzer` | wiki 記事からエンティティ、主張、暗黙の関係を抽出（`/understand-knowledge` で使用） |
+| `wiki-worker` | 単一ドメインのwikiコンテンツを生成（`/understand-wiki` で使用） |
+| `wiki-reviewer` | wiki出力品質とスキーマ準拠を検証（`/understand-wiki` で使用） |
+| `assemble-reviewer` | 組み立て後のクロスサービスwiki成果物をレビュー（`/understand-wiki` で使用） |
+| `upstream-updater` | 上流変更を検出し増分再分析をトリガー（`/understand-wiki` で使用） |
 
 ファイルアナライザーは並列実行されます（最大3つ同時）。インクリメンタル更新に対応しており、前回の実行から変更されたファイルのみを再分析します。
 

@@ -287,8 +287,14 @@ git add .gitattributes .understand-anything/
 | `architecture-analyzer` | 识别架构层 |
 | `tour-builder` | 生成引导式学习路径 |
 | `graph-reviewer` | 验证图的完整性和引用完整性 |
-| `domain-analyzer` | 提取业务领域、流程和处理步骤（由 `/understand-domain` 使用） |
+| `domain-discoverer` | 从凝缩的 KG 摘要中识别业务域并分配模块（由 `/understand-domain` 使用） |
+| `domain-flow-extractor` | 从单个域的 KG 子集中提取业务流程和步骤（由 `/understand-domain` 使用） |
+| `domain-analyzer` | 旧版单体域分析（已被 discoverer + flow-extractor 拆分替代） |
 | `article-analyzer` | 从 wiki 文章中提取实体、论断和隐式关系（由 `/understand-knowledge` 使用） |
+| `wiki-worker` | 为单个域生成 wiki 内容（由 `/understand-wiki` 使用） |
+| `wiki-reviewer` | 验证 wiki 输出质量和 schema 合规性（由 `/understand-wiki` 使用） |
+| `assemble-reviewer` | 审查组装后的跨服务 wiki 产物（由 `/understand-wiki` 使用） |
+| `upstream-updater` | 检测上游变更并触发增量重分析（由 `/understand-wiki` 使用） |
 
 文件分析器并行运行（最多 3 个并发）。支持增量更新 — 仅重新分析自上次运行以来发生更改的文件。
 

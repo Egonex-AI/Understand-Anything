@@ -288,8 +288,14 @@ Bu ayrım sayesinde graf yapısal tarafta yeniden üretilebilir kalırken (aynı
 | `architecture-analyzer` | Mimari katmanları tanımla |
 | `tour-builder` | Rehberli öğrenme turları oluştur |
 | `graph-reviewer` | Grafik bütünlüğünü ve referans bütünlüğünü doğrula |
-| `domain-analyzer` | İş alanları, akışlar ve işlem adımlarını çıkar (`/understand-domain` tarafından kullanılır) |
+| `domain-discoverer` | Yoğunlaştırılmış KG özetinden iş alanlarını belirle ve modülleri ata (`/understand-domain` tarafından kullanılır) |
+| `domain-flow-extractor` | Tek bir alanın KG alt kümesinden iş akışlarını ve adımları çıkar (`/understand-domain` tarafından kullanılır) |
+| `domain-analyzer` | Eski monolitik alan analizi (discoverer + flow-extractor bölünmesiyle değiştirildi) |
 | `article-analyzer` | Wiki makalelerinden varlıkları, iddiaları ve örtük ilişkileri çıkar (`/understand-knowledge` tarafından kullanılır) |
+| `wiki-worker` | Tek bir alan için wiki içeriği oluştur (`/understand-wiki` tarafından kullanılır) |
+| `wiki-reviewer` | Wiki çıktı kalitesini ve şema uyumluluğunu doğrula (`/understand-wiki` tarafından kullanılır) |
+| `assemble-reviewer` | Birleştirilmiş çapraz hizmet wiki eserlerini incele (`/understand-wiki` tarafından kullanılır) |
+| `upstream-updater` | Yukarı akış değişikliklerini tespit et ve artımlı yeniden analizi tetikle (`/understand-wiki` tarafından kullanılır) |
 
 Dosya analizörleri paralel çalışır (en fazla 3 eşzamanlı). Artımlı güncellemeleri destekler — yalnızca son çalıştırmadan bu yana değişen dosyaları yeniden analiz eder.
 

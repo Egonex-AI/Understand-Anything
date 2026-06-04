@@ -282,7 +282,7 @@ This split is why the graph is reproducible on the structural side (the same cod
 
 ### Multi-Agent Pipeline
 
-The `/understand` command orchestrates 5 specialized agents, and `/understand-domain` adds a 6th:
+The `/understand` command orchestrates 5 specialized agents. `/understand-domain` and `/understand-wiki` add domain analysis and wiki generation agents:
 
 | Agent | Role |
 |-------|------|
@@ -291,8 +291,14 @@ The `/understand` command orchestrates 5 specialized agents, and `/understand-do
 | `architecture-analyzer` | Identify architectural layers |
 | `tour-builder` | Generate guided learning tours |
 | `graph-reviewer` | Validate graph completeness and referential integrity (runs inline by default; use `--review` for full LLM review) |
-| `domain-analyzer` | Extract business domains, flows, and process steps (used by `/understand-domain`) |
+| `domain-discoverer` | Identify business domains and assign modules from a condensed KG summary (used by `/understand-domain`) |
+| `domain-flow-extractor` | Extract business flows and steps for a single domain from its KG subset (used by `/understand-domain`) |
+| `domain-analyzer` | Legacy monolithic domain analysis (superseded by discoverer + flow-extractor split) |
 | `article-analyzer` | Extract entities, claims, and implicit relationships from wiki articles (used by `/understand-knowledge`) |
+| `wiki-worker` | Generate wiki content for a single domain (used by `/understand-wiki`) |
+| `wiki-reviewer` | Validate wiki output quality and schema compliance (used by `/understand-wiki`) |
+| `assemble-reviewer` | Review assembled cross-service wiki artifacts (used by `/understand-wiki`) |
+| `upstream-updater` | Detect upstream changes and trigger incremental re-analysis (used by `/understand-wiki`) |
 
 File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 

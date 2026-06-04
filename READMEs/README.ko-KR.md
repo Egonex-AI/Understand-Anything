@@ -287,8 +287,14 @@ git add .gitattributes .understand-anything/
 | `architecture-analyzer` | 아키텍처 레이어 식별 |
 | `tour-builder` | 가이드 학습 투어 생성 |
 | `graph-reviewer` | 그래프 완전성 및 참조 무결성 검증 (기본적으로 인라인 실행; 전체 LLM 검토는 `--review` 사용) |
-| `domain-analyzer` | 비즈니스 도메인, 흐름 및 프로세스 단계 추출 (`/understand-domain`에서 사용) |
+| `domain-discoverer` | 압축된 KG 요약에서 비즈니스 도메인을 식별하고 모듈 할당 (`/understand-domain`에서 사용) |
+| `domain-flow-extractor` | 단일 도메인의 KG 하위 집합에서 비즈니스 흐름 및 단계 추출 (`/understand-domain`에서 사용) |
+| `domain-analyzer` | 레거시 모놀리식 도메인 분석 (discoverer + flow-extractor 분할로 대체) |
 | `article-analyzer` | 위키 문서에서 엔티티, 주장 및 암묵적 관계 추출 (`/understand-knowledge`에서 사용) |
+| `wiki-worker` | 단일 도메인의 위키 콘텐츠 생성 (`/understand-wiki`에서 사용) |
+| `wiki-reviewer` | 위키 출력 품질 및 스키마 준수 검증 (`/understand-wiki`에서 사용) |
+| `assemble-reviewer` | 조합된 크로스서비스 위키 산출물 검토 (`/understand-wiki`에서 사용) |
+| `upstream-updater` | 업스트림 변경 감지 및 증분 재분석 트리거 (`/understand-wiki`에서 사용) |
 
 파일 분석기는 병렬로 실행됩니다(최대 5개 동시, 배치당 20~30개 파일). 증분 업데이트를 지원하여 마지막 실행 이후 변경된 파일만 재분석합니다.
 

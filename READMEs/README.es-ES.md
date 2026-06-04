@@ -287,8 +287,14 @@ El comando `/understand` orquesta 5 agentes especializados, y `/understand-domai
 | `architecture-analyzer` | Identifica capas arquitectónicas |
 | `tour-builder` | Genera recorridos de aprendizaje guiados |
 | `graph-reviewer` | Valida la completitud y la integridad referencial del grafo (se ejecuta inline por defecto; usa `--review` para una revisión completa con LLM) |
-| `domain-analyzer` | Extrae dominios de negocio, flujos y pasos de proceso (usado por `/understand-domain`) |
+| `domain-discoverer` | Identifica dominios de negocio y asigna módulos desde un resumen KG condensado (usado por `/understand-domain`) |
+| `domain-flow-extractor` | Extrae flujos de negocio y pasos para un solo dominio de su subconjunto KG (usado por `/understand-domain`) |
+| `domain-analyzer` | Análisis de dominio monolítico heredado (reemplazado por la división discoverer + flow-extractor) |
 | `article-analyzer` | Extrae entidades, afirmaciones y relaciones implícitas de artículos wiki (usado por `/understand-knowledge`) |
+| `wiki-worker` | Genera contenido wiki para un solo dominio (usado por `/understand-wiki`) |
+| `wiki-reviewer` | Valida la calidad de salida wiki y el cumplimiento del esquema (usado por `/understand-wiki`) |
+| `assemble-reviewer` | Revisa artefactos wiki cross-service ensamblados (usado por `/understand-wiki`) |
+| `upstream-updater` | Detecta cambios upstream y dispara re-análisis incremental (usado por `/understand-wiki`) |
 
 Los analizadores de archivos se ejecutan en paralelo (hasta 5 concurrentes, 20-30 archivos por lote). Soporta actualizaciones incrementales: solo reanaliza los archivos que cambiaron desde la última ejecución.
 
