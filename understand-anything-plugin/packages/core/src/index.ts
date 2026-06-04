@@ -122,3 +122,18 @@ export {
   type IgnoreFilter,
 } from "./ignore-filter.js";
 export { generateStarterIgnoreFile } from "./ignore-generator.js";
+export {
+  validateWikiMeta,
+  validateWikiIndex,
+  validateWikiDomainPage,
+  validateWikiServiceOverview,
+  validateParentWikiOverview,
+  validateParentWikiArchitecture,
+  validateParentWikiCrossDomain,
+  validateSourceRefs,
+  runQualityGateLayer1,
+  autoFixDomainPage,
+  type ValidationIssue,
+  type WikiValidationResult,
+  type AutoFixResult,
+} from "./wiki-schema.js";
