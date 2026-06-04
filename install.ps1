@@ -119,6 +119,9 @@ function Get-ForgeCodeAgentsRoot { Join-Path $RepoDir 'understand-anything-plugi
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
+        if ($env:UA_REPO_URL) {
+            git -C $RepoDir remote set-url origin $RepoUrl
+        }
         git -C $RepoDir fetch --all --prune
     } else {
         Write-Host "→ Cloning $RepoUrl → $RepoDir"

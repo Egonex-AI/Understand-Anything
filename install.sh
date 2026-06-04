@@ -128,6 +128,9 @@ prompt_platform() {
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
+    if [[ -n "${UA_REPO_URL:-}" ]]; then
+      git -C "$REPO_DIR" remote set-url origin "$REPO_URL"
+    fi
     git -C "$REPO_DIR" fetch --all --prune
   else
     printf -- '→ Cloning %s → %s\n' "$REPO_URL" "$REPO_DIR"
