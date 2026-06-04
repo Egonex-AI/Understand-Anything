@@ -439,8 +439,13 @@ cmd_install() {
   target="$(resolve_target_dir "$id" "$target")"
 
   clone_or_update
-  printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
-  link_skills "$target" "$style"
+
+  if [[ "$id" == "forgecode" ]]; then
+    printf -- '→ Skipping ForgeCode skill installation (commands are the entrypoints)\n'
+  else
+    printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
+    link_skills "$target" "$style"
+  fi
 
   if [[ "$id" == "forgecode" ]]; then
     printf -- '→ Installing ForgeCode commands\n'
@@ -453,7 +458,11 @@ cmd_install() {
   link_plugin_root
 
   printf '\n✓ Installed Understand-Anything for %s\n' "$id"
-  printf '  Restart your CLI or IDE to pick up the skills.\n'
+  if [[ "$id" == "forgecode" ]]; then
+    printf '  Restart ForgeCode to pick up commands and agents.\n'
+  else
+    printf '  Restart your CLI or IDE to pick up the skills.\n'
+  fi
   if [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'
     printf '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.\n'
@@ -468,8 +477,12 @@ cmd_uninstall() {
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
   target="$(resolve_target_dir "$id" "$target")"
 
-  printf -- '→ Removing skill links for %s\n' "$id"
-  unlink_skills "$target" "$style"
+  if [[ "$id" == "forgecode" ]]; then
+    printf -- '→ Removing ForgeCode commands and agents\n'
+  else
+    printf -- '→ Removing skill links for %s\n' "$id"
+    unlink_skills "$target" "$style"
+  fi
 
   if [[ "$id" == "forgecode" ]]; then
     printf -- '→ Removing ForgeCode command files\n'

@@ -398,8 +398,13 @@ function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
     $target = Resolve-TargetDir $Id $cfg.Target
     Clone-Or-Update
-    Write-Host "→ Linking skills for $Id ($($cfg.Style) → $target)"
-    Link-Skills $target $cfg.Style
+
+    if ($Id -eq 'forgecode') {
+        Write-Host '→ Skipping ForgeCode skill installation (commands are the entrypoints)'
+    } else {
+        Write-Host "→ Linking skills for $Id ($($cfg.Style) → $target)"
+        Link-Skills $target $cfg.Style
+    }
 
     if ($Id -eq 'forgecode') {
         Write-Host '→ Installing ForgeCode commands'
@@ -412,7 +417,11 @@ function Cmd-Install([string]$Id) {
     Link-Plugin-Root
 
     Write-Host "`n✓ Installed Understand-Anything for $Id"
-    Write-Host '  Restart your CLI or IDE to pick up the skills.'
+    if ($Id -eq 'forgecode') {
+        Write-Host '  Restart ForgeCode to pick up commands and agents.'
+    } else {
+        Write-Host '  Restart your CLI or IDE to pick up the skills.'
+    }
     if ($Id -eq 'vscode') {
         Write-Host "`n  Tip: VS Code can also auto-discover the plugin by opening this repo"
         Write-Host '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.'
@@ -422,8 +431,13 @@ function Cmd-Install([string]$Id) {
 function Cmd-Uninstall([string]$Id) {
     $cfg = Resolve-Platform $Id
     $target = Resolve-TargetDir $Id $cfg.Target
-    Write-Host "→ Removing skill links for $Id"
-    Unlink-Skills $target $cfg.Style
+
+    if ($Id -eq 'forgecode') {
+        Write-Host '→ Removing ForgeCode commands and agents'
+    } else {
+        Write-Host "→ Removing skill links for $Id"
+        Unlink-Skills $target $cfg.Style
+    }
 
     if ($Id -eq 'forgecode') {
         Write-Host '→ Removing ForgeCode command files'
