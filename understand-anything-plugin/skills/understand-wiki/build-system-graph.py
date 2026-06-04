@@ -240,6 +240,65 @@ def build_system_graph(
     }
 
 
+def enrich_from_wiki(graph: dict[str, Any], project_root: str) -> dict[str, Any]:
+    """Enrich system graph with cross-service data from wiki architecture.json."""
+    arch_path = Path(project_root) / ".understand-anything" / "wiki" / "architecture.json"
+    if arch_path.exists():
+        try:
+            arch = json.loads(arch_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            arch = None
+        if arch is not None:
+            node_ids = {n["id"] for n in graph.get("nodes", [])}
+            existing_edges = {
+                (e["source"], e["target"], e["type"]) for e in graph.get("edges", [])
+            }
+
+            for call in arch.get("crossServiceCalls", []):
+                caller_svc = call.get("caller", {}).get("service", "")
+                callee_svc = call.get("callee", {}).get("service", "")
+                source_id = f"microservice:{caller_svc}"
+                target_id = f"microservice:{callee_svc}"
+
+                if source_id not in node_ids or target_id not in node_ids:
+                    continue
+
+                edge_key = (source_id, target_id, "rpc_call")
+                if edge_key in existing_edges:
+                    continue
+
+                iface = call.get("callee", {}).get("interface", "")
+                method = call.get("callee", {}).get("method", "")
+                graph["edges"].append({
+                    "source": source_id,
+                    "target": target_id,
+                    "type": "rpc_call",
+                    "weight": 0.8,
+                    "detail": {
+                        "interface": iface,
+                        "method": f"{iface}.{method}" if iface and method else method,
+                        "rpcType": call.get("type", "rpc"),
+                        "evidence": "wiki-enriched",
+                    },
+                })
+                existing_edges.add(edge_key)
+
+    ovw_path = Path(project_root) / ".understand-anything" / "wiki" / "overview.json"
+    if ovw_path.exists():
+        try:
+            ovw = json.loads(ovw_path.read_text(encoding="utf-8"))
+            if "project" not in graph:
+                graph["project"] = {}
+            if ovw.get("name"):
+                graph["project"]["name"] = ovw["name"]
+            if ovw.get("description") is not None:
+                graph["project"]["description"] = ovw["description"]
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    return graph
+
+
 def main() -> int:
     import argparse
 
@@ -274,15 +333,25 @@ def main() -> int:
         services = None
 
     graph = build_system_graph(project_root, services)
+    graph = enrich_from_wiki(graph, project_root)
+
     output = args.output or os.path.join(
         project_root, ".understand-anything", "system-graph.json"
     )
     os.makedirs(os.path.dirname(output), exist_ok=True)
     with open(output, "w", encoding="utf-8") as f:
-        json.dump(graph, f, indent=2)
+        json.dump(graph, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    print(f"Wrote {output} ({graph['project']['serviceCount']} services)", file=sys.stderr)
+    svc_count = graph["project"].get("serviceCount", 0)
+    node_count = len(graph["nodes"])
+    edge_count = len(graph["edges"])
+    print(
+        f"[system-graph] Generated: {svc_count} services, "
+        f"{node_count} nodes, {edge_count} edges",
+        file=sys.stderr,
+    )
+    print(f"[system-graph] Written to {output}", file=sys.stderr)
     return 0
 
 

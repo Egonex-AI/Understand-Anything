@@ -44,6 +44,7 @@ mod = _load_module()
 discover_services = mod.discover_services
 extract_service_info = mod.extract_service_info
 build_system_graph = mod.build_system_graph
+enrich_from_wiki = mod.enrich_from_wiki
 
 
 def _make_kg(
@@ -272,6 +273,155 @@ class TestBuildSystemGraph(unittest.TestCase):
         self.assertEqual(rpc_edges[0]["source"], "microservice:order-service")
         self.assertEqual(rpc_edges[0]["target"], "microservice:payment-service")
         self.assertEqual(rpc_edges[0]["detail"]["interface"], "PaymentFacade")
+
+
+class TestWikiEnrichment(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.mkdtemp()
+
+    def test_enriches_edges_from_architecture_json(self) -> None:
+        """Merges crossServiceCalls from wiki architecture.json."""
+        for svc_name in ["order-service", "payment-service"]:
+            d = os.path.join(self.tmpdir, svc_name, ".understand-anything")
+            os.makedirs(d)
+            with open(os.path.join(d, "knowledge-graph.json"), "w", encoding="utf-8") as f:
+                json.dump(_make_kg(svc_name), f)
+
+        wiki_dir = os.path.join(self.tmpdir, ".understand-anything", "wiki")
+        os.makedirs(wiki_dir)
+        arch = {
+            "crossServiceCalls": [
+                {
+                    "caller": {
+                        "service": "order-service",
+                        "method": "OrderService.createOrder()",
+                    },
+                    "callee": {
+                        "service": "payment-service",
+                        "interface": "PaymentFacade",
+                        "method": "createPayment()",
+                    },
+                    "type": "moa_rpc",
+                    "evidence": "script-matched",
+                },
+            ],
+        }
+        with open(os.path.join(wiki_dir, "architecture.json"), "w", encoding="utf-8") as f:
+            json.dump(arch, f)
+
+        graph = build_system_graph(self.tmpdir)
+        enriched = enrich_from_wiki(graph, self.tmpdir)
+
+        wiki_edges = [
+            e for e in enriched["edges"]
+            if e.get("detail", {}).get("evidence") == "wiki-enriched"
+        ]
+        self.assertGreaterEqual(len(wiki_edges), 1)
+        self.assertEqual(wiki_edges[0]["source"], "microservice:order-service")
+        self.assertEqual(wiki_edges[0]["target"], "microservice:payment-service")
+
+    def test_no_wiki_returns_graph_unchanged(self) -> None:
+        """When no wiki exists, graph is returned as-is."""
+        graph = {
+            "nodes": [],
+            "edges": [],
+            "version": "1.0.0",
+            "project": {},
+            "serviceIndex": {},
+        }
+        result = enrich_from_wiki(graph, self.tmpdir)
+        self.assertEqual(result, graph)
+
+    def test_skips_duplicate_edges(self) -> None:
+        """If an rpc_call edge already exists from KG matching, wiki doesn't duplicate it."""
+        order_kg = _make_kg(
+            "order-service",
+            nodes=[{"id": "file:src/OrderService.java", "type": "file", "name": "OrderService"}],
+            edges=[
+                {
+                    "source": "file:src/OrderService.java",
+                    "target": "file:src/PaymentFacade.java",
+                    "type": "consumes_rpc",
+                    "detail": "PaymentFacade.createPayment()",
+                },
+            ],
+        )
+        payment_kg = _make_kg(
+            "payment-service",
+            nodes=[
+                {
+                    "id": "file:src/PaymentFacadeImpl.java",
+                    "type": "file",
+                    "name": "PaymentFacadeImpl",
+                },
+            ],
+            edges=[
+                {
+                    "source": "file:src/PaymentFacadeImpl.java",
+                    "target": "file:src/PaymentFacade.java",
+                    "type": "provides_rpc",
+                    "detail": "PaymentFacade",
+                },
+            ],
+        )
+        for name, kg in [("order-service", order_kg), ("payment-service", payment_kg)]:
+            d = os.path.join(self.tmpdir, name, ".understand-anything")
+            os.makedirs(d)
+            with open(os.path.join(d, "knowledge-graph.json"), "w", encoding="utf-8") as f:
+                json.dump(kg, f)
+
+        wiki_dir = os.path.join(self.tmpdir, ".understand-anything", "wiki")
+        os.makedirs(wiki_dir)
+        arch = {
+            "crossServiceCalls": [
+                {
+                    "caller": {"service": "order-service", "method": "OrderService.createOrder()"},
+                    "callee": {
+                        "service": "payment-service",
+                        "interface": "PaymentFacade",
+                        "method": "createPayment()",
+                    },
+                    "type": "moa_rpc",
+                },
+            ],
+        }
+        with open(os.path.join(wiki_dir, "architecture.json"), "w", encoding="utf-8") as f:
+            json.dump(arch, f)
+
+        graph = build_system_graph(self.tmpdir)
+        rpc_before = [e for e in graph["edges"] if e["type"] == "rpc_call"]
+        self.assertEqual(len(rpc_before), 1)
+
+        enriched = enrich_from_wiki(graph, self.tmpdir)
+        rpc_after = [e for e in enriched["edges"] if e["type"] == "rpc_call"]
+        self.assertEqual(len(rpc_after), 1)
+        self.assertEqual(rpc_after[0]["detail"]["evidence"], "kg-matched")
+
+    def test_enriches_project_from_overview(self) -> None:
+        """overview.json enriches project name and description."""
+        for svc_name in ["order-service"]:
+            d = os.path.join(self.tmpdir, svc_name, ".understand-anything")
+            os.makedirs(d)
+            with open(os.path.join(d, "knowledge-graph.json"), "w", encoding="utf-8") as f:
+                json.dump(_make_kg(svc_name), f)
+
+        wiki_dir = os.path.join(self.tmpdir, ".understand-anything", "wiki")
+        os.makedirs(wiki_dir)
+        overview = {
+            "name": "Order Platform",
+            "description": "Multi-service order management platform",
+        }
+        with open(os.path.join(wiki_dir, "overview.json"), "w", encoding="utf-8") as f:
+            json.dump(overview, f)
+
+        graph = build_system_graph(self.tmpdir)
+        enriched = enrich_from_wiki(graph, self.tmpdir)
+
+        self.assertEqual(enriched["project"]["name"], "Order Platform")
+        self.assertEqual(
+            enriched["project"]["description"],
+            "Multi-service order management platform",
+        )
 
 
 if __name__ == "__main__":
