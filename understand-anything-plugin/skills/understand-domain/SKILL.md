@@ -111,20 +111,56 @@ The preprocessing script does NOT produce a domain graph — it produces **raw m
 
 ### Phase 3: Derive from Existing Graph (Path 2)
 
-1. Read `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`
-2. Format the graph data as structured context:
-   - All nodes with their types, names, summaries, and tags
-   - All edges with their types (especially `calls`, `imports`, `contains`)
-   - All layers with their descriptions
-   - Tour steps if available
-3. This is the context for the domain analyzer — no file reading needed
-4. Proceed to Phase 4
+1. Run the KG condensation script:
+   ```bash
+   python "$PLUGIN_ROOT/skills/understand-domain/condense_kg_for_domain.py" "$PROJECT_ROOT"
+   ```
+   This produces `$PROJECT_ROOT/.understand-anything/intermediate/kg-summary.json` — a module-level summary of the KG (~15k tokens vs 100k+ for the full KG).
 
-### Phase 4: Domain Analysis
+2. Read `kg-summary.json` as context for Phase 4a.
+3. Proceed to Phase 4a.
 
-1. Read the domain-analyzer agent prompt from `$PLUGIN_ROOT/agents/domain-analyzer.md`
-2. Dispatch a subagent with the domain-analyzer prompt + the context from Phase 2 or 3
-3. The agent writes its output to `$PROJECT_ROOT/.understand-anything/intermediate/domain-analysis.json`
+### Phase 4: Domain Analysis (Split Pipeline)
+
+This phase uses different strategies depending on Path:
+
+**Path 1 (no KG — from Phase 2):** Use the existing `domain-analyzer` agent with `domain-context.json` as input. This is a single-pass analysis suitable for smaller projects where context size is manageable. Proceed directly to Phase 5 after completion.
+
+**Path 2 (KG exists — from Phase 3):** Use the split pipeline below.
+
+#### Phase 4a: Domain Discovery
+
+1. Read the `domain-discoverer` agent prompt from `$PLUGIN_ROOT/agents/domain-discoverer.md`
+2. Dispatch a subagent with the `domain-discoverer` prompt + `kg-summary.json` content as context
+3. The agent writes to `$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery.json`
+4. Read the discovery output. If 0 domains found, report error and stop.
+
+#### Phase 4b: KG Splitting
+
+1. Run the splitting script:
+   ```bash
+   python "$PLUGIN_ROOT/skills/understand-domain/split_kg_by_domain.py" "$PROJECT_ROOT"
+   ```
+2. Verify one `domain-<name>.json` file exists in `intermediate/` for each domain in the discovery.
+
+#### Phase 4c: Flow Extraction (parallel, up to 3 concurrent)
+
+1. Read the `domain-flow-extractor` agent prompt from `$PLUGIN_ROOT/agents/domain-flow-extractor.md`
+2. For each domain in `domain-discovery.json`:
+   - Read `intermediate/domain-<name>.json` as context
+   - Dispatch a subagent with the `domain-flow-extractor` prompt + domain KG subset
+   - The agent writes to `intermediate/flows-<name>.json`
+3. Run up to **3 subagents concurrently** (same pattern as `/understand` Phase 2 batches)
+4. If a domain's flow extraction fails, retry once. If it fails again, skip that domain and continue with others.
+5. Wait for all to complete.
+
+#### Phase 4d: Merge
+
+1. Run the merge script:
+   ```bash
+   python "$PLUGIN_ROOT/skills/understand-domain/merge_domain_results.py" "$PROJECT_ROOT"
+   ```
+2. Verify `intermediate/domain-analysis.json` exists. If not, report error.
 
 ### Phase 5: Validate and Save
 
