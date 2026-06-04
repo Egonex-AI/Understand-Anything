@@ -225,6 +225,7 @@ export const en = {
     fuzzy: "Fuzzy",
     semantic: "Semantic",
     result: "result",
+    wikiResults: "Wiki",
   },
   export: {
     label: "Export",
@@ -310,6 +311,8 @@ export const en = {
     servicesInvolved: "Services involved",
     diagramStart: "Start",
     diagramEnd: "End",
+    showSidebar: "Show sidebar",
+    hideSidebar: "Hide sidebar",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · GET STARTED",

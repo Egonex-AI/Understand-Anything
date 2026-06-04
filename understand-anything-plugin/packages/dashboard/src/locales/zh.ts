@@ -225,6 +225,7 @@ export const zh = {
     fuzzy: "模糊",
     semantic: "语义",
     result: "结果",
+    wikiResults: "Wiki",
   },
   export: {
     label: "导出",
@@ -310,6 +311,8 @@ export const zh = {
     servicesInvolved: "涉及服务",
     diagramStart: "开始",
     diagramEnd: "结束",
+    showSidebar: "显示侧边栏",
+    hideSidebar: "隐藏侧边栏",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · 入门",

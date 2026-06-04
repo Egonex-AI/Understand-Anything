@@ -155,7 +155,7 @@ function WikiNavTree({
   }
 
   return (
-    <nav className="w-64 min-w-[200px] border-r border-border overflow-y-auto p-3 flex flex-col gap-1">
+    <nav className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-1">
       {/* Scope switcher */}
       {services.length > 1 && (
         <div className="mb-3">
@@ -449,8 +449,8 @@ function WikiContent({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 max-w-3xl">
-      <article className="max-w-none wiki-markdown">
+    <div className="flex-1 overflow-y-auto p-6">
+      <article className="max-w-4xl mx-auto wiki-markdown">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeRaw]}
@@ -469,6 +469,7 @@ function WikiContent({
 }
 
 export default function WikiView({ accessToken }: { accessToken: string }) {
+  const { t } = useI18n();
   const wikiIndex = useDashboardStore((s) => s.wikiIndex);
   const wikiActivePage = useDashboardStore((s) => s.wikiActivePage);
   const wikiPageContent = useDashboardStore((s) => s.wikiPageContent);
@@ -487,6 +488,9 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<NavEntry[]>([]);
   const [sourcePanel, setSourcePanel] = useState<{ path: string; lineRange?: [number, number] } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 900,
+  );
 
   const apiUrl = useCallback(
     (endpoint: string) => `/api/wiki${endpoint}?token=${encodeURIComponent(accessToken)}`,
@@ -682,7 +686,13 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
     <div className="w-full h-full flex flex-col bg-root">
       <WikiBreadcrumb crumbs={wikiBreadcrumb} onNavigate={handleBreadcrumbNav} />
       <div className="flex-1 flex min-h-0">
-        <div className="flex flex-col border-r border-border">
+        <div
+          id="wiki-sidebar"
+          className={`flex flex-col border-r border-border transition-[width] duration-200 shrink-0 ${
+            sidebarCollapsed ? "w-0 overflow-hidden" : "w-60"
+          }`}
+          {...(sidebarCollapsed ? { inert: "" as unknown as string } : {})}
+        >
           <div className="p-2 border-b border-border">
             <input
               type="text"
@@ -701,7 +711,19 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
             onScopeChange={setWikiViewScope}
           />
         </div>
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          <div className="flex items-center px-2 py-1 border-b border-border bg-surface/30 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed((v) => !v)}
+              className="w-6 h-6 flex items-center justify-center rounded hover:bg-elevated text-text-muted hover:text-text transition-colors text-xs"
+              aria-label={sidebarCollapsed ? t.wiki.showSidebar : t.wiki.hideSidebar}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="wiki-sidebar"
+            >
+              {sidebarCollapsed ? "▶" : "◀"}
+            </button>
+          </div>
           <div className={`min-h-0 overflow-auto ${sourcePanel ? "h-[50%]" : "flex-1"}`}>
             <WikiContent
               content={wikiPageContent}

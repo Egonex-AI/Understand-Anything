@@ -225,6 +225,7 @@ export const ko = {
     fuzzy: "퍼지",
     semantic: "시맨틱",
     result: "결과",
+    wikiResults: "Wiki",
   },
   export: {
     label: "내보내기",
@@ -310,6 +311,8 @@ edgeLabels: {
     servicesInvolved: "관련 서비스",
     diagramStart: "시작",
     diagramEnd: "종료",
+    showSidebar: "사이드바 표시",
+    hideSidebar: "사이드바 숨기기",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · 시작하기",

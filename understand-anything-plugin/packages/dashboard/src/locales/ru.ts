@@ -225,6 +225,7 @@ export const ru = {
     fuzzy: "Нечёткий",
     semantic: "Семантический",
     result: "результат",
+    wikiResults: "Wiki",
   },
   export: {
     label: "Экспорт",
@@ -310,6 +311,8 @@ export const ru = {
     servicesInvolved: "Задействованные сервисы",
     diagramStart: "Начало",
     diagramEnd: "Конец",
+    showSidebar: "Показать боковую панель",
+    hideSidebar: "Скрыть боковую панель",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · НАЧАЛО РАБОТЫ",

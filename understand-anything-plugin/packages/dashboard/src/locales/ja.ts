@@ -225,6 +225,7 @@ export const ja = {
     fuzzy: "ファジー",
     semantic: "セマンティック",
     result: "結果",
+    wikiResults: "Wiki",
   },
   export: {
     label: "エクスポート",
@@ -310,6 +311,8 @@ export const ja = {
     servicesInvolved: "関連サービス",
     diagramStart: "開始",
     diagramEnd: "終了",
+    showSidebar: "サイドバーを表示",
+    hideSidebar: "サイドバーを隠す",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · はじめに",
