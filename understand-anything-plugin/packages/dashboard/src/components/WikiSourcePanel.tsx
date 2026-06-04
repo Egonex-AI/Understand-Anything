@@ -88,18 +88,28 @@ export function WikiSourcePanel({
       : path;
 
   return (
-    <div className="w-96 min-w-[280px] border-l border-border bg-surface flex flex-col min-h-0">
-      <div className="flex items-center gap-2 p-2 border-b border-border shrink-0">
-        <span className="text-xs text-text-muted truncate flex-1 font-mono" title={headerLine}>
-          📎 {headerLine}
+    <div className="w-full h-full bg-surface flex flex-col min-h-0">
+      <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0 bg-elevated">
+        <svg className="w-4 h-4 text-text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+        <span className="text-xs text-text-primary truncate flex-1 font-mono" title={headerLine}>
+          {headerLine}
         </span>
+        {lineRange && (
+          <span className="text-[10px] text-text-muted shrink-0 bg-surface px-2 py-0.5 rounded">
+            Lines {lineRange[0]}–{lineRange[1]}
+          </span>
+        )}
         <button
           type="button"
           onClick={onClose}
-          className="text-text-muted hover:text-text text-xs px-1.5 shrink-0"
+          className="text-text-muted hover:text-text-primary transition-colors shrink-0 p-1 rounded hover:bg-surface"
           aria-label="Close source panel"
         >
-          ✕
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
 

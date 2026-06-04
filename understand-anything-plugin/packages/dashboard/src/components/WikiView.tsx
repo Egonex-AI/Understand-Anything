@@ -605,21 +605,27 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
             onScopeChange={setWikiViewScope}
           />
         </div>
-        <WikiContent
-          content={wikiPageContent}
-          pageType={wikiActivePage?.type ?? null}
-          loading={wikiLoading}
-          onWikiNavigate={handleWikiNavigate}
-          onSourceOpen={handleSourceOpen}
-        />
-        {sourcePanel && (
-          <WikiSourcePanel
-            path={sourcePanel.path}
-            lineRange={sourcePanel.lineRange}
-            accessToken={accessToken}
-            onClose={() => setSourcePanel(null)}
-          />
-        )}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
+          <div className={`min-h-0 overflow-auto ${sourcePanel ? "h-[50%]" : "flex-1"}`}>
+            <WikiContent
+              content={wikiPageContent}
+              pageType={wikiActivePage?.type ?? null}
+              loading={wikiLoading}
+              onWikiNavigate={handleWikiNavigate}
+              onSourceOpen={handleSourceOpen}
+            />
+          </div>
+          {sourcePanel && (
+            <div className="h-[50%] border-t border-border flex flex-col animate-slide-up">
+              <WikiSourcePanel
+                path={sourcePanel.path}
+                lineRange={sourcePanel.lineRange}
+                accessToken={accessToken}
+                onClose={() => setSourcePanel(null)}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
