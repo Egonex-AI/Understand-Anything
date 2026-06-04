@@ -17,6 +17,8 @@ Each domain page should function as a self-contained **Bounded Context Canvas** 
 
 **Optional sections (recommended):** `ubiquitousLanguage`, `businessRules`, `integrationPoints`, `errorCatalog`
 
+> **Language note:** All `name`, `summary`, `description` fields must be written in the configured `outputLanguage`. The `id` field and entity class names stay in English. The examples below show English for structural reference — when generating non-English content, translate `name` fields accordingly (e.g., `"Order Management"` → `"订单管理"` for zh).
+
 ```json
 {
   "id": "domain:<slug>",

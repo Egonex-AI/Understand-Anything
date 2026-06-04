@@ -2,6 +2,22 @@
 
 本文件提供生成中文 Wiki 文档内容的语言指导。
 
+## 名称翻译约定
+
+所有 `name` 字段必须使用中文（`id` 字段保持英文不变）：
+
+| 字段 | 英文（来自 DG） | 中文（输出） |
+|---|---|---|
+| Domain `name` | `"Order Management"` | `"订单管理"` |
+| Flow `name` | `"Create Order"` | `"创建订单"` |
+| Step `name` | `"Validate Input"` | `"校验输入"` |
+| Entity `name` | `"Order"` | `"Order"`（保留英文类名） |
+
+- Domain name：翻译业务领域概念，4-6 字为佳
+- Flow name：动词短语，如"创建订单"、"处理支付"、"同步库存"
+- Step name：简洁动作描述，如"校验输入"、"计算价格"、"持久化数据"
+- Entity name：保留代码中的类名（英文），不翻译
+
 ## Wiki Section 标题约定
 
 Wiki 结构化字段在 Dashboard 中会翻译为中文标题。wiki-worker 生成的 `name`、`summary`、`description` 等文本内容也必须使用中文。

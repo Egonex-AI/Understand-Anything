@@ -307,21 +307,43 @@ function flowToMarkdown(flow: WikiFlow, labels: WikiLabels = defaultLabels): str
   return lines.join("\n");
 }
 
-function crossServiceCallsToMarkdown(calls: CrossServiceCall[], labels: WikiLabels = defaultLabels): string {
+function crossServiceCallsToTable(
+  calls: CrossServiceCall[],
+  labels: WikiLabels = defaultLabels,
+  withLinks = false,
+): string {
   const lines: string[] = [];
   lines.push(`## ${labels.crossServiceCalls}`);
   lines.push("");
 
+  const link = (name: string) => (withLinks ? svcLink(name) : `\`${name}\``);
+
+  lines.push(`| ${labels.callerHeader} | ${labels.calleeHeader} | ${labels.typeHeader} | ${labels.detailHeader} |`);
+  lines.push("|---|---|---|---|");
   for (const call of calls) {
-    const callerInfo = `${call.caller.service}.${call.caller.method}`;
-    const calleeInfo = call.callee.interface
-      ? `${call.callee.service}#${call.callee.interface}`
-      : call.callee.service;
-    lines.push(`- \`${callerInfo}\` → \`${calleeInfo}\``);
+    const callerSvc = call.caller?.service ?? "?";
+    const calleeSvc = call.callee?.service ?? "?";
+    const callerMethod = call.caller?.method ? `.${call.caller.method}` : "";
+    const caller = `${link(callerSvc)}${callerMethod}`;
+    const calleeMethod = call.callee?.method ? `.${call.callee.method}` : "";
+    const callee = call.callee?.interface
+      ? `${link(calleeSvc)}#${call.callee.interface}${calleeMethod}`
+      : `${link(calleeSvc)}${calleeMethod}`;
+    const type = escapeTableCell(call.type ?? "");
+    const detail = escapeTableCell(call.detail ?? "");
+    lines.push(`| ${caller} | ${callee} | ${type} | ${detail} |`);
   }
   lines.push("");
 
   return lines.join("\n");
+}
+
+function escapeTableCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\n/g, " ");
+}
+
+function svcLink(name: string): string {
+  return `[${name}](wiki://${name}/service.json)`;
 }
 
 export function overviewToMarkdown(data: WikiOverview, labels: WikiLabels = defaultLabels): string {
@@ -345,7 +367,8 @@ export function overviewToMarkdown(data: WikiOverview, labels: WikiLabels = defa
     lines.push("|---|---|---|");
     for (const svc of services) {
       const domains = Array.isArray(svc?.domains) ? svc.domains.join(", ") : "";
-      lines.push(`| ${svc?.name ?? ""} | ${svc?.description ?? ""} | ${domains} |`);
+      const name = svc?.name ? svcLink(svc.name) : "";
+      lines.push(`| ${name} | ${svc?.description ?? ""} | ${domains} |`);
     }
     lines.push("");
   }
@@ -376,17 +399,7 @@ export function architectureToMarkdown(data: WikiArchitecture, labels: WikiLabel
 
   const crossServiceCalls = Array.isArray(data?.crossServiceCalls) ? data.crossServiceCalls : [];
   if (crossServiceCalls.length > 0) {
-    lines.push(`## ${labels.crossServiceCalls}`);
-    lines.push("");
-    for (const call of crossServiceCalls) {
-      const caller = `${call.caller?.service ?? "?"}.${call.caller?.method ?? "?"}`;
-      const callee = call.callee?.interface
-        ? `${call.callee.service}#${call.callee.interface}.${call.callee.method}`
-        : `${call.callee?.service ?? "?"}.${call.callee?.method ?? "?"}`;
-      lines.push(`- \`${caller}\` → \`${callee}\` (${call.type})`);
-      if (call.detail) lines.push(`  > ${call.detail}`);
-    }
-    lines.push("");
+    lines.push(crossServiceCallsToTable(crossServiceCalls, labels, true));
   }
 
   const eventFlows = Array.isArray(data?.eventFlows) ? data.eventFlows : [];
@@ -394,8 +407,9 @@ export function architectureToMarkdown(data: WikiArchitecture, labels: WikiLabel
     lines.push(`## ${labels.eventFlows}`);
     lines.push("");
     for (const ev of eventFlows) {
-      const subscribers = Array.isArray(ev?.subscribers) ? ev.subscribers.join(", ") : "";
-      lines.push(`- **${ev?.topic ?? "?"}**: ${ev?.publisher ?? "?"} → ${subscribers}`);
+      const pub = ev?.publisher ? svcLink(ev.publisher) : "?";
+      const subs = Array.isArray(ev?.subscribers) ? ev.subscribers.map(s => svcLink(s)).join(", ") : "";
+      lines.push(`- **${ev?.topic ?? "?"}**: ${pub} → ${subs}`);
     }
     lines.push("");
   }
@@ -405,7 +419,7 @@ export function architectureToMarkdown(data: WikiArchitecture, labels: WikiLabel
     lines.push(`## ${labels.sharedResources}`);
     lines.push("");
     for (const res of sharedResources) {
-      const svcList = Array.isArray(res?.services) ? res.services.join(", ") : "";
+      const svcList = Array.isArray(res?.services) ? res.services.map(s => svcLink(s)).join(", ") : "";
       lines.push(`- [${res?.type ?? "?"}] **${res?.name ?? "?"}** — used by: ${svcList}`);
     }
     lines.push("");
@@ -423,7 +437,7 @@ export function crossDomainToMarkdown(data: WikiCrossDomain, labels: WikiLabels 
 
   const services = Array.isArray(data?.services) ? data.services : [];
   if (services.length > 0) {
-    lines.push(`**${labels.servicesInvolved}:** ${services.join(", ")}`);
+    lines.push(`**${labels.servicesInvolved}:** ${services.map(s => svcLink(s)).join(", ")}`);
     lines.push("");
   }
 
@@ -438,7 +452,7 @@ export function crossDomainToMarkdown(data: WikiCrossDomain, labels: WikiLabels 
     lines.push(`## ${labels.flowSteps}`);
     lines.push("");
     for (const step of steps) {
-      let line = `${step.order}. **[${step.service}]** ${step.description}`;
+      let line = `${step.order}. **${svcLink(step.service)}** ${step.description}`;
       if (step.wikiRef) {
         line += `\n   → [View details](wiki://${step.wikiRef})`;
       }
@@ -570,7 +584,7 @@ export function domainPageToMarkdown(page: WikiDomainPage, labels: WikiLabels = 
   }
 
   if (Array.isArray(page?.crossServiceCalls) && page.crossServiceCalls.length > 0) {
-    lines.push(crossServiceCallsToMarkdown(page.crossServiceCalls, labels));
+    lines.push(crossServiceCallsToTable(page.crossServiceCalls, labels));
   }
 
   return lines.join("\n");

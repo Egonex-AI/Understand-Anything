@@ -107,11 +107,11 @@ $PROJECT_ROOT/.understand-anything/intermediate/wiki/domains/<domain-slug>.json
 
 **Domain slug derivation:** Strip the `domain:` prefix from the node ID (e.g., `domain:order-management` → `order-management`).
 
-Skeleton format (Bounded Context Canvas structure):
+Skeleton format (Bounded Context Canvas structure). **The example below shows Chinese (`zh`) output — when `$OUTPUT_LANGUAGE` is `en`, use English names instead:**
 ```json
 {
   "id": "domain:order-management",
-  "name": "Order Management",
+  "name": "订单管理",
   "summary": "<from DG node summary — will be expanded in Phase 2>",
 
   "ubiquitousLanguage": [],
@@ -138,12 +138,12 @@ Skeleton format (Bounded Context Canvas structure):
   "flows": [
     {
       "id": "flow:create-order",
-      "name": "Create Order",
+      "name": "创建订单",
       "summary": "<from DG flow node summary>",
       "steps": [
         {
           "order": 1,
-          "name": "Validate Input",
+          "name": "校验输入",
           "description": "<from DG step node summary — will be expanded>",
           "sourceRef": {
             "file": "src/services/OrderService.java",
@@ -155,6 +155,14 @@ Skeleton format (Bounded Context Canvas structure):
   ]
 }
 ```
+
+**Name translation (non-English only):** After populating the skeleton from DG nodes, if `$OUTPUT_LANGUAGE` is not `en`, translate ALL `name` fields to the target language:
+- Domain `name`: translate the domain concept (e.g., `"order-management"` → `"订单管理"` for zh)
+- Flow `name`: translate to a natural verb phrase (e.g., `"Create Order"` → `"创建订单"` for zh)
+- Step `name`: translate to a concise action description (e.g., `"Validate Input"` → `"校验输入"` for zh)
+- Entity `name`: keep the code class name in English (e.g., `"Order"`, `"PaymentDTO"`) — do NOT translate entity class names
+
+The `id` field always stays in English (it's a slug identifier, not display text).
 
 In the skeleton phase, populate these sections from the graph:
 - **`ubiquitousLanguage`**: Extract key domain terms from DG node names, entity names, and flow names. Each term gets a placeholder definition from the DG summary.

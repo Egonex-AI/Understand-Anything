@@ -67,6 +67,21 @@ function WikiBreadcrumb({
   );
 }
 
+function ChevronToggle({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); onClick(); } }}
+      className="w-4 h-4 flex items-center justify-center shrink-0 text-text-muted hover:text-text transition-colors cursor-pointer"
+      aria-label={expanded ? "Collapse" : "Expand"}
+    >
+      <span className="text-[10px]">{expanded ? "▼" : "▶"}</span>
+    </span>
+  );
+}
+
 function WikiNavTree({
   entries,
   topology,
@@ -77,11 +92,33 @@ function WikiNavTree({
 }: {
   entries: NavEntry[];
   topology: { hasParentWiki: boolean; services: Array<{ name: string }> } | null;
-  activePage: { type: WikiPageType; id: string; service?: string } | null;
+  activePage: { type: WikiPageType; id: string; service?: string; fragment?: string } | null;
   viewScope: "global" | string;
   onSelect: (page: { type: WikiPageType; id: string; service?: string }) => void;
   onScopeChange: (scope: "global" | string) => void;
 }) {
+  const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
+  const [expandedDomains, setExpandedDomains] = useState<Set<string>>(new Set());
+  const [globalDomainsExpanded, setGlobalDomainsExpanded] = useState(true);
+
+  const toggleService = useCallback((svcName: string) => {
+    setExpandedServices((prev) => {
+      const next = new Set(prev);
+      if (next.has(svcName)) next.delete(svcName);
+      else next.add(svcName);
+      return next;
+    });
+  }, []);
+
+  const toggleDomain = useCallback((domainId: string) => {
+    setExpandedDomains((prev) => {
+      const next = new Set(prev);
+      if (next.has(domainId)) next.delete(domainId);
+      else next.add(domainId);
+      return next;
+    });
+  }, []);
+
   const isActive = (type: WikiPageType, id: string, service?: string) =>
     activePage?.type === type && activePage?.id === id && activePage?.service === service;
 
@@ -101,6 +138,21 @@ function WikiNavTree({
 
   const showGlobalSection = topology?.hasParentWiki && viewScope === "global";
   const showServiceSection = viewScope === "global" || services.length <= 1;
+
+  // Initialize expanded state on first render (all expanded)
+  const initializedRef = useState({ current: false })[0];
+  if (!initializedRef.current && services.length > 0) {
+    initializedRef.current = true;
+    const svcSet = new Set(services.map((s) => s.name));
+    const domSet = new Set<string>();
+    for (const svc of services) {
+      for (const e of entries.filter((en) => en.service === svc.name && en.type === "domain")) {
+        domSet.add(e.id);
+      }
+    }
+    setExpandedServices(svcSet);
+    setExpandedDomains(domSet);
+  }
 
   return (
     <nav className="w-64 min-w-[200px] border-r border-border overflow-y-auto p-3 flex flex-col gap-1">
@@ -129,9 +181,9 @@ function WikiNavTree({
             <button
               key={entry.id}
               type="button"
-              onClick={() => onSelect({ type: entry.type, id: entry.id })}
+              onClick={() => onSelect({ type: entry.type as WikiPageType, id: entry.id })}
               className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                isActive(entry.type, entry.id)
+                isActive(entry.type as WikiPageType, entry.id)
                   ? "bg-accent/20 text-accent"
                   : "hover:bg-surface-hover text-text"
               }`}
@@ -146,11 +198,18 @@ function WikiNavTree({
       {/* By Domain section (cross-service domains) */}
       {showGlobalSection && (crossDomainEntries.length > 0 || domainEntries.length > 0) && (
         <div className="mb-3">
-          <h4 className="text-[10px] uppercase tracking-wider text-text-muted mb-1 px-2">
+          <button
+            type="button"
+            onClick={() => setGlobalDomainsExpanded((v) => !v)}
+            className="flex items-center gap-1 w-full text-left text-[10px] uppercase tracking-wider text-text-muted mb-1 px-2 hover:text-text transition-colors"
+          >
+            <span className="w-4 h-4 flex items-center justify-center shrink-0">
+              <span className="text-[10px]">{globalDomainsExpanded ? "▼" : "▶"}</span>
+            </span>
             By Domain
-          </h4>
-          {[...crossDomainEntries, ...domainEntries].map((entry) => {
-            const navType: WikiPageType = entry.type === "cross-domain" ? "cross-domain" : entry.type;
+          </button>
+          {globalDomainsExpanded && [...crossDomainEntries, ...domainEntries].map((entry) => {
+            const navType = (entry.type === "cross-domain" ? "cross-domain" : entry.type) as WikiPageType;
             return (
               <button
                 key={entry.id}
@@ -179,40 +238,56 @@ function WikiNavTree({
             .filter((s) => viewScope === "global" || s.name === viewScope)
             .map((svc) => {
               const domainItems = serviceDomainEntries(svc.name);
+              const svcExpanded = expandedServices.has(svc.name);
               return (
-                <div key={svc.name} className="mb-2">
-                  <button
-                    type="button"
-                    onClick={() => onSelect({ type: "service", id: svc.name, service: svc.name })}
-                    className={`w-full text-left px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                      isActive("service", svc.name, svc.name)
-                        ? "bg-accent/20 text-accent"
-                        : "hover:bg-surface-hover text-text"
-                    }`}
-                  >
-                    📦 {svc.name}
-                  </button>
-                  {domainItems.length > 0 && (
+                <div key={svc.name} className="mb-1">
+                  <div className="flex items-center gap-0.5 group">
+                    {domainItems.length > 0 ? (
+                      <ChevronToggle expanded={svcExpanded} onClick={() => toggleService(svc.name)} />
+                    ) : (
+                      <span className="w-4" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onSelect({ type: "service", id: svc.name, service: svc.name })}
+                      className={`flex-1 text-left px-1 py-1.5 rounded text-xs font-medium transition-colors ${
+                        isActive("service", svc.name, svc.name)
+                          ? "bg-accent/20 text-accent"
+                          : "hover:bg-surface-hover text-text"
+                      }`}
+                    >
+                      📦 {svc.name}
+                    </button>
+                  </div>
+                  {svcExpanded && domainItems.length > 0 && (
                     <div className="ml-4 mt-0.5">
                       {domainItems.map((item) => {
                         const flows = flowsForDomain(svc.name, item.id);
+                        const domExpanded = expandedDomains.has(item.id);
                         return (
                           <div key={item.id}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onSelect({ type: "domain", id: item.id, service: svc.name })
-                              }
-                              className={`w-full text-left px-2 py-1 rounded text-[11px] transition-colors ${
-                                isActive("domain", item.id, svc.name)
-                                  ? "bg-accent/20 text-accent"
-                                  : "hover:bg-surface-hover text-text-secondary"
-                              }`}
-                            >
-                              {item.name}
-                            </button>
-                            {flows.length > 0 && (
-                              <div className="ml-3 mt-0.5">
+                            <div className="flex items-center gap-0.5">
+                              {flows.length > 0 ? (
+                                <ChevronToggle expanded={domExpanded} onClick={() => toggleDomain(item.id)} />
+                              ) : (
+                                <span className="w-4" />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onSelect({ type: "domain", id: item.id, service: svc.name })
+                                }
+                                className={`flex-1 text-left px-1 py-1 rounded text-[11px] transition-colors ${
+                                  isActive("domain", item.id, svc.name)
+                                    ? "bg-accent/20 text-accent"
+                                    : "hover:bg-surface-hover text-text-secondary"
+                                }`}
+                              >
+                                {item.name}
+                              </button>
+                            </div>
+                            {domExpanded && flows.length > 0 && (
+                              <div className="ml-5 mt-0.5">
                                 {flows.map((flow) => (
                                   <button
                                     key={flow.id}
@@ -225,7 +300,11 @@ function WikiNavTree({
                                         fragment: `flow:${flow.id.replace(/^wiki:flow:/, "")}`,
                                       } as { type: WikiPageType; id: string; service: string })
                                     }
-                                    className="w-full text-left px-2 py-0.5 rounded text-[10px] transition-colors hover:bg-surface-hover text-text-muted"
+                                    className={`w-full text-left px-2 py-0.5 rounded text-[10px] transition-colors ${
+                                      activePage?.fragment === `flow:${flow.id.replace(/^wiki:flow:/, "")}`
+                                        ? "bg-accent/10 text-accent"
+                                        : "hover:bg-surface-hover text-text-muted"
+                                    }`}
                                   >
                                     ↳ {flow.name}
                                   </button>
@@ -286,12 +365,14 @@ function WikiContent({
   loading,
   onWikiNavigate,
   onSourceOpen,
+  onMermaidNodeClick,
 }: {
   content: unknown | null;
   pageType: WikiPageType | null;
   loading: boolean;
   onWikiNavigate: (nav: WikiLinkNavigation) => void;
   onSourceOpen: (nav: WikiLinkNavigation) => void;
+  onMermaidNodeClick?: (nodeLabel: string) => void;
 }) {
   const { t } = useI18n();
   const wikiLabels = t.wiki;
@@ -319,12 +400,12 @@ function WikiContent({
               : Array.isArray(child.props.children)
                 ? child.props.children.join("")
                 : "";
-          return <MermaidDiagram content={code} />;
+          return <MermaidDiagram content={code} onNodeClick={onMermaidNodeClick} />;
         }
         return <pre {...rest}>{children}</pre>;
       },
     }),
-    [onWikiNavigate, onSourceOpen],
+    [onWikiNavigate, onSourceOpen, onMermaidNodeClick],
   );
 
   if (loading) {
@@ -555,6 +636,18 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
     [],
   );
 
+  const handleMermaidNodeClick = useCallback(
+    (label: string) => {
+      const services = wikiTopology?.services ?? [];
+      const sanitize = (s: string) => s.replace(/["\[\](){}|<>#&]/g, " ").trim();
+      const match = services.find((s) => s.name === label || sanitize(s.name) === label);
+      if (match) {
+        handleSelect({ type: "service", id: match.name, service: match.name });
+      }
+    },
+    [handleSelect, wikiTopology],
+  );
+
   // Search
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -616,6 +709,11 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
               loading={wikiLoading}
               onWikiNavigate={handleWikiNavigate}
               onSourceOpen={handleSourceOpen}
+              onMermaidNodeClick={
+                wikiActivePage?.type === "architecture" || wikiActivePage?.type === "overview"
+                  ? handleMermaidNodeClick
+                  : undefined
+              }
             />
           </div>
           {sourcePanel && (

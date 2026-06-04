@@ -48,8 +48,10 @@ function getThemeKey(): string {
 
 let renderCounter = 0;
 
-export function MermaidDiagram({ content }: { content: string }) {
+export function MermaidDiagram({ content, onNodeClick }: { content: string; onNodeClick?: (nodeLabel: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onNodeClickRef = useRef(onNodeClick);
+  onNodeClickRef.current = onNodeClick;
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [themeKey, setThemeKey] = useState(getThemeKey);
@@ -100,6 +102,14 @@ export function MermaidDiagram({ content }: { content: string }) {
       .then(({ svg }) => {
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = svg;
+          if (onNodeClickRef.current) {
+            containerRef.current.querySelectorAll<SVGGElement>(".node").forEach((node) => {
+              const label = node.querySelector(".nodeLabel")?.textContent?.trim();
+              if (!label) return;
+              node.style.cursor = "pointer";
+              node.addEventListener("click", () => onNodeClickRef.current?.(label));
+            });
+          }
           setLoading(false);
         }
       })
