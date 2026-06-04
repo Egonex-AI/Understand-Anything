@@ -24,6 +24,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Lum1104/Understand-Anything.git' }
+$RepoRef    = if ($env:UA_REPO_REF) { $env:UA_REPO_REF } else { '' }
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
 
@@ -58,6 +59,7 @@ $($Platforms.Keys -join ', ')
 
 Environment:
   UA_REPO_URL   Override clone URL
+  UA_REPO_REF   Optional git ref to checkout after clone/update
   UA_DIR        Override clone destination (default: %USERPROFILE%\.understand-anything\repo)
 "@
 }
@@ -117,12 +119,26 @@ function Get-ForgeCodeAgentsRoot { Join-Path $RepoDir 'understand-anything-plugi
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
-        git -C $RepoDir pull --ff-only
+        git -C $RepoDir fetch --all --prune
     } else {
         Write-Host "→ Cloning $RepoUrl → $RepoDir"
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
         git clone $RepoUrl $RepoDir
+    }
+
+    if ($RepoRef) {
+        Write-Host "→ Checking out $RepoRef"
+        git -C $RepoDir checkout -q $RepoRef
+        if ($LASTEXITCODE -ne 0) {
+            git -C $RepoDir checkout -q -B $RepoRef "origin/$RepoRef"
+        }
+    }
+
+    # If we're on a branch, keep it fast-forwarded.
+    git -C $RepoDir symbolic-ref -q HEAD *> $null
+    if ($LASTEXITCODE -eq 0) {
+        git -C $RepoDir pull --ff-only
     }
 }
 
@@ -180,7 +196,11 @@ function Install-ForgeCodeCommands {
     $target = Join-Path $base 'commands'
     $root = Get-CommandsRoot
 
-    if (-not (Test-Path $root)) { Write-Error "Commands directory not found: $root" }
+    if (-not (Test-Path $root)) {
+        Write-Warning "ForgeCode commands not found in checkout: $root"
+        Write-Warning 'If you are testing a fork/branch, set UA_REPO_URL and optionally UA_REPO_REF.'
+        return
+    }
     if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
 
     foreach ($cmd in Get-CommandFiles) {
@@ -220,7 +240,11 @@ function Install-ForgeCodeAgents {
     $target = Join-Path $base 'agents'
     $root = Get-ForgeCodeAgentsRoot
 
-    if (-not (Test-Path $root)) { Write-Error "ForgeCode agents directory not found: $root" }
+    if (-not (Test-Path $root)) {
+        Write-Warning "ForgeCode agents not found in checkout: $root"
+        Write-Warning 'If you are testing a fork/branch, set UA_REPO_URL and optionally UA_REPO_REF.'
+        return
+    }
     if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
 
     foreach ($agent in Get-ForgeCodeAgentFiles) {

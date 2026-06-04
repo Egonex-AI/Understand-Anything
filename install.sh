@@ -15,11 +15,13 @@
 #
 # Environment:
 #   UA_REPO_URL  Override clone URL (default: official GitHub repo)
+#   UA_REPO_REF  Optional git ref to checkout after clone/update (branch/tag/commit)
 #   UA_DIR       Override clone destination (default: $HOME/.understand-anything/repo)
 
 set -euo pipefail
 
 REPO_URL="${UA_REPO_URL:-https://github.com/Lum1104/Understand-Anything.git}"
+REPO_REF="${UA_REPO_REF:-}"
 REPO_DIR="${UA_DIR:-$HOME/.understand-anything/repo}"
 PLUGIN_LINK="$HOME/.understand-anything-plugin"
 
@@ -126,11 +128,24 @@ prompt_platform() {
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
-    git -C "$REPO_DIR" pull --ff-only
+    git -C "$REPO_DIR" fetch --all --prune
   else
     printf -- '→ Cloning %s → %s\n' "$REPO_URL" "$REPO_DIR"
     mkdir -p "$(dirname "$REPO_DIR")"
     git clone "$REPO_URL" "$REPO_DIR"
+  fi
+
+  if [[ -n "${REPO_REF:-}" ]]; then
+    printf -- '→ Checking out %s\n' "$REPO_REF"
+    if ! git -C "$REPO_DIR" checkout -q "$REPO_REF"; then
+      # Common case: remote branch name. Create a local branch tracking origin.
+      git -C "$REPO_DIR" checkout -q -B "$REPO_REF" "origin/$REPO_REF"
+    fi
+  fi
+
+  # If we're on a branch, keep it fast-forwarded.
+  if git -C "$REPO_DIR" symbolic-ref -q HEAD >/dev/null; then
+    git -C "$REPO_DIR" pull --ff-only
   fi
 }
 
@@ -287,8 +302,9 @@ install_forgecode_commands() {
   root="$(commands_root)"
 
   if [[ ! -d "$root" ]]; then
-    printf 'Commands directory not found: %s\n' "$root" >&2
-    exit 1
+    printf '  • ForgeCode commands not found in checkout: %s\n' "$root" >&2
+    printf '    (If you are testing a fork/branch, set UA_REPO_URL and optionally UA_REPO_REF.)\n' >&2
+    return 0
   fi
 
   mkdir -p "$target"
@@ -331,8 +347,9 @@ install_forgecode_agents() {
   root="$(forgecode_agents_root)"
 
   if [[ ! -d "$root" ]]; then
-    printf 'ForgeCode agents directory not found: %s\n' "$root" >&2
-    exit 1
+    printf '  • ForgeCode agents not found in checkout: %s\n' "$root" >&2
+    printf '    (If you are testing a fork/branch, set UA_REPO_URL and optionally UA_REPO_REF.)\n' >&2
+    return 0
   fi
 
   mkdir -p "$target"
@@ -449,6 +466,7 @@ $(platform_ids | sed 's/^/  - /')
 
 Environment:
   UA_REPO_URL  Override clone URL (default: official repo)
+  UA_REPO_REF  Optional git ref to checkout after clone/update
   UA_DIR       Override clone destination (default: \$HOME/.understand-anything/repo)
 USAGE
 }
