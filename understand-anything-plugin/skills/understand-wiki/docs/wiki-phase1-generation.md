@@ -29,7 +29,8 @@ if [ "$INCREMENTAL" = true ] && [ -n "$DIRTY_DOMAINS" ]; then
   OVERVIEW_DIRTY=$(echo "$DIFF_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(str(d['serviceOverviewDirty']).lower())")
   if [ "$OVERVIEW_DIRTY" = "true" ]; then
     echo "[understand-wiki] Regenerating service overview (domain list changed)..."
-    # Dispatch wiki-worker for service-overview only
+    python3 "$SKILL_DIR/generate_service_overview.py" "$SERVICE_ROOT"
+    # Orchestrator enriches description inline (same as Full mode Step 4)
   fi
   
   # Phase 2 will handle meta.json generation via assemble-wiki.py
@@ -84,45 +85,75 @@ FILTERED_KG=$(python3 "$SKILL_DIR/wiki_kg_filter.py" \
 > **Instructions:** Only generate the page for domain `$DOMAIN_ID`. Write output to:
 > `$SERVICE_ROOT/.understand-anything/intermediate/wiki/domains/$DOMAIN_ID.json`
 
-### Full Generation — Single-Service Mode
+### Full Generation — Single-Service Mode (Per-Domain Dispatch)
 
-Dispatch ONE `wiki-worker` agent for the target service (full mode).
+Full mode uses the same per-domain dispatch pattern as Incremental mode, ensuring consistent context sizes and enabling parallelism.
 
-**Dispatch prompt template:**
+#### Step 1 — Generate Service Overview
 
-> Generate a complete Wiki for this microservice.
-> Project root: `$SERVICE_ROOT`
-> Service name: `$SERVICE_NAME`
->
-> **Knowledge Graph:**
-> ```json
-> <contents of $SERVICE_ROOT/.understand-anything/knowledge-graph.json>
-> ```
->
-> **Domain Graph:**
-> ```json
-> <contents of $SERVICE_ROOT/.understand-anything/domain-graph.json>
-> ```
->
-> Output language: `$OUTPUT_LANGUAGE`
-> $LANGUAGE_DIRECTIVE
->
-> $WIKI_LOCALE_GUIDANCE
->
-> RPC annotations config (if present; see Step 4.5):
-> ```json
-> $RPC_ANNOTATIONS
-> ```
->
-> Write all output files to: `$SERVICE_ROOT/.understand-anything/intermediate/wiki/`
-
-After the agent completes, verify output:
 ```bash
-test -f "$SERVICE_ROOT/.understand-anything/intermediate/wiki/service.json" && \
-test -d "$SERVICE_ROOT/.understand-anything/intermediate/wiki/domains"
+mkdir -p "$SERVICE_ROOT/.understand-anything/intermediate/wiki/domains"
+python3 "$SKILL_DIR/generate_service_overview.py" "$SERVICE_ROOT"
 ```
 
-If any file is missing, report the failure and stop (do not proceed to Quality Gate).
+This produces `intermediate/wiki/service.json` with deterministic fields (name, techStack, modules, entryPoints). The `description` field uses `project.description` from the KG as a baseline.
+
+#### Step 2 — Extract Domain List
+
+Read the domain graph and extract all domain IDs:
+
+```bash
+DOMAIN_IDS=$(python3 -c "
+import json, sys
+dg = json.load(open('$SERVICE_UA/domain-graph.json'))
+ids = [n['id'] for n in dg.get('nodes', []) if n.get('type') == 'domain']
+print(' '.join(ids))
+")
+```
+
+If no domains found, report error and stop.
+
+#### Step 3 — Dispatch Per-Domain wiki-workers
+
+For each domain, use the same dispatch pattern as Incremental mode:
+
+```bash
+for DOMAIN_ID in $DOMAIN_IDS; do
+  FILTERED_KG=$(python3 "$SKILL_DIR/wiki_kg_filter.py" \
+    "$SERVICE_UA/knowledge-graph.json" \
+    "$SERVICE_UA/domain-graph.json" \
+    "$DOMAIN_ID" --max-nodes=200)
+  # Dispatch wiki-worker with the same prompt as Incremental Dispatch (see above)
+done
+```
+
+Run up to **3 wiki-worker subagents concurrently** (same concurrency limit as batch mode).
+
+If a domain's wiki-worker fails, retry once. On second failure, skip that domain and continue.
+
+**Dispatch prompt:** Use the same template as "Incremental Dispatch — Per-Domain wiki-worker Prompt" above.
+
+#### Step 4 — Enrich Service Description
+
+After all domain wiki-workers complete:
+
+1. Read each generated domain page (`domains/*.json`), extract `name` and `summary`
+2. Rewrite `service.json` description to a professional 2-3 sentence summary incorporating domain names and key capabilities (inline orchestrator LLM generation, NOT a separate subagent)
+3. Re-write `service.json` with the enriched description
+
+#### Step 5 — Verify Output
+
+```bash
+test -f "$SERVICE_ROOT/.understand-anything/intermediate/wiki/service.json" && \
+test -d "$SERVICE_ROOT/.understand-anything/intermediate/wiki/domains" && \
+DOMAIN_COUNT=$(ls "$SERVICE_ROOT/.understand-anything/intermediate/wiki/domains/"*.json 2>/dev/null | wc -l) && \
+[ "$DOMAIN_COUNT" -gt 0 ]
+```
+
+If any file is missing, report the failure and stop (do not proceed to Phase 2).
+
+Report:
+> `[understand-wiki] Full generation: $DOMAIN_COUNT domain pages generated.`
 
 If intermediate output is verified, proceed to **Phase 2** (deterministic assembly). See [Phase 2 — Assembly Pipeline](wiki-phase2-assembly.md).
 
