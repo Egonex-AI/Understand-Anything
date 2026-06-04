@@ -213,7 +213,7 @@ class TestDryRunOutput(unittest.TestCase):
             self.assertIn("no files will be generated", report.lower())
             self.assertIn("order-service", report)
             self.assertIn("FULL", report)
-            self.assertIn("Phase 2", report)
+            self.assertIn("Phase 3", report)
             self.assertIn("Total estimated cost", report)
             self.assertIn("Run without --dry-run", report)
 

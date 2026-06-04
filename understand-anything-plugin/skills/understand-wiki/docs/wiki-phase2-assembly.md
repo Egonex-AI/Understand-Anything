@@ -1,6 +1,6 @@
-## Phase 1.5 — Deterministic Assembly Pipeline
+## Phase 2 — Deterministic Assembly Pipeline
 
-Report: `[Phase 1.5/5] Running deterministic assembly...`
+Report: `[Phase 2/5] Running deterministic assembly...`
 
 After wiki-worker writes raw content to `$PROJECT_ROOT/.understand-anything/intermediate/wiki/`, the deterministic pipeline validates, indexes, and assembles the final wiki output.
 

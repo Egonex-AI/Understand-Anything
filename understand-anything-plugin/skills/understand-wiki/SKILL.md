@@ -17,7 +17,7 @@ Generate a team knowledge base Wiki for microservice projects. Each service gets
   - `--full` — Force full regeneration, ignoring existing Wiki
   - `--force` — Skip upstream KG/DG staleness check (proceed even when graphs are from an older commit)
   - `--dry-run` — Preview what would be generated without running any LLM calls (see [Dry-Run Mode](docs/wiki-quality-gate.md#dry-run-mode))
-  - `--continue-on-error` — In batch mode, continue after per-service failures (default: `true`). Set `--continue-on-error=false` to stop at first failure and skip Phase 2 (see [Partial Failure Policy](docs/wiki-phase1-generation.md#partial-failure-policy))
+  - `--continue-on-error` — In batch mode, continue after per-service failures (default: `true`). Set `--continue-on-error=false` to stop at first failure and skip Phase 3 (see [Partial Failure Policy](docs/wiki-phase1-generation.md#partial-failure-policy))
   - `--language <lang>` — Generate content in specified language (ISO 639-1 or friendly name). Stores in config for future runs.
 
 ---
@@ -61,33 +61,33 @@ Dispatch `wiki-worker` agents (incremental per-domain or full), verify output, h
 
 **Detailed implementation:** See [Phase 1 — Service Wiki Generation](docs/wiki-phase1-generation.md) (includes [Partial Failure Policy](docs/wiki-phase1-generation.md#partial-failure-policy))
 
-### Phase 1.5 — Deterministic Assembly
+### Phase 2 — Deterministic Assembly
 
 After wiki-worker writes content to `intermediate/wiki/`, run the deterministic pipeline to validate, index, and assemble the final wiki.
 
-**Detailed implementation:** See [Phase 1.5 — Assembly Pipeline](docs/wiki-phase1.5-assembly.md)
+**Detailed implementation:** See [Phase 2 — Assembly Pipeline](docs/wiki-phase2-assembly.md)
 
-### Quality Gate (after Phase 1.5)
+### Quality Gate (after Phase 2)
 
 Structural validation (always) and optional `wiki-reviewer` when `--review` is set. Dry-run planning exits before Phase 1.
 
 **Detailed implementation:** See [Quality Gate & Dry-Run](docs/wiki-quality-gate.md)
 
-### Phase 2 — Cross-Service + Parent Wiki
+### Phase 3 — Cross-Service + Parent Wiki
 
 Identify cross-service relationships, LLM review/organize flows, generate parent `overview.json`, `architecture.json`, and cross-domain pages.
 
-**Detailed implementation:** See [Phase 2 — Cross-Service](docs/wiki-phase2-crossservice.md)
+**Detailed implementation:** See [Phase 3 — Cross-Service](docs/wiki-phase3-crossservice.md)
 
-### Phase 3 — Index Construction
+### Phase 4 — Parent Index Construction
 
 Build parent-level `index.json` and `meta.json` for navigation and metadata.
 
-**Detailed implementation:** See [Phase 3 — Index](docs/wiki-phase3-index.md)
+**Detailed implementation:** See [Phase 4 — Index](docs/wiki-phase4-index.md)
 
-### Phase 4 — Cleanup and Report
+### Phase 5 — Cleanup and Report
 
-Report: `[Phase 4/5] Finalizing...`
+Report: `[Phase 5/5] Finalizing...`
 
 1. Clean up temp files:
 ```bash
@@ -121,7 +121,7 @@ Review: <pass|warn|fail> (<N issues, M warnings>)
 ## Error Handling
 
 - **Prerequisite missing or stale** (`/understand` or `/understand-domain`): auto-dispatch `upstream-updater` subagent; on failure, log warning and proceed with stale data (single mode) or skip service (batch mode)
-- **wiki-worker dispatch fails**: retry once; on second failure skip service. Batch default continues and runs Phase 2 with successes; `--continue-on-error=false` stops batch and skips Phase 2
+- **wiki-worker dispatch fails**: retry once; on second failure skip service. Batch default continues and runs Phase 3 with successes; `--continue-on-error=false` stops batch and skips Phase 3
 - **Quality Gate Layer 1 fails**: report issues; batch skips service; single mode asks user
 - **Quality Gate Layer 2 fails (reviewer)**: retry wiki-worker once with feedback; if still failing, save Wiki with warnings and proceed
 - **Cross-service matcher script fails**: fall back to LLM-only cross-service detection
@@ -146,4 +146,4 @@ A service is considered "integrated" when:
 test -f "$SERVICE_ROOT/.understand-anything/wiki/meta.json"
 ```
 
-This file is written by `assemble-wiki.py` (Phase 1.5). Its presence guarantees a complete, validated Wiki.
+This file is written by `assemble-wiki.py` (Phase 2). Its presence guarantees a complete, validated Wiki.

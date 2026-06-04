@@ -185,7 +185,7 @@ def classify_service(
         return ServicePlan(
             name=name,
             mode="SKIP",
-            reason="commit changed, no domain changes (Phase 1.5 assembly only)",
+            reason="commit changed, no domain changes (Phase 2 assembly only)",
             detail=f"wiki {wiki_commit[:8]} → {commit[:8]}",
             total_domains=total_domains,
             domains_to_generate=0,
@@ -265,14 +265,14 @@ def _phase2_line(plans: list[ServicePlan], parent_root: Path) -> str:
             would_integrate += 1
 
     if would_integrate < 2:
-        return "Phase 2: Skipped (requires 2+ integrated services)."
+        return "Phase 3: Skipped (requires 2+ integrated services)."
 
     n = len(changing)
     if n == 0:
-        return "Phase 2: Parent wiki unchanged (no service wikis need regeneration)."
+        return "Phase 3: Parent wiki unchanged (no service wikis need regeneration)."
     if n == 1:
-        return f"Phase 2: Parent wiki would be updated (1 service changed)."
-    return f"Phase 2: Parent wiki would be regenerated ({n} services changed)."
+        return f"Phase 3: Parent wiki would be updated (1 service changed)."
+    return f"Phase 3: Parent wiki would be regenerated ({n} services changed)."
 
 
 def format_dry_run_report(plans: list[ServicePlan], parent_root: Path) -> str:

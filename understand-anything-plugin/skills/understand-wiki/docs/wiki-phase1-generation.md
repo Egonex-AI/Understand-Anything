@@ -32,15 +32,15 @@ if [ "$INCREMENTAL" = true ] && [ -n "$DIRTY_DOMAINS" ]; then
     # Dispatch wiki-worker for service-overview only
   fi
   
-  # Phase 1.5 will handle meta.json generation via assemble-wiki.py
+  # Phase 2 will handle meta.json generation via assemble-wiki.py
   
   # Cleanup snapshot
   rm -f "$DG_SNAPSHOT"
   
 elif [ "$INCREMENTAL" = true ] && [ -z "$DIRTY_DOMAINS" ]; then
   # --- No changes: only update commit hash via assembly ---
-  # No domain changes — Phase 1.5 (assemble-wiki.py) will update commit hash in final wiki/meta.json
-  echo "[understand-wiki] No wiki pages need regeneration. Running Phase 1.5 for commit hash update."
+  # No domain changes — Phase 2 (assemble-wiki.py) will update commit hash in final wiki/meta.json
+  echo "[understand-wiki] No wiki pages need regeneration. Running Phase 2 for commit hash update."
   rm -f "$DG_SNAPSHOT"
   
 else
@@ -120,7 +120,7 @@ test -d "$SERVICE_ROOT/.understand-anything/intermediate/wiki/domains"
 
 If any file is missing, report the failure and stop (do not proceed to Quality Gate).
 
-If intermediate output is verified, proceed to **Phase 1.5** (deterministic assembly). See [Phase 1.5 — Assembly Pipeline](wiki-phase1.5-assembly.md).
+If intermediate output is verified, proceed to **Phase 2** (deterministic assembly). See [Phase 2 — Assembly Pipeline](wiki-phase2-assembly.md).
 
 ### Batch Mode
 
@@ -143,9 +143,9 @@ After all services complete:
 
 In batch mode, wiki-worker agents run per service. Some may succeed while others fail (dispatch error, quality gate failure, context overflow, etc.).
 
-**Default (`--continue-on-error`, implied in batch):** Continue processing remaining services. **Phase 2 still runs** using whatever service wikis succeeded in this run (plus any already-integrated services from prior runs). Failed services are logged; they do not block parent wiki generation for successful siblings.
+**Default (`--continue-on-error`, implied in batch):** Continue processing remaining services. **Phase 3 still runs** using whatever service wikis succeeded in this run (plus any already-integrated services from prior runs). Failed services are logged; they do not block parent wiki generation for successful siblings.
 
-**Strict mode (`--continue-on-error=false`):** Stop at the **first** service failure. Do **not** run Phase 2. Report which service failed and how to retry.
+**Strict mode (`--continue-on-error=false`):** Stop at the **first** service failure. Do **not** run Phase 3. Report which service failed and how to retry.
 
 Track per-service outcome for the batch summary:
 
@@ -155,7 +155,7 @@ Track per-service outcome for the batch summary:
 | Failure | `✗` | wiki-worker or quality gate failed |
 | Skipped | `-` | Up-to-date or user-skipped (no generation) |
 
-**Batch completion summary** (print after Phase 1, repeat in Phase 4):
+**Batch completion summary** (print after Phase 1, repeat in Phase 5):
 
 ```
 [understand-wiki] Batch complete:
@@ -164,15 +164,15 @@ Track per-service outcome for the batch summary:
   ✗ inventory-service (wiki-worker failed: context overflow)
   - notification-service (skipped: up-to-date)
 
-Phase 2: Parent wiki updated with 2/4 services.
+Phase 3: Parent wiki updated with 2/4 services.
 Warning: 1 service failed. Run with --service=inventory-service --full to retry.
 ```
 
-**Phase 2 trigger with partial failure:**
+**Phase 3 trigger with partial failure:**
 
 - Collect `INTEGRATED_SERVICES` from services that have `wiki/meta.json` after Phase 1 (includes successes from this run and prior integrations).
-- If `--continue-on-error=false` and any failure occurred → skip Phase 2 entirely.
-- If integrated count ≥ 2 → run Phase 2 with available service wikis only.
+- If `--continue-on-error=false` and any failure occurred → skip Phase 3 entirely.
+- If integrated count ≥ 2 → run Phase 3 with available service wikis only.
 - In the summary, state how many services contributed to the parent update (e.g. `2/4 services`).
 
 **Retry guidance:** For each `✗` service, suggest `/understand-wiki --service=<name> [--full]`.

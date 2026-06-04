@@ -302,7 +302,7 @@ When `$RPC_ANNOTATIONS` config is present and the KG contains `provides_rpc` or 
 
 1. For provider nodes (`provides_rpc` edges): include in `service.json` under `entryPoints` with prefix `[RPC]` (e.g., `[RPC] PaymentFacade.createPayment()`)
 2. For consumer references (`consumes_rpc` edges in a step's call chain): add to the step's description: "Calls remote service: `<InterfaceName>.<methodName>()` (via <rpc-type>)"
-3. This information enables downstream cross-service matching in Phase 2 of the parent skill
+3. This information enables downstream cross-service matching in Phase 3 of the parent skill
 
 ---
 

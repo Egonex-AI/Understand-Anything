@@ -1,12 +1,8 @@
-## Phase 3 — Index Construction (Legacy)
+## Phase 4 — Parent Index Construction
 
-> **Note:** Service-level index and metadata generation has been moved to the deterministic assembly pipeline (Phase 1.5).
-> `build-wiki-index.py` and `assemble-wiki.py` now handle `index.json` and `meta.json` deterministically.
-> See [Phase 1.5 — Assembly Pipeline](wiki-phase1.5-assembly.md) for details.
+Report: `[Phase 4/5] Building parent-level index...`
 
-Report: `[Phase 3/5] Building parent-level index...`
-
-This phase now only handles **parent-level** index and meta construction (for multi-service projects).
+This phase handles **parent-level** index and meta construction (for multi-service projects).
 
 ### Parent-Level Index
 

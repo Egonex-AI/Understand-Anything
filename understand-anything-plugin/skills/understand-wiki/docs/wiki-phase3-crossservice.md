@@ -1,11 +1,11 @@
-## Phase 2 — Cross-Service Relationship Identification + Parent Wiki Generation
+## Phase 3 — Cross-Service Relationship Identification + Parent Wiki Generation
 
-Report: `[Phase 2/5] Generating parent orchestration Wiki...`
+Report: `[Phase 3/5] Generating parent orchestration Wiki...`
 
 **Trigger condition:** At least 2 services have Wiki (`.understand-anything/wiki/meta.json` exists).
 
-If only 1 service is integrated: skip Phase 2 entirely with message:
-> `Phase 2 skipped. Cross-service Wiki requires 2+ integrated services (current: 1).`
+If only 1 service is integrated: skip Phase 3 entirely with message:
+> `Phase 3 skipped. Cross-service Wiki requires 2+ integrated services (current: 1).`
 
 ### Step 1 — Collect Integrated Services
 
@@ -120,7 +120,7 @@ mkdir -p "$PROJECT_ROOT/.understand-anything/wiki/domains"
 }
 ```
 
-### Parent Wiki Quality Gate (after Phase 2 output)
+### Parent Wiki Quality Gate (after Phase 3 output)
 
 After generating all parent-level files, run the parent wiki quality gate:
 
@@ -135,4 +135,4 @@ This validates:
 - `architecture.json`: crossServiceCalls structure (caller/callee/type)
 - `domains/*.json` (cross-domain pages): services array, steps with order/service/description
 
-If `passed: false`, report issues but continue to Phase 3 (index construction) — parent wiki issues are non-blocking since service wikis remain valid independently.
+If `passed: false`, report issues but continue to Phase 4 (index construction) — parent wiki issues are non-blocking since service wikis remain valid independently.

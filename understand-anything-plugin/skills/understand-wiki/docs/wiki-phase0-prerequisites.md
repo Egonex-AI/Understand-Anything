@@ -385,7 +385,7 @@ if [ -f "$WIKI_META" ] && ! echo "$ARGUMENTS" | grep -q '\-\-full'; then
       if [ "$TOTAL_COUNT" -gt 0 ] && [ $((MODIFIED_COUNT * 100 / TOTAL_COUNT)) -gt 80 ]; then
         echo "[understand-wiki] Incremental skipped: ${MODIFIED_COUNT}/${TOTAL_COUNT} domains modified (>80%). Running full generation."
       elif [ "$MODIFIED_COUNT" -eq 0 ]; then
-        echo "[understand-wiki] No domain changes detected. Running Phase 1.5 assembly only (commit hash update via assemble-wiki.py)."
+        echo "[understand-wiki] No domain changes detected. Running Phase 2 assembly only (commit hash update via assemble-wiki.py)."
         INCREMENTAL=true
         DIRTY_DOMAINS=""
       else
@@ -448,7 +448,7 @@ if [ "$MODE" = "batch" ]; then
   echo "[understand-wiki] Services needing Wiki generation: ${#SERVICES_TO_GENERATE[@]}"
   if [ ${#SERVICES_TO_GENERATE[@]} -eq 0 ]; then
     echo "All services up to date. Use --full to force regeneration."
-    # Skip to Phase 2 (parent update) if any services are already integrated
+    # Skip to Phase 3 (parent update) if any services are already integrated
   fi
 fi
 ```
