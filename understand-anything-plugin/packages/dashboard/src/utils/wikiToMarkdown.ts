@@ -1,4 +1,4 @@
-import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, CrossServiceCall, WikiOverview, WikiArchitecture, WikiCrossDomain } from "@understand-anything/core";
+import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, CrossServiceCall, WikiOverview, WikiArchitecture, WikiCrossDomain, WikiEntity, WikiGlossaryEntry, WikiBusinessRule, WikiIntegrationPoints, WikiErrorCatalogEntry } from "@understand-anything/core";
 
 export function serviceOverviewToMarkdown(overview: WikiServiceOverview): string {
   const lines: string[] = [];
@@ -213,12 +213,91 @@ export function domainPageToMarkdown(page: WikiDomainPage): string {
   lines.push(page?.summary ?? "");
   lines.push("");
 
+  const glossary = Array.isArray(page?.ubiquitousLanguage) ? page.ubiquitousLanguage : [];
+  if (glossary.length > 0) {
+    lines.push("## Ubiquitous Language");
+    lines.push("");
+    lines.push("| Term | Definition |");
+    lines.push("|---|---|");
+    for (const entry of glossary as WikiGlossaryEntry[]) {
+      lines.push(`| **${entry?.term ?? "?"}** | ${entry?.definition ?? ""} |`);
+    }
+    lines.push("");
+  }
+
+  const rules = Array.isArray(page?.businessRules) ? page.businessRules : [];
+  if (rules.length > 0) {
+    lines.push("## Business Rules");
+    lines.push("");
+    lines.push("| ID | Rule | Enforced By |");
+    lines.push("|---|---|---|");
+    for (const rule of rules as WikiBusinessRule[]) {
+      lines.push(`| ${rule?.id ?? "?"} | ${rule?.rule ?? ""} | \`${rule?.enforcement ?? "—"}\` |`);
+    }
+    lines.push("");
+  }
+
   const entities = Array.isArray(page?.entities) ? page.entities : [];
   if (entities.length > 0) {
     lines.push("## Key Entities");
     lines.push("");
     for (const entity of entities) {
-      lines.push(`- ${entity}`);
+      if (typeof entity === "string") {
+        lines.push(`- ${entity}`);
+      } else {
+        const e = entity as WikiEntity;
+        lines.push(`**${e.name}**`);
+        lines.push("");
+        if (e.description) lines.push(e.description);
+        if (Array.isArray(e.keyFields) && e.keyFields.length > 0) {
+          lines.push(`- Fields: \`${e.keyFields.join("`, `")}\``);
+        }
+        if (Array.isArray(e.lifecycleStates) && e.lifecycleStates.length > 0) {
+          lines.push(`- Lifecycle: ${e.lifecycleStates.join(" → ")}`);
+        }
+        if (Array.isArray(e.invariants) && e.invariants.length > 0) {
+          for (const inv of e.invariants) {
+            lines.push(`- ⚠️ ${inv}`);
+          }
+        }
+        lines.push("");
+      }
+    }
+    lines.push("");
+  }
+
+  const integration = page?.integrationPoints as WikiIntegrationPoints | undefined;
+  const inbound = Array.isArray(integration?.inbound) ? integration!.inbound : [];
+  const outbound = Array.isArray(integration?.outbound) ? integration!.outbound : [];
+  if (inbound.length > 0 || outbound.length > 0) {
+    lines.push("## Integration Points");
+    lines.push("");
+    if (inbound.length > 0) {
+      lines.push("**Inbound:**");
+      lines.push("");
+      for (const p of inbound) {
+        lines.push(`- [${p?.type ?? "?"}] \`${p?.endpoint ?? "?"}\` from ${p?.source ?? "?"} — ${p?.description ?? ""}`);
+      }
+      lines.push("");
+    }
+    if (outbound.length > 0) {
+      lines.push("**Outbound:**");
+      lines.push("");
+      for (const p of outbound) {
+        lines.push(`- [${p?.type ?? "?"}] \`${p?.endpoint ?? "?"}\` to ${p?.target ?? "?"} — ${p?.description ?? ""}`);
+      }
+      lines.push("");
+    }
+  }
+
+  const errors = Array.isArray(page?.errorCatalog) ? page.errorCatalog : [];
+  if (errors.length > 0) {
+    lines.push("## Error Scenarios");
+    lines.push("");
+    lines.push("| Exception | Trigger | Handling | Severity |");
+    lines.push("|---|---|---|---|");
+    for (const err of errors as WikiErrorCatalogEntry[]) {
+      lines.push(`| \`${err?.exception ?? "?"}\` | ${err?.trigger ?? ""} | ${err?.handling ?? ""} | ${err?.severity ?? "?"} |`);
     }
     lines.push("");
   }

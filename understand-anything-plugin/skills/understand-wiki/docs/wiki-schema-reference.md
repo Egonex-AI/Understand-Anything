@@ -9,23 +9,80 @@
 | `service.json` | `name`, `description`, `techStack[]`, `modules[]`, `entryPoints[]` |
 | `domains/<slug>.json` | `id`, `name`, `summary`, `entities[]`, `flows[]` |
 
-### Flow Structure
+### Domain Page Structure (Bounded Context Canvas)
+
+Each domain page should function as a self-contained **Bounded Context Canvas** — an engineer should understand the business domain completely from reading this page alone.
+
+**Required sections:** `id`, `name`, `summary`, `entities`, `flows`
+
+**Optional sections (recommended):** `ubiquitousLanguage`, `businessRules`, `integrationPoints`, `errorCatalog`
 
 ```json
 {
-  "id": "flow:<slug>",
-  "name": "<display name>",
-  "summary": "<2-3 sentences>",
-  "steps": [
+  "id": "domain:<slug>",
+  "name": "<domain display name>",
+  "summary": "<3-5 sentence overview: business capability, key entities, invariants, external dependencies>",
+
+  "ubiquitousLanguage": [
+    { "term": "<domain-specific term>", "definition": "<what it means in THIS domain>" }
+  ],
+
+  "businessRules": [
     {
-      "order": 1,
-      "name": "<step name>",
-      "description": "<detailed description with business rules>",
+      "id": "BR-001",
+      "rule": "<human-readable business rule statement>",
+      "enforcement": "<class or method that enforces this rule>",
       "sourceRef": { "file": "<relative path>", "lineRange": [start, end] }
+    }
+  ],
+
+  "entities": [
+    {
+      "name": "<entity name>",
+      "description": "<what this entity represents, its role in the domain>",
+      "keyFields": ["<field1>", "<field2>"],
+      "lifecycleStates": ["<STATE1>", "<STATE2>"],
+      "invariants": ["<constraint that must always hold>"]
+    }
+  ],
+
+  "integrationPoints": {
+    "inbound": [
+      { "source": "<caller service or client>", "type": "<REST|RPC|event|cron>", "endpoint": "<method or topic>", "description": "<what it does>" }
+    ],
+    "outbound": [
+      { "target": "<target service>", "type": "<REST|RPC|event>", "endpoint": "<method or topic>", "description": "<what it does>" }
+    ]
+  },
+
+  "errorCatalog": [
+    {
+      "exception": "<exception class name>",
+      "trigger": "<when this error occurs>",
+      "handling": "<how the system handles it>",
+      "severity": "<user_error|transient|fatal>"
+    }
+  ],
+
+  "flows": [
+    {
+      "id": "flow:<slug>",
+      "name": "<display name>",
+      "summary": "<2-3 sentences: business purpose, key mechanisms, cross-service interactions>",
+      "steps": [
+        {
+          "order": 1,
+          "name": "<step name>",
+          "description": "<detailed: business rules, validation, exceptions, side effects, parameters/returns>",
+          "sourceRef": { "file": "<relative path>", "lineRange": [start, end] }
+        }
+      ]
     }
   ]
 }
 ```
+
+> **Backward compatibility:** `ubiquitousLanguage`, `businessRules`, `integrationPoints`, and `errorCatalog` are optional. Existing domain pages without these sections remain valid. The content depth quality gate rewards pages that include them.
 
 ### wikiRef Format
 

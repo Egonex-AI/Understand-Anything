@@ -330,14 +330,55 @@ def _check_content_depth(page: dict, filename: str) -> dict[str, Any]:
                 f"(target >= {DEPTH_THRESHOLDS['depth_indicator_target']:.0%})"
             )
 
-    weight_summary = min(summary_len / DEPTH_THRESHOLDS["domain_summary_warn"], 1.0) * 20
-    weight_entity = min(entity_count / 2, 1.0) * 10
-    weight_source = source_ref_coverage * 30
-    weight_depth = depth_indicator_ratio * 20
-    weight_flow_summary = (
-        (1 - flow_summary_issues / max(len(flows), 1)) * 20 if flows else 0
+    glossary = page.get("ubiquitousLanguage", [])
+    glossary_count = len(glossary) if isinstance(glossary, list) else 0
+    metrics["glossaryTerms"] = glossary_count
+    if glossary_count == 0:
+        depth_warnings.append(f"domains/{filename}: no ubiquitousLanguage defined")
+
+    biz_rules = page.get("businessRules", [])
+    biz_rules_count = len(biz_rules) if isinstance(biz_rules, list) else 0
+    metrics["businessRulesCount"] = biz_rules_count
+    if biz_rules_count == 0:
+        depth_warnings.append(f"domains/{filename}: no businessRules defined")
+
+    integration = page.get("integrationPoints", {})
+    inbound_count = len(integration.get("inbound", [])) if isinstance(integration, dict) else 0
+    outbound_count = len(integration.get("outbound", [])) if isinstance(integration, dict) else 0
+    metrics["integrationInbound"] = inbound_count
+    metrics["integrationOutbound"] = outbound_count
+    if inbound_count == 0 and outbound_count == 0:
+        depth_warnings.append(f"domains/{filename}: no integrationPoints defined")
+
+    error_catalog = page.get("errorCatalog", [])
+    error_count = len(error_catalog) if isinstance(error_catalog, list) else 0
+    metrics["errorCatalogCount"] = error_count
+    if error_count == 0:
+        depth_warnings.append(f"domains/{filename}: no errorCatalog defined")
+
+    rich_entities = sum(
+        1 for e in (entities if isinstance(entities, list) else [])
+        if isinstance(e, dict) and e.get("description") and len(str(e.get("description", ""))) >= 30
     )
-    depth_score = round(weight_summary + weight_entity + weight_source + weight_depth + weight_flow_summary)
+    metrics["richEntityCount"] = rich_entities
+
+    weight_summary = min(summary_len / DEPTH_THRESHOLDS["domain_summary_warn"], 1.0) * 15
+    weight_entity = min(rich_entities / max(entity_count, 1), 1.0) * min(entity_count / 2, 1.0) * 10
+    weight_source = source_ref_coverage * 20
+    weight_depth = depth_indicator_ratio * 15
+    weight_flow_summary = (
+        (1 - flow_summary_issues / max(len(flows), 1)) * 10 if flows else 0
+    )
+    weight_glossary = min(glossary_count / 5, 1.0) * 8
+    weight_rules = min(biz_rules_count / 3, 1.0) * 8
+    weight_integration = min((inbound_count + outbound_count) / 3, 1.0) * 7
+    weight_errors = min(error_count / 2, 1.0) * 7
+
+    depth_score = round(
+        weight_summary + weight_entity + weight_source + weight_depth
+        + weight_flow_summary + weight_glossary + weight_rules
+        + weight_integration + weight_errors
+    )
     metrics["depthScore"] = depth_score
 
     return {

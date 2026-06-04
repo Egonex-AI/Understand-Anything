@@ -105,13 +105,34 @@ $PROJECT_ROOT/.understand-anything/wiki/domains/<domain-slug>.json
 
 **Domain slug derivation:** Strip the `domain:` prefix from the node ID (e.g., `domain:order-management` → `order-management`).
 
-Skeleton format:
+Skeleton format (Bounded Context Canvas structure):
 ```json
 {
   "id": "domain:order-management",
   "name": "Order Management",
   "summary": "<from DG node summary — will be expanded in Phase 2>",
-  "entities": ["Order", "OrderItem", "OrderStatus"],
+
+  "ubiquitousLanguage": [],
+
+  "businessRules": [],
+
+  "entities": [
+    {
+      "name": "Order",
+      "description": "<from DG domainMeta.entities — will be expanded>",
+      "keyFields": [],
+      "lifecycleStates": [],
+      "invariants": []
+    }
+  ],
+
+  "integrationPoints": {
+    "inbound": [],
+    "outbound": []
+  },
+
+  "errorCatalog": [],
+
   "flows": [
     {
       "id": "flow:create-order",
@@ -132,6 +153,13 @@ Skeleton format:
   ]
 }
 ```
+
+In the skeleton phase, populate these sections from the graph:
+- **`ubiquitousLanguage`**: Extract key domain terms from DG node names, entity names, and flow names. Each term gets a placeholder definition from the DG summary.
+- **`businessRules`**: Extract from `domainMeta.businessRules` if present in DG nodes.
+- **`entities`**: Use rich objects (not strings). Extract entity names from `domainMeta.entities`, populate `keyFields` if visible in KG type nodes.
+- **`integrationPoints`**: Extract from KG edges — `consumes_rpc` → inbound, `provides_rpc` → outbound; `publishes` → outbound events; `endpoint:` nodes → inbound REST.
+- **`errorCatalog`**: Leave empty in skeleton — populated in Phase 2 from source code.
 
 ### Step 3 — Handle Large Services (> 5 domains)
 
@@ -172,6 +200,39 @@ Read only the relevant line ranges (not full files). Use the extracted code to:
 3. **Document side effects**: Database writes, event publishing, cache invalidation
 4. **Note cross-service calls**: If the step calls an RPC interface (visible via `consumes_rpc` edges), document the interface name and method
 
+### Step 5a — Populate Bounded Context Canvas Sections
+
+While reading source code for step expansion, simultaneously populate the domain's canvas sections:
+
+**Ubiquitous Language:**
+- For each domain-specific term you encounter in the code (class names, enum values, method names that represent business concepts), add an entry with a clear definition
+- Example: `{ "term": "Settlement", "definition": "The process of transferring funds from acquirer to merchant after a successful payment" }`
+- Aim for 5-15 terms per domain
+
+**Business Rules:**
+- Extract explicit validation checks, conditional logic, and constraint enforcement from the source
+- Assign sequential IDs (BR-001, BR-002, ...)
+- Include the enforcing class/method and sourceRef
+- Example: `{ "id": "BR-001", "rule": "Order total must be between ¥1 and ¥500,000", "enforcement": "OrderValidator.validateAmount()", "sourceRef": {...} }`
+
+**Entities (enrichment):**
+- For each entity in the skeleton, read its class/model source to extract:
+  - `keyFields`: actual field names from the class definition
+  - `lifecycleStates`: enum values if a status/state field exists
+  - `invariants`: constraints enforced in constructors, setters, or validators
+- Expand `description` to explain the entity's role in business terms, not just its technical structure
+
+**Integration Points:**
+- From source code, verify and enrich the integration points extracted from the KG
+- Add HTTP endpoints with method and path
+- Add RPC interface methods with parameter summaries
+- Add Kafka topics with event types
+
+**Error Catalog:**
+- Collect all exception classes thrown within this domain's source code
+- For each, document: trigger condition, handling strategy, severity level
+- Severity: `user_error` (invalid input), `transient` (timeout/retry), `fatal` (data corruption/system failure)
+
 ### Step 6 — Enrich Flow Summaries
 
 After expanding all steps in a flow, rewrite the flow `summary` to be a 2-3 sentence narrative that:
@@ -186,6 +247,8 @@ After all flows in a domain are expanded, rewrite the domain `summary` to be a 3
 - Lists the key entities and their relationships
 - Mentions important business rules/invariants
 - Notes any external dependencies (other services, external APIs)
+
+**Quality bar:** Your output should read like a **Bounded Context Canvas** — a human engineer should be able to understand the domain completely from reading this page alone, without looking at source code. If a section has fewer than 3 items, ask yourself whether you missed something in the source code.
 
 ---
 

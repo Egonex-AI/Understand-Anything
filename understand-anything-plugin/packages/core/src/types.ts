@@ -79,12 +79,56 @@ export interface WikiFlow {
   steps: WikiFlowStep[];
 }
 
+export interface WikiGlossaryEntry {
+  term: string;
+  definition: string;
+}
+
+export interface WikiBusinessRule {
+  id: string;
+  rule: string;
+  enforcement?: string;
+  sourceRef?: { file: string; lineRange?: [number, number] };
+}
+
+export interface WikiEntity {
+  name: string;
+  description: string;
+  keyFields?: string[];
+  lifecycleStates?: string[];
+  invariants?: string[];
+}
+
+export interface WikiIntegrationPoint {
+  source?: string;
+  target?: string;
+  type: string;
+  endpoint: string;
+  description: string;
+}
+
+export interface WikiIntegrationPoints {
+  inbound?: WikiIntegrationPoint[];
+  outbound?: WikiIntegrationPoint[];
+}
+
+export interface WikiErrorCatalogEntry {
+  exception: string;
+  trigger: string;
+  handling: string;
+  severity?: "user_error" | "transient" | "fatal" | string;
+}
+
 export interface WikiDomainPage {
   id: string;
   name: string;
   summary: string;
-  entities: string[];
+  entities: (string | WikiEntity)[];
   flows: WikiFlow[];
+  ubiquitousLanguage?: WikiGlossaryEntry[];
+  businessRules?: WikiBusinessRule[];
+  integrationPoints?: WikiIntegrationPoints;
+  errorCatalog?: WikiErrorCatalogEntry[];
   crossServiceCalls?: CrossServiceCall[];
 }
 
