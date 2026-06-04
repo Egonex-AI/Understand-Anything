@@ -289,22 +289,27 @@ function WikiContent({
   }
 
   let markdown = "";
-  switch (pageType) {
-    case "overview":
-      markdown = overviewToMarkdown(content as WikiOverview);
-      break;
-    case "architecture":
-      markdown = architectureToMarkdown(content as WikiArchitecture);
-      break;
-    case "cross-domain":
-      markdown = crossDomainToMarkdown(content as WikiCrossDomain);
-      break;
-    case "service":
-      markdown = serviceOverviewToMarkdown(content as WikiServiceOverview);
-      break;
-    case "domain":
-      markdown = domainPageToMarkdown(content as WikiDomainPage);
-      break;
+  try {
+    switch (pageType) {
+      case "overview":
+        markdown = overviewToMarkdown(content as WikiOverview);
+        break;
+      case "architecture":
+        markdown = architectureToMarkdown(content as WikiArchitecture);
+        break;
+      case "cross-domain":
+        markdown = crossDomainToMarkdown(content as WikiCrossDomain);
+        break;
+      case "service":
+        markdown = serviceOverviewToMarkdown(content as WikiServiceOverview);
+        break;
+      case "domain":
+        markdown = domainPageToMarkdown(content as WikiDomainPage);
+        break;
+    }
+  } catch (err) {
+    console.error(`[wiki] Failed to render ${pageType} page:`, err);
+    markdown = `# Render Error\n\nFailed to render this ${pageType} page. The data may be malformed.\n\n\`\`\`\n${err instanceof Error ? err.message : String(err)}\n\`\`\``;
   }
 
   return (

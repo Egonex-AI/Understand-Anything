@@ -3,33 +3,36 @@ import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, Cross
 export function serviceOverviewToMarkdown(overview: WikiServiceOverview): string {
   const lines: string[] = [];
 
-  lines.push(`# ${overview.name}`);
+  lines.push(`# ${overview?.name ?? "Service"}`);
   lines.push("");
-  lines.push(overview.description);
+  lines.push(overview?.description ?? "");
   lines.push("");
 
-  if (overview.techStack.length > 0) {
+  const techStack = Array.isArray(overview?.techStack) ? overview.techStack : [];
+  if (techStack.length > 0) {
     lines.push("## Tech Stack");
     lines.push("");
-    for (const tech of overview.techStack) {
+    for (const tech of techStack) {
       lines.push(`- ${tech}`);
     }
     lines.push("");
   }
 
-  if (overview.modules.length > 0) {
+  const modules = Array.isArray(overview?.modules) ? overview.modules : [];
+  if (modules.length > 0) {
     lines.push("## Modules");
     lines.push("");
-    for (const mod of overview.modules) {
+    for (const mod of modules) {
       lines.push(`- ${mod}`);
     }
     lines.push("");
   }
 
-  if (overview.entryPoints.length > 0) {
+  const entryPoints = Array.isArray(overview?.entryPoints) ? overview.entryPoints : [];
+  if (entryPoints.length > 0) {
     lines.push("## Entry Points");
     lines.push("");
-    for (const ep of overview.entryPoints) {
+    for (const ep of entryPoints) {
       lines.push(`- \`${ep}\``);
     }
     lines.push("");
@@ -88,26 +91,29 @@ function crossServiceCallsToMarkdown(calls: CrossServiceCall[]): string {
 
 export function overviewToMarkdown(data: WikiOverview): string {
   const lines: string[] = [];
-  lines.push(`# ${data.name}`);
+  lines.push(`# ${data?.name ?? "System Overview"}`);
   lines.push("");
-  lines.push(data.description);
+  lines.push(data?.description ?? "");
   lines.push("");
 
-  if (data.services.length > 0) {
+  const services = Array.isArray(data?.services) ? data.services : [];
+  if (services.length > 0) {
     lines.push("## Services");
     lines.push("");
     lines.push("| Service | Description | Domains |");
     lines.push("|---|---|---|");
-    for (const svc of data.services) {
-      lines.push(`| ${svc.name} | ${svc.description} | ${svc.domains.join(", ")} |`);
+    for (const svc of services) {
+      const domains = Array.isArray(svc?.domains) ? svc.domains.join(", ") : "";
+      lines.push(`| ${svc?.name ?? ""} | ${svc?.description ?? ""} | ${domains} |`);
     }
     lines.push("");
   }
 
-  if (data.techStack.length > 0) {
+  const techStack = Array.isArray(data?.techStack) ? data.techStack : [];
+  if (techStack.length > 0) {
     lines.push("## Tech Stack");
     lines.push("");
-    for (const tech of data.techStack) {
+    for (const tech of techStack) {
       lines.push(`- ${tech}`);
     }
     lines.push("");
@@ -121,34 +127,39 @@ export function architectureToMarkdown(data: WikiArchitecture): string {
   lines.push("# System Architecture");
   lines.push("");
 
-  if (data.crossServiceCalls.length > 0) {
+  const crossServiceCalls = Array.isArray(data?.crossServiceCalls) ? data.crossServiceCalls : [];
+  if (crossServiceCalls.length > 0) {
     lines.push("## Cross-Service Calls");
     lines.push("");
-    for (const call of data.crossServiceCalls) {
-      const caller = `${call.caller.service}.${call.caller.method}`;
-      const callee = call.callee.interface
+    for (const call of crossServiceCalls) {
+      const caller = `${call.caller?.service ?? "?"}.${call.caller?.method ?? "?"}`;
+      const callee = call.callee?.interface
         ? `${call.callee.service}#${call.callee.interface}.${call.callee.method}`
-        : `${call.callee.service}.${call.callee.method}`;
+        : `${call.callee?.service ?? "?"}.${call.callee?.method ?? "?"}`;
       lines.push(`- \`${caller}\` → \`${callee}\` (${call.type})`);
       if (call.detail) lines.push(`  > ${call.detail}`);
     }
     lines.push("");
   }
 
-  if (data.eventFlows.length > 0) {
+  const eventFlows = Array.isArray(data?.eventFlows) ? data.eventFlows : [];
+  if (eventFlows.length > 0) {
     lines.push("## Event Flows");
     lines.push("");
-    for (const ev of data.eventFlows) {
-      lines.push(`- **${ev.topic}**: ${ev.publisher} → ${ev.subscribers.join(", ")}`);
+    for (const ev of eventFlows) {
+      const subscribers = Array.isArray(ev?.subscribers) ? ev.subscribers.join(", ") : "";
+      lines.push(`- **${ev?.topic ?? "?"}**: ${ev?.publisher ?? "?"} → ${subscribers}`);
     }
     lines.push("");
   }
 
-  if (data.sharedResources.length > 0) {
+  const sharedResources = Array.isArray(data?.sharedResources) ? data.sharedResources : [];
+  if (sharedResources.length > 0) {
     lines.push("## Shared Resources");
     lines.push("");
-    for (const res of data.sharedResources) {
-      lines.push(`- [${res.type}] **${res.name}** — used by: ${res.services.join(", ")}`);
+    for (const res of sharedResources) {
+      const svcList = Array.isArray(res?.services) ? res.services.join(", ") : "";
+      lines.push(`- [${res?.type ?? "?"}] **${res?.name ?? "?"}** — used by: ${svcList}`);
     }
     lines.push("");
   }
@@ -158,17 +169,22 @@ export function architectureToMarkdown(data: WikiArchitecture): string {
 
 export function crossDomainToMarkdown(data: WikiCrossDomain): string {
   const lines: string[] = [];
-  lines.push(`# ${data.name}`);
+  lines.push(`# ${data?.name ?? "Untitled"}`);
   lines.push("");
-  lines.push(data.summary);
-  lines.push("");
-  lines.push(`**Services involved:** ${data.services.join(", ")}`);
+  lines.push(data?.summary ?? "");
   lines.push("");
 
-  if (data.steps.length > 0) {
+  const services = Array.isArray(data?.services) ? data.services : [];
+  if (services.length > 0) {
+    lines.push(`**Services involved:** ${services.join(", ")}`);
+    lines.push("");
+  }
+
+  const steps = Array.isArray(data?.steps) ? data.steps : [];
+  if (steps.length > 0) {
     lines.push("## Flow Steps");
     lines.push("");
-    for (const step of data.steps) {
+    for (const step of steps) {
       let line = `${step.order}. **[${step.service}]** ${step.description}`;
       if (step.wikiRef) {
         line += `\n   → [View details](wiki://${step.wikiRef})`;
@@ -187,29 +203,31 @@ export function crossDomainToMarkdown(data: WikiCrossDomain): string {
 export function domainPageToMarkdown(page: WikiDomainPage): string {
   const lines: string[] = [];
 
-  lines.push(`# ${page.name}`);
+  lines.push(`# ${page?.name ?? "Domain"}`);
   lines.push("");
-  lines.push(page.summary);
+  lines.push(page?.summary ?? "");
   lines.push("");
 
-  if (page.entities.length > 0) {
+  const entities = Array.isArray(page?.entities) ? page.entities : [];
+  if (entities.length > 0) {
     lines.push("## Key Entities");
     lines.push("");
-    for (const entity of page.entities) {
+    for (const entity of entities) {
       lines.push(`- ${entity}`);
     }
     lines.push("");
   }
 
-  if (page.flows.length > 0) {
+  const flows = Array.isArray(page?.flows) ? page.flows : [];
+  if (flows.length > 0) {
     lines.push("## Flows");
     lines.push("");
-    for (const flow of page.flows) {
+    for (const flow of flows) {
       lines.push(flowToMarkdown(flow));
     }
   }
 
-  if (page.crossServiceCalls && page.crossServiceCalls.length > 0) {
+  if (Array.isArray(page?.crossServiceCalls) && page.crossServiceCalls.length > 0) {
     lines.push(crossServiceCallsToMarkdown(page.crossServiceCalls));
   }
 

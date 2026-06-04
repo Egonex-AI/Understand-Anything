@@ -530,6 +530,51 @@ export function validateGraph(data: unknown): ValidationResult {
     }
   }
 
+  // Auto-fix project metadata before validation
+  if (typeof fixed.project === "object" && fixed.project !== null) {
+    const proj = fixed.project as Record<string, unknown>;
+    if (!proj.analyzedAt || typeof proj.analyzedAt !== "string") {
+      proj.analyzedAt = new Date().toISOString();
+      issues.push({
+        level: "auto-corrected",
+        category: "missing-field",
+        message: `project.analyzedAt missing — defaulted to current timestamp`,
+        path: "project.analyzedAt",
+      });
+    }
+    if (!proj.name || typeof proj.name !== "string") {
+      proj.name = "Unknown Project";
+      issues.push({ level: "auto-corrected", category: "missing-field", message: `project.name missing — defaulted`, path: "project.name" });
+    }
+    if (!Array.isArray(proj.languages)) {
+      proj.languages = [];
+      issues.push({ level: "auto-corrected", category: "missing-field", message: `project.languages missing — defaulted to []`, path: "project.languages" });
+    }
+    if (!Array.isArray(proj.frameworks)) {
+      proj.frameworks = [];
+      issues.push({ level: "auto-corrected", category: "missing-field", message: `project.frameworks missing — defaulted to []`, path: "project.frameworks" });
+    }
+    if (!proj.description || typeof proj.description !== "string") {
+      proj.description = "";
+      issues.push({ level: "auto-corrected", category: "missing-field", message: `project.description missing — defaulted to ""`, path: "project.description" });
+    }
+    if (!proj.gitCommitHash || typeof proj.gitCommitHash !== "string") {
+      proj.gitCommitHash = "";
+      issues.push({ level: "auto-corrected", category: "missing-field", message: `project.gitCommitHash missing — defaulted to ""`, path: "project.gitCommitHash" });
+    }
+    fixed.project = proj;
+  } else if (!fixed.project) {
+    fixed.project = {
+      name: "Unknown Project",
+      languages: [],
+      frameworks: [],
+      description: "",
+      analyzedAt: new Date().toISOString(),
+      gitCommitHash: "",
+    };
+    issues.push({ level: "auto-corrected", category: "missing-field", message: `project metadata missing — created with defaults`, path: "project" });
+  }
+
   // Tier 4: Fatal — missing project metadata
   const projectResult = ProjectMetaSchema.safeParse(fixed.project);
   if (!projectResult.success) {
