@@ -20,9 +20,9 @@
 | `skills/understand-wiki/build-wiki-index.py` | **CREATE** | Python script: scans intermediate wiki directory, deterministically builds index.json from actual files |
 | `skills/understand-wiki/assemble-wiki.py` | **CREATE** | Python script: copies validated intermediate to final wiki/, generates meta.json with hashes and quality metrics |
 | `agents/wiki-worker.md` | **MODIFY** | Change output path to intermediate/wiki/, remove Phase 3 (index + meta generation) |
-| `skills/understand-wiki/SKILL.md` | **MODIFY** | Add Phase 1.5 description |
+| `skills/understand-wiki/SKILL.md` | **MODIFY** | Add Phase 2 description |
 | `skills/understand-wiki/docs/wiki-phase1-generation.md` | **MODIFY** | Update wiki-worker output path references |
-| `skills/understand-wiki/docs/wiki-phase1.5-assembly.md` | **CREATE** | Phase 1.5 deterministic pipeline documentation |
+| `skills/understand-wiki/docs/wiki-phase2-assembly.md` | **CREATE** | Phase 2 deterministic pipeline documentation |
 | `skills/understand-wiki/docs/wiki-schema-reference.md` | **MODIFY** | Document new meta.json fields (domainHashes, qualityScore) |
 | `packages/core/src/wiki-schema.ts` | **MODIFY** | Add auto-fix helper functions, export for mjs consumption |
 
@@ -845,26 +845,26 @@ git commit -m "refactor(wiki-worker): output to intermediate/, remove index/meta
 **Files:**
 - Modify: `understand-anything-plugin/skills/understand-wiki/SKILL.md`
 - Modify: `understand-anything-plugin/skills/understand-wiki/docs/wiki-phase1-generation.md`
-- Create: `understand-anything-plugin/skills/understand-wiki/docs/wiki-phase1.5-assembly.md`
+- Create: `understand-anything-plugin/skills/understand-wiki/docs/wiki-phase2-assembly.md`
 - Modify: `understand-anything-plugin/skills/understand-wiki/docs/wiki-schema-reference.md`
 
-- [ ] **Step 1: Add Phase 1.5 to SKILL.md**
+- [ ] **Step 1: Add Phase 2 to SKILL.md**
 
 After the Phase 1 section, before Quality Gate, add:
 
 ```markdown
-### Phase 1.5 — Deterministic Assembly
+### Phase 2 — Deterministic Assembly
 
 After wiki-worker writes content to `intermediate/wiki/`, run the deterministic pipeline to validate, index, and assemble the final wiki.
 
-**Detailed implementation:** See [Phase 1.5 — Assembly Pipeline](docs/wiki-phase1.5-assembly.md)
+**Detailed implementation:** See [Phase 2 — Assembly Pipeline](docs/wiki-phase2-assembly.md)
 ```
 
 Update the phase count from `[Phase N/4]` to `[Phase N/5]` in the Progress Reporting section.
 
-- [ ] **Step 2: Create Phase 1.5 doc**
+- [ ] **Step 2: Create Phase 2 doc**
 
-Create `docs/wiki-phase1.5-assembly.md` with the pipeline documentation:
+Create `docs/wiki-phase2-assembly.md` with the pipeline documentation:
 - Script invocation order and arguments
 - Auto-fix behavior description
 - Error handling per script
@@ -883,9 +883,9 @@ Add documentation for new `meta.json` fields: `domainHashes`, `sourceRefCoverage
 ```bash
 git add understand-anything-plugin/skills/understand-wiki/SKILL.md \
   understand-anything-plugin/skills/understand-wiki/docs/wiki-phase1-generation.md \
-  understand-anything-plugin/skills/understand-wiki/docs/wiki-phase1.5-assembly.md \
+  understand-anything-plugin/skills/understand-wiki/docs/wiki-phase2-assembly.md \
   understand-anything-plugin/skills/understand-wiki/docs/wiki-schema-reference.md
-git commit -m "docs(wiki): add Phase 1.5 deterministic assembly pipeline documentation"
+git commit -m "docs(wiki): add Phase 2 deterministic assembly pipeline documentation"
 ```
 
 ---

@@ -45,7 +45,7 @@ Phase 0 (detection)
     ↓
 Phase 1 (wiki-worker → intermediate/wiki/)           ← output path change
     ↓
-Phase 1.5 (deterministic pipeline)                    ← NEW
+Phase 2 (deterministic pipeline)                    ← NEW
     ├── validate-wiki-schema.mjs  → schema check + auto-fix
     ├── build-wiki-index.py       → compute index from files
     └── assemble-wiki.py          → copy to wiki/ + meta + fingerprints
@@ -271,9 +271,9 @@ Prepare a wiki fixture set with known issues (missing fields, type errors, dangl
 | `skills/understand-wiki/build-wiki-index.py` | **NEW** | Deterministic index builder |
 | `skills/understand-wiki/assemble-wiki.py` | **NEW** | Post-validation assembly + meta + fingerprints |
 | `agents/wiki-worker.md` | **MODIFY** | Output path → intermediate/, remove Phase 3 |
-| `skills/understand-wiki/SKILL.md` | **MODIFY** | Insert Phase 1.5 description |
+| `skills/understand-wiki/SKILL.md` | **MODIFY** | Insert Phase 2 description |
 | `skills/understand-wiki/docs/wiki-phase1-generation.md` | **MODIFY** | Update wiki-worker output path |
-| `skills/understand-wiki/docs/wiki-phase1.5-assembly.md` | **NEW** | Phase 1.5 deterministic pipeline doc |
+| `skills/understand-wiki/docs/wiki-phase2-assembly.md` | **NEW** | Phase 2 deterministic pipeline doc |
 | `packages/core/src/wiki-schema.ts` | **MODIFY** | Export validators for mjs script import |
 | `skills/understand-wiki/docs/wiki-schema-reference.md` | **MODIFY** | Document new meta.json fields |
 
