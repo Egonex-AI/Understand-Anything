@@ -141,7 +141,7 @@ function WikiNavTree({
             By Domain
           </h4>
           {[...crossDomainEntries, ...domainEntries].map((entry) => {
-            const navType: WikiPageType = !entry.service ? "cross-domain" : entry.type;
+            const navType: WikiPageType = entry.type === "cross-domain" ? "cross-domain" : entry.type;
             return (
               <button
                 key={entry.id}

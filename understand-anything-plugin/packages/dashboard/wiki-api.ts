@@ -91,8 +91,8 @@ export class WikiDataService {
       return this.topology;
     }
 
-    const parentWikiDir = path.join(this.projectRoot, ".understand-anything", "wiki");
-    const hasParentWiki = fs.existsSync(path.join(parentWikiDir, "meta.json"));
+    const rootWikiDir = path.join(this.projectRoot, ".understand-anything", "wiki");
+    const rootMetaExists = fs.existsSync(path.join(rootWikiDir, "meta.json"));
 
     const services: WikiTopology["services"] = [];
     let entries: string[];
@@ -116,13 +116,67 @@ export class WikiDataService {
       }
     }
 
+    // Distinguish parent wiki from single-service wiki at project root.
+    // A true parent wiki has overview.json or architecture.json (Phase 2 output)
+    // or serviceCount in meta. A service.json without these is a single-service wiki.
+    let hasParentWiki = false;
+    let parentWikiDir: string | null = null;
+
+    if (rootMetaExists) {
+      const isParent =
+        fs.existsSync(path.join(rootWikiDir, "overview.json")) ||
+        fs.existsSync(path.join(rootWikiDir, "architecture.json")) ||
+        this.rootMetaHasServiceCount(rootWikiDir);
+
+      if (isParent) {
+        hasParentWiki = true;
+        parentWikiDir = rootWikiDir;
+      } else {
+        // Root wiki is a single-service wiki — treat it as a service entry
+        try {
+          const meta = JSON.parse(
+            fs.readFileSync(path.join(rootWikiDir, "meta.json"), "utf-8"),
+          ) as WikiMeta;
+          const serviceName = this.resolveServiceName(rootWikiDir);
+          services.push({ name: serviceName, wikiDir: rootWikiDir, meta });
+        } catch {
+          // skip corrupted meta
+        }
+      }
+    }
+
     this.topology = {
       hasParentWiki,
-      parentWikiDir: hasParentWiki ? parentWikiDir : null,
+      parentWikiDir,
       services,
     };
     this.topologyCachedAt = this.now();
     return this.topology;
+  }
+
+  private rootMetaHasServiceCount(wikiDir: string): boolean {
+    try {
+      const meta = JSON.parse(
+        fs.readFileSync(path.join(wikiDir, "meta.json"), "utf-8"),
+      ) as Record<string, unknown>;
+      return typeof meta.serviceCount === "number" && meta.serviceCount > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private resolveServiceName(wikiDir: string): string {
+    try {
+      const serviceJson = JSON.parse(
+        fs.readFileSync(path.join(wikiDir, "service.json"), "utf-8"),
+      ) as Record<string, unknown>;
+      if (typeof serviceJson.name === "string" && serviceJson.name) {
+        return serviceJson.name;
+      }
+    } catch {
+      // fall through
+    }
+    return path.basename(this.projectRoot);
   }
 
   getGlobalIndex(): { entries: WikiIndexEntry[]; topology: WikiTopology } {

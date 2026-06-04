@@ -119,3 +119,20 @@ mkdir -p "$PROJECT_ROOT/.understand-anything/wiki/domains"
   ]
 }
 ```
+
+### Parent Wiki Quality Gate (after Phase 2 output)
+
+After generating all parent-level files, run the parent wiki quality gate:
+
+```bash
+python3 "$SKILL_DIR/wiki_quality_gate.py" --parent \
+  "$PROJECT_ROOT/.understand-anything/wiki" \
+  "$PROJECT_ROOT/.understand-anything/tmp/ua-wiki-${WIKI_SESSION_ID}-parent-qg-result.json"
+```
+
+This validates:
+- `overview.json`: name, description, non-empty services array with required fields
+- `architecture.json`: crossServiceCalls structure (caller/callee/type)
+- `domains/*.json` (cross-domain pages): services array, steps with order/service/description
+
+If `passed: false`, report issues but continue to Phase 3 (index construction) — parent wiki issues are non-blocking since service wikis remain valid independently.

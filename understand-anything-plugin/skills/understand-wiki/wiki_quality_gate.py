@@ -165,20 +165,155 @@ def _check_domain_pages(
                             )
 
 
+def run_parent_quality_gate(
+    wiki_dir: str,
+    output_path: str | None = None,
+) -> dict[str, Any]:
+    """Run structural validation on a parent-level wiki directory.
+
+    Validates overview.json, architecture.json, and cross-domain pages.
+    """
+    issues: list[str] = []
+    warnings: list[str] = []
+
+    overview = _load_json(os.path.join(wiki_dir, "overview.json"))
+    arch = _load_json(os.path.join(wiki_dir, "architecture.json"))
+    index = _load_json(os.path.join(wiki_dir, "index.json"))
+    meta = _load_json(os.path.join(wiki_dir, "meta.json"))
+
+    _validate_meta(meta, issues)
+    _validate_index(index, issues)
+    _validate_parent_overview(overview, issues, warnings)
+    _validate_parent_architecture(arch, issues, warnings)
+
+    domain_dir = os.path.join(wiki_dir, "domains")
+    domain_files = _list_domain_files(domain_dir)
+    _validate_cross_domain_pages(domain_dir, domain_files, issues, warnings)
+
+    stats = {
+        "overviewValid": bool(overview and overview.get("name")),
+        "architectureValid": bool(arch and isinstance(arch.get("crossServiceCalls"), list)),
+        "crossDomainPages": len(domain_files),
+    }
+
+    result = {
+        "passed": len(issues) == 0,
+        "issues": issues,
+        "warnings": warnings,
+        "stats": stats,
+    }
+
+    if output_path:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w") as f:
+            json.dump(result, f, indent=2)
+
+    return result
+
+
+def _validate_parent_overview(
+    overview: dict, issues: list[str], warnings: list[str]
+) -> None:
+    if not overview:
+        issues.append("overview.json: missing or empty")
+        return
+    if not overview.get("name"):
+        issues.append("overview.json: missing name")
+    if not overview.get("description"):
+        issues.append("overview.json: missing description")
+    services = overview.get("services")
+    if not isinstance(services, list) or len(services) == 0:
+        issues.append("overview.json: missing or empty services array")
+    else:
+        for i, svc in enumerate(services):
+            if not isinstance(svc, dict):
+                issues.append(f"overview.json: services[{i}] is not an object")
+                continue
+            if not svc.get("name"):
+                issues.append(f"overview.json: services[{i}] missing name")
+            if not svc.get("description"):
+                warnings.append(f"overview.json: services[{i}] missing description")
+            if not isinstance(svc.get("domains"), list):
+                warnings.append(f"overview.json: services[{i}] missing domains array")
+
+
+def _validate_parent_architecture(
+    arch: dict, issues: list[str], warnings: list[str]
+) -> None:
+    if not arch:
+        warnings.append("architecture.json: missing or empty")
+        return
+    if not isinstance(arch.get("crossServiceCalls"), list):
+        warnings.append("architecture.json: missing crossServiceCalls array")
+    else:
+        for i, call in enumerate(arch["crossServiceCalls"]):
+            if not isinstance(call, dict):
+                issues.append(f"architecture.json: crossServiceCalls[{i}] is not an object")
+                continue
+            if not isinstance(call.get("caller"), dict):
+                issues.append(f"architecture.json: crossServiceCalls[{i}] missing caller")
+            if not isinstance(call.get("callee"), dict):
+                issues.append(f"architecture.json: crossServiceCalls[{i}] missing callee")
+            if not call.get("type"):
+                issues.append(f"architecture.json: crossServiceCalls[{i}] missing type")
+
+
+def _validate_cross_domain_pages(
+    domain_dir: str,
+    domain_files: list[str],
+    issues: list[str],
+    warnings: list[str],
+) -> None:
+    for file in domain_files:
+        page = _load_json(os.path.join(domain_dir, file))
+        if not page:
+            issues.append(f"domains/{file}: missing or invalid JSON")
+            continue
+        if not page.get("name"):
+            issues.append(f"domains/{file}: missing name")
+        if not page.get("summary"):
+            warnings.append(f"domains/{file}: missing summary")
+        services = page.get("services")
+        if not isinstance(services, list) or len(services) == 0:
+            issues.append(f"domains/{file}: missing or empty services array")
+        steps = page.get("steps")
+        if not isinstance(steps, list):
+            issues.append(f"domains/{file}: missing steps array")
+        else:
+            for i, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    issues.append(f"domains/{file}: steps[{i}] is not an object")
+                    continue
+                if not isinstance(step.get("order"), (int, float)):
+                    warnings.append(f"domains/{file}: steps[{i}] missing order")
+                if not step.get("service"):
+                    issues.append(f"domains/{file}: steps[{i}] missing service")
+                if not step.get("description"):
+                    warnings.append(f"domains/{file}: steps[{i}] missing description")
+
+
 def main() -> None:
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <wiki_dir> <dg_path> <service_root> [output_path]")
+        print(f"       {sys.argv[0]} --parent <wiki_dir> [output_path]")
         sys.exit(1)
 
-    wiki_dir = sys.argv[1]
-    dg_path = sys.argv[2]
-    service_root = sys.argv[3]
-    output_path = sys.argv[4] if len(sys.argv) > 4 else None
-
-    result = run_quality_gate(wiki_dir, dg_path, service_root, output_path)
+    if sys.argv[1] == "--parent":
+        wiki_dir = sys.argv[2]
+        output_path = sys.argv[3] if len(sys.argv) > 3 else None
+        result = run_parent_quality_gate(wiki_dir, output_path)
+    else:
+        if len(sys.argv) < 4:
+            print(f"Usage: {sys.argv[0]} <wiki_dir> <dg_path> <service_root> [output_path]")
+            sys.exit(1)
+        wiki_dir = sys.argv[1]
+        dg_path = sys.argv[2]
+        service_root = sys.argv[3]
+        output_path = sys.argv[4] if len(sys.argv) > 4 else None
+        result = run_quality_gate(wiki_dir, dg_path, service_root, output_path)
 
     if result["passed"]:
-        print(f"[wiki-quality-gate] PASSED — {result['stats']['coveragePercent']}% coverage")
+        print(f"[wiki-quality-gate] PASSED")
     else:
         print(f"[wiki-quality-gate] FAILED — {len(result['issues'])} issue(s)")
         for issue in result["issues"]:
