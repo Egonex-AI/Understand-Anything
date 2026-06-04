@@ -52,7 +52,7 @@ Generate/regenerate ONLY the wiki page for the specified domain ID. Used by the 
 2. Collect all flows (via `contains_flow` edges from this domain)
 3. Collect all steps (via `flow_step` edges from those flows)
 4. Process ONLY these nodes for wiki page generation (Phase 1 Step 2 + Phase 2)
-5. Write output to: `$PROJECT_ROOT/.understand-anything/wiki/domains/$TARGET_DOMAIN.json`
+5. Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/wiki/domains/$TARGET_DOMAIN.json`
 6. Do NOT generate service overview, index, or meta (the orchestrator handles those)
 7. Report: `"Generated 1 domain page: $TARGET_DOMAIN"`
 
@@ -75,7 +75,7 @@ From the knowledge graph, extract:
 
 Write the service overview to:
 ```
-$PROJECT_ROOT/.understand-anything/wiki/service.json
+$PROJECT_ROOT/.understand-anything/intermediate/wiki/service.json
 ```
 
 Format:
@@ -100,7 +100,7 @@ For each `domain` node in the domain graph:
 
 Write one file per domain to:
 ```
-$PROJECT_ROOT/.understand-anything/wiki/domains/<domain-slug>.json
+$PROJECT_ROOT/.understand-anything/intermediate/wiki/domains/<domain-slug>.json
 ```
 
 **Domain slug derivation:** Strip the `domain:` prefix from the node ID (e.g., `domain:order-management` → `order-management`).
@@ -252,65 +252,17 @@ After all flows in a domain are expanded, rewrite the domain `summary` to be a 3
 
 ---
 
-## Phase 3 — Index and Metadata Generation
+## Phase 3 — (Removed)
 
-### Step 8 — Generate Meta
-
-Write to `$PROJECT_ROOT/.understand-anything/wiki/meta.json`:
-```json
-{
-  "gitCommitHash": "<from KG project.gitCommitHash>",
-  "generatedAt": "<ISO 8601 timestamp — execute `date -u +%Y-%m-%dT%H:%M:%SZ`>",
-  "version": "1.0.0",
-  "outputLanguage": "<$OUTPUT_LANGUAGE>"
-}
-```
-
-### Step 9 — Generate Index
-
-Collect all pages and write to `$PROJECT_ROOT/.understand-anything/wiki/index.json`:
-```json
-{
-  "entries": [
-    {
-      "id": "wiki:service-overview",
-      "name": "<service name>",
-      "type": "service",
-      "summary": "<1-line service description>"
-    },
-    {
-      "id": "wiki:domain:order-management",
-      "name": "Order Management",
-      "type": "domain",
-      "service": "<service name>",
-      "summary": "<1-line domain description>"
-    },
-    {
-      "id": "wiki:flow:create-order",
-      "name": "Create Order",
-      "type": "flow",
-      "service": "<service name>",
-      "domain": "wiki:domain:order-management",
-      "summary": "<1-line flow description>"
-    }
-  ]
-}
-```
-
-**Index entry rules:**
-- One entry for `service.json` (type: `service`)
-- One entry per domain page (type: `domain`); MUST include `service` field
-- One entry per flow within each domain (type: `flow`); MUST include both `service` and `domain` fields — `domain` is the parent domain entry's `id` (e.g., `wiki:domain:order-management`)
-- `summary` must be a single sentence, max 100 characters
+Index and metadata generation is now handled by the deterministic assembly pipeline
+(`build-wiki-index.py` and `assemble-wiki.py`). wiki-worker only produces content files.
 
 ---
 
 ## Output Directory Structure
 
 ```
-$PROJECT_ROOT/.understand-anything/wiki/
-├── meta.json           ← Version, commit hash, timestamp, language
-├── index.json          ← Flat index of all pages (lightweight, for search/navigation)
+$PROJECT_ROOT/.understand-anything/intermediate/wiki/
 ├── service.json        ← Service overview (tech stack, modules, entry points)
 └── domains/
     ├── order-management.json    ← Domain page with expanded flows and steps
@@ -356,14 +308,14 @@ When `$RPC_ANNOTATIONS` config is present and the KG contains `provides_rpc` or 
 
 ## Critical Constraints
 
-- NEVER write files outside `$PROJECT_ROOT/.understand-anything/wiki/`
+- NEVER write files outside `$PROJECT_ROOT/.understand-anything/intermediate/wiki/`
 - NEVER read more than 200 lines from any single source file in one read operation
 - NEVER create domain pages for domains that don't exist in the domain graph
 - ALWAYS produce valid JSON — verify by attempting to parse before writing
 - ALWAYS use the service's actual domain graph structure — do not invent flows or steps
 - ALWAYS create the output directory before writing:
   ```bash
-  mkdir -p "$PROJECT_ROOT/.understand-anything/wiki/domains"
+  mkdir -p "$PROJECT_ROOT/.understand-anything/intermediate/wiki/domains"
   ```
 - If the domain graph has 0 domain nodes, this is a HARD FAILURE. Report it and stop.
 
