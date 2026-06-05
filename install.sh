@@ -11,6 +11,7 @@
 # Curl-pipe usage:
 #   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
 #   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
+#   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codebuddy
 #
 # Environment:
 #   UA_REPO_URL  Override clone URL (default: official GitHub repo)
@@ -40,6 +41,7 @@ hermes|$HOME/.hermes/skills|folder
 cline|$HOME/.cline/skills|folder
 kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
+codebuddy|$HOME/.codebuddy/skills|per-skill
 EOF
 }
 
