@@ -385,7 +385,7 @@ export interface StructuralAnalysis {
   functions: Array<{
     name: string;
     lineRange: [number, number];
-    params: string[];
+    params: Array<string | { name: string; type: string }>;
     returnType?: string;
     annotations?: AnnotationInfo[];
   }>;

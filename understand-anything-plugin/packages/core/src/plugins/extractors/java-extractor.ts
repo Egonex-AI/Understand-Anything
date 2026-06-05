@@ -3,19 +3,25 @@ import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
- * Extract parameter names from a Java `formal_parameters` node.
+ * Extract parameter names and types from a Java `formal_parameters` node.
  *
  * Each `formal_parameter` child has a `name` field (identifier) and a `type` field.
  */
-function extractParams(paramsNode: TreeSitterNode | null): string[] {
+function extractParams(
+  paramsNode: TreeSitterNode | null,
+): Array<{ name: string; type: string }> {
   if (!paramsNode) return [];
-  const params: string[] = [];
+  const params: Array<{ name: string; type: string }> = [];
 
   const declarations = findChildren(paramsNode, "formal_parameter");
   for (const decl of declarations) {
     const nameNode = decl.childForFieldName("name");
+    const typeNode = decl.childForFieldName("type");
     if (nameNode) {
-      params.push(nameNode.text);
+      params.push({
+        name: nameNode.text,
+        type: typeNode?.text ?? "unknown",
+      });
     }
   }
 
@@ -23,8 +29,12 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
   const spreadParams = findChildren(paramsNode, "spread_parameter");
   for (const spread of spreadParams) {
     const nameNode = spread.childForFieldName("name");
+    const typeNode = spread.childForFieldName("type");
     if (nameNode) {
-      params.push(nameNode.text);
+      params.push({
+        name: nameNode.text,
+        type: typeNode?.text ?? "unknown",
+      });
     }
   }
 

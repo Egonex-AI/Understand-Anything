@@ -38,6 +38,27 @@ describe("JavaExtractor", () => {
   // ---- Methods/Constructors (mapped to functions) ----
 
   describe("extractStructure - functions (methods & constructors)", () => {
+    it("extracts parameter types", () => {
+      const { tree, parser, root } = parse(`public class UserService {
+    public User findUser(Long userId, String username) {
+        return null;
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("findUser");
+      expect(result.functions[0].params).toEqual([
+        { name: "userId", type: "Long" },
+        { name: "username", type: "String" },
+      ]);
+      expect(result.functions[0].returnType).toBe("User");
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts methods with params and return types", () => {
       const { tree, parser, root } = parse(`public class Foo {
     public String getName(int id) {
@@ -52,11 +73,14 @@ describe("JavaExtractor", () => {
       expect(result.functions).toHaveLength(2);
 
       expect(result.functions[0].name).toBe("getName");
-      expect(result.functions[0].params).toEqual(["id"]);
+      expect(result.functions[0].params).toEqual([{ name: "id", type: "int" }]);
       expect(result.functions[0].returnType).toBe("String");
 
       expect(result.functions[1].name).toBe("process");
-      expect(result.functions[1].params).toEqual(["data", "count"]);
+      expect(result.functions[1].params).toEqual([
+        { name: "data", type: "String" },
+        { name: "count", type: "int" },
+      ]);
       expect(result.functions[1].returnType).toBe("void");
 
       tree.delete();
@@ -74,7 +98,10 @@ describe("JavaExtractor", () => {
 
       expect(result.functions).toHaveLength(1);
       expect(result.functions[0].name).toBe("Foo");
-      expect(result.functions[0].params).toEqual(["name", "value"]);
+      expect(result.functions[0].params).toEqual([
+        { name: "name", type: "String" },
+        { name: "value", type: "int" },
+      ]);
       expect(result.functions[0].returnType).toBeUndefined();
 
       tree.delete();
@@ -92,6 +119,24 @@ describe("JavaExtractor", () => {
       expect(result.functions[0].name).toBe("run");
       expect(result.functions[0].params).toEqual([]);
       expect(result.functions[0].returnType).toBe("void");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts generic parameter types", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void process(List<Long> ids, Map<String, Object> metadata) {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("process");
+      expect(result.functions[0].params).toEqual([
+        { name: "ids", type: "List<Long>" },
+        { name: "metadata", type: "Map<String, Object>" },
+      ]);
 
       tree.delete();
       parser.delete();
@@ -755,17 +800,17 @@ interface Repository {
 
       // Constructor has params but no return type
       const ctor = result.functions.find((f) => f.name === "UserService");
-      expect(ctor?.params).toEqual(["name"]);
+      expect(ctor?.params).toEqual([{ name: "name", type: "String" }]);
       expect(ctor?.returnType).toBeUndefined();
 
       // getUsers has params and generic return type
       const getUsers = result.functions.find((f) => f.name === "getUsers");
-      expect(getUsers?.params).toEqual(["limit"]);
+      expect(getUsers?.params).toEqual([{ name: "limit", type: "int" }]);
       expect(getUsers?.returnType).toBe("List<User>");
 
       // log has params and void return type
       const log = result.functions.find((f) => f.name === "log");
-      expect(log?.params).toEqual(["message"]);
+      expect(log?.params).toEqual([{ name: "message", type: "String" }]);
       expect(log?.returnType).toBe("void");
 
       // Classes: UserService, Repository
