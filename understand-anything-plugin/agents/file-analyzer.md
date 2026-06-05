@@ -257,8 +257,8 @@ Using the script's structural data and file categories, create edges:
 | `contains` | File contains a function or class node you created (use for ALL function/class nodes) | `1.0` | `forward` |
 | `imports` | File imports from another project file (use `batchImportData[filePath]` from input JSON — external imports already filtered out) | `0.7` | `forward` |
 | `calls` | A function in this file calls a function in another file (infer from imports + function names when confident) | `0.8` | `forward` |
-| `inherits` | A class extends another class in the project | `0.9` | `forward` |
-| `implements` | A class implements an interface in the project | `0.9` | `forward` |
+| `inherits` | A class extends another class in the project. Use `classes[].superclass` from structural data when available. | `0.9` | `forward` |
+| `implements` | A class implements an interface in the project. Use `classes[].interfaces` from structural data when available. | `0.9` | `forward` |
 | `exports` | File exports a function or class node you created (only for exported items — use IN ADDITION to `contains`, not instead of it) | `0.8` | `forward` |
 | `depends_on` | File has runtime dependency on another project file (broader than imports -- includes dynamic requires, lazy loads) | `0.6` | `forward` |
 | `provides_rpc` | Class/method exposes an RPC service via provider annotation (see RPC section below). Source: provider class. Target: interface node (`class:<path>:<InterfaceName>`). | `0.9` | `forward` |
@@ -314,6 +314,16 @@ The `batchImportData` values contain only resolved project-internal paths — ex
 
 **`rpcAnnotations` in `config.json` is only needed for custom frameworks** that are NOT in the built-in list below. When present, custom entries are merged with the built-in list — they never override or disable built-in detection.
 
+**IMPORTANT — Using structural annotation data:** The `extract-structure.mjs` script now extracts annotations, `superclass`, `interfaces`, and typed field info for Java files. Use this data as your PRIMARY source for RPC/MQ edge generation:
+
+- `classes[].annotations` — class-level annotations (e.g., `@MoaProvider`, `@DubboService`, `@RestController`)
+- `classes[].superclass` — the class this extends
+- `classes[].interfaces` — interfaces this class implements (critical for RPC provider→interface matching)
+- `classes[].typedProperties` — field names, types, and annotations (e.g., `@MoaConsumer`, `@DubboReference`, `@Resource`, `@Autowired`)
+- `functions[].annotations` — method-level annotations (e.g., `@KafkaListener`, `@RequestMapping`)
+
+When `annotations` data is present in the structural extraction output, you MUST check it against the built-in annotation table below and emit corresponding edges. Do NOT skip this step even if the source file looks unfamiliar — the annotations are deterministically extracted by tree-sitter and are reliable.
+
 **Built-in annotation → edge mapping:**
 
 | Annotation | Framework | Edge type | Role |
@@ -337,16 +347,18 @@ The `batchImportData` values contain only resolved project-internal paths — ex
 
 **Provider rules (`provides_rpc`):**
 
-1. On `@DubboService`, `@MoaProvider`, or `@GrpcService`: create edge from the annotated class → interface node.
-2. Add tags `rpc-provider` and framework tag (`dubbo`, `moa`, `grpc`).
-3. In the provider node's `summary`, list the interface name and exposed RPC methods (e.g., "Implements PaymentFacade: createPayment(), refund()") for downstream cross-service matching.
+1. Check `classes[].annotations` for `@DubboService`, `@MoaProvider`, or `@GrpcService`. When found, create edge from the annotated class → interface node.
+2. Use `classes[].interfaces` to identify the RPC interface the provider implements (e.g., if `interfaces: ["PaymentFacade"]`, the target is that interface node).
+3. Add tags `rpc-provider` and framework tag (`dubbo`, `moa`, `grpc`).
+4. In the provider node's `summary`, list the interface name and exposed RPC methods (e.g., "Implements PaymentFacade: createPayment(), refund()") for downstream cross-service matching.
 
 **Consumer rules (`consumes_rpc`):**
 
-1. On `@DubboReference`, `@MoaConsumer`, `@GrpcClient`, or `@FeignClient`: create edge from the containing class → target interface/service.
-2. For `@FeignClient`, resolve the target from `name` / `value` / `url` attributes; framework = `feign`.
-3. Add tag `rpc-consumer`. Use `consumes_rpc` exclusively — do NOT also emit `depends_on` for the same remote service.
-4. If the interface definition is not in this batch, emit the edge anyway (merge script resolves or drops dangling targets).
+1. Check `classes[].typedProperties[].annotations` for `@DubboReference`, `@MoaConsumer`, or `@GrpcClient`. The field's `type` gives the consumed interface name. Also check `classes[].annotations` for `@FeignClient`.
+2. Create edge from the containing class → target interface/service.
+3. For `@FeignClient`, resolve the target from annotation `arguments.name` / `arguments.value` / `arguments.url`; framework = `feign`.
+4. Add tag `rpc-consumer`. Use `consumes_rpc` exclusively — do NOT also emit `depends_on` for the same remote service.
+5. If the interface definition is not in this batch, emit the edge anyway (merge script resolves or drops dangling targets).
 
 **Message-queue rules (`publishes` / `subscribes`):**
 

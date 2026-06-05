@@ -1,13 +1,17 @@
 packages:
   - "packages/*"
 allowBuilds:
+  '@driftlog/tree-sitter-dart': set this to true or false
+  '@tree-sitter-grammars/tree-sitter-kotlin': true
   esbuild: set this to true or false
   tree-sitter-c: set this to true or false
   tree-sitter-c-sharp: set this to true or false
+  tree-sitter-cli: true
   tree-sitter-cpp: set this to true or false
   tree-sitter-go: set this to true or false
   tree-sitter-java: set this to true or false
   tree-sitter-javascript: set this to true or false
+  tree-sitter-objc: true
   tree-sitter-php: set this to true or false
   tree-sitter-python: set this to true or false
   tree-sitter-ruby: set this to true or false

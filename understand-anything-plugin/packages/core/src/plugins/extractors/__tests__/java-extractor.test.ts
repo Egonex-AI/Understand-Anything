@@ -460,6 +460,262 @@ public class Foo {}
     });
   });
 
+  // ---- Annotations ----
+
+  describe("extractStructure - annotations", () => {
+    it("extracts marker annotations on classes", () => {
+      const { tree, parser, root } = parse(`@MoaProvider
+public class OrderServiceImpl {
+    public void createOrder() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].annotations).toEqual([{ name: "MoaProvider" }]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts annotations with arguments on classes", () => {
+      const { tree, parser, root } = parse(`@FeignClient(name = "payment-service", url = "http://localhost:8080")
+public class PaymentClient {
+    public void pay() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].annotations).toHaveLength(1);
+      expect(result.classes[0].annotations![0].name).toBe("FeignClient");
+      expect(result.classes[0].annotations![0].arguments).toEqual({
+        name: "payment-service",
+        url: "http://localhost:8080",
+      });
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts multiple annotations on a class", () => {
+      const { tree, parser, root } = parse(`@RestController
+@RequestMapping("/api/orders")
+public class OrderController {
+    public void list() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].annotations).toHaveLength(2);
+      expect(result.classes[0].annotations![0].name).toBe("RestController");
+      expect(result.classes[0].annotations![1].name).toBe("RequestMapping");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts annotations on methods", () => {
+      const { tree, parser, root } = parse(`public class Consumer {
+    @KafkaListener(topics = "order-events")
+    public void onMessage(String msg) {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      const fn = result.functions.find(f => f.name === "onMessage");
+      expect(fn).toBeDefined();
+      expect(fn!.annotations).toHaveLength(1);
+      expect(fn!.annotations![0].name).toBe("KafkaListener");
+      expect(fn!.annotations![0].arguments?.topics).toBe("order-events");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("omits annotations field when class has none", () => {
+      const { tree, parser, root } = parse(`public class Plain {
+    public void run() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].annotations).toBeUndefined();
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
+  // ---- Inheritance ----
+
+  describe("extractStructure - inheritance", () => {
+    it("extracts superclass from extends", () => {
+      const { tree, parser, root } = parse(`public class Dog extends Animal {
+    public void bark() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].superclass).toBe("Animal");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts implemented interfaces", () => {
+      const { tree, parser, root } = parse(`public class OrderServiceImpl implements OrderService, Serializable {
+    public void createOrder() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].interfaces).toEqual(["OrderService", "Serializable"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts both extends and implements", () => {
+      const { tree, parser, root } = parse(`public class SpecialService extends BaseService implements ServiceInterface {
+    public void run() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].superclass).toBe("BaseService");
+      expect(result.classes[0].interfaces).toEqual(["ServiceInterface"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts interface extends", () => {
+      const { tree, parser, root } = parse(`public interface ExtendedRepo extends BaseRepo {
+    void customQuery();
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].interfaces).toEqual(["BaseRepo"]);
+      expect(result.classes[0].superclass).toBeUndefined();
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("omits superclass/interfaces when absent", () => {
+      const { tree, parser, root } = parse(`public class Simple {
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].superclass).toBeUndefined();
+      expect(result.classes[0].interfaces).toBeUndefined();
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
+  // ---- Typed Properties ----
+
+  describe("extractStructure - typedProperties", () => {
+    it("extracts field types", () => {
+      const { tree, parser, root } = parse(`public class Service {
+    private String name;
+    private int count;
+    private List<Order> orders;
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].typedProperties).toHaveLength(3);
+      expect(result.classes[0].typedProperties![0]).toEqual({ name: "name", type: "String" });
+      expect(result.classes[0].typedProperties![1]).toEqual({ name: "count", type: "int" });
+      expect(result.classes[0].typedProperties![2]).toEqual({ name: "orders", type: "List<Order>" });
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts field annotations (MoaConsumer/DubboReference)", () => {
+      const { tree, parser, root } = parse(`public class OrderService {
+    @MoaConsumer
+    private PaymentFacade paymentFacade;
+
+    @Resource
+    private UserMapper userMapper;
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].typedProperties).toHaveLength(2);
+
+      const payment = result.classes[0].typedProperties!.find(p => p.name === "paymentFacade");
+      expect(payment).toBeDefined();
+      expect(payment!.type).toBe("PaymentFacade");
+      expect(payment!.annotations).toEqual([{ name: "MoaConsumer" }]);
+
+      const userMapper = result.classes[0].typedProperties!.find(p => p.name === "userMapper");
+      expect(userMapper).toBeDefined();
+      expect(userMapper!.annotations).toEqual([{ name: "Resource" }]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("omits typedProperties when class has no fields", () => {
+      const { tree, parser, root } = parse(`public class Empty {
+    public void run() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].typedProperties).toBeUndefined();
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
+  // ---- RPC-style comprehensive test ----
+
+  describe("RPC annotation comprehensive test", () => {
+    it("extracts complete RPC provider/consumer structure", () => {
+      const { tree, parser, root } = parse(`import com.example.api.OrderService;
+import com.example.api.PaymentFacade;
+
+@MoaProvider
+public class OrderServiceImpl implements OrderService {
+    @MoaConsumer
+    private PaymentFacade paymentFacade;
+
+    @Override
+    public void createOrder(String orderId) {
+        paymentFacade.charge(orderId);
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      const cls = result.classes[0];
+      expect(cls.name).toBe("OrderServiceImpl");
+      expect(cls.annotations).toEqual([{ name: "MoaProvider" }]);
+      expect(cls.interfaces).toEqual(["OrderService"]);
+
+      const paymentField = cls.typedProperties!.find(p => p.name === "paymentFacade");
+      expect(paymentField!.type).toBe("PaymentFacade");
+      expect(paymentField!.annotations).toEqual([{ name: "MoaConsumer" }]);
+
+      const createOrder = result.functions.find(f => f.name === "createOrder");
+      expect(createOrder!.annotations).toEqual([{ name: "Override" }]);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
   // ---- Comprehensive ----
 
   describe("comprehensive Java file", () => {

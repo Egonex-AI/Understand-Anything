@@ -160,23 +160,35 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
 
   // Functions (code files)
   if (analysis.functions && analysis.functions.length > 0) {
-    base.functions = analysis.functions.map(fn => ({
-      name: fn.name,
-      startLine: fn.lineRange[0],
-      endLine: fn.lineRange[1],
-      params: fn.params || [],
-    }));
+    base.functions = analysis.functions.map(fn => {
+      const entry = {
+        name: fn.name,
+        startLine: fn.lineRange[0],
+        endLine: fn.lineRange[1],
+        params: fn.params || [],
+      };
+      if (fn.returnType) entry.returnType = fn.returnType;
+      if (fn.annotations?.length) entry.annotations = fn.annotations;
+      return entry;
+    });
   }
 
   // Classes (code files)
   if (analysis.classes && analysis.classes.length > 0) {
-    base.classes = analysis.classes.map(cls => ({
-      name: cls.name,
-      startLine: cls.lineRange[0],
-      endLine: cls.lineRange[1],
-      methods: cls.methods || [],
-      properties: cls.properties || [],
-    }));
+    base.classes = analysis.classes.map(cls => {
+      const entry = {
+        name: cls.name,
+        startLine: cls.lineRange[0],
+        endLine: cls.lineRange[1],
+        methods: cls.methods || [],
+        properties: cls.properties || [],
+      };
+      if (cls.annotations?.length) entry.annotations = cls.annotations;
+      if (cls.superclass) entry.superclass = cls.superclass;
+      if (cls.interfaces?.length) entry.interfaces = cls.interfaces;
+      if (cls.typedProperties?.length) entry.typedProperties = cls.typedProperties;
+      return entry;
+    });
   }
 
   // Exports (code files)

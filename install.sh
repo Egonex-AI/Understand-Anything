@@ -91,7 +91,16 @@ prompt_platform() {
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
+    local stashed=0
+    if ! git -C "$REPO_DIR" diff --quiet 2>/dev/null; then
+      printf -- '  (stashing local changes from pnpm install / build)\n'
+      git -C "$REPO_DIR" stash push -q -m "ua-installer-auto-stash"
+      stashed=1
+    fi
     git -C "$REPO_DIR" pull --ff-only
+    if (( stashed )); then
+      git -C "$REPO_DIR" stash pop -q 2>/dev/null || true
+    fi
   else
     printf -- '→ Cloning %s → %s\n' "$REPO_URL" "$REPO_DIR"
     mkdir -p "$(dirname "$REPO_DIR")"
@@ -221,7 +230,16 @@ cmd_update() {
     printf 'No installation found at %s. Run install first.\n' "$REPO_DIR" >&2
     exit 1
   fi
+  local stashed=0
+  if ! git -C "$REPO_DIR" diff --quiet 2>/dev/null; then
+    printf -- '→ Stashing local changes (pnpm install / build artifacts)...\n'
+    git -C "$REPO_DIR" stash push -q -m "ua-installer-auto-stash"
+    stashed=1
+  fi
   git -C "$REPO_DIR" pull --ff-only
+  if (( stashed )); then
+    git -C "$REPO_DIR" stash pop -q 2>/dev/null || true
+  fi
   printf '✓ Updated.\n'
 }
 

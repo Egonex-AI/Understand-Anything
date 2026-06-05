@@ -370,9 +370,35 @@ export interface ReferenceResolution {
 }
 
 // Plugin interfaces
+export interface AnnotationInfo {
+  name: string;
+  arguments?: Record<string, string>;
+}
+
+export interface PropertyInfo {
+  name: string;
+  type?: string;
+  annotations?: AnnotationInfo[];
+}
+
 export interface StructuralAnalysis {
-  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string }>;
-  classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
+  functions: Array<{
+    name: string;
+    lineRange: [number, number];
+    params: string[];
+    returnType?: string;
+    annotations?: AnnotationInfo[];
+  }>;
+  classes: Array<{
+    name: string;
+    lineRange: [number, number];
+    methods: string[];
+    properties: string[];
+    annotations?: AnnotationInfo[];
+    superclass?: string;
+    interfaces?: string[];
+    typedProperties?: PropertyInfo[];
+  }>;
   imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;
   // Non-code structural data (all optional for backward compat)

@@ -52,7 +52,7 @@ describe("LanguageRegistry", () => {
     it("registers all 40 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(40);
+      expect(all.length).toBe(42);
     });
 
     it("maps all expected extensions", () => {

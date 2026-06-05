@@ -1,4 +1,4 @@
-import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
+import type { StructuralAnalysis, CallGraphEntry, AnnotationInfo, PropertyInfo } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
@@ -54,6 +54,93 @@ function hasModifier(node: TreeSitterNode, modifier: string): boolean {
     if (child && child.text === modifier) return true;
   }
   return false;
+}
+
+/**
+ * Extract annotations from a `modifiers` node.
+ *
+ * In tree-sitter-java, modifiers can contain `marker_annotation` (no args)
+ * and `annotation` (with args). Both have a `name` field.
+ */
+function extractAnnotations(node: TreeSitterNode): AnnotationInfo[] {
+  const modifiers = findChild(node, "modifiers");
+  if (!modifiers) return [];
+  const annotations: AnnotationInfo[] = [];
+  for (let i = 0; i < modifiers.childCount; i++) {
+    const child = modifiers.child(i);
+    if (!child) continue;
+    if (child.type === "marker_annotation") {
+      const nameNode = child.childForFieldName("name");
+      if (nameNode) annotations.push({ name: nameNode.text });
+    } else if (child.type === "annotation") {
+      const nameNode = child.childForFieldName("name");
+      if (!nameNode) continue;
+      const info: AnnotationInfo = { name: nameNode.text };
+      const argsNode = child.childForFieldName("arguments");
+      if (argsNode) {
+        const args: Record<string, string> = {};
+        for (let j = 0; j < argsNode.childCount; j++) {
+          const arg = argsNode.child(j);
+          if (!arg) continue;
+          if (arg.type === "element_value_pair") {
+            const key = arg.childForFieldName("key");
+            const value = arg.childForFieldName("value");
+            if (key && value) {
+              args[key.text] = value.text.replace(/^"|"$/g, "");
+            }
+          } else if (arg.type !== "(" && arg.type !== ")" && arg.type !== ",") {
+            args["value"] = arg.text.replace(/^"|"$/g, "");
+          }
+        }
+        if (Object.keys(args).length > 0) info.arguments = args;
+      }
+      annotations.push(info);
+    }
+  }
+  return annotations;
+}
+
+/**
+ * Extract the superclass name from a class_declaration's `superclass` field.
+ */
+function extractSuperclass(node: TreeSitterNode): string | undefined {
+  const superNode = node.childForFieldName("superclass");
+  if (!superNode) return undefined;
+  const typeNode = findChild(superNode, "type_identifier") ?? findChild(superNode, "generic_type");
+  return typeNode?.text;
+}
+
+/**
+ * Extract implemented interface names from a class_declaration's `interfaces` field
+ * (which maps to a `super_interfaces` node), or extended interfaces from an
+ * interface_declaration's `extends_interfaces` child node.
+ *
+ * In tree-sitter-java:
+ * - class: `childForFieldName("interfaces")` → `super_interfaces` node
+ * - interface: `extends_interfaces` is a child node type, not a named field
+ * Both contain a `type_list` with `type_identifier` children.
+ */
+function extractInterfaces(node: TreeSitterNode): string[] {
+  const interfacesNode =
+    node.childForFieldName("interfaces") ??
+    findChild(node, "extends_interfaces");
+  if (!interfacesNode) return [];
+  const result: string[] = [];
+  for (let i = 0; i < interfacesNode.childCount; i++) {
+    const child = interfacesNode.child(i);
+    if (!child) continue;
+    if (child.type === "type_identifier" || child.type === "generic_type") {
+      result.push(child.text);
+    } else if (child.type === "type_list") {
+      for (let j = 0; j < child.childCount; j++) {
+        const typeChild = child.child(j);
+        if (typeChild && (typeChild.type === "type_identifier" || typeChild.type === "generic_type")) {
+          result.push(typeChild.text);
+        }
+      }
+    }
+  }
+  return result;
 }
 
 /**
@@ -247,6 +334,7 @@ export class JavaExtractor implements LanguageExtractor {
 
     const methods: string[] = [];
     const properties: string[] = [];
+    const typedProperties: PropertyInfo[] = [];
 
     const body = node.childForFieldName("body");
     if (body) {
@@ -256,10 +344,15 @@ export class JavaExtractor implements LanguageExtractor {
         properties,
         functions,
         exports,
+        typedProperties,
       );
     }
 
-    classes.push({
+    const annotations = extractAnnotations(node);
+    const superclass = extractSuperclass(node);
+    const interfaces = extractInterfaces(node);
+
+    const classEntry: StructuralAnalysis["classes"][0] = {
       name: nameNode.text,
       lineRange: [
         node.startPosition.row + 1,
@@ -267,7 +360,12 @@ export class JavaExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
-    });
+    };
+    if (annotations.length > 0) classEntry.annotations = annotations;
+    if (superclass) classEntry.superclass = superclass;
+    if (interfaces.length > 0) classEntry.interfaces = interfaces;
+    if (typedProperties.length > 0) classEntry.typedProperties = typedProperties;
+    classes.push(classEntry);
 
     if (hasModifier(node, "public")) {
       exports.push({
@@ -291,7 +389,6 @@ export class JavaExtractor implements LanguageExtractor {
 
     const body = node.childForFieldName("body");
     if (body) {
-      // Interface body contains method_declaration nodes (signatures without bodies)
       const methodNodes = findChildren(body, "method_declaration");
       for (const methodNode of methodNodes) {
         const methNameNode = methodNode.childForFieldName("name");
@@ -300,7 +397,6 @@ export class JavaExtractor implements LanguageExtractor {
         }
       }
 
-      // Interface can also contain constant_declaration (fields)
       const fields = findChildren(body, "constant_declaration");
       for (const field of fields) {
         const declarators = findChildren(field, "variable_declarator");
@@ -313,7 +409,10 @@ export class JavaExtractor implements LanguageExtractor {
       }
     }
 
-    classes.push({
+    const annotations = extractAnnotations(node);
+    const interfaces = extractInterfaces(node);
+
+    const classEntry: StructuralAnalysis["classes"][0] = {
       name: nameNode.text,
       lineRange: [
         node.startPosition.row + 1,
@@ -321,7 +420,10 @@ export class JavaExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
-    });
+    };
+    if (annotations.length > 0) classEntry.annotations = annotations;
+    if (interfaces.length > 0) classEntry.interfaces = interfaces;
+    classes.push(classEntry);
 
     if (hasModifier(node, "public")) {
       exports.push({
@@ -331,15 +433,13 @@ export class JavaExtractor implements LanguageExtractor {
     }
   }
 
-  /**
-   * Extract methods, constructors, and fields from a class_body node.
-   */
   private extractClassBodyMembers(
     body: TreeSitterNode,
     methods: string[],
     properties: string[],
     functions: StructuralAnalysis["functions"],
     exports: StructuralAnalysis["exports"],
+    typedProperties?: PropertyInfo[],
   ): void {
     for (let i = 0; i < body.childCount; i++) {
       const child = body.child(i);
@@ -355,7 +455,7 @@ export class JavaExtractor implements LanguageExtractor {
           break;
 
         case "field_declaration":
-          this.extractField(child, properties, exports);
+          this.extractField(child, properties, exports, typedProperties);
           break;
       }
     }
@@ -373,10 +473,11 @@ export class JavaExtractor implements LanguageExtractor {
     const paramsNode = node.childForFieldName("parameters");
     const params = extractParams(paramsNode ?? null);
     const returnType = extractReturnType(node);
+    const annotations = extractAnnotations(node);
 
     methods.push(nameNode.text);
 
-    functions.push({
+    const fnEntry: StructuralAnalysis["functions"][0] = {
       name: nameNode.text,
       lineRange: [
         node.startPosition.row + 1,
@@ -384,7 +485,9 @@ export class JavaExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
-    });
+    };
+    if (annotations.length > 0) fnEntry.annotations = annotations;
+    functions.push(fnEntry);
 
     if (hasModifier(node, "public")) {
       exports.push({
@@ -430,12 +533,24 @@ export class JavaExtractor implements LanguageExtractor {
     node: TreeSitterNode,
     properties: string[],
     exports: StructuralAnalysis["exports"],
+    typedProperties?: PropertyInfo[],
   ): void {
+    const typeNode = node.childForFieldName("type");
+    const fieldType = typeNode?.text;
+    const fieldAnnotations = extractAnnotations(node);
+
     const declarators = findChildren(node, "variable_declarator");
     for (const decl of declarators) {
       const nameNode = decl.childForFieldName("name");
       if (nameNode) {
         properties.push(nameNode.text);
+
+        if (typedProperties) {
+          const prop: PropertyInfo = { name: nameNode.text };
+          if (fieldType) prop.type = fieldType;
+          if (fieldAnnotations.length > 0) prop.annotations = fieldAnnotations;
+          typedProperties.push(prop);
+        }
 
         if (hasModifier(node, "public")) {
           exports.push({
