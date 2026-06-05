@@ -199,6 +199,18 @@ export class WikiDataService {
         // skip
       }
     }
+
+    // Fallback: check if filePath exists under any subproject's real root directory.
+    // This handles cases where sourceRef uses a Maven module directory as the first
+    // segment (e.g. "ultron-composite-service/src/...") but the actual file lives
+    // inside a parent subproject directory (e.g. "ultron-composite/ultron-composite-service/src/...").
+    for (const svc of topo.services) {
+      const serviceRoot = path.dirname(path.dirname(svc.wikiDir));
+      if (fs.existsSync(path.join(serviceRoot, filePath))) {
+        return [svc.name, ...segments].join("/");
+      }
+    }
+
     return filePath;
   }
 

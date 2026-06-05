@@ -390,6 +390,73 @@ describe("WikiDataService", () => {
     });
   });
 
+  describe("resolveSourcePath", () => {
+    it("returns path unchanged when file exists directly under projectRoot", () => {
+      fs.mkdirSync(path.join(tmpDir, "src", "main"), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, "src", "main", "App.java"), "class App {}");
+
+      const svc = new WikiDataService(tmpDir);
+      expect(svc.resolveSourcePath("src/main/App.java")).toBe("src/main/App.java");
+    });
+
+    it("returns path unchanged when first segment is an existing directory", () => {
+      fs.mkdirSync(path.join(tmpDir, "my-module"), { recursive: true });
+
+      const svc = new WikiDataService(tmpDir);
+      expect(svc.resolveSourcePath("my-module/src/Foo.java")).toBe("my-module/src/Foo.java");
+    });
+
+    it("rewrites path when service.json.name matches first segment", () => {
+      writeJson(path.join(tmpDir, "order-svc/.understand-anything/wiki/meta.json"), {
+        gitCommitHash: "a", generatedAt: "t", version: "1", outputLanguage: "en",
+      });
+      writeJson(path.join(tmpDir, "order-svc/.understand-anything/wiki/service.json"), {
+        name: "order-service",
+        description: "Orders",
+        techStack: [],
+        modules: [],
+        entryPoints: [],
+      });
+
+      const svc = new WikiDataService(tmpDir);
+      expect(svc.resolveSourcePath("order-service/src/Main.java"))
+        .toBe("order-svc/src/Main.java");
+    });
+
+    it("falls back to subproject root when first segment is a Maven module directory", () => {
+      const subProjectDir = path.join(tmpDir, "ultron-composite");
+      const moduleDir = path.join(subProjectDir, "ultron-composite-service");
+      fs.mkdirSync(path.join(moduleDir, "src", "main", "java", "com", "example"), { recursive: true });
+      fs.writeFileSync(
+        path.join(moduleDir, "src", "main", "java", "com", "example", "SayHiService.java"),
+        "class SayHiService {}",
+      );
+
+      writeJson(path.join(subProjectDir, ".understand-anything/wiki/meta.json"), {
+        gitCommitHash: "a", generatedAt: "t", version: "1", outputLanguage: "en",
+      });
+
+      const svc = new WikiDataService(tmpDir);
+      const input = "ultron-composite-service/src/main/java/com/example/SayHiService.java";
+      const expected = "ultron-composite/ultron-composite-service/src/main/java/com/example/SayHiService.java";
+      expect(svc.resolveSourcePath(input)).toBe(expected);
+    });
+
+    it("returns original path when no fallback matches", () => {
+      writeJson(path.join(tmpDir, "some-svc/.understand-anything/wiki/meta.json"), {
+        gitCommitHash: "a", generatedAt: "t", version: "1", outputLanguage: "en",
+      });
+
+      const svc = new WikiDataService(tmpDir);
+      expect(svc.resolveSourcePath("nonexistent/path/Foo.java")).toBe("nonexistent/path/Foo.java");
+    });
+
+    it("returns single-segment paths unchanged", () => {
+      const svc = new WikiDataService(tmpDir);
+      expect(svc.resolveSourcePath("README.md")).toBe("README.md");
+    });
+  });
+
   describe("invalidateCache", () => {
     it("forces re-discovery on next call", () => {
       const svc = new WikiDataService(tmpDir);
