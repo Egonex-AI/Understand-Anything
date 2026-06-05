@@ -10,10 +10,13 @@ import {
   overviewToMarkdown,
   architectureToMarkdown,
   crossDomainToMarkdown,
+  endpointDocToMarkdown,
+  endpointIndexToMarkdown,
 } from "../utils/wikiToMarkdown";
 import { WikiLinkRenderer, type WikiLinkNavigation } from "./WikiLinkRenderer";
 import { WikiSourcePanel } from "./WikiSourcePanel";
 import { useI18n } from "../contexts/I18nContext";
+import { flowFragmentFromId, isSameWikiPage, isSameWikiTarget, type WikiPageType } from "../utils/wikiFlowNav";
 
 function crossDomainSlug(id: string): string {
   return id.replace(/^(?:wiki:)?(?:cross-domain|domain):/, "");
@@ -24,9 +27,8 @@ import type {
   WikiOverview,
   WikiArchitecture,
   WikiCrossDomain,
+  ServiceEndpointDoc,
 } from "@understand-anything/core";
-
-type WikiPageType = "service" | "domain" | "overview" | "architecture" | "cross-domain";
 
 interface NavEntry {
   id: string;
@@ -94,7 +96,7 @@ function WikiNavTree({
   topology: { hasParentWiki: boolean; services: Array<{ name: string }> } | null;
   activePage: { type: WikiPageType; id: string; service?: string; fragment?: string } | null;
   viewScope: "global" | string;
-  onSelect: (page: { type: WikiPageType; id: string; service?: string }) => void;
+  onSelect: (page: { type: WikiPageType; id: string; service?: string; fragment?: string }) => void;
   onScopeChange: (scope: "global" | string) => void;
 }) {
   const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
@@ -228,6 +230,22 @@ function WikiNavTree({
         </div>
       )}
 
+      {/* Global endpoint index */}
+      {showGlobalSection && entries.filter((e) => e.type === "endpoint" && !e.service).map((ep) => (
+        <button
+          key={ep.id}
+          type="button"
+          onClick={() => onSelect({ type: "endpoint" as WikiPageType, id: ep.id })}
+          className={`w-full text-left px-3 py-1.5 rounded text-xs transition-colors ${
+            activePage?.type === "endpoint" && activePage?.id === ep.id
+              ? "bg-accent/10 text-accent font-medium"
+              : "hover:bg-surface-hover text-text-muted"
+          }`}
+        >
+          {ep.name}
+        </button>
+      ))}
+
       {/* By Service section */}
       {showServiceSection && services.length > 0 && (
         <div className="mb-3">
@@ -297,11 +315,11 @@ function WikiNavTree({
                                         type: "domain",
                                         id: item.id,
                                         service: svc.name,
-                                        fragment: `flow:${flow.id.replace(/^wiki:flow:/, "")}`,
-                                      } as { type: WikiPageType; id: string; service: string })
+                                        fragment: flowFragmentFromId(flow.id),
+                                      })
                                     }
                                     className={`w-full text-left px-2 py-0.5 rounded text-[10px] transition-colors ${
-                                      activePage?.fragment === `flow:${flow.id.replace(/^wiki:flow:/, "")}`
+                                      activePage?.fragment === flowFragmentFromId(flow.id)
                                         ? "bg-accent/10 text-accent"
                                         : "hover:bg-surface-hover text-text-muted"
                                     }`}
@@ -316,6 +334,20 @@ function WikiNavTree({
                       })}
                     </div>
                   )}
+                  {entries.filter((e) => e.type === "endpoint" && e.service === svc.name).map((ep) => (
+                    <button
+                      key={ep.id}
+                      type="button"
+                      onClick={() => onSelect({ type: "endpoint" as WikiPageType, id: ep.id, service: svc.name })}
+                      className={`w-full text-left px-3 py-1.5 rounded text-xs transition-colors ${
+                        activePage?.type === "endpoint" && activePage?.id === ep.id
+                          ? "bg-accent/10 text-accent font-medium"
+                          : "hover:bg-surface-hover text-text-muted"
+                      }`}
+                    >
+                      {ep.name}
+                    </button>
+                  ))}
                 </div>
               );
             })}
@@ -442,6 +474,13 @@ function WikiContent({
       case "domain":
         markdown = domainPageToMarkdown(content as WikiDomainPage, wikiLabels);
         break;
+      case "endpoint":
+        if ((content as Record<string, unknown>)?.byService) {
+          markdown = endpointIndexToMarkdown(content as Record<string, unknown>, wikiLabels);
+        } else {
+          markdown = endpointDocToMarkdown(content as ServiceEndpointDoc, wikiLabels);
+        }
+        break;
     }
   } catch (err) {
     console.error(`[wiki] Failed to render ${pageType} page:`, err);
@@ -511,9 +550,12 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
       .catch(() => {});
   }, [apiUrl, wikiIndex, setWikiIndex, setWikiTopology]);
 
-  // Fetch page content when active page changes
+  // Fetch page content when active page changes (type/id/service only, not fragment)
+  const fetchPageType = wikiActivePage?.type;
+  const fetchPageId = wikiActivePage?.id;
+  const fetchPageService = wikiActivePage?.service;
   useEffect(() => {
-    if (!wikiActivePage) {
+    if (!fetchPageType || !fetchPageId) {
       setWikiPageContent(null);
       return;
     }
@@ -522,7 +564,7 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
     const controller = new AbortController();
 
     let endpoint = "";
-    switch (wikiActivePage.type) {
+    switch (fetchPageType) {
       case "overview":
         endpoint = "/overview";
         break;
@@ -530,16 +572,24 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
         endpoint = "/architecture";
         break;
       case "cross-domain":
-        endpoint = `/domain/${encodeURIComponent(crossDomainSlug(wikiActivePage.id))}`;
+        endpoint = `/domain/${encodeURIComponent(crossDomainSlug(fetchPageId))}`;
         break;
       case "service":
-        endpoint = `/service/${encodeURIComponent(wikiActivePage.id)}`;
+        endpoint = `/service/${encodeURIComponent(fetchPageId)}`;
         break;
       case "domain":
-        if (wikiActivePage.service) {
-          endpoint = `/service/${encodeURIComponent(wikiActivePage.service)}/domain/${encodeURIComponent(crossDomainSlug(wikiActivePage.id))}`;
+        if (fetchPageService) {
+          endpoint = `/service/${encodeURIComponent(fetchPageService)}/domain/${encodeURIComponent(crossDomainSlug(fetchPageId))}`;
         } else {
-          endpoint = `/domain/${encodeURIComponent(crossDomainSlug(wikiActivePage.id))}`;
+          endpoint = `/domain/${encodeURIComponent(crossDomainSlug(fetchPageId))}`;
+        }
+        break;
+      case "endpoint":
+        if (fetchPageId === "wiki:endpoints:index") {
+          endpoint = "/endpoints/index";
+        } else {
+          const svcName = fetchPageId.replace(/^wiki:endpoints:/, "");
+          endpoint = `/endpoints/${encodeURIComponent(svcName)}`;
         }
         break;
     }
@@ -548,7 +598,7 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (controller.signal.aborted) return;
-        if (wikiActivePage.type === "service" && data?.index && data?.overview) {
+        if (fetchPageType === "service" && data?.index && data?.overview) {
           setWikiPageContent(data.overview);
         } else {
           setWikiPageContent(data);
@@ -562,19 +612,50 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
       });
 
     return () => controller.abort();
-  }, [wikiActivePage, apiUrl, setWikiPageContent, setWikiLoading]);
+  }, [fetchPageType, fetchPageId, fetchPageService, apiUrl, setWikiPageContent, setWikiLoading]);
+
+  // Scroll to fragment after page content loads
+  useEffect(() => {
+    const fragment = wikiActivePage?.fragment;
+    if (!fragment || wikiLoading || !wikiPageContent) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 30; // ~500ms at 60fps
+    const scroll = () => {
+      if (cancelled) return;
+      const el = document.getElementById(fragment);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (attempts++ < MAX_ATTEMPTS) {
+        requestAnimationFrame(scroll);
+      } else if (import.meta.env.DEV) {
+        console.warn(`[WikiView] Fragment #${fragment} not found after ${MAX_ATTEMPTS} rAF attempts`);
+      }
+    };
+
+    const rafId = requestAnimationFrame(scroll);
+    return () => { cancelled = true; cancelAnimationFrame(rafId); };
+  }, [wikiActivePage?.fragment, wikiLoading, wikiPageContent]);
 
   const handleSelect = useCallback(
     (page: { type: WikiPageType; id: string; service?: string; fragment?: string }) => {
-      const isSamePage =
-        wikiActivePage?.type === page.type &&
-        wikiActivePage?.id === page.id &&
-        wikiActivePage?.service === page.service;
+      const isSameTarget = wikiActivePage ? isSameWikiTarget(wikiActivePage, page) : false;
 
-      if (!isSamePage) {
+      if (!isSameTarget) {
+        const needsFetch = !wikiActivePage || !isSameWikiPage(wikiActivePage, page);
+
         setWikiActivePage(page);
-        setWikiPageContent(null);
-        setWikiLoading(true);
+        if (needsFetch) {
+          setWikiPageContent(null);
+          setWikiLoading(true);
+        }
+      } else if (page.fragment) {
+        // Same target with same fragment — re-scroll (user may have scrolled away)
+        const el = document.getElementById(page.fragment);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
       // Build breadcrumb
@@ -588,20 +669,6 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
       const entry = wikiIndex?.entries.find((e) => e.id === page.id);
       crumbs.push({ label: entry?.name ?? page.id, page: null });
       setWikiBreadcrumb(crumbs);
-
-      if (page.fragment) {
-        const scrollToFragment = () => {
-          const el = document.getElementById(page.fragment!);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        };
-        if (isSamePage) {
-          scrollToFragment();
-        } else {
-          setTimeout(scrollToFragment, 300);
-        }
-      }
     },
     [setWikiActivePage, setWikiPageContent, setWikiLoading, setWikiBreadcrumb, wikiIndex, wikiTopology, wikiActivePage],
   );
@@ -617,15 +684,11 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
     (nav: WikiLinkNavigation) => {
       if (!nav.service) return;
       const pathParts = nav.path.split("/");
-      if (pathParts[0] === "domains" && pathParts[1]) {
+      if (pathParts[0] === "endpoints") {
+        handleSelect({ type: "endpoint" as WikiPageType, id: `wiki:endpoints:${nav.service}`, service: nav.service });
+      } else if (pathParts[0] === "domains" && pathParts[1]) {
         const domainId = pathParts[1].replace(".json", "");
-        handleSelect({ type: "domain", id: domainId, service: nav.service });
-        if (nav.fragment) {
-          requestAnimationFrame(() => {
-            const el = document.getElementById(nav.fragment!);
-            el?.scrollIntoView({ behavior: "smooth", block: "start" });
-          });
-        }
+        handleSelect({ type: "domain", id: domainId, service: nav.service, fragment: nav.fragment });
       } else {
         handleSelect({ type: "service", id: nav.service, service: nav.service });
       }

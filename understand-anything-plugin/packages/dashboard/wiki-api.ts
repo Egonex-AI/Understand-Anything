@@ -12,6 +12,7 @@ import type {
   WikiCrossDomain,
   WikiSearchResult,
   WikiTopology,
+  ServiceEndpointDoc,
 } from "@understand-anything/core";
 import { sanitizeSlug } from "./src/utils/sanitize";
 
@@ -286,6 +287,26 @@ export class WikiDataService {
     const svc = topo.services.find((s) => s.name === svcSlug);
     if (!svc) return null;
     return this.readJson<WikiDomainPage>(path.join(svc.wikiDir, "domains", `${slug}.json`));
+  }
+
+  getEndpointDoc(serviceName: string): ServiceEndpointDoc | null {
+    const topo = this.discoverWikis();
+    for (const svc of topo.services) {
+      if (svc.name === serviceName) {
+        const endpointPath = path.join(svc.wikiDir, "endpoints", `${serviceName}.json`);
+        return this.readJson<ServiceEndpointDoc>(endpointPath);
+      }
+    }
+    return null;
+  }
+
+  getEndpointIndex(): Record<string, unknown> | null {
+    const topo = this.discoverWikis();
+    if (topo.hasParentWiki && topo.parentWikiDir) {
+      const indexPath = path.join(topo.parentWikiDir, "endpoints", "index.json");
+      return this.readJson<Record<string, unknown>>(indexPath);
+    }
+    return null;
   }
 
   async search(query: string, limit = 20): Promise<WikiSearchResult[]> {

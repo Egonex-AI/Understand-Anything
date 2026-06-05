@@ -212,7 +212,7 @@ interface DashboardStore {
   // Wiki view
   wikiAvailable: boolean;
   wikiIndex: { entries: Array<{ id: string; name: string; type: string; service?: string; summary: string }> } | null;
-  wikiActivePage: { type: "service" | "domain" | "overview" | "architecture" | "cross-domain"; id: string; service?: string } | null;
+  wikiActivePage: { type: "service" | "domain" | "overview" | "architecture" | "cross-domain" | "endpoint"; id: string; service?: string; fragment?: string } | null;
   wikiPageContent: unknown | null;
   wikiLoading: boolean;
   wikiTopology: { hasParentWiki: boolean; services: Array<{ name: string }> } | null;
@@ -224,7 +224,7 @@ interface DashboardStore {
   wikiBreadcrumb: Array<{ label: string; page: { type: string; id: string; service?: string } | null }>;
   setWikiAvailable: (available: boolean) => void;
   setWikiIndex: (index: { entries: Array<{ id: string; name: string; type: string; service?: string; summary: string }> }) => void;
-  setWikiActivePage: (page: { type: "service" | "domain" | "overview" | "architecture" | "cross-domain"; id: string; service?: string } | null) => void;
+  setWikiActivePage: (page: { type: "service" | "domain" | "overview" | "architecture" | "cross-domain" | "endpoint"; id: string; service?: string; fragment?: string } | null) => void;
   setWikiPageContent: (content: unknown | null) => void;
   setWikiLoading: (loading: boolean) => void;
   setWikiTopology: (topology: { hasParentWiki: boolean; services: Array<{ name: string }> } | null) => void;

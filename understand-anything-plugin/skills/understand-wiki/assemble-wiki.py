@@ -152,6 +152,15 @@ def main() -> None:
                 shutil.copy2(src, os.path.join(final_dir, "domains", f))
                 copied += 1
 
+    # Copy endpoints directory if present
+    endpoints_src = os.path.join(intermediate_dir, "endpoints")
+    if os.path.isdir(endpoints_src):
+        endpoints_dst = os.path.join(final_dir, "endpoints")
+        os.makedirs(endpoints_dst, exist_ok=True)
+        for f in sorted(os.listdir(endpoints_src)):
+            if f.endswith(".json"):
+                shutil.copy2(os.path.join(endpoints_src, f), os.path.join(endpoints_dst, f))
+
     for item in ["overview.json", "architecture.json"]:
         src = os.path.join(intermediate_dir, item)
         if os.path.exists(src):

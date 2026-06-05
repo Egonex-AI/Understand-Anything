@@ -1,4 +1,4 @@
-import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, CrossServiceCall, WikiOverview, WikiArchitecture, WikiCrossDomain, WikiEntity, WikiGlossaryEntry, WikiBusinessRule, WikiIntegrationPoints } from "@understand-anything/core";
+import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, CrossServiceCall, WikiOverview, WikiArchitecture, WikiCrossDomain, WikiEntity, WikiGlossaryEntry, WikiBusinessRule, WikiIntegrationPoints, ServiceEndpointDoc } from "@understand-anything/core";
 import type { Locale } from "../locales";
 import { en } from "../locales/en";
 
@@ -604,6 +604,160 @@ export function domainPageToMarkdown(page: WikiDomainPage, labels: WikiLabels = 
 
   if (Array.isArray(page?.crossServiceCalls) && page.crossServiceCalls.length > 0) {
     lines.push(crossServiceCallsToTable(page.crossServiceCalls, labels));
+  }
+
+  return lines.join("\n");
+}
+
+export function endpointDocToMarkdown(doc: ServiceEndpointDoc, labels: WikiLabels = defaultLabels): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${doc.service} ${labels.endpoints ?? "Endpoints"}`);
+  lines.push("");
+  lines.push(doc.description ?? "");
+  lines.push("");
+
+  const providers = Array.isArray(doc.providers) ? doc.providers : [];
+  if (providers.length > 0) {
+    lines.push(`## ${labels.endpointProviders ?? "Providers"}`);
+    lines.push("");
+    lines.push(`| ${labels.endpointIdentifier ?? "Identifier"} | ${labels.endpointProtocol ?? "Protocol"} | ${labels.endpointFramework ?? "Framework"} | ${labels.endpointMethods ?? "Methods"} |`);
+    lines.push("| --- | --- | --- | --- |");
+    for (const p of providers) {
+      const methodCount = Array.isArray(p.methods) ? p.methods.length : 0;
+      lines.push(`| \`${p.identifier}\` | ${p.protocol} | ${p.framework} | ${methodCount} |`);
+    }
+    lines.push("");
+
+    for (const p of providers) {
+      if (!Array.isArray(p.methods) || p.methods.length === 0) continue;
+      lines.push(`### ${p.identifier}`);
+      lines.push("");
+      if (p.group || p.version) {
+        const meta: string[] = [];
+        if (p.group) meta.push(`group: \`${p.group}\``);
+        if (p.version) meta.push(`version: \`${p.version}\``);
+        lines.push(`> ${meta.join(" | ")}`);
+        lines.push("");
+      }
+      lines.push(`| ${labels.endpointMethodName ?? "Method"} | ${labels.endpointParams ?? "Params"} | ${labels.endpointReturnType ?? "Return Type"} |`);
+      lines.push("| --- | --- | --- |");
+      for (const m of p.methods) {
+        const params = Array.isArray(m.params)
+          ? m.params.map((pp: { name: string; type: string }) => `${pp.name}: ${pp.type}`).join(", ")
+          : "";
+        lines.push(`| \`${m.name}\` | \`${params || "—"}\` | \`${m.returnType || "void"}\` |`);
+      }
+      lines.push("");
+      if (p.sourceRef?.file) {
+        lines.push(`📄 [${p.sourceRef.file}](source://${p.sourceRef.file})`);
+        lines.push("");
+      }
+    }
+  }
+
+  const consumers = Array.isArray(doc.consumers) ? doc.consumers : [];
+  if (consumers.length > 0) {
+    lines.push(`## ${labels.endpointConsumers ?? "Consumers"}`);
+    lines.push("");
+    lines.push(`| ${labels.endpointIdentifier ?? "Identifier"} | ${labels.endpointProtocol ?? "Protocol"} | ${labels.endpointFramework ?? "Framework"} | ${labels.endpointTargetInterface ?? "Target Interface"} |`);
+    lines.push("| --- | --- | --- | --- |");
+    for (const c of consumers) {
+      lines.push(`| \`${c.identifier}\` | ${c.protocol} | ${c.framework} | \`${c.targetInterface}\` |`);
+    }
+    lines.push("");
+  }
+
+  const kafkaTopics = Array.isArray(doc.kafkaTopics) ? doc.kafkaTopics : [];
+  if (kafkaTopics.length > 0) {
+    lines.push(`## ${labels.endpointKafkaTopics ?? "Kafka Topics"}`);
+    lines.push("");
+    lines.push(`| ${labels.endpointTopic ?? "Topic"} | ${labels.endpointRole ?? "Role"} | ${labels.endpointHandler ?? "Handler Method"} |`);
+    lines.push("| --- | --- | --- |");
+    for (const t of kafkaTopics) {
+      lines.push(`| \`${t.topic}\` | ${t.role} | \`${t.handlerMethod ?? "—"}\` |`);
+    }
+    lines.push("");
+  }
+
+  if (providers.length > 0 || consumers.length > 0) {
+    lines.push(`## ${labels.systemArchitecture ?? "Topology"}`);
+    lines.push("");
+    lines.push("```mermaid");
+    lines.push("graph LR");
+    for (const c of consumers) {
+      const safeName = sanitizeMermaidLabel(c.targetInterface);
+      const safeId = sanitizeMermaidLabel(c.identifier);
+      lines.push(`  ${safeId}["${c.identifier}"] -->|${c.protocol}| ${safeName}["${c.targetInterface}"]`);
+    }
+    for (const p of providers) {
+      const safeId = sanitizeMermaidLabel(p.identifier);
+      lines.push(`  ${safeId}["${p.identifier}"]:::provider`);
+    }
+    lines.push("  classDef provider fill:#3b82f6,stroke:#1e40af,color:white");
+    lines.push("```");
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+export function endpointIndexToMarkdown(index: Record<string, unknown>, labels: WikiLabels = defaultLabels): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${labels.endpointIndex ?? "Endpoint Index"}`);
+  lines.push("");
+
+  const totalProviders = (index as { totalProviders?: number }).totalProviders ?? 0;
+  const totalConsumers = (index as { totalConsumers?: number }).totalConsumers ?? 0;
+  const totalKafka = (index as { totalKafkaTopics?: number }).totalKafkaTopics ?? 0;
+  lines.push(`> ${totalProviders} providers | ${totalConsumers} consumers | ${totalKafka} Kafka topics`);
+  lines.push("");
+
+  const byService = Array.isArray((index as { byService?: unknown[] }).byService)
+    ? (index as { byService: Array<{ service: string; providerCount?: number; consumerCount?: number; kafkaTopicCount?: number; protocols?: string[] }> }).byService
+    : [];
+  if (byService.length > 0) {
+    lines.push(`## ${labels.endpointByService ?? "By Service"}`);
+    lines.push("");
+    lines.push("| Service | Providers | Consumers | Kafka | Protocols |");
+    lines.push("| --- | --- | --- | --- | --- |");
+    for (const s of byService) {
+      const protocols = Array.isArray(s.protocols) ? s.protocols.join(", ") : "";
+      lines.push(`| [${s.service}](wiki://${s.service}/endpoints) | ${s.providerCount ?? 0} | ${s.consumerCount ?? 0} | ${s.kafkaTopicCount ?? 0} | ${protocols} |`);
+    }
+    lines.push("");
+  }
+
+  const byProtocol = (index as { byProtocol?: Record<string, Array<{ service: string; identifier: string; methodCount?: number }>> }).byProtocol ?? {};
+  const protocols = Object.keys(byProtocol).sort();
+  if (protocols.length > 0) {
+    lines.push(`## ${labels.endpointByProtocol ?? "By Protocol"}`);
+    lines.push("");
+    for (const proto of protocols) {
+      lines.push(`### ${proto.toUpperCase()}`);
+      lines.push("");
+      lines.push("| Service | Identifier | Methods |");
+      lines.push("| --- | --- | --- |");
+      for (const entry of byProtocol[proto]) {
+        lines.push(`| ${entry.service} | \`${entry.identifier}\` | ${entry.methodCount ?? 0} |`);
+      }
+      lines.push("");
+    }
+  }
+
+  const byTopic = (index as { byTopic?: Record<string, { publishers?: string[]; subscribers?: string[] }> }).byTopic ?? {};
+  const topics = Object.keys(byTopic).sort();
+  if (topics.length > 0) {
+    lines.push(`## ${labels.endpointByTopic ?? "By Topic"}`);
+    lines.push("");
+    lines.push("| Topic | Publishers | Subscribers |");
+    lines.push("| --- | --- | --- |");
+    for (const topic of topics) {
+      const t = byTopic[topic];
+      lines.push(`| \`${topic}\` | ${(t.publishers ?? []).join(", ")} | ${(t.subscribers ?? []).join(", ")} |`);
+    }
+    lines.push("");
   }
 
   return lines.join("\n");

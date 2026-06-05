@@ -392,6 +392,26 @@ export default defineConfig({
               return;
             }
 
+            // /api/wiki/endpoints/index
+            if (apiPath === "/endpoints/index") {
+              const data = ws.getEndpointIndex();
+              if (!data) { sendJson(res, 404, { error: "Endpoint index not found" }); return; }
+              sendJson(res, 200, data);
+              return;
+            }
+
+            // /api/wiki/endpoints/:service
+            const endpointMatch = apiPath.match(/^\/endpoints\/([^/]+)$/);
+            if (endpointMatch) {
+              try {
+                const svcName = decodeURIComponent(endpointMatch[1]);
+                const data = ws.getEndpointDoc(svcName);
+                if (!data) { sendJson(res, 404, { error: "Endpoint doc not found" }); return; }
+                sendJson(res, 200, data);
+              } catch { sendJson(res, 400, { error: "Invalid URL encoding" }); }
+              return;
+            }
+
             sendJson(res, 404, { error: `Unknown wiki API endpoint: ${apiPath}` });
             return;
           }

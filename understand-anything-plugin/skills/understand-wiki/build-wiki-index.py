@@ -32,37 +32,48 @@ def build_service_index(wiki_dir: str, service_name: str) -> dict:
         })
 
     domain_dir = os.path.join(wiki_dir, "domains")
-    if not os.path.isdir(domain_dir):
-        return {"entries": entries}
+    if os.path.isdir(domain_dir):
+        domain_files = sorted(
+            f for f in os.listdir(domain_dir) if f.endswith(".json")
+        )
 
-    domain_files = sorted(
-        f for f in os.listdir(domain_dir) if f.endswith(".json")
-    )
+        for df in domain_files:
+            slug = df.removesuffix(".json")
+            domain_id = f"wiki:domain:{slug}"
+            with open(os.path.join(domain_dir, df)) as f:
+                page = json.load(f)
 
-    for df in domain_files:
-        slug = df.removesuffix(".json")
-        domain_id = f"wiki:domain:{slug}"
-        with open(os.path.join(domain_dir, df)) as f:
-            page = json.load(f)
-
-        entries.append({
-            "id": domain_id,
-            "name": page.get("name", slug),
-            "type": "domain",
-            "service": service_name,
-            "summary": _truncate(page.get("summary", ""), 100),
-        })
-
-        for flow in page.get("flows", []):
-            flow_id = flow.get("id", f"flow:{to_kebab_case(flow.get('name', ''))}")
             entries.append({
-                "id": f"wiki:{flow_id}" if not flow_id.startswith("wiki:") else flow_id,
-                "name": flow.get("name", flow_id),
-                "type": "flow",
+                "id": domain_id,
+                "name": page.get("name", slug),
+                "type": "domain",
                 "service": service_name,
-                "domain": domain_id,
-                "summary": _truncate(flow.get("summary", ""), 100),
+                "summary": _truncate(page.get("summary", ""), 100),
             })
+
+            for flow in page.get("flows", []):
+                flow_id = flow.get("id", f"flow:{to_kebab_case(flow.get('name', ''))}")
+                entries.append({
+                    "id": f"wiki:{flow_id}" if not flow_id.startswith("wiki:") else flow_id,
+                    "name": flow.get("name", flow_id),
+                    "type": "flow",
+                    "service": service_name,
+                    "domain": domain_id,
+                    "summary": _truncate(flow.get("summary", ""), 100),
+                })
+
+    endpoints_path = os.path.join(wiki_dir, "endpoints", f"{service_name}.json")
+    if os.path.exists(endpoints_path):
+        with open(endpoints_path) as f:
+            doc = json.load(f)
+        entries.append({
+            "id": f"wiki:endpoints:{service_name}",
+            "name": f"{service_name} Endpoints",
+            "type": "endpoint",
+            "summary": _truncate(doc.get("description", ""), 100),
+            "service": service_name,
+            "tags": list(set(p.get("protocol", "") for p in doc.get("providers", []))),
+        })
 
     return {"entries": entries}
 
@@ -104,6 +115,22 @@ def build_parent_index(wiki_dir: str) -> dict:
                 "type": "cross-domain",
                 "summary": _truncate(page.get("summary", ""), 100),
             })
+
+    endpoint_index_path = os.path.join(wiki_dir, "endpoints", "index.json")
+    if os.path.exists(endpoint_index_path):
+        with open(endpoint_index_path) as f:
+            endpoint_index = json.load(f)
+        total_providers = endpoint_index.get("totalProviders", 0)
+        total_consumers = endpoint_index.get("totalConsumers", 0)
+        entries.append({
+            "id": "wiki:endpoints:index",
+            "name": "Endpoint Index",
+            "type": "endpoint",
+            "summary": (
+                f"Cross-service endpoint navigation ({total_providers} providers, "
+                f"{total_consumers} consumers)"
+            ),
+        })
 
     return {"entries": entries}
 
