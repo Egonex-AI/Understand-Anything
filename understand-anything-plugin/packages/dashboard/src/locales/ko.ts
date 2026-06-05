@@ -244,6 +244,8 @@ edgeLabels: {
     subscribes: { forward: "구독", backward: "구독됨" },
     publishes: { forward: "게시", backward: "소비됨" },
     middleware: { forward: "미들웨어", backward: "미들웨어 사용" },
+    provides_rpc: { forward: "RPC 제공", backward: "RPC 제공자" },
+    consumes_rpc: { forward: "RPC 소비", backward: "RPC 소비자" },
     reads_from: { forward: "읽기", backward: "읽기됨" },
     writes_to: { forward: "쓰기", backward: "쓰기됨" },
     transforms: { forward: "변환", backward: "변환됨" },

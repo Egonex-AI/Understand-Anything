@@ -317,7 +317,7 @@ describe("WikiView integration", () => {
     await user.click(sourceLink);
 
     const closeButton = await screen.findByLabelText("Close source panel");
-    const sourcePanel = closeButton.closest(".border-t")!;
+    const sourcePanel = closeButton.closest(".border-t") as HTMLElement;
     expect(within(sourcePanel).getByText(/src\/OrderService\.java:10-20/)).toBeInTheDocument();
 
     await waitFor(() => {

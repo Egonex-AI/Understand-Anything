@@ -691,7 +691,7 @@ export default function WikiView({ accessToken }: { accessToken: string }) {
           className={`flex flex-col border-r border-border transition-[width] duration-200 shrink-0 ${
             sidebarCollapsed ? "w-0 overflow-hidden" : "w-60"
           }`}
-          {...(sidebarCollapsed ? { inert: "" as unknown as string } : {})}
+          {...(sidebarCollapsed ? { inert: true } : {})}
         >
           <div className="p-2 border-b border-border">
             <input

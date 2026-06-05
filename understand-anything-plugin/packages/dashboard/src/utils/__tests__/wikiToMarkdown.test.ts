@@ -94,7 +94,9 @@ describe("domainPageToMarkdown", () => {
       crossServiceCalls: [
         {
           caller: { service: "order-service", node: "OrderService", method: "processPayment" },
-          callee: { service: "payment-service", node: "PaymentFacade", interface: "PaymentAPI" },
+          callee: { service: "payment-service", node: "PaymentFacade", method: "pay", interface: "PaymentAPI" },
+          type: "dubbo_rpc" as const,
+          evidence: "script-matched" as const,
         },
       ],
     };

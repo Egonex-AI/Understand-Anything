@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react";
 import { validateGraph } from "@understand-anything/core/schema";
-import { validateSystemGraph } from "@understand-anything/core";
+import { validateSystemGraph } from "@understand-anything/core/system-graph";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
 import GraphView from "./components/GraphView";

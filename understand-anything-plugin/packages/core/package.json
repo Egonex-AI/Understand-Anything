@@ -24,6 +24,10 @@
     "./languages": {
       "types": "./dist/languages/index.d.ts",
       "default": "./dist/languages/index.js"
+    },
+    "./system-graph": {
+      "types": "./dist/system-graph.d.ts",
+      "default": "./dist/system-graph.js"
     }
   },
   "scripts": {

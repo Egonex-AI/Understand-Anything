@@ -190,6 +190,7 @@ export default defineConfig({
       "@understand-anything/core/schema": path.resolve(__dirname, "../core/src/schema.ts"),
       "@understand-anything/core/search": path.resolve(__dirname, "../core/src/search.ts"),
       "@understand-anything/core/types": path.resolve(__dirname, "../core/src/types.ts"),
+      "@understand-anything/core/system-graph": path.resolve(__dirname, "../core/src/system-graph.ts"),
       "@understand-anything/core": path.resolve(__dirname, "../core/src/index.ts"),
     },
   },
@@ -205,6 +206,7 @@ export default defineConfig({
       "@understand-anything/core/schema": path.resolve(__dirname, "../core/dist/schema.js"),
       "@understand-anything/core/search": path.resolve(__dirname, "../core/dist/search.js"),
       "@understand-anything/core/types": path.resolve(__dirname, "../core/dist/types.js"),
+      "@understand-anything/core/system-graph": path.resolve(__dirname, "../core/dist/system-graph.js"),
     },
   },
 

@@ -244,6 +244,8 @@ export const zhTW = {
     subscribes: { forward: "訂閱", backward: "被訂閱" },
     publishes: { forward: "發布到", backward: "被消費" },
     middleware: { forward: "中介軟體", backward: "使用中介軟體" },
+    provides_rpc: { forward: "提供 RPC", backward: "RPC 由其提供" },
+    consumes_rpc: { forward: "消費 RPC", backward: "RPC 由其消費" },
     reads_from: { forward: "讀取", backward: "被讀取" },
     writes_to: { forward: "寫入", backward: "被寫入" },
     transforms: { forward: "轉換", backward: "被轉換" },

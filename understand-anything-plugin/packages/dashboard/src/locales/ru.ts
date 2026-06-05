@@ -244,6 +244,8 @@ export const ru = {
     subscribes: { forward: "подписывается на", backward: "подписан" },
     publishes: { forward: "публикует в", backward: "получает события" },
     middleware: { forward: "middleware для", backward: "использует middleware" },
+    provides_rpc: { forward: "предоставляет RPC", backward: "RPC предоставлен" },
+    consumes_rpc: { forward: "потребляет RPC", backward: "RPC потреблён" },
     reads_from: { forward: "читает из", backward: "читается" },
     writes_to: { forward: "пишет в", backward: "записывается" },
     transforms: { forward: "преобразует", backward: "преобразуется" },

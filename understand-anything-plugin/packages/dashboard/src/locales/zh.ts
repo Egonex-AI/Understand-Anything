@@ -244,6 +244,8 @@ export const zh = {
     subscribes: { forward: "订阅", backward: "被订阅" },
     publishes: { forward: "发布到", backward: "被消费" },
     middleware: { forward: "中间件", backward: "使用中间件" },
+    provides_rpc: { forward: "提供 RPC", backward: "RPC 由其提供" },
+    consumes_rpc: { forward: "消费 RPC", backward: "RPC 由其消费" },
     reads_from: { forward: "读取", backward: "被读取" },
     writes_to: { forward: "写入", backward: "被写入" },
     transforms: { forward: "转换", backward: "被转换" },

@@ -244,6 +244,8 @@ export const ja = {
     subscribes: { forward: "購読", backward: "購読される" },
     publishes: { forward: "公開", backward: "消費される" },
     middleware: { forward: "ミドルウェア", backward: "ミドルウェアを使用" },
+    provides_rpc: { forward: "RPCを提供", backward: "RPCの提供元" },
+    consumes_rpc: { forward: "RPCを消費", backward: "RPCの消費元" },
     reads_from: { forward: "読み取り", backward: "読み取られる" },
     writes_to: { forward: "書き込み", backward: "書き込まれる" },
     transforms: { forward: "変換", backward: "変換される" },
