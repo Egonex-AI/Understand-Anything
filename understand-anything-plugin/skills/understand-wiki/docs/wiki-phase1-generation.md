@@ -127,7 +127,7 @@ for DOMAIN_ID in $DOMAIN_IDS; do
 done
 ```
 
-**MUST dispatch wiki-worker subagents in parallel** — run up to **3 concurrently** (same concurrency limit as batch mode). Use your platform's subagent/worker dispatch mechanism (Claude Code: `dispatch_agent`; Codex: parallel agent tasks; other: equivalent multi-agent spawn). Never run domain workers sequentially when parallelism is available.
+**MUST dispatch wiki-worker subagents in parallel** — run up to **5 concurrently**. Use your platform's subagent/worker dispatch mechanism (Claude Code: `dispatch_agent`; Codex: parallel agent tasks; other: equivalent multi-agent spawn). Never run domain workers sequentially when parallelism is available.
 
 If a domain's wiki-worker fails, retry once. On second failure, skip that domain and continue.
 
@@ -159,7 +159,7 @@ If intermediate output is verified, proceed to **Phase 2** (deterministic assemb
 
 ### Batch Mode
 
-For each service in `$SERVICES_TO_GENERATE`, **MUST dispatch wiki-worker agents in parallel** using your platform's subagent/worker mechanism. Run up to **3 concurrently** to manage token costs.
+For each service in `$SERVICES_TO_GENERATE`, **MUST dispatch wiki-worker agents in parallel** using your platform's subagent/worker mechanism. Run up to **5 concurrently**.
 
 Progress reporting:
 > `Generating Wiki for service 1/N: order-service...`
