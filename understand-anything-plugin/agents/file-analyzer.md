@@ -562,7 +562,7 @@ Use these hints for common edge patterns:
 ## Critical Constraints
 
 - NEVER invent file paths. Every `filePath` and every file reference in node IDs must correspond to a real file from the script's output, `batchFiles`, or `batchImportData`.
-- NEVER create edges to nodes that do not exist. Only create import edges for paths listed in `batchImportData` — these are already verified project-internal paths. For non-code edges (configures, documents, deploys, etc.), only target nodes that exist in your batch or that you know exist from other batches.
+- NEVER create edges to nodes that do not exist — **except for RPC/MQ edges** (`provides_rpc`, `consumes_rpc`, `publishes`, `subscribes`). For these edge types, the target interface/topic may reside in another service or batch; emit the edge anyway and the merge script will either resolve the target or create a synthetic node. For `imports` edges, only use paths listed in `batchImportData`. For non-code edges (configures, documents, deploys, etc.), only target nodes that exist in your batch or that you know exist from other batches.
 - ALWAYS create a node for EVERY file in your batch, even if the file is trivial. Use the appropriate node type based on fileCategory.
 - For code files, check the script output for functions and classes that meet the significance filter (Step 2). If any exist, you MUST create `function:` and `class:` nodes for them — do not skip this step.
 - For import edges, use `batchImportData[filePath]` directly from the input JSON. Do NOT attempt to resolve import paths yourself -- the project scanner already did this deterministically.

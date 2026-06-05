@@ -678,6 +678,41 @@ function DashboardContent({
               </div>
             </>
           )}
+          {!graph && (systemGraph || wikiAvailable) && (
+            <>
+              <div className="w-px h-5 bg-border-subtle" />
+              <div className="flex items-center bg-elevated rounded-lg p-0.5">
+                {systemGraph && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("system")}
+                    title={t.systemView}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      viewMode === "system"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        : "text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                    }`}
+                  >
+                    {t.systemView}
+                  </button>
+                )}
+                {wikiAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("wiki")}
+                    title="Wiki"
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      viewMode === "wiki"
+                        ? "bg-accent/20 text-accent"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                  >
+                    Wiki
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Middle — scrollable legends */}

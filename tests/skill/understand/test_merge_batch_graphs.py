@@ -1183,5 +1183,381 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         self.assertNotIn("file:src/y.ts", node_ids)
 
 
+# ── RPC/MQ annotation recovery ─────────────────────────────────────────────
+
+
+def _class_node(path: str, class_name: str, **extra: Any) -> dict[str, Any]:
+    """Build a minimal class node."""
+    node: dict[str, Any] = {
+        "id": f"class:{path}:{class_name}",
+        "type": "class",
+        "name": class_name,
+        "filePath": path,
+        "summary": "",
+        "tags": [],
+        "complexity": "simple",
+    }
+    node.update(extra)
+    return node
+
+
+def _extraction_result(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build a mock extraction result file content."""
+    return {
+        "scriptCompleted": True,
+        "filesAnalyzed": len(results),
+        "filesSkipped": [],
+        "results": results,
+    }
+
+
+class TestRecoverRpcMqFromExtraction(unittest.TestCase):
+    """recover_rpc_mq_from_extraction() reads annotation data from
+    ua-file-extract-results-*.json and creates deterministic RPC/MQ edges
+    + synthetic nodes when annotations are found but corresponding edges
+    are missing from the assembled graph."""
+
+    def setUp(self) -> None:
+        import tempfile
+        self.tmp = Path(tempfile.mkdtemp(prefix="ua-mbg-rpc-"))
+        self.tmp_dir = self.tmp / ".understand-anything" / "tmp"
+        self.tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write_extraction(self, batch_index: int, results: list[dict]) -> None:
+        import json as _j
+        path = self.tmp_dir / f"ua-file-extract-results-{batch_index}.json"
+        path.write_text(_j.dumps(_extraction_result(results)), encoding="utf-8")
+
+    def test_moa_provider_creates_provides_rpc_edge_and_synthetic_node(self) -> None:
+        """@MoaProvider on a class with interfaces should produce a
+        provides_rpc edge and a synthetic interface node if absent."""
+        service_path = "src/main/java/com/example/UserServiceImpl.java"
+        self._write_extraction(1, [{
+            "path": service_path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "UserServiceImpl",
+                "startLine": 10, "endLine": 200,
+                "methods": ["getUser", "createUser"],
+                "properties": [],
+                "annotations": [{"name": "MoaProvider"}],
+                "interfaces": ["UserService"],
+            }],
+        }])
+
+        class_node = _class_node(service_path, "UserServiceImpl")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        recovered, report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertGreater(recovered, 0)
+
+        edge_types = [e["type"] for e in assembled["edges"]]
+        self.assertIn("provides_rpc", edge_types)
+
+        rpc_edge = next(e for e in assembled["edges"] if e["type"] == "provides_rpc")
+        self.assertEqual(rpc_edge["source"], f"class:{service_path}:UserServiceImpl")
+        self.assertIn("UserService", rpc_edge["target"])
+        self.assertEqual(rpc_edge["weight"], 0.9)
+
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertTrue(
+            any("UserService" in nid for nid in node_ids),
+            "Synthetic interface node should be created",
+        )
+
+    def test_moa_consumer_creates_consumes_rpc_edge(self) -> None:
+        """@MoaConsumer on a typedProperty should produce a consumes_rpc edge."""
+        consumer_path = "src/main/java/com/example/OrderHandler.java"
+        self._write_extraction(1, [{
+            "path": consumer_path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "OrderHandler",
+                "startLine": 5, "endLine": 100,
+                "methods": ["handle"],
+                "properties": [],
+                "typedProperties": [{
+                    "name": "userService",
+                    "type": "UserService",
+                    "annotations": [{"name": "MoaConsumer"}],
+                }],
+            }],
+        }])
+
+        class_node = _class_node(consumer_path, "OrderHandler")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        recovered, report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertGreater(recovered, 0)
+
+        rpc_edge = next(e for e in assembled["edges"] if e["type"] == "consumes_rpc")
+        self.assertEqual(rpc_edge["source"], f"class:{consumer_path}:OrderHandler")
+        self.assertIn("UserService", rpc_edge["target"])
+        self.assertEqual(rpc_edge["weight"], 0.8)
+
+    def test_kafka_listener_creates_subscribes_edge(self) -> None:
+        """@KafkaListener on a method should produce a subscribes edge."""
+        listener_path = "src/main/java/com/example/EventConsumer.java"
+        self._write_extraction(1, [{
+            "path": listener_path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "EventConsumer",
+                "startLine": 1, "endLine": 50,
+                "methods": ["onMessage"],
+                "properties": [],
+            }],
+            "functions": [{
+                "name": "onMessage",
+                "startLine": 10, "endLine": 30,
+                "params": ["record"],
+                "annotations": [{"name": "KafkaListener", "arguments": {"topics": "order-events"}}],
+            }],
+        }])
+
+        class_node = _class_node(listener_path, "EventConsumer")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        recovered, report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertGreater(recovered, 0)
+
+        sub_edge = next(e for e in assembled["edges"] if e["type"] == "subscribes")
+        self.assertEqual(sub_edge["source"], f"class:{listener_path}:EventConsumer")
+        self.assertIn("order-events", sub_edge["target"])
+
+    def test_dubbo_service_creates_provides_rpc_edge(self) -> None:
+        """@DubboService should also create provides_rpc edge."""
+        path = "src/main/java/com/example/PaymentServiceImpl.java"
+        self._write_extraction(1, [{
+            "path": path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "PaymentServiceImpl",
+                "startLine": 1, "endLine": 100,
+                "methods": ["pay"],
+                "properties": [],
+                "annotations": [{"name": "DubboService"}],
+                "interfaces": ["PaymentService"],
+            }],
+        }])
+
+        class_node = _class_node(path, "PaymentServiceImpl")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        recovered, _report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertGreater(recovered, 0)
+        edge_types = [e["type"] for e in assembled["edges"]]
+        self.assertIn("provides_rpc", edge_types)
+
+    def test_dubbo_reference_creates_consumes_rpc_edge(self) -> None:
+        """@DubboReference on a typedProperty should produce consumes_rpc."""
+        path = "src/main/java/com/example/Client.java"
+        self._write_extraction(1, [{
+            "path": path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "Client",
+                "startLine": 1, "endLine": 50,
+                "methods": [],
+                "properties": [],
+                "typedProperties": [{
+                    "name": "paymentSvc",
+                    "type": "PaymentService",
+                    "annotations": [{"name": "DubboReference"}],
+                }],
+            }],
+        }])
+
+        class_node = _class_node(path, "Client")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        recovered, _report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertGreater(recovered, 0)
+        edge = next(e for e in assembled["edges"] if e["type"] == "consumes_rpc")
+        self.assertIn("PaymentService", edge["target"])
+
+    def test_skip_if_edge_already_exists(self) -> None:
+        """Should not duplicate edges that the LLM already created."""
+        path = "src/main/java/com/example/Svc.java"
+        self._write_extraction(1, [{
+            "path": path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "SvcImpl",
+                "startLine": 1, "endLine": 50,
+                "methods": [],
+                "properties": [],
+                "annotations": [{"name": "MoaProvider"}],
+                "interfaces": ["SvcFacade"],
+            }],
+        }])
+
+        class_node = _class_node(path, "SvcImpl")
+        existing_edge = {
+            "source": f"class:{path}:SvcImpl",
+            "target": "class:__synthetic__:SvcFacade",
+            "type": "provides_rpc",
+            "direction": "forward",
+            "weight": 0.9,
+        }
+        assembled: dict[str, Any] = {
+            "nodes": [class_node, {"id": "class:__synthetic__:SvcFacade", "type": "class", "name": "SvcFacade", "summary": "", "tags": [], "complexity": "simple"}],
+            "edges": [existing_edge],
+        }
+
+        recovered, _report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertEqual(recovered, 0)
+        provides_edges = [e for e in assembled["edges"] if e["type"] == "provides_rpc"]
+        self.assertEqual(len(provides_edges), 1)
+
+    def test_no_extraction_files_returns_zero(self) -> None:
+        """No extraction files → (0, report_line)."""
+        assembled: dict[str, Any] = {"nodes": [], "edges": []}
+        recovered, report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertEqual(recovered, 0)
+
+    def test_tags_added_to_provider_node(self) -> None:
+        """Provider class node should get rpc-provider tag."""
+        path = "src/main/java/com/example/Impl.java"
+        self._write_extraction(1, [{
+            "path": path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "Impl",
+                "startLine": 1, "endLine": 50,
+                "methods": [],
+                "properties": [],
+                "annotations": [{"name": "MoaProvider"}],
+                "interfaces": ["Facade"],
+            }],
+        }])
+
+        class_node = _class_node(path, "Impl")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        mbg.recover_rpc_mq_from_extraction(assembled, self.tmp_dir)
+        self.assertIn("rpc-provider", class_node["tags"])
+
+    def test_tags_added_to_consumer_node(self) -> None:
+        """Consumer class node should get rpc-consumer tag."""
+        path = "src/main/java/com/example/Handler.java"
+        self._write_extraction(1, [{
+            "path": path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "Handler",
+                "startLine": 1, "endLine": 50,
+                "methods": [],
+                "properties": [],
+                "typedProperties": [{
+                    "name": "svc",
+                    "type": "SomeService",
+                    "annotations": [{"name": "MoaConsumer"}],
+                }],
+            }],
+        }])
+
+        class_node = _class_node(path, "Handler")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        mbg.recover_rpc_mq_from_extraction(assembled, self.tmp_dir)
+        self.assertIn("rpc-consumer", class_node["tags"])
+
+    def test_multiple_extraction_files_across_batches(self) -> None:
+        """Should process all ua-file-extract-results-*.json files."""
+        path1 = "src/main/java/com/example/A.java"
+        path2 = "src/main/java/com/example/B.java"
+        self._write_extraction(1, [{
+            "path": path1,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "AImpl",
+                "startLine": 1, "endLine": 50,
+                "methods": [],
+                "properties": [],
+                "annotations": [{"name": "MoaProvider"}],
+                "interfaces": ["AFacade"],
+            }],
+        }])
+        self._write_extraction(2, [{
+            "path": path2,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "BImpl",
+                "startLine": 1, "endLine": 50,
+                "methods": [],
+                "properties": [],
+                "annotations": [{"name": "DubboService"}],
+                "interfaces": ["BFacade"],
+            }],
+        }])
+
+        assembled: dict[str, Any] = {
+            "nodes": [_class_node(path1, "AImpl"), _class_node(path2, "BImpl")],
+            "edges": [],
+        }
+
+        recovered, _report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertEqual(recovered, 2)
+        provides_edges = [e for e in assembled["edges"] if e["type"] == "provides_rpc"]
+        self.assertEqual(len(provides_edges), 2)
+
+    def test_feign_client_creates_consumes_rpc_edge(self) -> None:
+        """@FeignClient on a class should produce consumes_rpc edge."""
+        path = "src/main/java/com/example/RemoteClient.java"
+        self._write_extraction(1, [{
+            "path": path,
+            "language": "java",
+            "fileCategory": "code",
+            "classes": [{
+                "name": "RemoteClient",
+                "startLine": 1, "endLine": 30,
+                "methods": ["call"],
+                "properties": [],
+                "annotations": [{"name": "FeignClient", "arguments": {"name": "user-service"}}],
+            }],
+        }])
+
+        class_node = _class_node(path, "RemoteClient")
+        assembled: dict[str, Any] = {"nodes": [class_node], "edges": []}
+
+        recovered, _report = mbg.recover_rpc_mq_from_extraction(
+            assembled, self.tmp_dir
+        )
+        self.assertGreater(recovered, 0)
+        edge = next(e for e in assembled["edges"] if e["type"] == "consumes_rpc")
+        self.assertIn("user-service", edge["target"])
+
+
 if __name__ == "__main__":
     unittest.main()
