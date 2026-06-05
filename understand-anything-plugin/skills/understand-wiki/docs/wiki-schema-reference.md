@@ -100,6 +100,38 @@ See [wikiRef Specification](./wikiref-spec.md) for the canonical format.
 | `index.json` | Parent-level navigation index |
 | `meta.json` | Parent-level metadata with serviceCount |
 
+#### `architecture.json` Schema
+
+```json
+{
+  "crossServiceCalls": [
+    {
+      "caller": { "service": "order-service", "node": "...", "file": "...", "method": "..." },
+      "callee": { "service": "payment-service", "node": "...", "interface": "PaymentFacade", "method": "..." },
+      "type": "moa_rpc | dubbo_rpc | http | kafka | database | unknown",
+      "evidence": "script-matched | llm-inferred",
+      "detail": "human-readable description"
+    }
+  ],
+  "sharedResources": [
+    { "type": "database | cache | queue | storage", "name": "orders_db", "services": ["svc-a", "svc-b"] }
+  ],
+  "eventFlows": [
+    {
+      "topic": "order.created",
+      "publisher": "order-service",
+      "subscribers": ["payment-service", "notification-service"],
+      "evidence": "script-matched",
+      "detail": "human-readable description"
+    }
+  ]
+}
+```
+
+> **`eventFlows[]` MUST use `topic`/`publisher`/`subscribers`.**
+> Do NOT use `caller`/`callee` — those are only valid in `crossServiceCalls[]`.
+> The quality gate rejects entries with the wrong schema.
+
 ---
 
 ### Content Depth Quality: Good vs Shallow Examples

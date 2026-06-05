@@ -334,9 +334,11 @@ export default defineConfig({
               return;
             }
             if (apiPath === "/source") {
+              const rawFile = url.searchParams.get("file") ?? "";
+              const resolvedFile = ws.resolveSourcePath(rawFile);
               const result = readWikiSourceFile(
                 ws.getProjectRoot(),
-                url.searchParams.get("file") ?? "",
+                resolvedFile,
                 url.searchParams.get("start"),
                 url.searchParams.get("end"),
               );

@@ -8,7 +8,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "understand-anything-plugin", "skills", "understand-wiki"))
 
-from wiki_quality_gate import run_quality_gate
+from wiki_quality_gate import run_quality_gate, run_parent_quality_gate
 
 
 class TestWikiQualityGate(unittest.TestCase):
@@ -176,6 +176,77 @@ class TestWikiQualityGate(unittest.TestCase):
         with open(out_path) as f:
             data = json.load(f)
         self.assertTrue(data["passed"])
+
+
+class TestParentArchitectureEventFlows(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.wiki_dir = os.path.join(self.tmp, "wiki")
+        os.makedirs(os.path.join(self.wiki_dir, "domains"), exist_ok=True)
+
+    def _write_json(self, path, data):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(data, f)
+
+    def _write_valid_parent_wiki(self, arch_overrides=None):
+        self._write_json(os.path.join(self.wiki_dir, "meta.json"), {
+            "gitCommitHash": "abc", "generatedAt": "t", "version": "1", "outputLanguage": "en",
+            "serviceCount": 2,
+        })
+        self._write_json(os.path.join(self.wiki_dir, "index.json"), {
+            "entries": [{"id": "x", "name": "overview", "type": "overview", "summary": "s"}],
+        })
+        self._write_json(os.path.join(self.wiki_dir, "overview.json"), {
+            "name": "System", "description": "A multi-service system",
+            "services": [{"name": "svc-a", "description": "Service A", "domains": ["d1"]}],
+        })
+        arch = {
+            "crossServiceCalls": [
+                {"caller": {"service": "a"}, "callee": {"service": "b"}, "type": "moa_rpc", "evidence": "script-matched"},
+            ],
+            "sharedResources": [],
+            "eventFlows": [
+                {"topic": "order.created", "publisher": "a", "subscribers": ["b"]},
+            ],
+        }
+        if arch_overrides:
+            arch.update(arch_overrides)
+        self._write_json(os.path.join(self.wiki_dir, "architecture.json"), arch)
+
+    def test_valid_eventflows_passes(self):
+        self._write_valid_parent_wiki()
+        result = run_parent_quality_gate(self.wiki_dir)
+        arch_issues = [i for i in result["issues"] if "eventFlows" in i]
+        self.assertEqual(len(arch_issues), 0)
+
+    def test_eventflows_missing_topic_is_error(self):
+        self._write_valid_parent_wiki({"eventFlows": [{"publisher": "a", "subscribers": ["b"]}]})
+        result = run_parent_quality_gate(self.wiki_dir)
+        self.assertTrue(any("missing topic" in i for i in result["issues"]))
+
+    def test_eventflows_missing_publisher_is_error(self):
+        self._write_valid_parent_wiki({"eventFlows": [{"topic": "t", "subscribers": ["b"]}]})
+        result = run_parent_quality_gate(self.wiki_dir)
+        self.assertTrue(any("missing publisher" in i for i in result["issues"]))
+
+    def test_eventflows_missing_subscribers_is_error(self):
+        self._write_valid_parent_wiki({"eventFlows": [{"topic": "t", "publisher": "a"}]})
+        result = run_parent_quality_gate(self.wiki_dir)
+        self.assertTrue(any("subscribers" in i for i in result["issues"]))
+
+    def test_eventflows_with_caller_callee_is_error(self):
+        self._write_valid_parent_wiki({"eventFlows": [
+            {"caller": {"service": "a"}, "callee": {"service": "b"}, "type": "kafka"},
+        ]})
+        result = run_parent_quality_gate(self.wiki_dir)
+        self.assertTrue(any("caller/callee" in i for i in result["issues"]))
+
+    def test_empty_eventflows_is_ok(self):
+        self._write_valid_parent_wiki({"eventFlows": []})
+        result = run_parent_quality_gate(self.wiki_dir)
+        arch_issues = [i for i in result["issues"] if "eventFlows" in i]
+        self.assertEqual(len(arch_issues), 0)
 
 
 if __name__ == "__main__":

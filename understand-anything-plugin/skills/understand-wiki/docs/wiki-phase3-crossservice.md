@@ -32,14 +32,16 @@ The script reads KG files from all integrated services and performs deterministi
 - Matches `consumes_rpc` → `provides_rpc` across services (by interface name)
 - Matches Kafka topic `publishes` → `subscribes` across services
 - Matches shared database table access patterns
-- Outputs: candidate relationship list with evidence
+- Outputs:
+  - `relationships[]`: RPC and database matches (caller/callee format, for `crossServiceCalls`)
+  - `eventFlows[]`: Kafka/event matches **pre-aggregated by topic** (topic/publisher/subscribers format, directly usable in `architecture.json`)
 
 ### Step 3 — LLM Review + Supplement + Organize (Layer 2, Always Execute)
 
 The main skill (YOU, the executing agent) performs the LLM layer directly — no separate agent dispatch needed because the data is lightweight.
 
 **Input for LLM analysis:**
-- Script output: candidate relationships with evidence
+- Script output: `relationships` (RPC/DB) and `eventFlows` (events) with evidence
 - Per-service summaries: from each service's `wiki/index.json` entries
 - Per-service endpoints: from each service's KG (`endpoint:` nodes)
 - Per-service RPC interfaces: from each service's KG (`provides_rpc` / `consumes_rpc` edges)
@@ -86,9 +88,22 @@ mkdir -p "$PROJECT_ROOT/.understand-anything/wiki/domains"
     }
   ],
   "sharedResources": [],
-  "eventFlows": []
+  "eventFlows": [
+    {
+      "topic": "order.created",
+      "publisher": "order-service",
+      "subscribers": ["payment-service", "inventory-service"],
+      "evidence": "script-matched",
+      "detail": "Topic 'order.created' published by OrderService (order-service) consumed by payment-service, inventory-service"
+    }
+  ]
 }
 ```
+
+> **CRITICAL — `eventFlows[]` schema constraint:**
+> `eventFlows[]` entries MUST use `topic` / `publisher` / `subscribers` fields.
+> They MUST NOT use `caller` / `callee` — those fields are only valid inside `crossServiceCalls[]`.
+> The quality gate will reject `eventFlows` entries that use the wrong schema.
 
 3. **`domains/<cross-domain>.json`** — Cross-service business flow pages:
 ```json
@@ -132,7 +147,7 @@ python3 "$SKILL_DIR/wiki_quality_gate.py" --parent \
 
 This validates:
 - `overview.json`: name, description, non-empty services array with required fields
-- `architecture.json`: crossServiceCalls structure (caller/callee/type)
+- `architecture.json`: crossServiceCalls structure (caller/callee/type), eventFlows entries (topic/publisher/subscribers — rejects caller/callee schema)
 - `domains/*.json` (cross-domain pages): services array, steps with order/service/description
 
 If `passed: false`, report issues but continue to Phase 4 (index construction) — parent wiki issues are non-blocking since service wikis remain valid independently.

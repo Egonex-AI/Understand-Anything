@@ -226,7 +226,7 @@ class TestMatchRpcRelationships(unittest.TestCase):
 
 
 class TestMatchEventRelationships(unittest.TestCase):
-    def test_matches_publisher_to_subscriber_across_services(self):
+    def test_outputs_topic_publisher_subscribers_format(self):
         publishers = [
             {
                 "service": "payment-service",
@@ -247,9 +247,29 @@ class TestMatchEventRelationships(unittest.TestCase):
         ]
         rels = mod.match_event_relationships(publishers, subscribers)
         self.assertEqual(len(rels), 1)
-        self.assertEqual(rels[0]["caller"]["service"], "payment-service")
-        self.assertEqual(rels[0]["callee"]["service"], "inventory-service")
-        self.assertEqual(rels[0]["type"], "kafka")
+        rel = rels[0]
+        self.assertEqual(rel["topic"], "payment.completed")
+        self.assertEqual(rel["publisher"], "payment-service")
+        self.assertEqual(rel["subscribers"], ["inventory-service"])
+        self.assertEqual(rel["evidence"], "script-matched")
+        self.assertEqual(rel["confidence"], "high")
+        self.assertNotIn("caller", rel)
+        self.assertNotIn("callee", rel)
+
+    def test_aggregates_multiple_subscribers_per_topic(self):
+        publishers = [
+            {"service": "order-service", "topic": "order.created", "publisher_id": "x", "publisher_name": "OrderService", "file": "a.java"},
+        ]
+        subscribers = [
+            {"service": "payment-service", "topic": "order.created", "subscriber_id": "y", "subscriber_name": "PaymentListener", "file": "b.java"},
+            {"service": "notification-service", "topic": "order.created", "subscriber_id": "z", "subscriber_name": "NotifyListener", "file": "c.java"},
+        ]
+        rels = mod.match_event_relationships(publishers, subscribers)
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]["topic"], "order.created")
+        self.assertEqual(rels[0]["publisher"], "order-service")
+        self.assertIn("payment-service", rels[0]["subscribers"])
+        self.assertIn("notification-service", rels[0]["subscribers"])
 
     def test_ignores_same_service_events(self):
         publishers = [{"service": "svc", "topic": "t", "publisher_id": "x", "publisher_name": "P", "file": "p.java"}]

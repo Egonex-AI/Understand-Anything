@@ -275,6 +275,26 @@ def _validate_parent_architecture(
             if not call.get("type"):
                 issues.append(f"architecture.json: crossServiceCalls[{i}] missing type")
 
+    if not isinstance(arch.get("eventFlows"), list):
+        warnings.append("architecture.json: missing eventFlows array")
+    else:
+        for i, ev in enumerate(arch["eventFlows"]):
+            if not isinstance(ev, dict):
+                issues.append(f"architecture.json: eventFlows[{i}] is not an object")
+                continue
+            if ev.get("caller") or ev.get("callee"):
+                issues.append(
+                    f"architecture.json: eventFlows[{i}] must use topic/publisher/subscribers, not caller/callee"
+                )
+            if not ev.get("topic"):
+                issues.append(f"architecture.json: eventFlows[{i}] missing topic")
+            if not ev.get("publisher"):
+                issues.append(f"architecture.json: eventFlows[{i}] missing publisher")
+            if not isinstance(ev.get("subscribers"), list) or not ev.get("subscribers"):
+                issues.append(
+                    f"architecture.json: eventFlows[{i}] missing non-empty subscribers array"
+                )
+
 
 def _validate_cross_domain_pages(
     domain_dir: str,

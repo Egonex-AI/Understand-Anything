@@ -278,6 +278,26 @@ export function validateParentWikiArchitecture(data: unknown, filePath: string):
   }
   if (!Array.isArray(arch.eventFlows)) {
     issues.push({ file: filePath, severity: "warning", message: "Missing eventFlows array" });
+  } else {
+    for (let i = 0; i < arch.eventFlows.length; i++) {
+      const ev = arch.eventFlows[i] as Record<string, unknown>;
+      if (!ev || typeof ev !== "object") {
+        issues.push({ file: filePath, severity: "error", message: `eventFlows[${i}] is not an object` });
+        continue;
+      }
+      if (ev.caller || ev.callee) {
+        issues.push({ file: filePath, severity: "error", message: `eventFlows[${i}] must use topic/publisher/subscribers, not caller/callee` });
+      }
+      if (!ev.topic || typeof ev.topic !== "string") {
+        issues.push({ file: filePath, severity: "error", message: `eventFlows[${i}] missing topic` });
+      }
+      if (!ev.publisher || typeof ev.publisher !== "string") {
+        issues.push({ file: filePath, severity: "error", message: `eventFlows[${i}] missing publisher` });
+      }
+      if (!Array.isArray(ev.subscribers) || (ev.subscribers as unknown[]).length === 0) {
+        issues.push({ file: filePath, severity: "error", message: `eventFlows[${i}] missing non-empty subscribers array` });
+      }
+    }
   }
   return issues;
 }

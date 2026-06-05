@@ -105,6 +105,46 @@ describe("validateParentWikiArchitecture", () => {
     const issues = validateParentWikiArchitecture(data, "architecture.json");
     expect(issues.some((i) => i.severity === "warning" && i.message.includes("eventFlows"))).toBe(true);
   });
+
+  it("reports error for eventFlows entry missing topic", () => {
+    const data = {
+      crossServiceCalls: [],
+      sharedResources: [],
+      eventFlows: [{ publisher: "a", subscribers: ["b"] }],
+    };
+    const issues = validateParentWikiArchitecture(data, "architecture.json");
+    expect(issues.some((i) => i.severity === "error" && i.message.includes("missing topic"))).toBe(true);
+  });
+
+  it("reports error for eventFlows entry missing publisher", () => {
+    const data = {
+      crossServiceCalls: [],
+      sharedResources: [],
+      eventFlows: [{ topic: "t", subscribers: ["b"] }],
+    };
+    const issues = validateParentWikiArchitecture(data, "architecture.json");
+    expect(issues.some((i) => i.severity === "error" && i.message.includes("missing publisher"))).toBe(true);
+  });
+
+  it("reports error for eventFlows entry missing subscribers", () => {
+    const data = {
+      crossServiceCalls: [],
+      sharedResources: [],
+      eventFlows: [{ topic: "t", publisher: "a" }],
+    };
+    const issues = validateParentWikiArchitecture(data, "architecture.json");
+    expect(issues.some((i) => i.severity === "error" && i.message.includes("subscribers"))).toBe(true);
+  });
+
+  it("reports error for eventFlows using caller/callee schema", () => {
+    const data = {
+      crossServiceCalls: [],
+      sharedResources: [],
+      eventFlows: [{ caller: { service: "a" }, callee: { service: "b" }, type: "kafka" }],
+    };
+    const issues = validateParentWikiArchitecture(data, "architecture.json");
+    expect(issues.some((i) => i.severity === "error" && i.message.includes("caller/callee"))).toBe(true);
+  });
 });
 
 describe("validateParentWikiCrossDomain", () => {

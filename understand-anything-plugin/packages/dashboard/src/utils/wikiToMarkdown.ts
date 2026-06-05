@@ -180,9 +180,10 @@ function architectureToMermaidDiagram(data: WikiArchitecture): string {
   };
 
   for (const res of resources) {
-    const rid = `res_${(res.name || "unknown").replace(/[^a-zA-Z0-9]/g, "_")}`;
+    if (!res.name) continue;
+    const rid = `res_${res.name.replace(/[^a-zA-Z0-9]/g, "_")}`;
     const shape = resTypeShape[res.type || ""] || ["[", "]"];
-    lines.push(`    ${rid}${shape[0]}"${sanitizeMermaidLabel(res.name || "?")}"${shape[1]}`);
+    lines.push(`    ${rid}${shape[0]}"${sanitizeMermaidLabel(res.name)}"${shape[1]}`);
     for (const svc of (res.services || [])) {
       serviceSet.add(svc);
       if (!lines.some(l => l.includes(`${svcId(svc)}[`))) {
@@ -193,8 +194,9 @@ function architectureToMermaidDiagram(data: WikiArchitecture): string {
   }
 
   for (const ev of events) {
-    const tid = `topic_${(ev.topic || "unknown").replace(/[^a-zA-Z0-9]/g, "_")}`;
-    lines.push(`    ${tid}{{"${sanitizeMermaidLabel(ev.topic || "?")}"}}`);
+    if (!ev.topic) continue;
+    const tid = `topic_${ev.topic.replace(/[^a-zA-Z0-9]/g, "_")}`;
+    lines.push(`    ${tid}{{"${sanitizeMermaidLabel(ev.topic)}"}}`);
     if (ev.publisher) {
       if (!serviceSet.has(ev.publisher)) {
         lines.push(`    ${svcId(ev.publisher)}["${sanitizeMermaidLabel(ev.publisher)}"]`);
@@ -402,25 +404,29 @@ export function architectureToMarkdown(data: WikiArchitecture, labels: WikiLabel
     lines.push(crossServiceCallsToTable(crossServiceCalls, labels, true));
   }
 
-  const eventFlows = Array.isArray(data?.eventFlows) ? data.eventFlows : [];
+  const eventFlows = Array.isArray(data?.eventFlows)
+    ? data.eventFlows.filter((ev) => ev?.topic)
+    : [];
   if (eventFlows.length > 0) {
     lines.push(`## ${labels.eventFlows}`);
     lines.push("");
     for (const ev of eventFlows) {
-      const pub = ev?.publisher ? svcLink(ev.publisher) : "?";
-      const subs = Array.isArray(ev?.subscribers) ? ev.subscribers.map(s => svcLink(s)).join(", ") : "";
-      lines.push(`- **${ev?.topic ?? "?"}**: ${pub} → ${subs}`);
+      const pub = ev.publisher ? svcLink(ev.publisher) : "?";
+      const subs = Array.isArray(ev.subscribers) ? ev.subscribers.map(s => svcLink(s)).join(", ") : "";
+      lines.push(`- **${ev.topic}**: ${pub} → ${subs}`);
     }
     lines.push("");
   }
 
-  const sharedResources = Array.isArray(data?.sharedResources) ? data.sharedResources : [];
+  const sharedResources = Array.isArray(data?.sharedResources)
+    ? data.sharedResources.filter((res) => res?.name)
+    : [];
   if (sharedResources.length > 0) {
     lines.push(`## ${labels.sharedResources}`);
     lines.push("");
     for (const res of sharedResources) {
-      const svcList = Array.isArray(res?.services) ? res.services.map(s => svcLink(s)).join(", ") : "";
-      lines.push(`- [${res?.type ?? "?"}] **${res?.name ?? "?"}** — used by: ${svcList}`);
+      const svcList = Array.isArray(res.services) ? res.services.map(s => svcLink(s)).join(", ") : "";
+      lines.push(`- [${res.type ?? "unknown"}] **${res.name}** — used by: ${svcList}`);
     }
     lines.push("");
   }

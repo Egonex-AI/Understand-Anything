@@ -197,43 +197,46 @@ def match_rpc_relationships(
 def match_event_relationships(
     all_publishers: list[dict], all_subscribers: list[dict]
 ) -> list[dict]:
-    """Match event publishers to subscribers across services by topic name."""
-    relationships = []
+    """Match event publishers to subscribers across services by topic name.
 
+    Returns a list of topic-aggregated event flow objects:
+    { topic, publisher, subscribers[], evidence, confidence, detail }
+    """
     publisher_index: dict[str, list[dict]] = {}
     for p in all_publishers:
         publisher_index.setdefault(p["topic"], []).append(p)
 
+    topic_flows: dict[str, dict] = {}
+
     for subscriber in all_subscribers:
         topic = subscriber["topic"]
-        if topic in publisher_index:
-            for publisher in publisher_index[topic]:
-                if publisher["service"] == subscriber["service"]:
-                    continue
-
-                relationships.append({
-                    "caller": {
-                        "service": publisher["service"],
-                        "node": publisher["publisher_id"],
-                        "file": publisher["file"],
-                        "method": f"{publisher['publisher_name']}.publish('{topic}')",
-                    },
-                    "callee": {
-                        "service": subscriber["service"],
-                        "node": subscriber["subscriber_id"],
-                        "file": subscriber["file"],
-                        "method": f"{subscriber['subscriber_name']}.onMessage('{topic}')",
-                    },
-                    "type": "kafka",
+        if topic not in publisher_index:
+            continue
+        for publisher in publisher_index[topic]:
+            if publisher["service"] == subscriber["service"]:
+                continue
+            key = f"{topic}|||{publisher['service']}"
+            if key not in topic_flows:
+                topic_flows[key] = {
+                    "topic": topic,
+                    "publisher": publisher["service"],
+                    "subscribers": [],
                     "evidence": "script-matched",
+                    "confidence": "high",
                     "detail": (
                         f"Topic '{topic}' published by {publisher['publisher_name']} "
-                        f"({publisher['service']}) consumed by "
-                        f"{subscriber['subscriber_name']} ({subscriber['service']})"
+                        f"({publisher['service']})"
                     ),
-                    "confidence": "high",
-                })
-    return relationships
+                }
+            sub_svc = subscriber["service"]
+            if sub_svc not in topic_flows[key]["subscribers"]:
+                topic_flows[key]["subscribers"].append(sub_svc)
+
+    for key, flow in topic_flows.items():
+        subs = ", ".join(flow["subscribers"])
+        flow["detail"] += f" consumed by {subs}"
+
+    return list(topic_flows.values())
 
 
 def match_shared_tables(all_accesses: list[dict]) -> list[dict]:
@@ -318,17 +321,16 @@ def main():
     event_rels = match_event_relationships(all_publishers, all_subscribers)
     table_rels = match_shared_tables(all_table_accesses)
 
-    all_relationships = rpc_rels + event_rels + table_rels
-
     result = {
         "scriptCompleted": True,
         "servicesAnalyzed": services_loaded,
-        "relationships": all_relationships,
+        "relationships": rpc_rels + table_rels,
+        "eventFlows": event_rels,
         "stats": {
             "rpcMatches": len(rpc_rels),
             "eventMatches": len(event_rels),
             "sharedTableMatches": len(table_rels),
-            "totalRelationships": len(all_relationships),
+            "totalRelationships": len(rpc_rels) + len(event_rels) + len(table_rels),
             "providersFound": len(all_providers),
             "consumersFound": len(all_consumers),
             "publishersFound": len(all_publishers),
