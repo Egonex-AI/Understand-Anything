@@ -257,7 +257,14 @@ fi
 
 #### Subagent Dispatch Protocol
 
-When KG or DG is missing (Step 5) or stale (Step 5a), dispatch an `upstream-updater` subagent from `$PLUGIN_ROOT/agents/upstream-updater.md` instead of running the skill inline. This prevents context window bloat — `/understand` alone has 7 phases with multiple nested subagents.
+When KG or DG is missing (Step 5) or stale (Step 5a), you **MUST** dispatch `upstream-updater` subagents from `$PLUGIN_ROOT/agents/upstream-updater.md`. **Never** run `/understand` or `/understand-domain` inline in your own context — this will exhaust your context window. Each upstream skill has 5–7 phases with nested subagents; they must run in isolated agent contexts.
+
+**CRITICAL — How to dispatch:** Use your platform's subagent/worker dispatch mechanism:
+- **Claude Code**: `dispatch_agent` tool or `Task` subagent
+- **Codex (OpenAI)**: Launch separate agent tasks / create parallel tool calls
+- **OpenCode / other platforms**: Use the equivalent multi-agent or worker spawn capability
+
+If your platform does not support multi-agent dispatch, you MUST still execute each upstream skill in a **separate, isolated invocation** (e.g., a new CLI session or tool call). Never attempt to inline the full `/understand` pipeline in your current context.
 
 **Dispatch template (KG update):**
 
@@ -277,9 +284,9 @@ When KG or DG is missing (Step 5) or stale (Step 5a), dispatch an `upstream-upda
 > - `$SKILL_ARGS`: *(empty — `/understand-domain` auto-derives from KG when available; language preference is read from `config.json`)*
 > - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/domain-graph.json`
 
-**Sequential dependency:** If both KG and DG need updating, dispatch KG first, wait for completion, then dispatch DG. `/understand-domain` benefits from an up-to-date KG (Path 2: derive from graph).
+**Sequential dependency (within one service):** If both KG and DG need updating, dispatch KG first, wait for completion, then dispatch DG. `/understand-domain` benefits from an up-to-date KG (Path 2: derive from graph).
 
-**Batch mode concurrency:** In batch mode, upstream updates for different services MAY run in parallel (each operates on a separate `$SERVICE_ROOT`). Within one service, KG → DG is still sequential.
+**Batch mode concurrency (across services) — MANDATORY:** In batch mode, upstream updates for **different services MUST be dispatched in parallel** (each operates on a separate `$SERVICE_ROOT` with no shared state). Dispatch all service KG updates simultaneously, wait for all to complete, then dispatch all DG updates simultaneously. Sequential processing across services wastes time and is not acceptable.
 
 ### Step 5a — Upstream KG/DG Staleness Check & Auto-Update
 
