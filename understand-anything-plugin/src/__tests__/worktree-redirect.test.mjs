@@ -1,8 +1,8 @@
 // Validates the worktree-redirect bash snippet embedded in
-// `skills/understand/SKILL.md` Phase 0 step 1 and
-// `skills/understand-domain/SKILL.md` Phase 0.
+// `skills/understand/recipes/worktree-redirect.md` (referenced from `skills/understand/SKILL.md`
+// Phase 0 step 1) and `skills/understand-domain/SKILL.md` Phase 0.
 //
-// If you edit the snippet in either SKILL.md, mirror the change to RESOLVE_SNIPPET
+// If you edit the snippet in either location, mirror the change to RESOLVE_SNIPPET
 // below — there is no shared script to source (per-skill convention in this repo).
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
