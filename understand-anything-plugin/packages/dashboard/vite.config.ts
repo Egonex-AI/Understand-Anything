@@ -194,10 +194,8 @@ export default defineConfig({
     },
   },
 
-  // FIX 1 — bind only to localhost, not 0.0.0.0
-  // This blocks access from any other device on the same LAN / WiFi.
   server: {
-    host: "127.0.0.1",
+    host: "0.0.0.0",
     port: 5173,
     open: `/?token=${ACCESS_TOKEN}`,
   },
@@ -252,7 +250,8 @@ export default defineConfig({
           const address = server.httpServer?.address();
           const port = typeof address === "object" && address ? address.port : 5173;
           console.log(
-            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
+            `\n  🔑  Dashboard URL (local):   http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}` +
+            `\n  🔑  Dashboard URL (network): http://0.0.0.0:${port}/?token=${ACCESS_TOKEN}\n`
           );
         });
 

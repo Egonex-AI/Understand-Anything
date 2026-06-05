@@ -1,0 +1,147 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "sample-service",
+    "languages": ["java"],
+    "frameworks": ["spring"],
+    "description": "Sample microservice fixture for wiki integration tests",
+    "analyzedAt": "2026-06-03T12:00:00Z",
+    "gitCommitHash": "fixture001"
+  },
+  "nodes": [
+    {
+      "id": "file:src/OrderController.java",
+      "type": "file",
+      "name": "OrderController.java",
+      "filePath": "src/OrderController.java",
+      "summary": "REST controller exposing order endpoints",
+      "tags": ["controller", "entry"],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/OrderService.java",
+      "type": "file",
+      "name": "OrderService.java",
+      "filePath": "src/OrderService.java",
+      "summary": "Core order business logic and RPC consumer",
+      "tags": ["service"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/PaymentFacade.java",
+      "type": "file",
+      "name": "PaymentFacade.java",
+      "filePath": "src/PaymentFacade.java",
+      "summary": "Payment RPC interface and provider implementation",
+      "tags": ["rpc", "interface"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:src/OrderService.java:OrderService",
+      "type": "class",
+      "name": "OrderService",
+      "filePath": "src/OrderService.java",
+      "summary": "Manages order creation and validation; consumes PaymentFacade RPC",
+      "tags": ["service", "rpc-consumer"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:src/PaymentFacade.java:PaymentFacade",
+      "type": "class",
+      "name": "PaymentFacade",
+      "filePath": "src/PaymentFacade.java",
+      "summary": "Payment facade interface for cross-service RPC",
+      "tags": ["interface"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/OrderController.java:createOrder",
+      "type": "function",
+      "name": "createOrder",
+      "filePath": "src/OrderController.java",
+      "lineRange": [3, 5],
+      "summary": "HTTP handler that accepts a new order request",
+      "tags": ["endpoint-handler"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/OrderService.java:createOrder",
+      "type": "function",
+      "name": "createOrder",
+      "filePath": "src/OrderService.java",
+      "lineRange": [3, 4],
+      "summary": "Creates an order and delegates payment to PaymentFacade",
+      "tags": ["business-logic"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/OrderService.java:validateOrder",
+      "type": "function",
+      "name": "validateOrder",
+      "filePath": "src/OrderService.java",
+      "lineRange": [5, 6],
+      "summary": "Validates order payload before persistence",
+      "tags": ["validation"],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/PaymentFacade.java:createPayment",
+      "type": "function",
+      "name": "createPayment",
+      "filePath": "src/PaymentFacade.java",
+      "lineRange": [3, 4],
+      "summary": "RPC method to initiate payment for an order",
+      "tags": ["rpc-method"],
+      "complexity": "simple"
+    },
+    {
+      "id": "endpoint:POST /api/orders",
+      "type": "endpoint",
+      "name": "POST /api/orders",
+      "summary": "Creates a new customer order",
+      "tags": ["http", "write"],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:src/PaymentFacade.java:PaymentFacadeImpl",
+      "type": "service",
+      "name": "PaymentFacadeImpl",
+      "filePath": "src/PaymentFacade.java",
+      "summary": "Implements PaymentFacade RPC interface: createPayment()",
+      "tags": ["rpc-provider", "moa"],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "class:src/OrderService.java:OrderService",
+      "target": "class:src/PaymentFacade.java:PaymentFacade",
+      "type": "consumes_rpc",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:src/PaymentFacade.java:PaymentFacadeImpl",
+      "target": "class:src/PaymentFacade.java:PaymentFacade",
+      "type": "provides_rpc",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "function:src/OrderController.java:createOrder",
+      "target": "function:src/OrderService.java:createOrder",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "endpoint:POST /api/orders",
+      "target": "function:src/OrderController.java:createOrder",
+      "type": "handled_by",
+      "direction": "forward",
+      "weight": 1.0
+    }
+  ],
+  "layers": [],
+  "tour": []
+}

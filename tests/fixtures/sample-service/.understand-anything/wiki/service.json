@@ -1,0 +1,7 @@
+{
+  "name": "sample-service",
+  "description": "Sample microservice that manages orders and consumes PaymentFacade RPC for payment processing.",
+  "techStack": ["Java", "Spring Boot"],
+  "modules": ["controller", "service", "payment"],
+  "entryPoints": ["OrderController.createOrder", "POST /api/orders"]
+}

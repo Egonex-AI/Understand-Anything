@@ -123,6 +123,25 @@ case "$OUTPUT_LANGUAGE" in
   german) OUTPUT_LANGUAGE="de" ;;
 esac
 
+# If --language was explicitly set, persist to service config.json
+# so upstream skills (/understand, /understand-domain) pick it up
+# even when dispatched without --language in $SKILL_ARGS.
+if [ -n "$OUTPUT_LANGUAGE" ]; then
+  mkdir -p "$SERVICE_ROOT/.understand-anything"
+  CONFIG_FILE="$SERVICE_ROOT/.understand-anything/config.json"
+  if [ -f "$CONFIG_FILE" ]; then
+    python3 -c "
+import json, sys
+p = sys.argv[1]
+with open(p) as f: cfg = json.load(f)
+cfg['outputLanguage'] = sys.argv[2]
+with open(p, 'w') as f: json.dump(cfg, f, indent=2, ensure_ascii=False)
+" "$CONFIG_FILE" "$OUTPUT_LANGUAGE"
+  else
+    echo "{\"outputLanguage\": \"$OUTPUT_LANGUAGE\"}" > "$CONFIG_FILE"
+  fi
+fi
+
 # Fall back to config, then default
 if [ -z "$OUTPUT_LANGUAGE" ]; then
   if [ -f "$SERVICE_ROOT/.understand-anything/config.json" ]; then
@@ -246,7 +265,7 @@ When KG or DG is missing (Step 5) or stale (Step 5a), dispatch an `upstream-upda
 >
 > - `$SKILL_PATH`: `$PLUGIN_ROOT/skills/understand/SKILL.md`
 > - `$SERVICE_ROOT`: `<service directory path>`
-> - `$SKILL_ARGS`: *(empty for missing KG; see Step 5a for stale KG)*
+> - `$SKILL_ARGS`: `--language $OUTPUT_LANGUAGE` *(propagates language preference to KG generation)*
 > - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/knowledge-graph.json`
 
 **Dispatch template (DG update):**
@@ -255,7 +274,7 @@ When KG or DG is missing (Step 5) or stale (Step 5a), dispatch an `upstream-upda
 >
 > - `$SKILL_PATH`: `$PLUGIN_ROOT/skills/understand-domain/SKILL.md`
 > - `$SERVICE_ROOT`: `<service directory path>`
-> - `$SKILL_ARGS`: *(empty — `/understand-domain` auto-derives from KG when available)*
+> - `$SKILL_ARGS`: *(empty — `/understand-domain` auto-derives from KG when available; language preference is read from `config.json`)*
 > - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/domain-graph.json`
 
 **Sequential dependency:** If both KG and DG need updating, dispatch KG first, wait for completion, then dispatch DG. `/understand-domain` benefits from an up-to-date KG (Path 2: derive from graph).
@@ -293,10 +312,11 @@ for w in d.get('warnings', []):
         # → Dispatch upstream-updater subagent with:
         #   $SKILL_PATH = $PLUGIN_ROOT/skills/understand/SKILL.md
         #   $SERVICE_ROOT = <current service root>
-        #   $SKILL_ARGS = (empty — /understand auto-detects incremental via commit hash diff)
+        #   $SKILL_ARGS = --language $OUTPUT_LANGUAGE
         #   $EXPECTED_OUTPUT = $SERVICE_ROOT/.understand-anything/knowledge-graph.json
         #
         # /understand will run incremental (git diff based) since KG+meta already exist.
+        # --language propagates the wiki's language preference to KG content.
         # Wait for completion before proceeding.
 
         if [ ! -f "$SERVICE_UA/knowledge-graph.json" ]; then
@@ -312,11 +332,12 @@ for w in d.get('warnings', []):
         # → Dispatch upstream-updater subagent with:
         #   $SKILL_PATH = $PLUGIN_ROOT/skills/understand-domain/SKILL.md
         #   $SERVICE_ROOT = <current service root>
-        #   $SKILL_ARGS = (empty — auto-derives from freshly updated KG)
+        #   $SKILL_ARGS = (empty — auto-derives from freshly updated KG; language preference is read from config.json)
         #   $EXPECTED_OUTPUT = $SERVICE_ROOT/.understand-anything/domain-graph.json
         #
         # /understand-domain has no incremental mode, but if KG was just updated,
         # it will use Path 2 (derive from graph) which is cheaper than file scanning.
+        # Language preference is already persisted in config.json by Step 4.
         # Wait for completion before proceeding.
 
         if [ ! -f "$SERVICE_UA/domain-graph.json" ]; then

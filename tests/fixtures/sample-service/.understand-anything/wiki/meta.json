@@ -1,0 +1,18 @@
+{
+  "gitCommitHash": "fixture001",
+  "generatedAt": "2026-06-03T12:00:00Z",
+  "version": "1.0.0",
+  "outputLanguage": "en",
+  "domainStates": {
+    "domain:order-mgmt": {
+      "lastGeneratedAt": "2026-06-03T12:00:00Z",
+      "nodeCount": 7,
+      "flowCount": 2
+    },
+    "domain:payment": {
+      "lastGeneratedAt": "2026-06-03T12:00:00Z",
+      "nodeCount": 4,
+      "flowCount": 1
+    }
+  }
+}

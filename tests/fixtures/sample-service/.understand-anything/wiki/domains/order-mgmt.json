@@ -1,0 +1,52 @@
+{
+  "id": "domain:order-mgmt",
+  "name": "Order Management",
+  "summary": "Handles the complete order lifecycle including creation, validation, and cancellation.",
+  "entities": ["Order", "OrderStatus"],
+  "flows": [
+    {
+      "id": "flow:create-order",
+      "name": "Create Order",
+      "summary": "Customer submits a new order through the REST API",
+      "steps": [
+        {
+          "order": 1,
+          "name": "Validate Input",
+          "description": "Validates order request parameters and business rules before persistence",
+          "sourceRef": { "file": "src/OrderService.java", "lineRange": [5, 6] }
+        },
+        {
+          "order": 2,
+          "name": "Submit Order",
+          "description": "Persists the order and delegates payment to PaymentFacade RPC",
+          "sourceRef": { "file": "src/OrderService.java", "lineRange": [3, 4] }
+        },
+        {
+          "order": 3,
+          "name": "Return Response",
+          "description": "Returns order confirmation payload to the API caller",
+          "sourceRef": { "file": "src/OrderController.java", "lineRange": [3, 5] }
+        }
+      ]
+    },
+    {
+      "id": "flow:cancel-order",
+      "name": "Cancel Order",
+      "summary": "Cancels an existing order before it enters fulfillment",
+      "steps": [
+        {
+          "order": 1,
+          "name": "Lookup Order",
+          "description": "Finds the order record by identifier from the data store",
+          "sourceRef": { "file": "src/OrderService.java", "lineRange": [3, 4] }
+        },
+        {
+          "order": 2,
+          "name": "Mark Cancelled",
+          "description": "Updates order status to cancelled and emits domain events",
+          "sourceRef": { "file": "src/OrderService.java", "lineRange": [5, 6] }
+        }
+      ]
+    }
+  ]
+}

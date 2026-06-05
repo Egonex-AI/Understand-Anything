@@ -83,15 +83,18 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    ```
    Run this in the background so the user can continue working.
 
-6. **Capture the access token URL from the server output.** The Vite server prints a line like:
+6. **Capture the access token URL from the server output.** The Vite server prints lines like:
    ```
-   🔑  Dashboard URL: http://127.0.0.1:<PORT>?token=<TOKEN>
+   🔑  Dashboard URL (local):   http://127.0.0.1:<PORT>?token=<TOKEN>
+   🔑  Dashboard URL (network): http://0.0.0.0:<PORT>?token=<TOKEN>
    ```
    Extract the full URL including the `?token=` parameter. The token is required to access the knowledge graph data — without it the dashboard will show an "Access Token Required" gate.
 
 7. Report to the user, including the full tokenized URL:
    ```
-   Dashboard started at http://127.0.0.1:<PORT>?token=<TOKEN>
+   Dashboard started!
+   Local:   http://127.0.0.1:<PORT>?token=<TOKEN>
+   Network: http://0.0.0.0:<PORT>?token=<TOKEN>
    Viewing: <project-dir>/.understand-anything/knowledge-graph.json
 
    The dashboard is running in the background. Press Ctrl+C in the terminal to stop it.
@@ -100,6 +103,7 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Notes
 
+- The dashboard binds to `0.0.0.0` by default, accessible from external networks via the host's IP address
 - The dashboard auto-opens in the default browser via `--open`
 - If port 5173 is already in use, Vite will pick the next available port
 - The `GRAPH_DIR` environment variable tells the dashboard where to find the knowledge graph

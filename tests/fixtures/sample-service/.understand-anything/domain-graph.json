@@ -1,0 +1,214 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "sample-service",
+    "languages": ["java"],
+    "frameworks": ["spring"],
+    "description": "Domain graph fixture for sample-service",
+    "analyzedAt": "2026-06-03T12:00:00Z",
+    "gitCommitHash": "fixture001"
+  },
+  "nodes": [
+    {
+      "id": "domain:order-mgmt",
+      "type": "domain",
+      "name": "Order Management",
+      "summary": "Handles order creation, validation, and lifecycle",
+      "tags": ["core"],
+      "complexity": "complex"
+    },
+    {
+      "id": "flow:create-order",
+      "type": "flow",
+      "name": "Create Order",
+      "summary": "Customer submits a new order through the API",
+      "tags": ["write-path"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "flow:cancel-order",
+      "type": "flow",
+      "name": "Cancel Order",
+      "summary": "Cancels an existing order before fulfillment",
+      "tags": ["write-path"],
+      "complexity": "simple"
+    },
+    {
+      "id": "step:create-order:validate",
+      "type": "step",
+      "name": "Validate Input",
+      "summary": "Validates order request parameters and business rules",
+      "tags": ["validation"],
+      "complexity": "simple",
+      "filePath": "src/OrderService.java",
+      "lineRange": [5, 6]
+    },
+    {
+      "id": "step:create-order:submit",
+      "type": "step",
+      "name": "Submit Order",
+      "summary": "Persists the order and triggers downstream payment",
+      "tags": ["persistence"],
+      "complexity": "moderate",
+      "filePath": "src/OrderService.java",
+      "lineRange": [3, 4]
+    },
+    {
+      "id": "step:create-order:respond",
+      "type": "step",
+      "name": "Return Response",
+      "summary": "Returns order confirmation to the API caller",
+      "tags": ["api"],
+      "complexity": "simple",
+      "filePath": "src/OrderController.java",
+      "lineRange": [3, 5]
+    },
+    {
+      "id": "step:cancel-order:lookup",
+      "type": "step",
+      "name": "Lookup Order",
+      "summary": "Finds the order record by identifier",
+      "tags": ["read"],
+      "complexity": "simple",
+      "filePath": "src/OrderService.java",
+      "lineRange": [3, 4]
+    },
+    {
+      "id": "step:cancel-order:mark-cancelled",
+      "type": "step",
+      "name": "Mark Cancelled",
+      "summary": "Updates order status to cancelled",
+      "tags": ["write"],
+      "complexity": "simple",
+      "filePath": "src/OrderService.java",
+      "lineRange": [5, 6]
+    },
+    {
+      "id": "domain:payment",
+      "type": "domain",
+      "name": "Payment",
+      "summary": "Payment processing and RPC facade exposure",
+      "tags": ["integration"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "flow:process-payment",
+      "type": "flow",
+      "name": "Process Payment",
+      "summary": "Initiates payment for a confirmed order",
+      "tags": ["rpc"],
+      "complexity": "moderate"
+    },
+    {
+      "id": "step:process-payment:authorize",
+      "type": "step",
+      "name": "Authorize Payment",
+      "summary": "Authorizes the payment amount with the provider",
+      "tags": ["payment"],
+      "complexity": "moderate",
+      "filePath": "src/PaymentFacade.java",
+      "lineRange": [3, 4]
+    },
+    {
+      "id": "step:process-payment:capture",
+      "type": "step",
+      "name": "Capture Funds",
+      "summary": "Captures authorized funds after order confirmation",
+      "tags": ["payment"],
+      "complexity": "moderate",
+      "filePath": "src/PaymentFacade.java",
+      "lineRange": [3, 4]
+    },
+    {
+      "id": "step:process-payment:notify",
+      "type": "step",
+      "name": "Notify Order Service",
+      "summary": "Sends payment result back to the order domain",
+      "tags": ["integration"],
+      "complexity": "simple",
+      "filePath": "src/OrderService.java",
+      "lineRange": [3, 4]
+    }
+  ],
+  "edges": [
+    {
+      "source": "domain:order-mgmt",
+      "target": "flow:create-order",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "domain:order-mgmt",
+      "target": "flow:cancel-order",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "flow:create-order",
+      "target": "step:create-order:validate",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.1
+    },
+    {
+      "source": "flow:create-order",
+      "target": "step:create-order:submit",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.2
+    },
+    {
+      "source": "flow:create-order",
+      "target": "step:create-order:respond",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:cancel-order",
+      "target": "step:cancel-order:lookup",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.1
+    },
+    {
+      "source": "flow:cancel-order",
+      "target": "step:cancel-order:mark-cancelled",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.2
+    },
+    {
+      "source": "domain:payment",
+      "target": "flow:process-payment",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1.0
+    },
+    {
+      "source": "flow:process-payment",
+      "target": "step:process-payment:authorize",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.1
+    },
+    {
+      "source": "flow:process-payment",
+      "target": "step:process-payment:capture",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.2
+    },
+    {
+      "source": "flow:process-payment",
+      "target": "step:process-payment:notify",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    }
+  ],
+  "layers": [],
+  "tour": []
+}

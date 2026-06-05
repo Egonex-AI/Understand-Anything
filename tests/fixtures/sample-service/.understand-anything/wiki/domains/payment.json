@@ -1,0 +1,33 @@
+{
+  "id": "domain:payment",
+  "name": "Payment",
+  "summary": "Payment processing domain covering RPC facade exposure and fund capture workflows.",
+  "entities": ["Payment", "PaymentStatus"],
+  "flows": [
+    {
+      "id": "flow:process-payment",
+      "name": "Process Payment",
+      "summary": "Initiates and completes payment for a confirmed order via MOA RPC",
+      "steps": [
+        {
+          "order": 1,
+          "name": "Authorize Payment",
+          "description": "Authorizes the payment amount with the external payment provider",
+          "sourceRef": { "file": "src/PaymentFacade.java", "lineRange": [3, 4] }
+        },
+        {
+          "order": 2,
+          "name": "Capture Funds",
+          "description": "Captures authorized funds after order confirmation is received",
+          "sourceRef": { "file": "src/PaymentFacade.java", "lineRange": [3, 4] }
+        },
+        {
+          "order": 3,
+          "name": "Notify Order Service",
+          "description": "Sends payment completion result back to the order management domain",
+          "sourceRef": { "file": "src/OrderService.java", "lineRange": [3, 4] }
+        }
+      ]
+    }
+  ]
+}
