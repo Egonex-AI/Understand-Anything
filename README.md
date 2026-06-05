@@ -233,7 +233,7 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | VS Code + GitHub Copilot | ✅ Supported | Auto-discovery |
 | Copilot CLI | ✅ Supported | Plugin install |
 | Codex | ✅ Supported | `install.sh codex` |
-| OpenCode | ✅ Supported | `install.sh opencode` |
+| OpenCode | ⚠️ Structural-only — [see notes](docs/platforms/opencode.md) | `install.sh opencode` |
 | OpenClaw | ✅ Supported | `install.sh openclaw` |
 | Antigravity | ✅ Supported | `install.sh antigravity` |
 | Gemini CLI | ✅ Supported | `install.sh gemini` |
@@ -243,6 +243,8 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | Cline | ✅ Supported | `install.sh cline` |
 | KIMI CLI | ✅ Supported | `install.sh kimi` |
 | Trae | ✅ Supported | `install.sh trae` |
+
+> **OpenCode note:** the plugin installs and the deterministic scripts run, but OpenCode (≤ 1.15.11) does not implement Claude Code's `Task` tool, so the LLM subagent phases (file summaries, architecture, tour, review) are skipped. You get a **structural-only** graph — file nodes + import edges. See [`docs/platforms/opencode.md`](docs/platforms/opencode.md) for the manual activation procedure.
 
 ---
 
