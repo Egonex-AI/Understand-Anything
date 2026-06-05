@@ -355,6 +355,15 @@ def _check_content_depth(page: dict, filename: str) -> dict[str, Any]:
     metrics["errorCatalogCount"] = error_count
     if error_count == 0:
         depth_warnings.append(f"domains/{filename}: no errorCatalog defined")
+    else:
+        for ei, entry in enumerate(error_catalog):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("code") and not entry.get("exception"):
+                depth_warnings.append(
+                    f"domains/{filename}: errorCatalog[{ei}] uses 'code' instead of 'exception' — "
+                    "expected fields: exception, trigger, handling, severity"
+                )
 
     rich_entities = sum(
         1 for e in (entities if isinstance(entities, list) else [])

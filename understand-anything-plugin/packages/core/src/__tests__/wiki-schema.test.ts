@@ -133,6 +133,28 @@ describe("validateWikiDomainPage", () => {
     const issues = validateWikiDomainPage(page, "domains/test.json");
     expect(issues.some((i) => i.message.includes("missing order"))).toBe(true);
   });
+
+  it("warns when errorCatalog uses code instead of exception", () => {
+    const page = {
+      ...validPage,
+      errorCatalog: [
+        { code: "IM_AUDIT_FAIL", description: "Audit failed", sourceRef: { file: "a.java" } },
+      ],
+    };
+    const issues = validateWikiDomainPage(page, "domains/test.json");
+    expect(issues.some((i) => i.severity === "warning" && i.message.includes("code"))).toBe(true);
+  });
+
+  it("accepts valid errorCatalog with exception field", () => {
+    const page = {
+      ...validPage,
+      errorCatalog: [
+        { exception: "OrderNotFoundException", trigger: "invalid ID", handling: "returns 404", severity: "user_error" },
+      ],
+    };
+    const issues = validateWikiDomainPage(page, "domains/test.json");
+    expect(issues.filter((i) => i.message.includes("errorCatalog"))).toHaveLength(0);
+  });
 });
 
 describe("validateWikiServiceOverview", () => {

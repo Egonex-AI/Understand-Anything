@@ -148,6 +148,15 @@ export function validateWikiDomainPage(data: unknown, filePath: string): Validat
   if (page.summary && typeof page.summary === "string" && (page.summary as string).length < 10) {
     issues.push({ file: filePath, severity: "warning", message: "Summary is too short (< 10 chars)" });
   }
+  if (Array.isArray(page.errorCatalog)) {
+    for (let i = 0; i < page.errorCatalog.length; i++) {
+      const entry = page.errorCatalog[i] as Record<string, unknown>;
+      if (!entry || typeof entry !== "object") continue;
+      if (entry.code && !entry.exception) {
+        issues.push({ file: filePath, severity: "warning", message: `errorCatalog[${i}] uses 'code' instead of 'exception' — expected fields: exception, trigger, handling, severity` });
+      }
+    }
+  }
   return issues;
 }
 

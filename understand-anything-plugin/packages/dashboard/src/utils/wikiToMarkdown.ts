@@ -568,14 +568,22 @@ export function domainPageToMarkdown(page: WikiDomainPage, labels: WikiLabels = 
     }
   }
 
-  const errors = Array.isArray(page?.errorCatalog) ? page.errorCatalog : [];
+  const rawErrors = Array.isArray(page?.errorCatalog) ? page.errorCatalog : [];
+  const errors = rawErrors.filter((e: Record<string, unknown>) =>
+    e && (e.exception || e.code),
+  );
   if (errors.length > 0) {
     lines.push(`## ${labels.errorScenarios}`);
     lines.push("");
     lines.push(`| ${labels.exceptionHeader} | ${labels.triggerHeader} | ${labels.handlingHeader} | ${labels.severityHeader} |`);
     lines.push("|---|---|---|---|");
-    for (const err of errors as WikiErrorCatalogEntry[]) {
-      lines.push(`| \`${err?.exception ?? "?"}\` | ${err?.trigger ?? ""} | ${err?.handling ?? ""} | ${err?.severity ?? "?"} |`);
+    for (const raw of errors) {
+      const e = raw as Record<string, unknown>;
+      const exception = (e.exception ?? e.code ?? "") as string;
+      const trigger = (e.trigger ?? "") as string;
+      const handling = (e.handling ?? e.description ?? "") as string;
+      const severity = (e.severity ?? "") as string;
+      lines.push(`| \`${exception}\` | ${trigger} | ${handling} | ${severity} |`);
     }
     lines.push("");
   }
