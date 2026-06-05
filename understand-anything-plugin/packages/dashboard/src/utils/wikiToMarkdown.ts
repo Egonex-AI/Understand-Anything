@@ -219,12 +219,16 @@ function entityLifecycleDiagram(entity: WikiEntity): string {
   const states = Array.isArray(entity.lifecycleStates) ? entity.lifecycleStates : [];
   if (states.length < 2) return "";
 
+  const stateId = (i: number) => `state_${i}`;
   const lines: string[] = ["```mermaid", "stateDiagram-v2"];
-  lines.push(`    [*] --> ${sanitizeMermaidLabel(states[0])}`);
-  for (let i = 0; i < states.length - 1; i++) {
-    lines.push(`    ${sanitizeMermaidLabel(states[i])} --> ${sanitizeMermaidLabel(states[i + 1])}`);
+  for (let i = 0; i < states.length; i++) {
+    lines.push(`    state "${sanitizeMermaidLabel(states[i])}" as ${stateId(i)}`);
   }
-  lines.push(`    ${sanitizeMermaidLabel(states[states.length - 1])} --> [*]`);
+  lines.push(`    [*] --> ${stateId(0)}`);
+  for (let i = 0; i < states.length - 1; i++) {
+    lines.push(`    ${stateId(i)} --> ${stateId(i + 1)}`);
+  }
+  lines.push(`    ${stateId(states.length - 1)} --> [*]`);
   lines.push("```");
   return lines.join("\n");
 }
