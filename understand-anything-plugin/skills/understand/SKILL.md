@@ -114,9 +114,13 @@ Determine whether to run a full analysis or incremental update.
    fi
 
    if [ ! -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
-     cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
+     (cd "$PLUGIN_ROOT" && COREPACK_ENABLE_PROJECT_SPEC=0 pnpm install --frozen-lockfile 2>/dev/null \
+       || (cd "$PLUGIN_ROOT" && COREPACK_ENABLE_PROJECT_SPEC=0 pnpm install)) \
+       && (cd "$PLUGIN_ROOT" && COREPACK_ENABLE_PROJECT_SPEC=0 pnpm --filter @understand-anything/core build)
    fi
    ```
+
+   **Why the subshell + `COREPACK_ENABLE_PROJECT_SPEC=0`?** When `/understand` runs from a host project whose `package.json` pins `"packageManager": "yarn@x"` or `"npm@x"`, corepack reads the **shell CWD's** `packageManager` field (not the `-C` / `--dir` target) and refuses to launch pnpm — failing the build with errors like `This project is configured to use yarn`. The fix is two-pronged: (1) `cd "$PLUGIN_ROOT"` inside a subshell so corepack's CWD-based lookup hits the plugin's own `packageManager` pin (`pnpm@…`); (2) `COREPACK_ENABLE_PROJECT_SPEC=0` to disable corepack's project-spec enforcement entirely as a belt-and-suspenders backstop in case the plugin's `packageManager` field is missing or stripped (e.g., during installation). Do **not** simplify this to `pnpm -C "$PLUGIN_ROOT" install` — `pnpm -C` does not change the CWD that corepack inspects, so the host pin still wins and the build still fails. See issue #315.
 
    If `pnpm` is missing, report to the user: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
 
