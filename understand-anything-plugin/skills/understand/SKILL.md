@@ -173,11 +173,25 @@ Determine whether to run a full analysis or incremental update.
 
    **Review-only path:** Copy the existing `knowledge-graph.json` to `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`, then jump directly to Phase 6 step 3.
 
-   For incremental updates, get the changed file list:
+   For incremental updates, get the changed file list using `--name-status -M` so renames are reported as **both** the old and new path (a plain `--name-only` only reports the new path, leaving the pre-rename node + every edge that referenced it orphaned in the graph — issue #366, Bug 1):
+
    ```bash
-   git diff <lastCommitHash>..HEAD --name-only
+   git diff <lastCommitHash>..HEAD --name-status -M \
+     > $PROJECT_ROOT/.understand-anything/tmp/git-changes.txt
+   node <SKILL_DIR>/parse-git-changes.mjs \
+     $PROJECT_ROOT/.understand-anything/tmp/git-changes.txt \
+     $PROJECT_ROOT/.understand-anything/tmp/changed-files.txt \
+     $PROJECT_ROOT/.understand-anything/tmp/prune-files.txt
    ```
-   If this returns no files, report "Graph is up to date" and STOP.
+
+   The parser splits each `--name-status` line into two disjoint sets:
+
+   - `changed-files.txt` — newline-delimited paths to **analyze** (statuses `M`, `A`, `T`, `U`, plus the new path of `R<score>` renames and `C<score>` copies).
+   - `prune-files.txt` — newline-delimited paths to **prune-only** (statuses `D`, plus the old path of `R<score>` renames). These are never re-analyzed; their nodes and edges are dropped from the existing graph so renamed/deleted files don't leave orphans.
+
+   Copies (`C<score>`) intentionally do **not** prune the source path because the source file still exists on disk.
+
+   If both files are empty, report "Graph is up to date" and STOP. (mkdir `$PROJECT_ROOT/.understand-anything/tmp` first if it does not already exist — Phase 0 step 3 creates it as part of normal flow.)
 
 8. **Collect project context for subagent injection:**
    - Read `README.md` (or `README.rst`, `readme.md`) from `$PROJECT_ROOT` if it exists. Store as `$README_CONTENT` (first 3000 characters).
@@ -362,12 +376,14 @@ Include the script's warnings in `$PHASE_WARNINGS` for the reviewer.
 
 ### Incremental update path
 
-Write the changed-files list (one path per line) to a temp file:
-```bash
-git diff <lastCommitHash>..HEAD --name-only > $PROJECT_ROOT/.understand-anything/tmp/changed-files.txt
-```
+Reuse the two files produced by Phase 0 step 7's `parse-git-changes.mjs`:
 
-Run compute-batches with `--changed-files`:
+- `$PROJECT_ROOT/.understand-anything/tmp/changed-files.txt` — paths to re-analyze (`M`, `A`, `T`, `U`, plus `R<score>` new paths and `C<score>` new paths).
+- `$PROJECT_ROOT/.understand-anything/tmp/prune-files.txt` — paths to prune-only (`D` deletions plus `R<score>` old paths). These are NOT re-analyzed; their existing nodes and edges are removed from the graph so renamed/deleted files don't leave orphans.
+
+If Phase 0 did not write these files yet (e.g. when this path is reached out of order), re-run the parser now using the same commands as Phase 0 step 7.
+
+Run compute-batches with `--changed-files` (only the changed-set — the prune-only set has nothing to analyze):
 ```bash
 node <SKILL_DIR>/compute-batches.mjs $PROJECT_ROOT \
   --changed-files=$PROJECT_ROOT/.understand-anything/tmp/changed-files.txt
@@ -377,14 +393,18 @@ This produces a `batches.json` that contains only batches with changed files, bu
 
 Then dispatch file-analyzer subagents per the same template as the full path.
 
-After batches complete:
-1. Remove old nodes whose `filePath` matches any changed file from the existing graph
-2. Remove old edges whose `source` or `target` references a removed node
-3. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory
-4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
+After batches complete, **prune using the union of both sets** (`changed-files.txt` ∪ `prune-files.txt`) so renamed/deleted files no longer appear in the graph:
+
+1. Build the prune-path set: read `$PROJECT_ROOT/.understand-anything/tmp/changed-files.txt` AND `$PROJECT_ROOT/.understand-anything/tmp/prune-files.txt`, take the union.
+2. Remove old nodes whose `filePath` matches any path in the prune-path set from the existing graph.
+3. Remove old edges whose `source` or `target` references a removed node.
+4. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory.
+5. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
    ```bash
    python <SKILL_DIR>/merge-batch-graphs.py $PROJECT_ROOT
    ```
+
+**Why the union?** Re-analyzed files (`changed-files.txt`) need their old nodes/edges removed before the fresh batches add the new ones, otherwise stale function/class nodes survive alongside the rewritten file. Prune-only files (`prune-files.txt`) need removal without re-analysis — there is no replacement node to merge in.
 
 ---
 
