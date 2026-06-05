@@ -877,6 +877,276 @@ class MergeIntegrationTests(unittest.TestCase):
         self.assertIn("tested", prod_node["tags"])
 
 
+class PruneExistingGraphTests(unittest.TestCase):
+    """Incremental prune of the existing graph, source-only.
+
+    Regression for issue #366 Bug 2 — the previous `source OR target` rule
+    silently dropped inbound edges from unchanged files (`U imports F`,
+    `U calls F`, `U tests F`) every time F was re-analyzed, because the
+    unchanged U never regenerates them.
+    """
+
+    def test_inbound_edges_from_unchanged_sources_survive(self) -> None:
+        # Fixture: F1 imports F2, F3 imports F2. F2 is the only changed file.
+        # Both inbound edges (F1→F2 and F3→F2) must survive the prune even
+        # though their target (F2) was removed.
+        existing = {
+            "nodes": [
+                _file_node("src/F1.ts"),
+                _file_node("src/F2.ts"),
+                _file_node("src/F3.ts"),
+            ],
+            "edges": [
+                {
+                    "source": "file:src/F1.ts",
+                    "target": "file:src/F2.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+                {
+                    "source": "file:src/F3.ts",
+                    "target": "file:src/F2.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+            ],
+        }
+
+        pruned = mbg.prune_existing_graph(existing, {"src/F2.ts"})
+
+        # F2's node was removed, F1 + F3 survive
+        surviving_ids = {n["id"] for n in pruned["nodes"]}
+        self.assertEqual(surviving_ids, {"file:src/F1.ts", "file:src/F3.ts"})
+
+        # Both inbound edges into F2 were retained (target removed, but
+        # source survived → keep). The merge's dangling-edge sweep will
+        # absorb them once fresh F2 batch lands.
+        edge_pairs = {(e["source"], e["target"]) for e in pruned["edges"]}
+        self.assertIn(("file:src/F1.ts", "file:src/F2.ts"), edge_pairs)
+        self.assertIn(("file:src/F3.ts", "file:src/F2.ts"), edge_pairs)
+        self.assertEqual(len(pruned["edges"]), 2)
+
+    def test_outbound_edges_from_removed_nodes_are_dropped(self) -> None:
+        # Edges sourced by a removed node have no use in the merged graph —
+        # the fresh batch for that file will regenerate them (or not).
+        existing = {
+            "nodes": [
+                _file_node("src/F1.ts"),
+                _file_node("src/F2.ts"),
+            ],
+            "edges": [
+                # Outbound from changed F2 — must be dropped (fresh batch
+                # will re-emit if still valid).
+                {
+                    "source": "file:src/F2.ts",
+                    "target": "file:src/F1.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+            ],
+        }
+
+        pruned = mbg.prune_existing_graph(existing, {"src/F2.ts"})
+
+        # F2 dropped from nodes, F2's outbound edge dropped too
+        self.assertEqual({n["id"] for n in pruned["nodes"]}, {"file:src/F1.ts"})
+        self.assertEqual(pruned["edges"], [])
+
+    def test_function_level_nodes_inside_changed_file_are_removed(self) -> None:
+        # Function/class nodes share their host file's `filePath` — they
+        # must be dropped when that file changes (their fresh batch will
+        # re-emit them under canonical IDs).
+        existing = {
+            "nodes": [
+                _file_node("src/F1.ts"),
+                _file_node("src/F2.ts"),
+                {
+                    "id": "function:src/F2.ts:helper",
+                    "type": "function",
+                    "name": "helper",
+                    "filePath": "src/F2.ts",
+                    "summary": "",
+                    "tags": [],
+                    "complexity": "simple",
+                },
+            ],
+            "edges": [
+                # Inbound function-level edge: F1's caller → F2's helper.
+                # Retained at this step; merge's dangling sweep decides
+                # later (drops it if `function:src/F2.ts:helper` does not
+                # reappear in the fresh batch).
+                {
+                    "source": "file:src/F1.ts",
+                    "target": "function:src/F2.ts:helper",
+                    "type": "calls",
+                    "direction": "forward",
+                    "weight": 0.5,
+                },
+            ],
+        }
+
+        pruned = mbg.prune_existing_graph(existing, {"src/F2.ts"})
+
+        surviving_ids = {n["id"] for n in pruned["nodes"]}
+        self.assertEqual(surviving_ids, {"file:src/F1.ts"})
+        # Inbound edge retained — source F1 survived
+        self.assertEqual(len(pruned["edges"]), 1)
+        self.assertEqual(pruned["edges"][0]["target"], "function:src/F2.ts:helper")
+
+    def test_no_changed_files_is_noop(self) -> None:
+        existing = {
+            "nodes": [_file_node("src/a.ts"), _file_node("src/b.ts")],
+            "edges": [
+                {
+                    "source": "file:src/a.ts",
+                    "target": "file:src/b.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+            ],
+        }
+        pruned = mbg.prune_existing_graph(existing, set())
+        self.assertEqual(len(pruned["nodes"]), 2)
+        self.assertEqual(len(pruned["edges"]), 1)
+
+    def test_unrelated_top_level_fields_preserved(self) -> None:
+        # Real graphs carry `projectName`, `frameworks`, `layers`, etc.
+        # alongside `nodes` and `edges`. Prune must not strip them.
+        existing = {
+            "projectName": "demo",
+            "frameworks": ["next"],
+            "layers": [{"id": "ui", "nodeIds": []}],
+            "nodes": [_file_node("src/F1.ts"), _file_node("src/F2.ts")],
+            "edges": [],
+        }
+        pruned = mbg.prune_existing_graph(existing, {"src/F2.ts"})
+        self.assertEqual(pruned["projectName"], "demo")
+        self.assertEqual(pruned["frameworks"], ["next"])
+        self.assertEqual(pruned["layers"], [{"id": "ui", "nodeIds": []}])
+
+    def test_does_not_mutate_input(self) -> None:
+        existing = {
+            "nodes": [_file_node("src/F1.ts"), _file_node("src/F2.ts")],
+            "edges": [
+                {
+                    "source": "file:src/F2.ts",
+                    "target": "file:src/F1.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+            ],
+        }
+        original_node_count = len(existing["nodes"])
+        original_edge_count = len(existing["edges"])
+
+        mbg.prune_existing_graph(existing, {"src/F2.ts"})
+
+        # Input graph untouched
+        self.assertEqual(len(existing["nodes"]), original_node_count)
+        self.assertEqual(len(existing["edges"]), original_edge_count)
+
+    def test_merge_dangling_sweep_drops_truly_removed_function_target(self) -> None:
+        # End-to-end safety check: an inbound edge into a deleted function
+        # survives the source-only prune (good), then the merge's dangling
+        # sweep drops it because the function does NOT reappear in the
+        # fresh batch (also good — no zombie edges in the final graph).
+        existing = {
+            "nodes": [
+                _file_node("src/F1.ts"),
+                _file_node("src/F2.ts"),
+                {
+                    "id": "function:src/F2.ts:removedFn",
+                    "type": "function",
+                    "name": "removedFn",
+                    "filePath": "src/F2.ts",
+                    "summary": "",
+                    "tags": [],
+                    "complexity": "simple",
+                },
+            ],
+            "edges": [
+                # Inbound function-level edge from unchanged F1
+                {
+                    "source": "file:src/F1.ts",
+                    "target": "function:src/F2.ts:removedFn",
+                    "type": "calls",
+                    "direction": "forward",
+                    "weight": 0.5,
+                },
+            ],
+        }
+
+        pruned = mbg.prune_existing_graph(existing, {"src/F2.ts"})
+
+        # Fresh batch for F2: file-level only, removedFn is gone
+        fresh_batch = {
+            "nodes": [_file_node("src/F2.ts")],
+            "edges": [],
+        }
+
+        # Stitch into the merge pipeline by treating pruned as a batch
+        existing_batch = {"nodes": pruned["nodes"], "edges": pruned["edges"]}
+        assembled, _report = mbg.merge_and_normalize([existing_batch, fresh_batch])
+
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertIn("file:src/F1.ts", node_ids)
+        self.assertIn("file:src/F2.ts", node_ids)
+        # removedFn never reappeared
+        self.assertNotIn("function:src/F2.ts:removedFn", node_ids)
+
+        # The inbound calls edge gets dropped by the dangling-edge sweep
+        # in merge_and_normalize Step 6 — its target node is missing.
+        edge_pairs = {(e["source"], e["target"]) for e in assembled["edges"]}
+        self.assertNotIn(
+            ("file:src/F1.ts", "function:src/F2.ts:removedFn"),
+            edge_pairs,
+        )
+
+    def test_merge_preserves_inbound_file_edge_after_prune(self) -> None:
+        # Full end-to-end: F1 imports F2, F3 imports F2. F2 is reanalyzed
+        # and the fresh batch re-emits file:F2. The inbound edges (file-level
+        # targets) survive prune + merge.
+        existing = {
+            "nodes": [
+                _file_node("src/F1.ts"),
+                _file_node("src/F2.ts"),
+                _file_node("src/F3.ts"),
+            ],
+            "edges": [
+                {
+                    "source": "file:src/F1.ts",
+                    "target": "file:src/F2.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+                {
+                    "source": "file:src/F3.ts",
+                    "target": "file:src/F2.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                },
+            ],
+        }
+
+        pruned = mbg.prune_existing_graph(existing, {"src/F2.ts"})
+        fresh_batch = {"nodes": [_file_node("src/F2.ts")], "edges": []}
+
+        existing_batch = {"nodes": pruned["nodes"], "edges": pruned["edges"]}
+        assembled, _report = mbg.merge_and_normalize([existing_batch, fresh_batch])
+
+        edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        # Both inbound imports edges into F2 survived end-to-end
+        self.assertIn(("file:src/F1.ts", "file:src/F2.ts", "imports"), edge_pairs)
+        self.assertIn(("file:src/F3.ts", "file:src/F2.ts", "imports"), edge_pairs)
+
+
 class NormalizeDirectionTests(unittest.TestCase):
     """`direction` canonicalization mirrors the dashboard schema validator."""
 
