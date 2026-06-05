@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { SystemGraph } from "@understand-anything/core";
 import SystemOverview from "../components/SystemOverview";
 import { useDashboardStore } from "../store";
 import { I18nProvider } from "../contexts/I18nContext";
+import { ThemeProvider } from "../themes/index.ts";
 
 const mockSystemGraph: SystemGraph = {
   version: "1.0.0",
@@ -53,14 +54,23 @@ const mockSystemGraph: SystemGraph = {
 
 function renderSystemOverview() {
   return render(
-    <I18nProvider language="en">
-      <SystemOverview />
-    </I18nProvider>,
+    <ThemeProvider>
+      <I18nProvider language="en">
+        <SystemOverview />
+      </I18nProvider>
+    </ThemeProvider>,
   );
+}
+
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
 }
 
 describe("SystemOverview", () => {
   beforeEach(() => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     useDashboardStore.setState({ systemGraph: mockSystemGraph });
   });
 
@@ -78,8 +88,8 @@ describe("SystemOverview", () => {
 
   it("renders service list in sidebar", () => {
     renderSystemOverview();
-    expect(screen.getByText("Order Service")).toBeInTheDocument();
-    expect(screen.getByText("Payment Service")).toBeInTheDocument();
+    expect(screen.getAllByText("Order Service").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Payment Service").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows empty state when no system graph", () => {

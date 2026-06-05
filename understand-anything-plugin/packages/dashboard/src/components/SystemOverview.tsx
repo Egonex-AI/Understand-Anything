@@ -1,23 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  forceSimulation,
-  forceLink,
-  forceManyBody,
-  forceCenter,
-  forceCollide,
-  type SimulationNodeDatum,
-  type SimulationLinkDatum,
-} from "d3-force";
+  ReactFlow,
+  ReactFlowProvider,
+  useNodesState,
+  useEdgesState,
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+} from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+
 import type { SystemGraph, SystemGraphNode } from "@understand-anything/core";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { useTheme } from "../themes/index.ts";
+import ServiceNode from "./ServiceNode";
+import type { ServiceFlowNode } from "./ServiceNode";
 
-interface SystemNode extends SimulationNodeDatum, SystemGraphNode {}
-
-interface SystemLink extends SimulationLinkDatum<SystemNode> {
-  type: SystemGraph["edges"][number]["type"];
-  detail?: SystemGraph["edges"][number]["detail"];
-}
+const nodeTypes = {
+  service: ServiceNode,
+};
 
 const EDGE_COLORS: Record<string, string> = {
   rpc_call: "#3b82f6",
@@ -26,91 +30,129 @@ const EDGE_COLORS: Record<string, string> = {
   contains: "#94a3b8",
 };
 
-const NODE_RADIUS = 30;
-
 function serviceKeyFromNodeId(nodeId: string): string {
   return nodeId.replace(/^microservice:/, "");
 }
 
-export default function SystemOverview() {
+function SystemOverviewInner() {
   const systemGraph = useDashboardStore((s) => s.systemGraph);
   const setActiveService = useDashboardStore((s) => s.setActiveService);
   const { t } = useI18n();
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [layoutNodes, setLayoutNodes] = useState<SystemNode[]>([]);
-  const [layoutLinks, setLayoutLinks] = useState<SystemLink[]>([]);
+  const { preset } = useTheme();
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  const { nodes, edges, project, serviceIndex } = useMemo(() => {
+  const { svcNodes, svcEdges, project, serviceIndex } = useMemo(() => {
     if (!systemGraph) {
       return {
-        nodes: [] as SystemNode[],
-        edges: [] as SystemLink[],
+        svcNodes: [] as SystemGraphNode[],
+        svcEdges: [] as SystemGraph["edges"],
         project: null,
         serviceIndex: undefined as SystemGraph["serviceIndex"] | undefined,
       };
     }
-    const svcNodes: SystemNode[] = systemGraph.nodes
-      .filter((n) => n.type === "microservice")
-      .map((n) => ({ ...n }));
-    const svcIds = new Set(svcNodes.map((n) => n.id));
-    const svcEdges: SystemLink[] = systemGraph.edges
-      .filter((e) => svcIds.has(e.source) && svcIds.has(e.target))
-      .map((e) => ({ ...e, source: e.source, target: e.target }));
+    const nodes = systemGraph.nodes.filter((n) => n.type === "microservice");
+    const svcIds = new Set(nodes.map((n) => n.id));
+    const edges = systemGraph.edges.filter(
+      (e) => svcIds.has(e.source) && svcIds.has(e.target),
+    );
     return {
-      nodes: svcNodes,
-      edges: svcEdges,
+      svcNodes: nodes,
+      svcEdges: edges,
       project: systemGraph.project,
       serviceIndex: systemGraph.serviceIndex,
     };
   }, [systemGraph]);
 
-  useEffect(() => {
-    if (!svgRef.current || nodes.length === 0) {
-      setLayoutNodes([]);
-      setLayoutLinks([]);
-      return;
+  const neighborIds = useMemo(() => {
+    if (!selectedNodeId) return new Set<string>();
+    const ids = new Set<string>();
+    for (const edge of svcEdges) {
+      if (edge.source === selectedNodeId) ids.add(edge.target);
+      if (edge.target === selectedNodeId) ids.add(edge.source);
     }
+    return ids;
+  }, [selectedNodeId, svcEdges]);
 
-    const svg = svgRef.current;
-    const width = svg.clientWidth || 800;
-    const height = svg.clientHeight || 600;
+  const computedNodes = useMemo((): Node[] => {
+    return svcNodes.map((node, i): ServiceFlowNode => {
+      const svcName = serviceKeyFromNodeId(node.id);
+      const idx = serviceIndex?.[svcName];
+      const isSelected = selectedNodeId === node.id;
+      const hasSelection = !!selectedNodeId;
+      const isNeighbor = neighborIds.has(node.id);
+      const isFaded = hasSelection && !isSelected && !isNeighbor;
 
-    const simNodes: SystemNode[] = nodes.map((n, i) => ({
-      ...n,
-      x: width / 2 + (i - nodes.length / 2) * 40,
-      y: height / 2,
-    }));
-    const simLinks: SystemLink[] = edges.map((e) => ({ ...e }));
-
-    const sim = forceSimulation<SystemNode>(simNodes)
-      .force(
-        "link",
-        forceLink<SystemNode, SystemLink>(simLinks)
-          .id((d) => d.id)
-          .distance(200)
-          .strength(0.3),
-      )
-      .force("charge", forceManyBody().strength(-500))
-      .force("center", forceCenter(width / 2, height / 2))
-      .force("collide", forceCollide(NODE_RADIUS + 8));
-
-    sim.on("tick", () => {
-      setLayoutNodes([...simNodes]);
-      setLayoutLinks([...simLinks]);
+      return {
+        id: node.id,
+        type: "service",
+        position: { x: (i % 4) * 280, y: Math.floor(i / 4) * 180 },
+        style: isFaded ? { opacity: 0.35 } : undefined,
+        data: {
+          label: node.name,
+          summary: node.summary,
+          languages: node.languages ?? [],
+          frameworks: node.frameworks ?? [],
+          stats: node.stats ?? { nodes: 0, edges: 0, files: 0 },
+          hasKg: idx?.hasKg ?? false,
+          hasWiki: idx?.hasWiki ?? false,
+          hasDomain: idx?.hasDomain ?? false,
+          isSelected,
+          onNodeClick: () => {},
+        },
+      };
     });
+  }, [svcNodes, serviceIndex, selectedNodeId, neighborIds]);
 
-    return () => {
-      sim.stop();
-    };
-  }, [nodes, edges]);
+  const computedEdges = useMemo((): Edge[] => {
+    return svcEdges.map((edge, i) => {
+      const color = EDGE_COLORS[edge.type] ?? EDGE_COLORS.contains;
+      const isConnected =
+        !!selectedNodeId &&
+        (edge.source === selectedNodeId || edge.target === selectedNodeId);
 
-  const handleNodeClick = useCallback(
-    (node: SystemNode) => {
-      const serviceName = node.id.replace("microservice:", "");
-      setActiveService(serviceName);
+      return {
+        id: `${edge.source}-${edge.target}-${i}`,
+        source: edge.source,
+        target: edge.target,
+        style: {
+          stroke: color,
+          strokeWidth: isConnected ? 2.5 : 1.5,
+          opacity: selectedNodeId ? (isConnected ? 1 : 0.15) : 0.8,
+        },
+        animated: edge.type === "event" && isConnected,
+      };
+    });
+  }, [svcEdges, selectedNodeId]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(computedEdges);
+
+  useEffect(() => {
+    setNodes(computedNodes);
+    setEdges(computedEdges);
+  }, [computedNodes, computedEdges, setNodes, setEdges]);
+
+  const handleServiceNavigate = useCallback(
+    (node: SystemGraphNode) => {
+      setActiveService(serviceKeyFromNodeId(node.id));
     },
     [setActiveService],
   );
+
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+
+  const onNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      setActiveService(serviceKeyFromNodeId(node.id));
+    },
+    [setActiveService],
+  );
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
 
   if (!systemGraph) {
     return (
@@ -119,9 +161,6 @@ export default function SystemOverview() {
       </div>
     );
   }
-
-  const displayNodes = layoutNodes.length > 0 ? layoutNodes : nodes;
-  const displayLinks = layoutLinks.length > 0 ? layoutLinks : edges;
 
   return (
     <div className="flex h-full min-h-0">
@@ -137,7 +176,7 @@ export default function SystemOverview() {
         <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
           <div className="bg-elevated rounded-lg p-2 border border-border-subtle">
             <div className="font-mono text-accent text-lg">
-              {project?.serviceCount ?? nodes.length}
+              {project?.serviceCount ?? svcNodes.length}
             </div>
             <div className="text-text-muted uppercase tracking-wider">
               {t.systemServiceCount}
@@ -152,17 +191,52 @@ export default function SystemOverview() {
             </div>
           </div>
         </div>
+
+        <div className="mb-4">
+          <div className="text-[10px] text-text-muted uppercase tracking-wider mb-2">
+            Edge Types
+          </div>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-2">
+              <span
+                className="w-4 h-0.5 rounded"
+                style={{ backgroundColor: EDGE_COLORS.rpc_call }}
+              />
+              <span className="text-text-secondary">RPC</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="w-4 h-0.5 rounded"
+                style={{ backgroundColor: EDGE_COLORS.event }}
+              />
+              <span className="text-text-secondary">Event</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className="w-4 h-0.5 rounded"
+                style={{ backgroundColor: EDGE_COLORS.shared_db }}
+              />
+              <span className="text-text-secondary">SharedDB</span>
+            </div>
+          </div>
+        </div>
+
         <p className="text-[11px] text-text-muted mb-3">{t.systemDrillDown}</p>
         <ul className="space-y-2">
-          {nodes.map((node) => {
+          {svcNodes.map((node) => {
             const svcName = serviceKeyFromNodeId(node.id);
             const idx = serviceIndex?.[svcName];
+            const isSelected = selectedNodeId === node.id;
             return (
               <li key={node.id}>
                 <button
                   type="button"
-                  className="w-full text-left p-2 rounded-lg hover:bg-elevated transition-colors"
-                  onClick={() => handleNodeClick(node)}
+                  className={`w-full text-left p-2 rounded-lg transition-colors ${
+                    isSelected
+                      ? "bg-elevated border border-gold/30"
+                      : "hover:bg-elevated"
+                  }`}
+                  onClick={() => handleServiceNavigate(node)}
                 >
                   <div className="font-medium text-sm text-text-primary">
                     {node.name}
@@ -181,80 +255,46 @@ export default function SystemOverview() {
       </div>
 
       <div className="flex-1 min-w-0 relative bg-canvas">
-        <svg ref={svgRef} className="w-full h-full" role="img" aria-label={t.systemOverview}>
-          <defs>
-            <marker
-              id="sys-arrow"
-              viewBox="0 0 10 10"
-              refX={NODE_RADIUS + 6}
-              refY={5}
-              markerWidth={6}
-              markerHeight={6}
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
-            </marker>
-          </defs>
-          {displayLinks.map((edge, i) => {
-            const src = edge.source as SystemNode;
-            const tgt = edge.target as SystemNode;
-            const x1 = src.x ?? 0;
-            const y1 = src.y ?? 0;
-            const x2 = tgt.x ?? 0;
-            const y2 = tgt.y ?? 0;
-            return (
-              <line
-                key={`${String(src.id)}-${String(tgt.id)}-${i}`}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={EDGE_COLORS[edge.type] ?? EDGE_COLORS.contains}
-                strokeWidth={2}
-                markerEnd="url(#sys-arrow)"
-              />
-            );
-          })}
-          {displayNodes.map((node) => (
-            <g
-              key={node.id}
-              className="cursor-pointer"
-              transform={`translate(${node.x ?? 0},${node.y ?? 0})`}
-              onClick={() => handleNodeClick(node)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  handleNodeClick(node);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              aria-label={node.name}
-            >
-              <circle r={NODE_RADIUS} fill="#3b82f6" opacity={0.85} />
-              <text
-                textAnchor="middle"
-                dy={4}
-                fill="white"
-                fontSize={10}
-                fontWeight="bold"
-                pointerEvents="none"
-              >
-                {node.name.length > 12 ? `${node.name.slice(0, 12)}…` : node.name}
-              </text>
-              <text
-                textAnchor="middle"
-                dy={NODE_RADIUS + 16}
-                fill="var(--color-text-muted, #6b7280)"
-                fontSize={9}
-                pointerEvents="none"
-              >
-                {node.stats?.nodes ?? 0} nodes
-              </text>
-            </g>
-          ))}
-        </svg>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onNodeDoubleClick={onNodeDoubleClick}
+          onPaneClick={onPaneClick}
+          nodeTypes={nodeTypes}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          fitView
+          fitViewOptions={{ padding: 0.15 }}
+          minZoom={0.1}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+          colorMode={preset.isDark ? "dark" : "light"}
+        >
+          <Background
+            variant={BackgroundVariant.Dots}
+            color="var(--color-edge-dot)"
+            gap={20}
+            size={1}
+          />
+          <Controls />
+          <MiniMap
+            nodeColor="var(--color-elevated)"
+            maskColor="var(--glass-bg)"
+            className="!bg-surface !border !border-border-subtle"
+          />
+        </ReactFlow>
       </div>
     </div>
+  );
+}
+
+export default function SystemOverview() {
+  return (
+    <ReactFlowProvider>
+      <SystemOverviewInner />
+    </ReactFlowProvider>
   );
 }
