@@ -326,5 +326,273 @@ class TestMatchSharedTables(unittest.TestCase):
         self.assertEqual(len(rels), 0)
 
 
+class TestExtractWrapperProviders(unittest.TestCase):
+    def test_identifies_wrapper_pattern(self):
+        """测试识别 wrapper 模式：同一类既有 consumes_rpc 又有 provides_rpc"""
+        kg = _make_kg(
+            nodes=[
+                {
+                    "id": "class:src/UserIntimacyMoaWrapperService.java:UserIntimacyMoaWrapperService",
+                    "type": "class",
+                    "name": "UserIntimacyMoaWrapperService",
+                    "summary": "Wrapper for UserIntimacyRemoteService",
+                    "tags": ["wrapper"],
+                    "complexity": "simple",
+                    "filePath": "src/UserIntimacyMoaWrapperService.java",
+                },
+                {
+                    "id": "class:src/UserIntimacyRemoteService.java:UserIntimacyRemoteService",
+                    "type": "class",
+                    "name": "UserIntimacyRemoteService",
+                    "summary": "RPC interface",
+                    "tags": ["interface"],
+                    "complexity": "simple",
+                    "filePath": "src/UserIntimacyRemoteService.java",
+                },
+                {
+                    "id": "class:src/UserIntimacyRemoteServiceImpl.java:UserIntimacyRemoteServiceImpl",
+                    "type": "service",
+                    "name": "UserIntimacyRemoteServiceImpl",
+                    "summary": "Implements UserIntimacyRemoteService",
+                    "tags": ["rpc-provider"],
+                    "complexity": "simple",
+                    "filePath": "src/UserIntimacyRemoteServiceImpl.java",
+                },
+            ],
+            edges=[
+                {
+                    "source": "class:src/UserIntimacyMoaWrapperService.java:UserIntimacyMoaWrapperService",
+                    "target": "class:src/UserIntimacyRemoteService.java:UserIntimacyRemoteService",
+                    "type": "consumes_rpc",
+                    "direction": "forward",
+                    "weight": 0.8,
+                },
+                {
+                    "source": "class:src/UserIntimacyRemoteServiceImpl.java:UserIntimacyRemoteServiceImpl",
+                    "target": "class:src/UserIntimacyRemoteService.java:UserIntimacyRemoteService",
+                    "type": "provides_rpc",
+                    "direction": "forward",
+                    "weight": 0.9,
+                },
+            ],
+        )
+        wrappers = mod.extract_wrapper_providers(kg, "ultron-basic-user")
+        self.assertEqual(len(wrappers), 1)
+        self.assertEqual(wrappers[0]["wrapper_class"], "UserIntimacyMoaWrapperService")
+        self.assertEqual(wrappers[0]["rpc_interface"], "UserIntimacyRemoteService")
+        self.assertEqual(wrappers[0]["provider_class"], "UserIntimacyRemoteServiceImpl")
+
+    def test_returns_empty_when_no_wrapper_pattern(self):
+        """测试没有 wrapper 模式时返回空列表"""
+        kg = _make_kg(
+            nodes=[
+                {
+                    "id": "class:src/OrderService.java:OrderService",
+                    "type": "class",
+                    "name": "OrderService",
+                    "summary": "Order service",
+                    "tags": ["service"],
+                    "complexity": "simple",
+                    "filePath": "src/OrderService.java",
+                },
+                {
+                    "id": "class:src/PaymentFacade.java:PaymentFacade",
+                    "type": "class",
+                    "name": "PaymentFacade",
+                    "summary": "Payment interface",
+                    "tags": ["interface"],
+                    "complexity": "simple",
+                    "filePath": "src/PaymentFacade.java",
+                },
+            ],
+            edges=[
+                {
+                    "source": "class:src/OrderService.java:OrderService",
+                    "target": "class:src/PaymentFacade.java:PaymentFacade",
+                    "type": "consumes_rpc",
+                    "direction": "forward",
+                    "weight": 0.8,
+                },
+            ],
+        )
+        wrappers = mod.extract_wrapper_providers(kg, "order-service")
+        self.assertEqual(len(wrappers), 0)
+
+
+class TestExtractInjects(unittest.TestCase):
+    def test_extracts_injects_edges(self):
+        """测试提取 injects 边"""
+        kg = _make_kg(
+            nodes=[
+                {
+                    "id": "class:src/OrderService.java:OrderService",
+                    "type": "class",
+                    "name": "OrderService",
+                    "summary": "Order service",
+                    "tags": ["service"],
+                    "complexity": "simple",
+                    "filePath": "src/OrderService.java",
+                },
+                {
+                    "id": "class:src/UserIntimacyMoaWrapperService.java:UserIntimacyMoaWrapperService",
+                    "type": "class",
+                    "name": "UserIntimacyMoaWrapperService",
+                    "summary": "Wrapper service",
+                    "tags": ["wrapper"],
+                    "complexity": "simple",
+                    "filePath": "src/UserIntimacyMoaWrapperService.java",
+                },
+            ],
+            edges=[
+                {
+                    "source": "class:src/OrderService.java:OrderService",
+                    "target": "class:src/UserIntimacyMoaWrapperService.java:UserIntimacyMoaWrapperService",
+                    "type": "injects",
+                    "direction": "forward",
+                    "weight": 0.8,
+                },
+            ],
+        )
+        injects = mod.extract_injects(kg, "order-service")
+        self.assertEqual(len(injects), 1)
+        self.assertEqual(injects[0]["injector_class"], "OrderService")
+        self.assertEqual(injects[0]["injected_class"], "UserIntimacyMoaWrapperService")
+        self.assertEqual(injects[0]["service"], "order-service")
+
+    def test_returns_empty_for_no_injects(self):
+        """测试没有 injects 边时返回空列表"""
+        kg = _make_kg(
+            nodes=[
+                {
+                    "id": "class:src/OrderService.java:OrderService",
+                    "type": "class",
+                    "name": "OrderService",
+                    "summary": "Order service",
+                    "tags": ["service"],
+                    "complexity": "simple",
+                    "filePath": "src/OrderService.java",
+                },
+            ],
+            edges=[],
+        )
+        injects = mod.extract_injects(kg, "order-service")
+        self.assertEqual(len(injects), 0)
+
+
+class TestMatchWrapperRpcRelationships(unittest.TestCase):
+    def test_matches_wrapper_injection_across_services(self):
+        """测试通过 injects 边识别跨服务 wrapper 使用"""
+        wrappers = [
+            {
+                "service": "ultron-basic-user",
+                "wrapper_class": "UserIntimacyMoaWrapperService",
+                "wrapper_id": "class:wrapper",
+                "wrapper_file": "src/UserIntimacyMoaWrapperService.java",
+                "rpc_interface": "UserIntimacyRemoteService",
+                "rpc_interface_id": "class:interface",
+                "provider_class": "UserIntimacyRemoteServiceImpl",
+                "provider_id": "class:provider",
+            }
+        ]
+        injects = [
+            {
+                "service": "ultron-relation",
+                "injector_id": "class:src/IntimacyService.java:IntimacyService",
+                "injector_class": "IntimacyService",
+                "injector_file": "src/IntimacyService.java",
+                "injected_id": "class:wrapper",
+                "injected_class": "UserIntimacyMoaWrapperService",
+            }
+        ]
+        rels = mod.match_wrapper_rpc_relationships(wrappers, injects)
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]["caller"]["service"], "ultron-relation")
+        self.assertEqual(rels[0]["callee"]["service"], "ultron-basic-user")
+        self.assertEqual(rels[0]["type"], "moa_rpc_via_wrapper")
+        self.assertEqual(rels[0]["callee"]["wrapper"], "UserIntimacyMoaWrapperService")
+        self.assertEqual(rels[0]["callee"]["interface"], "UserIntimacyRemoteService")
+        self.assertEqual(rels[0]["confidence"], "high")
+
+    def test_ignores_same_service_injection(self):
+        """测试忽略同服务内的 wrapper 注入"""
+        wrappers = [
+            {
+                "service": "ultron-basic-user",
+                "wrapper_class": "UserIntimacyMoaWrapperService",
+                "wrapper_id": "class:wrapper",
+                "wrapper_file": "src/wrapper.java",
+                "rpc_interface": "UserIntimacyRemoteService",
+                "rpc_interface_id": "class:interface",
+                "provider_class": "Impl",
+                "provider_id": "class:provider",
+            }
+        ]
+        injects = [
+            {
+                "service": "ultron-basic-user",  # 同服务
+                "injector_id": "class:src/SomeService.java:SomeService",
+                "injector_class": "SomeService",
+                "injector_file": "src/SomeService.java",
+                "injected_id": "class:wrapper",
+                "injected_class": "UserIntimacyMoaWrapperService",
+            }
+        ]
+        rels = mod.match_wrapper_rpc_relationships(wrappers, injects)
+        self.assertEqual(len(rels), 0)
+
+    def test_ignores_non_wrapper_injection(self):
+        """测试忽略非 wrapper 类的注入"""
+        wrappers = []  # 没有 wrapper
+        injects = [
+            {
+                "service": "order-service",
+                "injector_id": "class:src/OrderService.java:OrderService",
+                "injector_class": "OrderService",
+                "injector_file": "src/OrderService.java",
+                "injected_id": "class:src/SomeService.java:SomeService",
+                "injected_class": "SomeService",
+            }
+        ]
+        rels = mod.match_wrapper_rpc_relationships(wrappers, injects)
+        self.assertEqual(len(rels), 0)
+
+    def test_multiple_injectors_same_wrapper(self):
+        """测试多个调用者注入同一个 wrapper"""
+        wrappers = [
+            {
+                "service": "ultron-basic-user",
+                "wrapper_class": "UserIntimacyMoaWrapperService",
+                "wrapper_id": "class:wrapper",
+                "wrapper_file": "src/wrapper.java",
+                "rpc_interface": "UserIntimacyRemoteService",
+                "rpc_interface_id": "class:interface",
+                "provider_class": "Impl",
+                "provider_id": "class:provider",
+            }
+        ]
+        injects = [
+            {
+                "service": "ultron-relation",
+                "injector_id": "class:src/IntimacyService.java:IntimacyService",
+                "injector_class": "IntimacyService",
+                "injector_file": "src/IntimacyService.java",
+                "injected_id": "class:wrapper",
+                "injected_class": "UserIntimacyMoaWrapperService",
+            },
+            {
+                "service": "ultron-relation",
+                "injector_id": "class:src/AnotherService.java:AnotherService",
+                "injector_class": "AnotherService",
+                "injector_file": "src/AnotherService.java",
+                "injected_id": "class:wrapper",
+                "injected_class": "UserIntimacyMoaWrapperService",
+            },
+        ]
+        rels = mod.match_wrapper_rpc_relationships(wrappers, injects)
+        self.assertEqual(len(rels), 2)  # 两个不同的调用者
+        self.assertEqual(rels[0]["caller"]["method"], "IntimacyService uses UserIntimacyMoaWrapperService")
+        self.assertEqual(rels[1]["caller"]["method"], "AnotherService uses UserIntimacyMoaWrapperService")
+
+
 if __name__ == "__main__":
     unittest.main()
