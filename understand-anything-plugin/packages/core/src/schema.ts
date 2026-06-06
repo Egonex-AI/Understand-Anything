@@ -1,10 +1,11 @@
 import { z } from "zod";
 
-// Edge types (37 values across 8 categories)
+// Edge types (38 values across 8 categories)
 export const EdgeTypeSchema = z.enum([
   "imports", "exports", "contains", "inherits", "implements",  // Structural
   "calls", "subscribes", "publishes", "middleware",             // Behavioral
   "provides_rpc", "consumes_rpc",                               // RPC (cross-service)
+  "injects",                                                     // Dependency Injection
   "reads_from", "writes_to", "transforms", "validates",        // Data flow
   "depends_on", "tested_by", "configures",                     // Dependencies
   "related", "similar_to",                                      // Semantic

@@ -6,11 +6,12 @@ export type NodeType =
   | "domain" | "flow" | "step"
   | "article" | "entity" | "topic" | "claim" | "source";
 
-// Edge types (37 total in 8 categories: Structural, Behavioral, Data flow, Dependencies, Semantic, Infrastructure/Schema, Domain, Knowledge)
+// Edge types (38 total in 8 categories: Structural, Behavioral, Data flow, Dependencies, Semantic, Infrastructure/Schema, Domain, Knowledge)
 export type EdgeType =
   | "imports" | "exports" | "contains" | "inherits" | "implements"  // Structural
   | "calls" | "subscribes" | "publishes" | "middleware"              // Behavioral
   | "provides_rpc" | "consumes_rpc"                                  // RPC (cross-service)
+  | "injects"                                                        // Dependency Injection
   | "reads_from" | "writes_to" | "transforms" | "validates"         // Data flow
   | "depends_on" | "tested_by" | "configures"                       // Dependencies
   | "related" | "similar_to"                                         // Semantic
