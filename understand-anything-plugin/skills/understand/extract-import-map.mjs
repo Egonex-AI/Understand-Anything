@@ -365,9 +365,33 @@ function buildResolutionContext(projectRoot, files) {
 // Extensions probed when the import has no extension. The order mirrors the
 // historical project-scanner prose so behavior matches existing fixtures.
 const TS_EXT_PROBES = [
-  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs',
-  '/index.ts', '/index.tsx', '/index.js', '/index.jsx',
+  '.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs',
+  '/index.ts', '/index.tsx', '/index.mts', '/index.cts',
+  '/index.js', '/index.jsx', '/index.mjs', '/index.cjs',
 ];
+
+const RUNTIME_JS_SPECIFIER_PROBES = new Map([
+  ['.js', ['.ts', '.tsx', '.js', '.jsx']],
+  ['.jsx', ['.tsx', '.jsx']],
+  ['.mjs', ['.mts', '.ts', '.mjs']],
+  ['.cjs', ['.cts', '.ts', '.cjs']],
+]);
+
+function getRuntimeJsSpecifierExt(basePath) {
+  for (const runtimeExt of RUNTIME_JS_SPECIFIER_PROBES.keys()) {
+    if (basePath.endsWith(runtimeExt)) return runtimeExt;
+  }
+  return null;
+}
+
+function probeRuntimeJsSpecifier(basePath, runtimeExt, fileSet) {
+  const sourceStem = basePath.slice(0, -runtimeExt.length);
+  for (const sourceExt of RUNTIME_JS_SPECIFIER_PROBES.get(runtimeExt)) {
+    const candidate = sourceStem + sourceExt;
+    if (fileSet.has(candidate)) return candidate;
+  }
+  return null;
+}
 
 /**
  * Try ext probes against the file set for the given base path. Returns the
@@ -378,6 +402,8 @@ function probeWithExtensions(basePath, fileSet) {
   if (!basePath) return null;
   // Exact match (import already had an extension)
   if (fileSet.has(basePath)) return basePath;
+  const runtimeExt = getRuntimeJsSpecifierExt(basePath);
+  if (runtimeExt) return probeRuntimeJsSpecifier(basePath, runtimeExt, fileSet);
   for (const ext of TS_EXT_PROBES) {
     const candidate = basePath + ext;
     if (fileSet.has(candidate)) return candidate;

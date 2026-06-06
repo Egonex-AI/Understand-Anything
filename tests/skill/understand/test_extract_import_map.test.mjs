@@ -91,6 +91,31 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.stats.totalEdges).toBe(2);
   });
 
+  it('resolves TypeScript ESM .js specifiers to .ts source files', () => {
+    projectRoot = setupTree({
+      'src/index.ts':
+        `import { run } from './commands/source.js';\n` +
+        `import { render } from './view/render.js';\n`,
+      'src/commands/source.ts': `export function run() { return true; }\n`,
+      'src/view/render.ts': `export function render() { return true; }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/commands/source.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/view/render.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual([
+      'src/commands/source.ts',
+      'src/view/render.ts',
+    ]);
+  });
+
   it('resolves tsconfig paths aliases', () => {
     projectRoot = setupTree({
       'tsconfig.json': JSON.stringify({
