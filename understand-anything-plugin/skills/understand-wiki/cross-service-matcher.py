@@ -285,6 +285,142 @@ def match_shared_tables(all_accesses: list[dict]) -> list[dict]:
     return relationships
 
 
+def extract_wrapper_providers(kg: dict, service_name: str) -> list[dict]:
+    """
+    提取 wrapper 类及其 provides_rpc 的接口。
+
+    Wrapper 类的特征：
+    1. 有 consumes_rpc 边指向某个 RPC 接口
+    2. 同一服务中有 provides_rpc 边指向同一个接口
+    """
+    wrappers = []
+    nodes_by_id = {n["id"]: n for n in kg.get("nodes", [])}
+
+    # 找所有 consumes_rpc 的 source
+    rpc_consumers = {}
+    for edge in kg.get("edges", []):
+        if edge["type"] == "consumes_rpc":
+            source_id = edge["source"]
+            target_id = edge["target"]
+            source_node = nodes_by_id.get(source_id)
+            target_node = nodes_by_id.get(target_id)
+            if source_node and target_node:
+                rpc_consumers[source_id] = {
+                    "node": source_node,
+                    "interface": target_node["name"],
+                    "interface_id": target_id,
+                }
+
+    # 找所有 provides_rpc 的 target
+    rpc_providers = {}
+    for edge in kg.get("edges", []):
+        if edge["type"] == "provides_rpc":
+            source_id = edge["source"]
+            target_id = edge["target"]
+            source_node = nodes_by_id.get(source_id)
+            target_node = nodes_by_id.get(target_id)
+            if source_node and target_node:
+                rpc_providers[target_id] = {
+                    "node": source_node,
+                    "interface": target_node["name"],
+                }
+
+    # 匹配：某个类既有 consumes_rpc 又有 provides_rpc 指向同一接口
+    for consumer_id, consumer_info in rpc_consumers.items():
+        interface_id = consumer_info["interface_id"]
+        if interface_id in rpc_providers:
+            provider_info = rpc_providers[interface_id]
+            wrappers.append({
+                "service": service_name,
+                "wrapper_class": consumer_info["node"]["name"],
+                "wrapper_id": consumer_id,
+                "wrapper_file": consumer_info["node"].get("filePath", ""),
+                "rpc_interface": consumer_info["interface"],
+                "rpc_interface_id": interface_id,
+                "provider_class": provider_info["node"]["name"],
+                "provider_id": provider_info["node"]["id"],
+            })
+
+    return wrappers
+
+
+def extract_injects(kg: dict, service_name: str) -> list[dict]:
+    """
+    提取所有 injects 边，表示依赖注入关系。
+    """
+    injects = []
+    nodes_by_id = {n["id"]: n for n in kg.get("nodes", [])}
+
+    for edge in kg.get("edges", []):
+        if edge["type"] == "injects":
+            source_node = nodes_by_id.get(edge["source"])
+            target_node = nodes_by_id.get(edge["target"])
+            if source_node and target_node:
+                injects.append({
+                    "service": service_name,
+                    "injector_id": edge["source"],
+                    "injector_class": source_node["name"],
+                    "injector_file": source_node.get("filePath", ""),
+                    "injected_id": edge["target"],
+                    "injected_class": target_node["name"],
+                })
+
+    return injects
+
+
+def match_wrapper_rpc_relationships(
+    all_wrappers: list[dict],
+    all_injects: list[dict]
+) -> list[dict]:
+    """
+    匹配 wrapper 使用关系：如果服务 A 注入了服务 B 的 wrapper 类，则建立跨服务 RPC 关系。
+    """
+    relationships = []
+
+    # 建立 wrapper 索引：wrapper_class -> wrapper_info
+    wrapper_index: dict[str, list[dict]] = {}
+    for w in all_wrappers:
+        wrapper_index.setdefault(w["wrapper_class"], []).append(w)
+
+    # 检查每个 injects 边
+    for inject in all_injects:
+        injected_class = inject["injected_class"]
+
+        # 检查被注入的类型是否是某个 wrapper
+        if injected_class in wrapper_index:
+            for wrapper in wrapper_index[injected_class]:
+                # 跳过同服务内的注入
+                if inject["service"] == wrapper["service"]:
+                    continue
+
+                relationships.append({
+                    "caller": {
+                        "service": inject["service"],
+                        "node": inject["injector_id"],
+                        "file": inject["injector_file"],
+                        "method": f"{inject['injector_class']} uses {wrapper['wrapper_class']}",
+                    },
+                    "callee": {
+                        "service": wrapper["service"],
+                        "node": wrapper["provider_id"],
+                        "interface": wrapper["rpc_interface"],
+                        "method": f"{wrapper['provider_class']}.*()",
+                        "wrapper": wrapper["wrapper_class"],
+                    },
+                    "type": "moa_rpc_via_wrapper",
+                    "evidence": "cross-service-wrapper-injection",
+                    "detail": (
+                        f"{inject['injector_class']} ({inject['service']}) injects "
+                        f"{wrapper['wrapper_class']} from {wrapper['service']}; "
+                        f"wrapper consumes {wrapper['rpc_interface']} provided by "
+                        f"{wrapper['provider_class']}"
+                    ),
+                    "confidence": "high",
+                })
+
+    return relationships
+
+
 def main():
     parser = argparse.ArgumentParser(description="Cross-service relationship matcher")
     parser.add_argument("project_root", help="Absolute path to parent project directory")
@@ -301,6 +437,8 @@ def main():
     all_publishers: list[dict] = []
     all_subscribers: list[dict] = []
     all_table_accesses: list[dict] = []
+    all_wrappers: list[dict] = []
+    all_injects: list[dict] = []
     services_loaded = []
 
     for svc_name in service_names:
@@ -316,26 +454,32 @@ def main():
         all_publishers.extend(extract_event_publishers(kg, svc_name))
         all_subscribers.extend(extract_event_subscribers(kg, svc_name))
         all_table_accesses.extend(extract_table_accesses(kg, svc_name))
+        all_wrappers.extend(extract_wrapper_providers(kg, svc_name))
+        all_injects.extend(extract_injects(kg, svc_name))
 
     # Perform matching
     rpc_rels = match_rpc_relationships(all_providers, all_consumers)
     event_rels = match_event_relationships(all_publishers, all_subscribers)
     table_rels = match_shared_tables(all_table_accesses)
+    wrapper_rels = match_wrapper_rpc_relationships(all_wrappers, all_injects)
 
     result = {
         "scriptCompleted": True,
         "servicesAnalyzed": services_loaded,
-        "relationships": rpc_rels + table_rels,
+        "relationships": rpc_rels + table_rels + wrapper_rels,
         "eventFlows": event_rels,
         "stats": {
             "rpcMatches": len(rpc_rels),
             "eventMatches": len(event_rels),
             "sharedTableMatches": len(table_rels),
-            "totalRelationships": len(rpc_rels) + len(event_rels) + len(table_rels),
+            "wrapperRpcMatches": len(wrapper_rels),
+            "totalRelationships": len(rpc_rels) + len(event_rels) + len(table_rels) + len(wrapper_rels),
             "providersFound": len(all_providers),
             "consumersFound": len(all_consumers),
             "publishersFound": len(all_publishers),
             "subscribersFound": len(all_subscribers),
+            "wrappersFound": len(all_wrappers),
+            "injectsFound": len(all_injects),
         },
     }
 
@@ -348,7 +492,8 @@ def main():
     print(f"  RPC matches: {len(rpc_rels)}")
     print(f"  Event matches: {len(event_rels)}")
     print(f"  Shared table matches: {len(table_rels)}")
-    print(f"  Total relationships: {len(rpc_rels) + len(event_rels) + len(table_rels)}")
+    print(f"  Wrapper RPC matches: {len(wrapper_rels)}")
+    print(f"  Total relationships: {len(rpc_rels) + len(event_rels) + len(table_rels) + len(wrapper_rels)}")
 
 
 if __name__ == "__main__":
