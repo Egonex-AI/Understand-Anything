@@ -130,6 +130,7 @@ A multi-agent pipeline scans your project, extracts every file, function, class,
 On the **first run** in a project — when you don't pass `--language` and no language is stored yet — `/understand` detects the language you're conversing in. If it isn't English, it asks you to confirm (or override) before generating; English conversations are unaffected. Your choice is saved to `.understand-anything/config.json` and reused on every later run.
 
 The `--language` parameter affects:
+
 - Node summaries and descriptions in the knowledge graph
 - Dashboard UI labels, buttons, and tooltips
 - Guided tour explanations
@@ -177,6 +178,9 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 
 ## 🌐 Multi-Platform Installation
 
+> **Prerequisites:** [Node.js ≥ 22](https://nodejs.org) and [pnpm ≥ 10](https://pnpm.io/installation).
+> The installers below will check for pnpm and install it automatically if it's missing.
+
 Understand-Anything works across multiple AI coding platforms.
 
 ### Claude Code (Native)
@@ -189,6 +193,7 @@ Understand-Anything works across multiple AI coding platforms.
 ### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae)
 
 **macOS / Linux:**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
 # or skip the prompt by passing the platform:
@@ -196,6 +201,7 @@ curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/in
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
 ```
@@ -226,23 +232,23 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 
 ### Platform Compatibility
 
-| Platform | Status | Install Method |
-|----------|--------|----------------|
-| Claude Code | ✅ Native | Plugin marketplace |
-| Cursor | ✅ Supported | Auto-discovery |
-| VS Code + GitHub Copilot | ✅ Supported | Auto-discovery |
-| Copilot CLI | ✅ Supported | Plugin install |
-| Codex | ✅ Supported | `install.sh codex` |
-| OpenCode | ✅ Supported | `install.sh opencode` |
-| OpenClaw | ✅ Supported | `install.sh openclaw` |
-| Antigravity | ✅ Supported | `install.sh antigravity` |
-| Gemini CLI | ✅ Supported | `install.sh gemini` |
-| Pi Agent | ✅ Supported | `install.sh pi` |
-| Vibe CLI | ✅ Supported | `install.sh vibe` |
-| Hermes | ✅ Supported | `install.sh hermes` |
-| Cline | ✅ Supported | `install.sh cline` |
-| KIMI CLI | ✅ Supported | `install.sh kimi` |
-| Trae | ✅ Supported | `install.sh trae` |
+| Platform                 | Status       | Install Method           |
+| ------------------------ | ------------ | ------------------------ |
+| Claude Code              | ✅ Native    | Plugin marketplace       |
+| Cursor                   | ✅ Supported | Auto-discovery           |
+| VS Code + GitHub Copilot | ✅ Supported | Auto-discovery           |
+| Copilot CLI              | ✅ Supported | Plugin install           |
+| Codex                    | ✅ Supported | `install.sh codex`       |
+| OpenCode                 | ✅ Supported | `install.sh opencode`    |
+| OpenClaw                 | ✅ Supported | `install.sh openclaw`    |
+| Antigravity              | ✅ Supported | `install.sh antigravity` |
+| Gemini CLI               | ✅ Supported | `install.sh gemini`      |
+| Pi Agent                 | ✅ Supported | `install.sh pi`          |
+| Vibe CLI                 | ✅ Supported | `install.sh vibe`        |
+| Hermes                   | ✅ Supported | `install.sh hermes`      |
+| Cline                    | ✅ Supported | `install.sh cline`       |
+| KIMI CLI                 | ✅ Supported | `install.sh kimi`        |
+| Trae                     | ✅ Supported | `install.sh trae`        |
 
 ---
 
@@ -252,7 +258,7 @@ The graph is just JSON — **commit it once, and teammates skip the pipeline**. 
 
 > **Example:** [GoogleCloudPlatform/microservices-demo (fork)](https://github.com/Lum1104/microservices-demo) — Go / Java / Python / Node reference with a committed graph.
 
-**What to commit:** everything in `.understand-anything/` *except* `intermediate/` and `diff-overlay.json` (those are local scratch).
+**What to commit:** everything in `.understand-anything/` _except_ `intermediate/` and `diff-overlay.json` (those are local scratch).
 
 ```gitignore
 .understand-anything/intermediate/
@@ -280,21 +286,21 @@ Static analysis and LLMs do what each does best:
 - **Tree-sitter (deterministic)** — parses source into a concrete syntax tree and extracts structural facts: imports, exports, function/class definitions, call sites, inheritance. Pre-resolved into an `importMap` during the scan phase and passed to file-analyzers so they don't re-derive imports from source. Same input → same output, every run. Also powers fingerprint-based change detection for incremental updates.
 - **LLM (semantic)** — reads the parsed structure alongside the original source to produce what parsers can't: plain-English summaries, tags, architectural layer assignments, business-domain mapping, guided tours, language concept callouts.
 
-This split is why the graph is reproducible on the structural side (the same code always yields the same edges) while still capturing intent on the semantic side (what a file is *for*, not just what it imports).
+This split is why the graph is reproducible on the structural side (the same code always yields the same edges) while still capturing intent on the semantic side (what a file is _for_, not just what it imports).
 
 ### Multi-Agent Pipeline
 
 The `/understand` command orchestrates 5 specialized agents, and `/understand-domain` adds a 6th:
 
-| Agent | Role |
-|-------|------|
-| `project-scanner` | Discover files, detect languages and frameworks |
-| `file-analyzer` | Extract functions, classes, imports; produce graph nodes and edges |
-| `architecture-analyzer` | Identify architectural layers |
-| `tour-builder` | Generate guided learning tours |
-| `graph-reviewer` | Validate graph completeness and referential integrity (runs inline by default; use `--review` for full LLM review) |
-| `domain-analyzer` | Extract business domains, flows, and process steps (used by `/understand-domain`) |
-| `article-analyzer` | Extract entities, claims, and implicit relationships from wiki articles (used by `/understand-knowledge`) |
+| Agent                   | Role                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `project-scanner`       | Discover files, detect languages and frameworks                                                                    |
+| `file-analyzer`         | Extract functions, classes, imports; produce graph nodes and edges                                                 |
+| `architecture-analyzer` | Identify architectural layers                                                                                      |
+| `tour-builder`          | Generate guided learning tours                                                                                     |
+| `graph-reviewer`        | Validate graph completeness and referential integrity (runs inline by default; use `--review` for full LLM review) |
+| `domain-analyzer`       | Extract business domains, flows, and process steps (used by `/understand-domain`)                                  |
+| `article-analyzer`      | Extract entities, claims, and implicit relationships from wiki articles (used by `/understand-knowledge`)          |
 
 File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 

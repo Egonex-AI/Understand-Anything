@@ -1,2 +1,16 @@
 packages:
   - "packages/*"
+allowBuilds:
+  esbuild: true
+  tree-sitter-c: true
+  tree-sitter-c-sharp: true
+  tree-sitter-cpp: true
+  tree-sitter-go: true
+  tree-sitter-java: true
+  tree-sitter-javascript: true
+  tree-sitter-php: true
+  tree-sitter-python: true
+  tree-sitter-ruby: true
+  tree-sitter-rust: true
+  tree-sitter-typescript: true
+  tree-sitter-pascal: true

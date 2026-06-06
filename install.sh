@@ -88,6 +88,27 @@ prompt_platform() {
   printf '%s\n' "${ids[$((choice-1))]}"
 }
 
+ensure_pnpm() {
+  if command -v pnpm >/dev/null 2>&1; then
+    return 0
+  fi
+  printf -- '→ pnpm not found — installing...\n'
+  if command -v corepack >/dev/null 2>&1; then
+    corepack enable pnpm
+  elif command -v npm >/dev/null 2>&1; then
+    npm install -g pnpm
+  else
+    printf 'Error: Node.js (and npm or corepack) is required but not found.\n' >&2
+    printf 'Install Node.js ≥ 22 from https://nodejs.org, then re-run this script.\n' >&2
+    exit 1
+  fi
+  if ! command -v pnpm >/dev/null 2>&1; then
+    printf 'Error: pnpm installation failed. Install it manually: https://pnpm.io/installation\n' >&2
+    exit 1
+  fi
+  printf '✓ pnpm installed.\n'
+}
+
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
@@ -96,6 +117,18 @@ clone_or_update() {
     printf -- '→ Cloning %s → %s\n' "$REPO_URL" "$REPO_DIR"
     mkdir -p "$(dirname "$REPO_DIR")"
     git clone "$REPO_URL" "$REPO_DIR"
+  fi
+  # If this script is running from a local git checkout, install that same branch.
+  # Falls back gracefully when piped from curl (no git context).
+  local script_dir script_branch=""
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-}")" 2>/dev/null && pwd || true)"
+  if [[ -n "$script_dir" ]] && git -C "$script_dir" rev-parse --git-dir >/dev/null 2>&1; then
+    script_branch="$(git -C "$script_dir" branch --show-current 2>/dev/null || true)"
+  fi
+  if [[ -n "$script_branch" && "$script_branch" != "main" ]]; then
+    printf -- '→ Checking out branch: %s\n' "$script_branch"
+    git -C "$REPO_DIR" fetch origin
+    git -C "$REPO_DIR" checkout "$script_branch"
   fi
 }
 
@@ -183,6 +216,7 @@ cmd_install() {
   target="$(printf '%s\n' "$row" | cut -d'|' -f2)"
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
 
+  ensure_pnpm
   clone_or_update
   printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
   link_skills "$target" "$style"

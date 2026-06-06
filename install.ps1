@@ -83,6 +83,22 @@ function Prompt-Platform {
 
 function Get-SkillsRoot { Join-Path $RepoDir 'understand-anything-plugin\skills' }
 
+function Ensure-Pnpm {
+    if (Get-Command pnpm -ErrorAction SilentlyContinue) { return }
+    Write-Host '→ pnpm not found — installing...'
+    if (Get-Command corepack -ErrorAction SilentlyContinue) {
+        corepack enable pnpm
+    } elseif (Get-Command npm -ErrorAction SilentlyContinue) {
+        npm install -g pnpm
+    } else {
+        Write-Error "Node.js (and npm or corepack) is required but not found.`nInstall Node.js >= 22 from https://nodejs.org, then re-run this script."
+    }
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+        Write-Error "pnpm installation failed. Install it manually: https://pnpm.io/installation"
+    }
+    Write-Host '✓ pnpm installed.'
+}
+
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
@@ -92,6 +108,17 @@ function Clone-Or-Update {
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
         git clone $RepoUrl $RepoDir
+    }
+    # If this script is running from a local git checkout, install that same branch.
+    # Falls back gracefully when run via curl/iwr (no git context).
+    $scriptBranch = ''
+    if (Test-Path (Join-Path $PSScriptRoot '.git')) {
+        $scriptBranch = git -C $PSScriptRoot branch --show-current 2>$null
+    }
+    if ($scriptBranch -and $scriptBranch -ne 'main') {
+        Write-Host "→ Checking out branch: $scriptBranch"
+        git -C $RepoDir fetch origin
+        git -C $RepoDir checkout $scriptBranch
     }
 }
 
@@ -193,6 +220,7 @@ function Link-Plugin-Root {
 
 function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
+    Ensure-Pnpm
     Clone-Or-Update
     Write-Host "→ Linking skills for $Id ($($cfg.Style) → $($cfg.Target))"
     Link-Skills $cfg.Target $cfg.Style
