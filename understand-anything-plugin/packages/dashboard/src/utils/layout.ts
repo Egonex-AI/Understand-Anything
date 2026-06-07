@@ -12,8 +12,8 @@ import type { SimulationNodeDatum, SimulationLinkDatum } from "d3-force";
 import type { Node, Edge } from "@xyflow/react";
 import type { ElkInput } from "./elk-layout";
 
-export const NODE_WIDTH = 280;
-export const NODE_HEIGHT = 120;
+export const NODE_WIDTH = 330;
+export const NODE_HEIGHT = 150;
 export const LAYER_CLUSTER_WIDTH = 320;
 export const LAYER_CLUSTER_HEIGHT = 180;
 export const PORTAL_NODE_WIDTH = 240;
