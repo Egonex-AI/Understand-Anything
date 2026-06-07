@@ -82,7 +82,66 @@ def validate_graph(graph: dict[str, Any]) -> None:
         raise PipelineError(f"ERR_GRAPH_DANGLING_EDGES: {len(dangling)} dangling edges")
 
 
-def write_root_outputs(output_dir: Path, manifest: dict[str, Any]) -> tuple[Path, Path]:
+def write_book_report(output_dir: Path, manifest: dict[str, Any], graph: dict[str, Any]) -> Path:
+    book = manifest.get("book", {})
+    title = book.get("title") or "未知书名"
+    authors = book.get("authors") or []
+    chapters = manifest.get("chapters", [])
+    nodes = graph.get("nodes", []) if isinstance(graph.get("nodes"), list) else []
+    edges = graph.get("edges", []) if isinstance(graph.get("edges"), list) else []
+
+    lines = [
+        f"# 《{title}》理解报告",
+        "",
+        "## 一句话总结",
+        "",
+        f"这是一本包含 {len(chapters)} 个章节的 EPUB 书籍，已转换为可浏览 wiki 和知识图谱。",
+        "",
+        "## 书籍信息",
+        "",
+        f"- 书名：{title}",
+        f"- 作者：{', '.join(authors) if authors else 'unknown'}",
+        f"- 语言：{book.get('language') or 'unknown'}",
+        f"- 出版方：{book.get('publisher') or 'unknown'}",
+        "",
+        "## 全书结构",
+        "",
+        f"- 章节数：{len(chapters)}",
+        f"- 图谱节点数：{len(nodes)}",
+        f"- 图谱边数：{len(edges)}",
+        "",
+        "## 章节导读",
+        "",
+    ]
+
+    for chapter in chapters:
+        lines.append(f"### {chapter.get('title') or chapter.get('id')}")
+        lines.append("")
+        lines.append(f"- 章节 ID：`{chapter.get('id')}`")
+        lines.append(f"- 字符数：{chapter.get('char_count', 0)}")
+        lines.append(f"- Wiki：`wiki/chapters/{chapter.get('id')}.md`")
+        lines.append("")
+
+    lines.extend(
+        [
+            "## 知识图谱解读",
+            "",
+            "当前版本生成章节级结构图谱；后续可叠加 LLM 章节分析，抽取概念、实体、论点、证据与跨章节关系。",
+            "",
+            "## 输出文件",
+            "",
+            "- `wiki/index.md`：书籍 wiki 入口",
+            "- `.understand-anything/knowledge-graph.json`：dashboard 图谱",
+            "- `.understand-anything/intermediate/book-manifest.json`：EPUB 解析清单",
+        ]
+    )
+
+    report_path = output_dir / "book-report.md"
+    report_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return report_path
+
+
+def write_root_outputs(output_dir: Path, manifest: dict[str, Any]) -> tuple[Path, Path, Path]:
     wiki_dir = output_dir / "wiki"
     wiki_intermediate = wiki_dir / ".understand-anything" / "intermediate"
     assembled_graph_path = wiki_intermediate / "assembled-graph.json"
@@ -115,7 +174,8 @@ def write_root_outputs(output_dir: Path, manifest: dict[str, Any]) -> tuple[Path
     meta_path = root_graph_dir / "meta.json"
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
-    return root_graph_path, meta_path
+    report_path = write_book_report(output_dir, manifest, graph)
+    return root_graph_path, meta_path, report_path
 
 
 def run_pipeline(input_path: Path, output_dir: Path, language: str) -> dict[str, Any]:
@@ -138,11 +198,17 @@ def run_pipeline(input_path: Path, output_dir: Path, language: str) -> dict[str,
     run_command([sys.executable, str(_MERGE_KNOWLEDGE), str(wiki_dir)], cwd=output_dir)
 
     print("[4/4] Save root graph and metadata...")
-    graph_path, meta_path = write_root_outputs(output_dir, manifest)
+    graph_path, meta_path, report_path = write_root_outputs(output_dir, manifest)
     print(f"[4/4] Graph: {graph_path}")
     print(f"[4/4] Meta: {meta_path}")
+    print(f"[4/4] Report: {report_path}")
     print("Done.")
-    return {"manifest": manifest, "graphPath": str(graph_path), "metaPath": str(meta_path)}
+    return {
+        "manifest": manifest,
+        "graphPath": str(graph_path),
+        "metaPath": str(meta_path),
+        "reportPath": str(report_path),
+    }
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

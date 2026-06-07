@@ -37,6 +37,7 @@ EPUB
   → understand-knowledge merge
   → <OUTPUT_DIR>/.understand-anything/knowledge-graph.json
   → <OUTPUT_DIR>/.understand-anything/meta.json
+  → <OUTPUT_DIR>/book-report.md
 ```
 
 Expected progress output:
@@ -63,6 +64,7 @@ Check these files exist:
 <OUTPUT_DIR>/.understand-anything/intermediate/book-manifest.json
 <OUTPUT_DIR>/.understand-anything/knowledge-graph.json
 <OUTPUT_DIR>/.understand-anything/meta.json
+<OUTPUT_DIR>/book-report.md
 ```
 
 If validation fails, report the exact `ERR_*` message from the script and stop.

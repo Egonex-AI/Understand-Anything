@@ -151,6 +151,14 @@ class EpubToWikiTests(unittest.TestCase):
             wiki_graph_path = out_dir / "wiki" / ".understand-anything" / "knowledge-graph.json"
             self.assertTrue(wiki_graph_path.is_file())
 
+            report_path = out_dir / "book-report.md"
+            self.assertTrue(report_path.is_file())
+            report = report_path.read_text(encoding="utf-8")
+            self.assertIn("# 《Tiny Test Book》理解报告", report)
+            self.assertIn("## 章节导读", report)
+            self.assertIn("第一章 开端", report)
+            self.assertIn("第二章 回声", report)
+
 
 if __name__ == "__main__":
     unittest.main()
