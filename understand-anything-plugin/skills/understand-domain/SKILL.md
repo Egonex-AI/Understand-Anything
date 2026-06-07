@@ -206,10 +206,15 @@ This phase uses different strategies depending on Path:
 
 ### Phase 5: Validate and Save
 
-1. Read the domain analysis output
-2. Validate using the standard graph validation pipeline (the schema now supports domain/flow/step types)
-3. If validation fails, log warnings but save what's valid (error tolerance)
-4. Save to `$PROJECT_ROOT/.understand-anything/domain-graph.json`
+1. Validate the domain analysis output using the shared validation script (zod schemas + auto-fix):
+   ```bash
+   node <SKILL_DIR>/../understand/validate-graph.mjs \
+     "$PROJECT_ROOT/.understand-anything/intermediate/domain-analysis.json" \
+     "$PROJECT_ROOT/.understand-anything/intermediate/domain-validation-report.json"
+   ```
+2. Read the validation report. Log any warnings (auto-corrected or dropped issues).
+3. If validation exits with fatal (exit code 1), log error but save what's valid (error tolerance).
+4. Save the validated graph to `$PROJECT_ROOT/.understand-anything/domain-graph.json`
 5. Clean up `$PROJECT_ROOT/.understand-anything/intermediate/domain-analysis.json` and `$PROJECT_ROOT/.understand-anything/intermediate/domain-context.json`
 
 ### Phase 6: Launch Dashboard
