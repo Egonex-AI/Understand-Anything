@@ -1361,6 +1361,134 @@ def recover_rpc_mq_from_extraction(
     return recovered, lines
 
 
+# ── DI (injects) edge recovery from extraction results ────────────────────
+#
+# The file-analyzer agent is expected to emit `injects` edges from
+# @Autowired, @Resource, @Inject annotations. In practice, these edges
+# are frequently dropped because the `injects` type appears in the
+# annotation-specific section of the agent definition rather than the
+# main edge type table. This postprocess reads the deterministic
+# extraction results and emits any `injects` edges that annotations
+# dictate but are missing from the assembled graph.
+
+_DI_ANNOTATIONS: frozenset[str] = frozenset({
+    "Autowired", "Resource", "Inject",
+})
+
+
+def recover_injects_from_extraction(
+    assembled: dict[str, Any],
+    tmp_dir: Path,
+) -> tuple[int, list[str]]:
+    """Read ua-file-extract-results-*.json files and create deterministic
+    `injects` edges from @Autowired/@Resource/@Inject annotations.
+
+    Returns (recovered_count, report_lines).
+    """
+    extraction_files = sorted(tmp_dir.glob("ua-file-extract-results-*.json"))
+    if not extraction_files:
+        return 0, ["  DI recovery skipped — no extraction result files found"]
+
+    node_ids: set[str] = {n["id"] for n in assembled["nodes"]}
+    nodes_by_id: dict[str, dict[str, Any]] = {n["id"]: n for n in assembled["nodes"]}
+
+    existing_edges: set[tuple[str, str, str]] = set()
+    for edge in assembled["edges"]:
+        existing_edges.add((
+            edge.get("source", ""),
+            edge.get("target", ""),
+            edge.get("type", ""),
+        ))
+
+    recovered = 0
+    skipped_no_target = 0
+
+    for ext_file in extraction_files:
+        try:
+            data = json.loads(ext_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        results = data.get("results")
+        if not isinstance(results, list):
+            continue
+
+        for file_result in results:
+            file_path = file_result.get("path", "")
+            classes = file_result.get("classes", [])
+            if not isinstance(classes, list):
+                continue
+
+            for cls in classes:
+                if not isinstance(cls, dict):
+                    continue
+                cls_name = cls.get("name", "")
+                if not cls_name:
+                    continue
+
+                cls_node_id = f"class:{file_path}:{cls_name}"
+                typed_props = cls.get("typedProperties", [])
+                if not isinstance(typed_props, list):
+                    continue
+
+                for prop in typed_props:
+                    if not isinstance(prop, dict):
+                        continue
+                    prop_ann_names = _annotation_names(prop.get("annotations"))
+                    di_anns = prop_ann_names & _DI_ANNOTATIONS
+                    if not di_anns:
+                        continue
+
+                    injected_type = prop.get("type", "")
+                    if not isinstance(injected_type, str) or not injected_type:
+                        continue
+
+                    # Find target node: search for class nodes matching the type name
+                    target_id = ""
+                    for nid in node_ids:
+                        if nid.endswith(f":{injected_type}") and nid.startswith("class:"):
+                            target_id = nid
+                            break
+
+                    if not target_id:
+                        skipped_no_target += 1
+                        continue
+
+                    edge_key = (cls_node_id, target_id, "injects")
+                    if edge_key in existing_edges:
+                        continue
+
+                    if cls_node_id not in node_ids:
+                        continue
+
+                    assembled["edges"].append({
+                        "source": cls_node_id,
+                        "target": target_id,
+                        "type": "injects",
+                        "direction": "forward",
+                        "weight": 0.8,
+                        "description": f"DI: {cls_name}.{prop.get('name', '?')} ({injected_type})",
+                        "recoveredFromAnnotation": True,
+                    })
+                    existing_edges.add(edge_key)
+                    recovered += 1
+
+                    if cls_node_id in nodes_by_id:
+                        _ensure_tag(nodes_by_id[cls_node_id], "dependency-injection")
+
+    lines: list[str] = []
+    lines.append(
+        f"  Recovered {recovered} `injects` edges from DI annotation data "
+        f"({len(extraction_files)} extraction files scanned)"
+    )
+    if skipped_no_target:
+        lines.append(
+            f"  Skipped {skipped_no_target} DI annotations where injected type "
+            f"has no matching class node in graph (external dependency)"
+        )
+    return recovered, lines
+
+
 def generate_manifest(kg: dict, output_path: str) -> dict:
     """Extract a lightweight manifest from the assembled knowledge graph."""
     nodes = kg.get("nodes", [])
@@ -1624,6 +1752,16 @@ def main() -> None:
             report.append("")
             report.append("RPC/MQ annotation recovery:")
             report.extend(rpc_report)
+
+        # Recover DI (injects) edges from @Autowired/@Resource/@Inject.
+        # Same safety-net pattern as RPC/MQ: extraction results contain the
+        # annotations deterministically, but the LLM agent frequently omits
+        # the corresponding edges.
+        di_recovered, di_report = recover_injects_from_extraction(assembled, tmp_dir)
+        if di_report:
+            report.append("")
+            report.append("DI (injects) edge recovery:")
+            report.extend(di_report)
 
     # Print report
     print("", file=sys.stderr)

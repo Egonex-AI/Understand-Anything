@@ -292,59 +292,56 @@ def match_shared_tables(all_accesses: list[dict]) -> list[dict]:
 
 def extract_wrapper_providers(kg: dict, service_name: str) -> list[dict]:
     """
-    提取 wrapper 类及其 provides_rpc 的接口。
+    提取 wrapper 类及其消费的 RPC 接口。
 
-    Wrapper 类的特征：
-    1. 有 consumes_rpc 边指向某个 RPC 接口
-    2. 同一服务中有 provides_rpc 边指向同一个接口
+    Wrapper 类的特征：有 consumes_rpc 边指向某个 RPC 接口。
+    同一服务中可能有 provides_rpc 边提供该接口的实现，
+    但由于 KG 中 provides_rpc 和 consumes_rpc 的目标节点类型
+    可能不一致（class: vs endpoint:__synthetic__:），此处不要求
+    严格的 target ID 匹配，改为通过接口名称做尽力匹配。
     """
     wrappers = []
     nodes_by_id = build_nodes_index(kg)
 
-    # 找所有 consumes_rpc 的 source
-    rpc_consumers = {}
+    rpc_consumers: dict[str, dict] = {}
     for edge in kg.get("edges", []):
         if edge["type"] == "consumes_rpc":
             source_id = edge["source"]
             target_id = edge["target"]
             source_node = nodes_by_id.get(source_id)
-            target_node = nodes_by_id.get(target_id)
-            if source_node and target_node:
+            target_name = nodes_by_id.get(target_id, {}).get("name") or target_id.split(":")[-1]
+            if source_node:
                 rpc_consumers[source_id] = {
                     "node": source_node,
-                    "interface": target_node["name"],
+                    "interface": target_name,
                     "interface_id": target_id,
                 }
 
-    # 找所有 provides_rpc 的 target
-    rpc_providers = {}
+    provides_by_name: dict[str, dict] = {}
     for edge in kg.get("edges", []):
         if edge["type"] == "provides_rpc":
             source_id = edge["source"]
-            target_id = edge["target"]
             source_node = nodes_by_id.get(source_id)
-            target_node = nodes_by_id.get(target_id)
-            if source_node and target_node:
-                rpc_providers[target_id] = {
+            target_name = nodes_by_id.get(edge["target"], {}).get("name") or edge["target"].split(":")[-1]
+            if source_node:
+                provides_by_name[target_name] = {
                     "node": source_node,
-                    "interface": target_node["name"],
+                    "interface": target_name,
                 }
 
-    # 匹配：某个类既有 consumes_rpc 又有 provides_rpc 指向同一接口
     for consumer_id, consumer_info in rpc_consumers.items():
-        interface_id = consumer_info["interface_id"]
-        if interface_id in rpc_providers:
-            provider_info = rpc_providers[interface_id]
-            wrappers.append({
-                "service": service_name,
-                "wrapper_class": consumer_info["node"]["name"],
-                "wrapper_id": consumer_id,
-                "wrapper_file": consumer_info["node"].get("filePath", ""),
-                "rpc_interface": consumer_info["interface"],
-                "rpc_interface_id": interface_id,
-                "provider_class": provider_info["node"]["name"],
-                "provider_id": provider_info["node"]["id"],
-            })
+        iface_name = consumer_info["interface"]
+        provider_info = provides_by_name.get(iface_name)
+        wrappers.append({
+            "service": service_name,
+            "wrapper_class": consumer_info["node"]["name"],
+            "wrapper_id": consumer_id,
+            "wrapper_file": consumer_info["node"].get("filePath", ""),
+            "rpc_interface": iface_name,
+            "rpc_interface_id": consumer_info["interface_id"],
+            "provider_class": provider_info["node"]["name"] if provider_info else "",
+            "provider_id": provider_info["node"]["id"] if provider_info else "",
+        })
 
     return wrappers
 
@@ -373,55 +370,132 @@ def extract_injects(kg: dict, service_name: str) -> list[dict]:
     return injects
 
 
+def extract_cross_kg_di(project_root: str, service_name: str, local_class_names: set[str]) -> list[dict]:
+    """
+    从 extraction results 中提取跨 KG 的 DI 注入。
+
+    当服务 A 通过 @Autowired 注入了服务 B 定义的类时，
+    该注入在 A 的 KG 中不存在 injects 边（因为 target 节点不在 A 的图中）。
+    此函数直接读取 extraction results 中的 DI 注解，
+    找出所有注入类型名不在本服务 KG 中的注入关系。
+    """
+    _DI_ANNOTATIONS = {"Autowired", "Resource", "Inject"}
+    results = []
+
+    tmp_dir = os.path.join(project_root, service_name, ".understand-anything", "tmp")
+    if not os.path.isdir(tmp_dir):
+        return results
+
+    for fname in sorted(os.listdir(tmp_dir)):
+        if not fname.startswith("ua-file-extract-results-") or not fname.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(tmp_dir, fname), "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        for file_result in data.get("results", []):
+            file_path = file_result.get("path", "")
+            for cls in file_result.get("classes", []):
+                cls_name = cls.get("name", "")
+                if not cls_name:
+                    continue
+                for prop in cls.get("typedProperties", []):
+                    annotations = prop.get("annotations", [])
+                    ann_names = {
+                        a["name"] for a in annotations
+                        if isinstance(a, dict) and isinstance(a.get("name"), str)
+                    } if isinstance(annotations, list) else set()
+                    if not (ann_names & _DI_ANNOTATIONS):
+                        continue
+                    injected_type = prop.get("type", "")
+                    if not injected_type:
+                        continue
+                    if injected_type in local_class_names:
+                        continue
+                    results.append({
+                        "service": service_name,
+                        "injector_class": cls_name,
+                        "injector_id": f"class:{file_path}:{cls_name}",
+                        "injector_file": file_path,
+                        "injected_type": injected_type,
+                        "property_name": prop.get("name", ""),
+                    })
+
+    return results
+
+
 def match_wrapper_rpc_relationships(
     all_wrappers: list[dict],
-    all_injects: list[dict]
+    all_injects: list[dict],
+    cross_kg_di: list[dict] | None = None,
 ) -> list[dict]:
     """
     匹配 wrapper 使用关系：如果服务 A 注入了服务 B 的 wrapper 类，则建立跨服务 RPC 关系。
+
+    匹配来源：
+    1. KG 内 injects 边（同 KG 中有 target 节点的注入）
+    2. cross_kg_di（跨 KG 注入，从 extraction results 提取，target 不在本服务 KG 中）
     """
     relationships = []
+    seen: set[tuple[str, str, str]] = set()
 
-    # 建立 wrapper 索引：wrapper_class -> wrapper_info
     wrapper_index: dict[str, list[dict]] = {}
     for w in all_wrappers:
         wrapper_index.setdefault(w["wrapper_class"], []).append(w)
 
-    # 检查每个 injects 边
+    def _try_match(injector_service: str, injector_class: str,
+                   injector_id: str, injector_file: str,
+                   injected_class: str):
+        if injected_class not in wrapper_index:
+            return
+        for wrapper in wrapper_index[injected_class]:
+            if injector_service == wrapper["service"]:
+                continue
+            key = (injector_service, injector_id, wrapper["wrapper_class"])
+            if key in seen:
+                continue
+            seen.add(key)
+            relationships.append({
+                "caller": {
+                    "service": injector_service,
+                    "node": injector_id,
+                    "file": injector_file,
+                    "method": f"{injector_class} uses {wrapper['wrapper_class']}",
+                },
+                "callee": {
+                    "service": wrapper["service"],
+                    "node": wrapper["provider_id"],
+                    "interface": wrapper["rpc_interface"],
+                    "method": f"{wrapper['provider_class']}.*()" if wrapper["provider_class"] else "",
+                    "wrapper": wrapper["wrapper_class"],
+                },
+                "type": "moa_rpc_via_wrapper",
+                "evidence": "cross-service-wrapper-injection",
+                "detail": (
+                    f"{injector_class} ({injector_service}) injects "
+                    f"{wrapper['wrapper_class']} from {wrapper['service']}; "
+                    f"wrapper consumes {wrapper['rpc_interface']}"
+                    + (f" provided by {wrapper['provider_class']}" if wrapper["provider_class"] else "")
+                ),
+                "confidence": "high",
+            })
+
     for inject in all_injects:
-        injected_class = inject["injected_class"]
+        _try_match(
+            inject["service"], inject["injector_class"],
+            inject["injector_id"], inject["injector_file"],
+            inject["injected_class"],
+        )
 
-        # 检查被注入的类型是否是某个 wrapper
-        if injected_class in wrapper_index:
-            for wrapper in wrapper_index[injected_class]:
-                # 跳过同服务内的注入
-                if inject["service"] == wrapper["service"]:
-                    continue
-
-                relationships.append({
-                    "caller": {
-                        "service": inject["service"],
-                        "node": inject["injector_id"],
-                        "file": inject["injector_file"],
-                        "method": f"{inject['injector_class']} uses {wrapper['wrapper_class']}",
-                    },
-                    "callee": {
-                        "service": wrapper["service"],
-                        "node": wrapper["provider_id"],
-                        "interface": wrapper["rpc_interface"],
-                        "method": f"{wrapper['provider_class']}.*()",
-                        "wrapper": wrapper["wrapper_class"],
-                    },
-                    "type": "moa_rpc_via_wrapper",
-                    "evidence": "cross-service-wrapper-injection",
-                    "detail": (
-                        f"{inject['injector_class']} ({inject['service']}) injects "
-                        f"{wrapper['wrapper_class']} from {wrapper['service']}; "
-                        f"wrapper consumes {wrapper['rpc_interface']} provided by "
-                        f"{wrapper['provider_class']}"
-                    ),
-                    "confidence": "high",
-                })
+    if cross_kg_di:
+        for entry in cross_kg_di:
+            _try_match(
+                entry["service"], entry["injector_class"],
+                entry.get("injector_id", ""), entry.get("injector_file", ""),
+                entry["injected_type"],
+            )
 
     return relationships
 
@@ -444,7 +518,9 @@ def main():
     all_table_accesses: list[dict] = []
     all_wrappers: list[dict] = []
     all_injects: list[dict] = []
+    all_cross_kg_di: list[dict] = []
     services_loaded = []
+    service_class_names: dict[str, set[str]] = {}
 
     for svc_name in service_names:
         svc_root = os.path.join(project_root, svc_name)
@@ -462,11 +538,22 @@ def main():
         all_wrappers.extend(extract_wrapper_providers(kg, svc_name))
         all_injects.extend(extract_injects(kg, svc_name))
 
+        local_classes = {
+            n["name"] for n in kg.get("nodes", [])
+            if n.get("type") == "class" and n.get("name")
+        }
+        service_class_names[svc_name] = local_classes
+
+    for svc_name in services_loaded:
+        all_cross_kg_di.extend(
+            extract_cross_kg_di(project_root, svc_name, service_class_names.get(svc_name, set()))
+        )
+
     # Perform matching
     rpc_rels = match_rpc_relationships(all_providers, all_consumers)
     event_rels = match_event_relationships(all_publishers, all_subscribers)
     table_rels = match_shared_tables(all_table_accesses)
-    wrapper_rels = match_wrapper_rpc_relationships(all_wrappers, all_injects)
+    wrapper_rels = match_wrapper_rpc_relationships(all_wrappers, all_injects, all_cross_kg_di)
 
     result = {
         "scriptCompleted": True,
@@ -485,6 +572,7 @@ def main():
             "subscribersFound": len(all_subscribers),
             "wrappersFound": len(all_wrappers),
             "injectsFound": len(all_injects),
+            "crossKgDiFound": len(all_cross_kg_di),
         },
     }
 
