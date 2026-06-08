@@ -179,6 +179,16 @@ Track per-service results:
 After all services complete:
 > `Phase 1 complete. Generated Wiki for X/N services. Failures: Y.`
 
+### Repo-Type-Aware Worker Dispatch
+
+When dispatching wiki-worker agents, pass the `REPO_TYPE` context:
+
+- `REPO_TYPE=backend` (default): Use existing backend-focused prompt
+- `REPO_TYPE=mobile`: Use mobile-focused prompt (screens, API calls, state management)
+- `REPO_TYPE=frontend`: Use frontend-focused prompt (routes, components, API calls, state)
+
+Also pass `SERVER_WIKI_AVAILABLE` and `SERVER_FACET_PATH` when `REPO_TYPE=mobile` so the wiki-worker can perform server-aware domain classification.
+
 ---
 
 ## Partial Failure Policy

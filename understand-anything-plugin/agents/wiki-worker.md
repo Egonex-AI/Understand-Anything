@@ -264,6 +264,39 @@ After all flows in a domain are expanded, rewrite the domain `summary` to be a 3
 
 ---
 
+### Mobile Mode (`REPO_TYPE=mobile`)
+
+When generating wiki for a mobile repository, adjust content focus:
+
+**Content priorities (replace backend defaults):**
+- **Screens & Navigation**: Document each screen/activity/view controller, navigation flows between screens, deep link handling
+- **API Calls**: Document all HTTP API calls (endpoints consumed), request/response formats, error handling
+- **State Management**: ViewModel/Store/BLoC patterns, data persistence (Room/Core Data/SharedPreferences)
+- **Offline Strategy**: Cache policies, sync mechanisms, conflict resolution
+- **Platform-Specific**: Push notifications, permissions, background tasks
+
+**Domain classification strategy:**
+
+IF `SERVER_WIKI_AVAILABLE=true`:
+1. Load server wiki domain→endpoint mapping from `$SERVER_FACET_PATH/.understand-anything/wiki/`
+2. For each candidate domain in client code:
+   - Extract `consumes_api` edges from the client KG
+   - Match API paths to server endpoints
+   - Classify: client domain = server domain that owns the matched endpoints
+3. Unmatched domains: classify from code structure/naming (mark as degraded confidence)
+
+IF `SERVER_WIKI_AVAILABLE=false`:
+1. Classify all domains from code structure/directory naming
+2. Mark all domain classifications as degraded confidence
+3. Record `sourceHashes["server/system-graph"] = null` in meta.json
+
+**Entity naming conventions for mobile:**
+- Use screen/activity names as primary entities (e.g., `OrderListScreen`, `OrderDetailActivity`)
+- Use ViewModel/Repository names as secondary entities (e.g., `OrderViewModel`, `OrderRepository`)
+- API call sites are tertiary (e.g., `OrderApiService.createOrder()`)
+
+---
+
 ## Phase 3 — (Removed)
 
 Index and metadata generation is now handled by the deterministic assembly pipeline
