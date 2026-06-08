@@ -1,7 +1,7 @@
 ---
 name: understand-wiki
 description: Generate a comprehensive, navigable knowledge base Wiki for a microservice project. Supports single-service and batch modes with progressive adoption.
-argument-hint: ["[--batch] [--service=<name>] [--review] [--full] [--force] [--dry-run] [--continue-on-error] [--language <lang>] [--repo-type <type>]"]
+argument-hint: '[--batch] [--service=<name>] [--review] [--full] [--force] [--dry-run] [--continue-on-error] [--language <lang>] [--repo-type <type>]'
 ---
 
 # /understand-wiki
@@ -35,12 +35,16 @@ Generate a team knowledge base Wiki for microservice projects. Each service gets
 
 ### Dependency Management
 
-| Mode | KG/DG missing | How |
-|---|---|---|
-| Single-service | Dispatch `/understand` subagent → wait → dispatch `/understand-domain` subagent → wait | Main agent orchestrates; skill sub-agents execute in isolated context |
-| Batch | Dispatch `upstream-updater` per service (isolates context) | Wrapper agent handles KG → DG internally per service |
+Both modes use the same dependency chain — the difference is **who orchestrates**:
 
-In single-service mode, `/understand-wiki` manages the full dependency chain: it ensures KG exists (dispatching an `/understand` sub-agent if needed), then ensures DG exists (dispatching an `/understand-domain` sub-agent if needed), then generates the Wiki. Each upstream skill runs in an isolated sub-agent context to prevent context window exhaustion.
+| Mode | Orchestrator | Flow |
+|---|---|---|
+| Single-service | Main agent | `/understand` → `/understand-domain` → wiki-worker → assembly (all dispatched sequentially from main agent) |
+| Batch | Per-service sub-agent | Each sub-agent runs the full single-service flow above in an isolated context |
+
+In single-service mode, the main agent manages the dependency chain directly: it ensures KG exists (dispatching an `/understand` sub-agent if needed), then ensures DG exists (dispatching an `/understand-domain` sub-agent if needed), then generates the Wiki.
+
+In batch mode, the main agent dispatches one sub-agent per service. Each sub-agent reads this same SKILL.md and executes the single-service flow end-to-end (Phase 0 → 1 → 2), including prerequisite resolution. This isolates each service's context and enables parallel execution across services.
 
 ---
 
@@ -61,13 +65,19 @@ Phase completion:
 
 ### Phase 0 — Detection and Prerequisites
 
-Resolve execution mode, plugin root, language/RPC config, verify KG/DG prerequisites, staleness and incremental decisions, and batch service list.
+Resolve execution mode, plugin root, language/RPC config, and service list.
+
+**Single-service mode:** Also verify KG/DG prerequisites, check staleness, and make incremental decisions. If KG or DG is missing, dispatch `/understand` and/or `/understand-domain` sub-agents before proceeding to Phase 1.
+
+**Batch mode:** Only resolve plugin root, language config, and build the service list. Prerequisites are handled by each per-service sub-agent in Phase 1.
 
 **Detailed implementation:** See [Phase 0 — Prerequisites](docs/wiki-phase0-prerequisites.md)
 
 ### Phase 1 — Service Wiki Generation
 
-Dispatch `wiki-worker` agents (incremental per-domain or full), verify output, handle batch concurrency and per-service outcomes.
+**Single-service mode:** Dispatch `wiki-worker` agents (incremental per-domain or full), verify output.
+
+**Batch mode:** Dispatch one sub-agent per service. Each sub-agent runs the complete single-service flow (Phase 0 prerequisite check → Phase 1 wiki-worker → Phase 2 assembly) in an isolated context. The sub-agent reads this SKILL.md and follows the single-service path. Up to 3 sub-agents run concurrently.
 
 **Detailed implementation:** See [Phase 1 — Service Wiki Generation](docs/wiki-phase1-generation.md) (includes [Partial Failure Policy](docs/wiki-phase1-generation.md#partial-failure-policy))
 
@@ -130,8 +140,9 @@ Review: <pass|warn|fail> (<N issues, M warnings>)
 
 ## Error Handling
 
-- **Prerequisite missing or stale** (`/understand` or `/understand-domain`): auto-dispatch `upstream-updater` subagent; on failure, log warning and proceed with stale data (single mode) or skip service (batch mode)
-- **wiki-worker dispatch fails**: retry once; on second failure skip service. Batch default continues and runs Phase 3 with successes; `--continue-on-error=false` stops batch and skips Phase 3
+- **Prerequisite missing or stale** (`/understand` or `/understand-domain`): single mode auto-dispatches `/understand` and/or `/understand-domain` sub-agents; batch mode per-service sub-agent handles this internally. On failure, log warning and proceed with stale data (single mode) or skip service (batch mode)
+- **Per-service sub-agent fails (batch)**: retry once; on second failure skip service. Batch default continues and runs Phase 3 with successes; `--continue-on-error=false` stops batch and skips Phase 3
+- **wiki-worker dispatch fails (single)**: retry once; on second failure stop
 - **Quality Gate Layer 1 fails**: report issues; batch skips service; single mode asks user
 - **Quality Gate Layer 2 fails (reviewer)**: retry wiki-worker once with feedback; if still failing, save Wiki with warnings and proceed
 - **Cross-service matcher script fails**: fall back to LLM-only cross-service detection

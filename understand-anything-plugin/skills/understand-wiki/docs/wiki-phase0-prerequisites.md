@@ -267,9 +267,11 @@ if [ -f "$SERVICE_ROOT/.understand-anything/config.json" ]; then
 fi
 ```
 
-### Step 5 — Prerequisite Verification (per service)
+### Step 5 — Prerequisite Verification (single-service mode only)
 
-For each target service (1 in single mode, N in batch mode), check whether the knowledge graph and domain graph exist:
+**Batch mode: SKIP this step.** In batch mode, each per-service sub-agent handles its own prerequisite verification internally when it runs the single-service flow. The main agent only needs the service list (Step 7) and proceeds directly to Phase 1.
+
+For single-service mode, check whether the knowledge graph and domain graph exist:
 
 ```bash
 SERVICE_UA="$SERVICE_ROOT/.understand-anything"
@@ -289,7 +291,7 @@ fi
 
 #### If KG is missing (`KG_MISSING=true`)
 
-**Single mode:** Dispatch an `/understand` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
+Dispatch an `/understand` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
 
 > Read the skill definition at `$PLUGIN_ROOT/skills/understand/SKILL.md` and follow its instructions.
 >
@@ -306,18 +308,9 @@ test -f "$SERVICE_UA/knowledge-graph.json"
 
 If the file is still missing, report: `Error: /understand failed for "${SERVICE_NAME}". Cannot generate Wiki without KG.` and stop.
 
-**Batch mode:** Dispatch an `upstream-updater` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
-
-> Read the agent definition at `$PLUGIN_ROOT/agents/upstream-updater.md` and follow its instructions.
->
-> - `$SKILL_PATH`: `$PLUGIN_ROOT/skills/understand/SKILL.md`
-> - `$SERVICE_ROOT`: `<service directory path>`
-> - `$SKILL_ARGS`: `--language $OUTPUT_LANGUAGE`
-> - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/knowledge-graph.json`
-
 #### If DG is missing (`DG_MISSING=true`)
 
-**Single mode:** Dispatch an `/understand-domain` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
+Dispatch an `/understand-domain` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
 
 > Read the skill definition at `$PLUGIN_ROOT/skills/understand-domain/SKILL.md` and follow its instructions.
 >
@@ -333,24 +326,15 @@ test -f "$SERVICE_UA/domain-graph.json"
 
 If the file is still missing, report: `Error: /understand-domain failed for "${SERVICE_NAME}". Cannot generate Wiki without DG.` and stop.
 
-**Batch mode:** Dispatch an `upstream-updater` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
+**Sequential dependency:** If both KG and DG need updating, dispatch KG first, wait for completion, then dispatch DG. `/understand-domain` benefits from an up-to-date KG (Path 2: derive from graph).
 
-> Read the agent definition at `$PLUGIN_ROOT/agents/upstream-updater.md` and follow its instructions.
->
-> - `$SKILL_PATH`: `$PLUGIN_ROOT/skills/understand-domain/SKILL.md`
-> - `$SERVICE_ROOT`: `<service directory path>`
-> - `$SKILL_ARGS`: *(empty — auto-derives from KG; language preference is read from `config.json`)*
-> - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/domain-graph.json`
+### Step 5a — Upstream KG/DG Staleness Check & Auto-Update (single-service mode only)
 
-**Sequential dependency (within one service):** If both KG and DG need updating, dispatch KG first, wait for completion, then dispatch DG. `/understand-domain` benefits from an up-to-date KG (Path 2: derive from graph).
-
-**Batch mode concurrency (across services) — MANDATORY:** In batch mode, upstream updates for **different services MUST be dispatched in parallel** (each operates on a separate `$SERVICE_ROOT` with no shared state). Dispatch all service KG updates simultaneously, wait for all to complete, then dispatch all DG updates simultaneously. Sequential processing across services wastes time and is not acceptable.
-
-### Step 5a — Upstream KG/DG Staleness Check & Auto-Update
+**Batch mode: SKIP this step.** Staleness checks and auto-updates are handled by each per-service sub-agent internally.
 
 After KG and DG exist, verify they were generated from the current git HEAD. Wiki `meta.json` can be updated to the latest commit while graphs still reflect an older tree (silent stale upstream).
 
-**When stale upstream is detected, automatically refresh them** using the same dispatch pattern as Step 5 (single mode: dispatch skill sub-agents directly; batch mode: dispatch via `upstream-updater`). This eliminates the manual step of re-running `/understand` and `/understand-domain` separately.
+**When stale upstream is detected, automatically refresh them** using the same dispatch pattern as Step 5 (dispatch `/understand` and/or `/understand-domain` sub-agents). This eliminates the manual step of re-running `/understand` and `/understand-domain` separately.
 
 Skip staleness check entirely when `--force` is set (proceed with existing graphs as-is):
 
@@ -390,15 +374,6 @@ The bash script above sets `$KG_STALE` and `$DG_STALE` to `"true"` when stalenes
 >
 > You are authorized to dispatch sub-agents as required by the parent task.
 
-**Batch mode:** Dispatch an `upstream-updater` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
-
-> Read the agent definition at `$PLUGIN_ROOT/agents/upstream-updater.md` and follow its instructions.
->
-> - `$SKILL_PATH`: `$PLUGIN_ROOT/skills/understand/SKILL.md`
-> - `$SERVICE_ROOT`: `$SERVICE_ROOT`
-> - `$SKILL_ARGS`: `--language $OUTPUT_LANGUAGE`
-> - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/knowledge-graph.json`
-
 `/understand` will run incremental (git diff based) since KG + meta already exist. Wait for completion, then verify:
 
 ```bash
@@ -418,15 +393,6 @@ fi
 > - Working directory: `$SERVICE_ROOT`
 >
 > You are authorized to dispatch sub-agents as required by the parent task.
-
-**Batch mode:** Dispatch an `upstream-updater` subagent. See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
-
-> Read the agent definition at `$PLUGIN_ROOT/agents/upstream-updater.md` and follow its instructions.
->
-> - `$SKILL_PATH`: `$PLUGIN_ROOT/skills/understand-domain/SKILL.md`
-> - `$SERVICE_ROOT`: `$SERVICE_ROOT`
-> - `$SKILL_ARGS`: *(empty — auto-derives from freshly updated KG; language preference is read from `config.json`)*
-> - `$EXPECTED_OUTPUT`: `$SERVICE_ROOT/.understand-anything/domain-graph.json`
 
 `/understand-domain` has no incremental mode, but if KG was just updated, it will use Path 2 (derive from graph) which is cheaper than file scanning. Wait for completion, then verify:
 

@@ -2,6 +2,40 @@
 
 Report: `[Phase 1/5] Generating service Wiki...`
 
+### Batch Mode — Per-Service Sub-Agent Dispatch
+
+In batch mode, Phase 1 dispatches one sub-agent per service. Each sub-agent runs the **complete single-service flow** from this SKILL.md:
+
+1. Phase 0: prerequisite check (KG/DG missing → dispatch `/understand` and `/understand-domain`)
+2. Phase 1: wiki-worker dispatch (this section, single-service path)
+3. Phase 2: assembly (`assemble-wiki.py`)
+
+**Dispatch one sub-agent per service** (up to 3 concurrently). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
+
+> Read the skill definition at `$PLUGIN_ROOT/skills/understand-wiki/SKILL.md` and follow its instructions.
+>
+> - Working directory: `$PROJECT_ROOT/<service-name>` (the service directory, NOT the parent)
+> - Arguments: `--language $OUTPUT_LANGUAGE` (add `--full` if parent was called with `--full`, `--force` if `--force`)
+> - Skip Phase 3, 4, 5, 6 — the parent agent handles cross-service, index, cleanup, and dashboard launch
+>
+> You are authorized to dispatch sub-agents as required by the parent task.
+
+Wait for ALL sub-agents to complete. For each, verify:
+
+```bash
+test -f "$PROJECT_ROOT/<service>/.understand-anything/wiki/meta.json"
+```
+
+Track successes and failures for the Phase 5 report. If `--continue-on-error=false` and any service fails, stop batch and skip Phase 3.
+
+**After all per-service sub-agents complete, skip to Phase 3** (cross-service + parent wiki).
+
+---
+
+### Single-Service Mode — Wiki-Worker Dispatch
+
+The instructions below apply to single-service mode only (and to each per-service sub-agent in batch mode).
+
 ### Dispatch Strategy (Incremental vs Full)
 
 The following bash template shows the branching logic. Actual dispatch instructions are in the sections below — follow those, not the comments in this template.
