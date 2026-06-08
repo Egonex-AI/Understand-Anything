@@ -1,10 +1,11 @@
 import { z } from "zod";
 
-// Edge types (38 values across 8 categories)
+// Edge types (39 values across 8 categories)
 export const EdgeTypeSchema = z.enum([
   "imports", "exports", "contains", "inherits", "implements",  // Structural
   "calls", "subscribes", "publishes", "middleware",             // Behavioral
   "provides_rpc", "consumes_rpc",                               // RPC (cross-service)
+  "consumes_api",                                                // API consumption (client→server)
   "injects",                                                     // Dependency Injection
   "reads_from", "writes_to", "transforms", "validates",        // Data flow
   "depends_on", "tested_by", "configures",                     // Dependencies
@@ -121,6 +122,8 @@ export const EDGE_TYPE_ALIASES: Record<string, string> = {
   tagged_with: "categorized_under",
   written_by: "authored_by",
   created_by: "authored_by",
+  api_call: "consumes_api",
+  http_call: "consumes_api",
   // Note: "implemented_by" is intentionally NOT aliased to "implements" —
   // it inverts edge direction (see commit fd0df15). The LLM should use
   // "implements" with correct source/target instead.

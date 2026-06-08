@@ -6,11 +6,12 @@ export type NodeType =
   | "domain" | "flow" | "step"
   | "article" | "entity" | "topic" | "claim" | "source";
 
-// Edge types (38 total in 8 categories: Structural, Behavioral, Data flow, Dependencies, Semantic, Infrastructure/Schema, Domain, Knowledge)
+// Edge types (39 total in 8 categories: Structural, Behavioral, Data flow, Dependencies, Semantic, Infrastructure/Schema, Domain, Knowledge)
 export type EdgeType =
   | "imports" | "exports" | "contains" | "inherits" | "implements"  // Structural
   | "calls" | "subscribes" | "publishes" | "middleware"              // Behavioral
   | "provides_rpc" | "consumes_rpc"                                  // RPC (cross-service)
+  | "consumes_api"                                                    // API consumption (client→server)
   | "injects"                                                        // Dependency Injection
   | "reads_from" | "writes_to" | "transforms" | "validates"         // Data flow
   | "depends_on" | "tested_by" | "configures"                       // Dependencies
@@ -19,6 +20,12 @@ export type EdgeType =
   | "migrates" | "documents" | "routes" | "defines_schema"          // Schema/Data
   | "contains_flow" | "flow_step" | "cross_domain"                  // Domain
   | "cites" | "contradicts" | "builds_on" | "exemplifies" | "categorized_under" | "authored_by"; // Knowledge
+
+// Metadata for consumes_api edges (client function → server endpoint)
+export interface ApiCallMeta {
+  method: string;   // "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
+  path: string;     // "/api/orders" or "/api/orders/{id}"
+}
 
 // Optional knowledge metadata for article/entity/topic/claim/source nodes
 export interface KnowledgeMeta {

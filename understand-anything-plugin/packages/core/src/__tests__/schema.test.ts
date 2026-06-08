@@ -697,6 +697,40 @@ describe("Extended node/edge types", () => {
     }
   });
 
+  it('accepts consumes_api edge type', () => {
+    const graph = {
+      nodes: [
+        { id: 'function:OrderRepo.kt:createOrder', type: 'function', name: 'createOrder', filePath: 'OrderRepo.kt', summary: 'Creates order' },
+        { id: 'endpoint:OrderRepo.kt:POST /api/orders', type: 'endpoint', name: 'POST /api/orders', filePath: 'OrderRepo.kt', summary: 'Order creation endpoint' },
+      ],
+      edges: [
+        { source: 'function:OrderRepo.kt:createOrder', target: 'endpoint:OrderRepo.kt:POST /api/orders', type: 'consumes_api', weight: 0.7 },
+      ],
+      layers: [],
+      tour: [],
+    };
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.edges[0].type).toBe('consumes_api');
+  });
+
+  it('normalizes api_call alias to consumes_api', () => {
+    const graph = {
+      nodes: [
+        { id: 'function:a', type: 'function', name: 'a', filePath: 'a.kt', summary: 'a' },
+        { id: 'endpoint:b', type: 'endpoint', name: 'b', filePath: 'b.kt', summary: 'b' },
+      ],
+      edges: [
+        { source: 'function:a', target: 'endpoint:b', type: 'api_call', weight: 0.7 },
+      ],
+      layers: [],
+      tour: [],
+    };
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.edges[0].type).toBe('consumes_api');
+  });
+
   it("validates behavioral edge types: publishes, subscribes", () => {
     for (const type of ["publishes", "subscribes"] as const) {
       const graph = structuredClone(validGraph);
