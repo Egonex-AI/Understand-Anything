@@ -461,6 +461,33 @@ You MUST use these exact prefixes for node IDs:
 
 > **WARNING:** Node IDs MUST use the exact prefix formats shown above. Do NOT prefix IDs with the project name (e.g., `my-project:file:src/foo.ts` is WRONG). Do NOT use bare file paths without a type prefix (e.g., `src/foo.ts` is WRONG). Invalid IDs will be auto-corrected during assembly, which may cause unexpected edge rewiring.
 
+## Summary Quality Rules (MANDATORY)
+
+Every node summary MUST answer "What does this do in business terms?" in one Chinese sentence (≥10 characters).
+
+### BANNED generic summaries (generating these means failure):
+- "方法 X，实现具体业务步骤" ❌
+- "方法 X，实现 Y 中的具体业务步骤" ❌
+- "类 Y，承载相关业务类型与行为" ❌
+- "类 Y，位于 Z，承载相关业务类型与行为" ❌
+- "数据传输对象 X.java，封装 API 请求/响应字段" ❌
+- "业务服务 X.java，实现核心领域逻辑与流程编排" ❌
+- "MOA/RPC 接口定义 X.java，声明对外或内部服务契约" ❌
+
+### REQUIRED specific summaries:
+- "检查用户亲密度是否达到挚友绑定阈值(默认500)" ✓
+- "管理挚友空间装扮素材的佩戴状态与过期回收" ✓
+- "封装家族创建请求参数：家族名、类型、封面URL、简介" ✓
+- "MOA接口：提供家族广场推荐、家族搜索、热门家族列表查询" ✓
+
+### Rules:
+1. For methods: describe WHAT business decision or action this method performs
+2. For classes: describe the DOMAIN CONCEPT and RESPONSIBILITY this class holds
+3. For DTOs/Models: list 2-3 key business fields, not just "封装字段"
+4. For interfaces/services: list the main capabilities exposed
+5. If the source has Javadoc/docstring, use its first meaningful sentence as basis
+6. Summary MUST contain at least one domain-specific keyword that aids BM25 search
+
 ## Output Format
 
 Produce a single, valid JSON block. Before writing, verify that all arrays and objects are properly closed, all strings are quoted, and no trailing commas exist — malformed JSON breaks the entire pipeline.

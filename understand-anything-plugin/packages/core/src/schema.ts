@@ -725,6 +725,66 @@ export function validateGraph(data: unknown): ValidationResult {
     }
   }
 
+  // Domain-graph quality gates (P0/P2): check flow step depth and naming
+  const flowNodes = validNodes.filter(n => n.type === "flow");
+  const stepNodes = validNodes.filter(n => n.type === "step");
+  if (flowNodes.length > 0 && stepNodes.length > 0) {
+    const BANNED_STEP_NAMES = new Set([
+      "Validate Input", "Execute Business Logic", "Build Response",
+      "校验输入", "执行业务逻辑", "构建响应",
+    ]);
+    const CJK_RE = /[\u4e00-\u9fff]/;
+    // Only enforce CJK if the graph appears to be from a Chinese-language project
+    const hasCjkContent = validNodes.some(n => CJK_RE.test(n.summary || ""));
+
+    for (const flow of flowNodes) {
+      if (hasCjkContent && flow.summary && !CJK_RE.test(flow.summary)) {
+        issues.push({
+          level: "auto-corrected",
+          category: "domain-quality",
+          message: `Flow "${flow.name}" summary lacks Chinese characters (expected for this project)`,
+          path: `nodes[${flow.id}].summary`,
+        });
+      }
+
+      const flowSteps = validEdges
+        .filter(e => e.source === flow.id && e.type === "flow_step")
+        .map(e => stepNodes.find(s => s.id === e.target))
+        .filter((s): s is typeof stepNodes[number] => s != null);
+
+      if (flowSteps.length > 0 && flowSteps.length < 4) {
+        issues.push({
+          level: "auto-corrected",
+          category: "domain-quality",
+          message: `Flow "${flow.name}" has only ${flowSteps.length} steps (minimum 4 recommended)`,
+          path: `nodes[${flow.id}]`,
+        });
+      }
+
+      for (const step of flowSteps) {
+        if (BANNED_STEP_NAMES.has(step.name)) {
+          issues.push({
+            level: "auto-corrected",
+            category: "domain-quality",
+            message: `Step "${step.name}" uses banned template name in flow "${flow.name}"`,
+            path: `nodes[${step.id}].name`,
+          });
+        }
+        if (step.lineRange) {
+          const [start, end] = step.lineRange;
+          if ((start === 1 && end === 100) || (start === 0 && end === 0) || start >= end) {
+            issues.push({
+              level: "auto-corrected",
+              category: "domain-quality",
+              message: `Step "${step.name}" has invalid lineRange [${start},${end}] in flow "${flow.name}"`,
+              path: `nodes[${step.id}].lineRange`,
+            });
+          }
+        }
+      }
+    }
+  }
+
   const graph = {
     version: typeof fixed.version === "string" ? fixed.version : "1.0.0",
     project: projectResult.data,

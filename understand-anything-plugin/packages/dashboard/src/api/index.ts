@@ -5,9 +5,11 @@ import { handleGraphRequest } from "./handlers/graph"
 import { handleWikiRequest } from "./handlers/wiki"
 import { handleSourceRequest } from "./handlers/source"
 import { handleBusinessRequest } from "./handlers/business"
+import { handleSearchRequest } from "./handlers/search"
 
 const HANDLERS = [
   handleServicesRequest,
+  handleSearchRequest,
   handleGraphQueryRequest,
   handleBusinessRequest,
   handleWikiRequest,

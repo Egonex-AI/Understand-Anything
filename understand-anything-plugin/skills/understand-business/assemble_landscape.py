@@ -17,6 +17,26 @@ import sys
 from pathlib import Path
 
 
+def _deduplicate_domains(domains: list[dict]) -> list[dict]:
+    """Merge domains with identical names, combining their facets and interactions."""
+    seen: dict[str, dict] = {}
+    for domain in domains:
+        key = domain.get('name', '').strip().lower()
+        if not key:
+            continue
+        if key in seen:
+            existing = seen[key]
+            existing.setdefault('facets', []).extend(domain.get('facets', []))
+            existing.setdefault('interactions', []).extend(domain.get('interactions', []))
+            existing.setdefault('businessRules', []).extend(domain.get('businessRules', []))
+            existing['facets'] = list({json.dumps(f, sort_keys=True, ensure_ascii=False): f for f in existing['facets']}.values())
+            existing['interactions'] = list({json.dumps(i, sort_keys=True, ensure_ascii=False): i for i in existing['interactions']}.values())
+            existing['businessRules'] = list({json.dumps(r, sort_keys=True, ensure_ascii=False): r for r in existing['businessRules']}.values())
+        else:
+            seen[key] = domain
+    return list(seen.values())
+
+
 def assemble_landscape(project_root_str: str) -> dict | None:
     project_root = Path(project_root_str)
     intermediate = project_root / '.understand-anything' / 'intermediate'
@@ -89,6 +109,8 @@ def assemble_landscape(project_root_str: str) -> dict | None:
             'detailRef': f"business-landscape/domains/{m['canonical']}.json",
         }
         domains_list.append(domain_entry)
+
+    domains_list = _deduplicate_domains(domains_list)
 
     unmapped = []
     for candidate in phase1.get('candidates', []):
