@@ -1,7 +1,7 @@
 ---
 name: understand-query
 description: Query the Understand-Anything knowledge base via CLI. Six-layer drill-down from services to source code, backed by the shared API server.
-argument-hint: ["<subcommand> [--server URL] [--token TOKEN] [--format json|md] [--verbose] [subcommand-flags...]"]
+argument-hint: ["<subcommand> [--server URL] [--format json|md] [--verbose] [subcommand-flags...]"]
 ---
 
 # /understand-query
@@ -17,7 +17,6 @@ Query codebase knowledge through a lightweight CLI (`ua_query.py`) backed by the
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--server URL` | `$UNDERSTAND_SERVER` or `http://localhost:3001` | API server base URL |
-| `--token TOKEN` | `$UNDERSTAND_TOKEN` | Access token (required if env unset) |
 | `--format json\|md` | `json` | Output format |
 | `--verbose` | off | Include extra detail (e.g., edges in KG node queries) |
 
@@ -34,6 +33,87 @@ Query codebase knowledge through a lightweight CLI (`ua_query.py`) backed by the
 
 ---
 
+## Known Limits
+
+| Constraint | Detail |
+|------------|--------|
+| `kg --file` max per request | 500 lines (use `--start`/`--end` to paginate larger files) |
+| `trace --source` auto-range | Uses KG `lineRange` if available; otherwise first 500 lines |
+| KG coverage per service | Only modules that were analyzed by `/understand`; Flutter/client modules may be in a separate service or unindexed |
+| Token in KG nodes | Individual method bodies are NOT in KG; only metadata. Use `--file` or `trace --source` to read actual code |
+
+## Search Algorithm & Cross-Language Matching
+
+### BM25 Search
+All `--search` and `trace --query` use BM25 (TF-IDF based) with intelligent tokenization:
+- **PascalCase/camelCase splitting**: `OrderPaymentService` → [order, payment, service]
+- **Multi-word queries**: `"sendInvite acceptInvite"` matches nodes containing either term
+- **CJK bigrams**: `"订单支付"` → [订单, 单支, 支付] for matching against non-English summaries
+- **Mixed queries**: `"Order创建"` → [order] + CJK bigrams
+
+### Domain-Flow Auto-Fallback
+When non-English keywords have no KG match, `trace` automatically:
+1. Searches domain graph flows via BM25 (flow summaries often contain non-English text)
+2. Extracts English code keywords from the matching flow name (e.g., "Create Order Flow" → "CreateOrder")
+3. Re-searches KG with extracted English keyword → success!
+
+```
+trace --query "非英文关键词"
+  → KG BM25: 0 matches (KG nodes are English-named)
+  → Domain flow BM25: finds flow whose summary matches
+  → Extract keyword from flow name: "EnglishCodeKeyword"
+  → KG re-search: ServiceImpl, ManagerClass, ...
+  → Response: discoveredVia: "domain-flow:<flow-name>"
+```
+
+### Agent Pre-Query Translation Guide
+
+**Rule: ALWAYS expand to multi-keyword BEFORE calling `trace`. Include original term + English translation + synonym in one comma-separated query.**
+
+The ideal flow:
+1. User asks a question about a feature
+2. Agent extracts the core concept
+3. Agent generates 2-4 keyword variants (original + English + abbreviation/synonym)
+4. Agent calls: `trace --query "原词,EnglishName,Variant" --source`
+5. Done in ONE call (no retry needed)
+
+**Dynamic keyword discovery (when you DON'T know the English name):**
+
+1. `business --search "用户提的关键词"` → look at result names for English patterns
+2. `domain --service S --flows` → scan flow names (often bilingual: English name + Chinese summary)
+3. Add discovered English names to your multi-keyword query
+
+**Fallback**: Even if you can't guess the English name, `trace` has automatic domain-flow fallback that searches flow summaries (which may contain non-English text) and extracts English code keywords from flow names.
+
+**Key insight:** `trace` with multi-keyword does parallel BM25 on all keywords — it automatically picks the best results from whichever keyword matched best. Never search one keyword at a time.
+
+## Cross-Platform Query Recipe
+
+For features spanning client + server (e.g., order creation, payment flow):
+
+```bash
+# 1. Business context — shows BOTH client and server interaction steps
+python ua_query.py business --domain "target-domain" --type interactions
+
+# 2. Server-side implementation (usually well-indexed)
+python ua_query.py trace --service backend-service --query "featureName,FeatureService" --source --business
+
+# 3. Client-side attempt — may return empty if client code not in KG
+python ua_query.py trace --service client-service --query "FeatureCreate,featureCreate" --source
+
+# 4. If client trace is empty (hint provided), fall back to workspace grep:
+#    grep -r "feature/create" client-module/
+#    Then read the found files directly
+
+# 5. API contract — use --toc to see all methods first, then read specific ones
+python ua_query.py kg --service backend-service --file "FeatureServiceImpl.java" --toc
+python ua_query.py kg --service backend-service --file "FeatureServiceImpl.java" --start 100 --end 150
+```
+
+**Key insight:** Business `interactions` is the ONLY layer that consistently shows both client and server steps. When KG returns empty for a service, check if the code lives in a Flutter/React/mobile module not covered by that service's analysis.
+
+---
+
 ## Prerequisites
 
 1. **API Server must be running.** This CLI queries the shared API server (same backend as the Dashboard):
@@ -42,17 +122,15 @@ Query codebase knowledge through a lightweight CLI (`ua_query.py`) backed by the
 cd understand-anything-plugin/packages/dashboard && pnpm run serve
 ```
 
-The server prints startup info including an access URL with embedded token:
+The server prints startup info:
 
 ```
 🚀 API Server running at http://localhost:3001
-   Access URL: http://localhost:3001?token=<generated-token>
 ```
 
-2. **Copy the token** and either pass it via `--token` or set the environment variable:
+2. **Optionally set the server URL** (if not using default):
 
 ```bash
-export UNDERSTAND_TOKEN=<copied-token>
 export UNDERSTAND_SERVER=http://localhost:3001   # optional, this is the default
 ```
 
@@ -79,6 +157,7 @@ The recommended exploration pattern starts at Layer 0 (what exists?) and narrows
 | 3. Wiki Detail | `wiki --service S --domain D` | Technical implementation of domain D? |
 | 4. Domain Graph | `domain --service S --flow F` | Business flow structure and steps? |
 | 5. Source-Level KG | `kg --service S --neighbors N` | Class relationships and code? |
+| 6. Source Code | `kg --service S --file PATH` | Read actual implementation source code |
 | +. Meta Check | `meta` / `meta --stale` | Is data fresh? |
 
 **Example drill-down session:**
@@ -105,6 +184,9 @@ python ua_query.py domain --service order-service --flow checkout-flow --steps
 
 # Layer 5: Source-level neighbors of a controller
 python ua_query.py kg --service order-service --neighbors OrderController --verbose
+
+# Layer 6: Read actual source code (extract path from node ID: "file:path/to/File.java")
+python ua_query.py kg --service order-service --file src/controllers/OrderController.java
 ```
 
 ---
@@ -113,18 +195,54 @@ python ua_query.py kg --service order-service --neighbors OrderController --verb
 
 Use this section to pick a query path based on the agent's goal. Always consult the **Strategy Summary** first.
 
+### Step 0: Multi-Keyword Expansion (MANDATORY before trace)
+
+**Before your first `trace` call, expand the user's question into 2-4 comma-separated keywords:**
+
+```
+User question → Extract core concept → Generate variants:
+  1. Original term (as user stated it)
+  2. Likely English code name (think: what would a developer name this class/method?)
+  3. Alternative naming pattern (abbreviation, synonym, or PascalCase/camelCase variant)
+```
+
+**Keyword generation strategy (no hardcoded tables — think dynamically):**
+
+1. **Translate the concept**: If user asks in Chinese/non-English, think "what English word would a developer use for this concept?" Common patterns:
+   - Domain concepts → English nouns (PascalCase for classes, camelCase for methods)
+   - Actions → English verbs (create, send, bind, update, check)
+   - Compound terms → multiple word combinations (e.g., "好友关系" → "Friend,Friendship,FriendRelation")
+
+2. **Include code naming variants**: Developers often use abbreviations or domain-specific names:
+   - Full word + abbreviation: `"Message,Msg,IM"`
+   - Service suffix patterns: `"Payment,PaymentService,PayService"`
+   - Verb+noun: `"sendGift,GiftSender"`
+
+3. **Keep the original**: Always include the user's original term — BM25 with Chinese bigrams + domain-flow fallback can match it in summaries or flow names.
+
+**Rule: ALWAYS pass multiple keywords in one `trace` call. This searches all variants in parallel and returns the best matches — no retry needed.**
+
+```bash
+# BAD: single keyword, may miss
+python ua_query.py trace --service my-service --query "userKeyword" --source
+
+# GOOD: multi-keyword covers original + translation + variant
+python ua_query.py trace --service my-service --query "userKeyword,EnglishName,Synonym" --source
+```
+
 ### Strategy Summary
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
+│ 0. EXPAND keywords: Chinese + English + synonym (comma-separated)       │
 │ 1. ALWAYS start with `meta` to check freshness                          │
 │ 2. Use `services --list` to discover available targets                  │
 │ 3. Start broad (business/wiki) → narrow (kg/neighbors)                  │
 │ 4. For code changes: wiki sourceRef > kg --file > read file             │
-│ 5. For impact analysis: kg --neighbors inbound first                      │
-│ 6. For cross-service: business panorama → links → wiki                    │
-│ 7. Prefer --search over full graph download                               │
-│ 8. Use --verbose only when edge detail is needed                          │
+│ 5. For impact analysis: kg --neighbors inbound first                    │
+│ 6. For cross-service: business panorama → links → wiki                  │
+│ 7. Prefer --search over full graph download                             │
+│ 8. Use --verbose only when edge detail is needed                        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -437,6 +555,7 @@ Query the source-level knowledge graph generated by `/understand`. Use `--neighb
 | `--target NODE` | string | Filter edges by target node (with `--edges`) |
 | `--layers` | boolean | Package/module layer summary for the service |
 | `--tour` | boolean | Guided tour steps for exploring the service KG |
+| `--toc` | boolean | With `--file`: return method index (name+type+lineRange) instead of source code |
 
 **Examples:**
 
@@ -464,9 +583,116 @@ python ua_query.py kg --service order-service --file src/controllers/OrderContro
 # Architecture layers and guided tour
 python ua_query.py kg --service order-service --layers
 python ua_query.py kg --service order-service --tour
+
+# File TOC: see all methods before reading source (saves pagination calls)
+python ua_query.py kg --service order-service --file OrderController.java --toc
+# Then read specific method by lineRange from TOC
+python ua_query.py kg --service order-service --file OrderController.java --start 120 --end 180
 ```
 
 **Avoid:** `python ua_query.py kg --service S` with no filter flags — downloads and filters client-side, wasting tokens.
+
+---
+
+### `trace` — Aggregated Search→Neighbors→Source (Recommended for Agents)
+
+**One command to search, explore relationships, and read source.** Reduces 3–5 separate calls to 1.
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--service NAME` | string | Target service (required) |
+| `--query KEYWORDS` | string | Search keywords — **comma-separated for multi-keyword parallel search** (required) |
+| `--type TYPE` | string | Filter matches by node type (class, function, file) |
+| `--limit N` | int | Max matched nodes (default: 5) |
+| `--source` | boolean | Include source code of top match's file |
+| `--symbol NAME` | string | Extract specific method/class from source (with `--source`) |
+| `--business` | boolean | Include business landscape context search |
+
+**Key behaviors:**
+
+- **Multi-keyword parallel search:** `--query "原词,EnglishName,Synonym"` searches ALL keywords via BM25 in one call, merges results, and ranks by best relevance. **This eliminates retry loops — always provide 2-4 variants.**
+- **Domain-flow fallback:** When ALL keywords have no KG matches, automatically searches domain graph flows, extracts English code keywords, and re-searches KG. Response includes `discoveredVia` and `discoveryKeyword` fields.
+- **Relevance ranking:** Matches are sorted by name similarity + type priority (Service/Impl > class > function > DTO/PO)
+- **Rich matchedNodes:** Each matched node includes `filePath` and `lineRange` so you can directly read specific methods without extra calls
+- **Auto line-range:** If KG has `lineRange` for the top match, source is fetched precisely for that method (not truncated at 200)
+- **Empty result guidance:** When no nodes match even after fallback, returns a `hint` with concrete fallback suggestions
+- **Symbol extraction:** `--symbol createFamily` finds and extracts just that method block from the file
+
+**Examples:**
+
+```bash
+# BEST PRACTICE: Multi-keyword with original + English + synonym
+python ua_query.py trace --service my-service --query "原词,EnglishName,Synonym" --source --business
+
+# Multiple English variants for broader coverage
+python ua_query.py trace --service my-service --query "Payment,Recharge,TopUp" --type class --source --business
+
+# Precise method extraction
+python ua_query.py trace --service my-service --query "createOrder,placeOrder" --source --symbol "createOrder"
+
+# Quick trace without source (low token cost)
+python ua_query.py trace --service my-service --query "Validator,OrderValidator" --type function
+```
+
+**Response shape:**
+
+```json
+{
+  "service": "...",
+  "query": "keyword1,keyword2,keyword3",
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "discoveredVia": "domain-flow:Some Flow Name",
+  "discoveryKeyword": "DiscoveredEnglishKeyword",
+  "matchedNodes": [{"id": "...", "name": "MatchedService", "type": "class", "summary": "...", "filePath": "src/...", "lineRange": [53, 319], "relevance": 16.5}],
+  "neighbors": {"center": {...}, "totalEdges": N, "neighbors": [...]},
+  "source": {"file": "...", "lineCount": N, "lineRange": [193, 264], "content": "..."},
+  "businessContext": [...]
+}
+```
+
+**When empty (no matches):**
+
+```json
+{
+  "service": "client-service",
+  "query": "FeatureCreate",
+  "matchedNodes": [],
+  "hint": "No KG nodes matched 'FeatureCreate' in service 'client-service'. Try: (1) grep workspace..."
+}
+```
+
+**Agent usage:** For "How does X work?" questions, use `trace --source --business` as the first and often only call needed. If trace returns empty, follow the hint: grep workspace or try a different service.
+
+---
+
+### `kg --file` TOC + Batch Read (Recommended Pattern)
+
+**Max per request: 500 lines.** Use `--toc` first, then batch-read consecutive methods in ONE call:
+
+```bash
+# Step 1: Get file's method index (no source, very cheap)
+python ua_query.py kg --service S --file ServiceImpl.java --toc
+# Returns: [{"name":"preCheck","lineRange":[120,145]}, {"name":"doProcess","lineRange":[147,210]}, ...]
+
+# Step 2: BATCH READ — merge consecutive methods into one range
+# If preCheck=[120,145] + doProcess=[147,210] + postCheck=[212,250]
+# → One call: --start 120 --end 250 (130 lines, covers all 3 methods)
+python ua_query.py kg --service S --file ServiceImpl.java --start 120 --end 250
+
+# NOT RECOMMENDED: Reading each method separately (wastes API calls)
+# python ua_query.py kg --service S --file ServiceImpl.java --start 120 --end 145
+# python ua_query.py kg --service S --file ServiceImpl.java --start 147 --end 210
+# python ua_query.py kg --service S --file ServiceImpl.java --start 212 --end 250
+```
+
+**Agent batch-read strategy:**
+1. Run `--toc` to see all methods with line ranges
+2. Identify which methods are relevant to the question
+3. Group consecutive/nearby methods (gap < 50 lines between them)
+4. Read each group in ONE call using `--start min --end max` (max 500 lines per call)
+5. Only split into separate calls when methods are far apart (>50 lines gap)
+
+**Why batch?** One call reading 300 lines costs FEWER tokens than 3 calls each reading 100 lines (saves ~450 tokens of tool-call overhead per extra call).
 
 ---
 
@@ -482,15 +708,40 @@ python ua_query.py kg --service order-service --tour
 
 | Scenario | Behavior |
 |----------|----------|
-| `--token` not provided and `$UNDERSTAND_TOKEN` unset | Exit 1 with usage hint |
+| Server not reachable | Exit 2 with startup instructions |
 | Server not running (connection refused) | Exit 2 with startup instructions |
 | Subcommand requires `--service` but not provided | Exit 1 with `SystemExit` message |
 | Wiki `--related` without `--domain` | Exit 1: `--related requires --domain` |
-| Domain `--flow` not found | Exit 1: `Flow 'X' not found` |
+| Domain `--flow` not found | Exit 1: `Flow 'X' not found` with fuzzy suggestions |
 | API returns 404 (data not generated) | Exit 1, HTTP error printed |
 | API returns 500 (server error) | Exit 1, error body printed |
 | KG neighbor depth out of range | Exit 1: depth must be 1–3 |
-| Node not found in graph query | Exit 1: `node not found` |
+| Node not found in graph query | Exit 1: `node not found` + **"Did you mean"** suggestions |
+
+### Fuzzy Matching Behavior
+
+The CLI handles imprecise input gracefully:
+
+| Operation | Exact Match | Fuzzy Fallback |
+|-----------|-------------|----------------|
+| `kg --node NAME` | Returns exact match | Substring search on name/id, returns all matches |
+| `kg --neighbors NAME` | Traverses from exact node | Returns up to 10 suggestions (token-scored) |
+| `kg --edges --source/--target` | Filters by exact node | Suggestions on miss |
+| `domain --flow NAME` | Returns exact flow | Substring suggestions from flow nodes |
+| `kg --search Q --type T` | — | Filters combine: search + type applied together |
+
+**Agent pattern:** When you don't know the exact node name, use `--search` first to find candidates, then use the precise name from results with `--neighbors`.
+
+```bash
+# Step 1: Fuzzy search to find candidate names
+python ua_query.py kg --service S --search "intimacy" --type class
+
+# Step 2: Use exact name from results for neighbors
+python ua_query.py kg --service S --neighbors UserIntimacyService --direction both
+
+# Step 3: Get source from file node ID (strip "file:" prefix from node id)
+python ua_query.py kg --service S --file path/from/node/id.java
+```
 
 ---
 
@@ -526,7 +777,6 @@ python ua_query.py --format md business --search "order"
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `UNDERSTAND_SERVER` | API server base URL | `http://localhost:3001` |
-| `UNDERSTAND_TOKEN` | Access token (avoids `--token` flag) | (none — required) |
 
 ---
 
