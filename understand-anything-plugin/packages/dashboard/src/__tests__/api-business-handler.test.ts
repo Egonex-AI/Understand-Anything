@@ -78,4 +78,67 @@ describe("handleBusinessRequest", () => {
       { pathname: "/api/other", searchParams: new URLSearchParams() }, ctx)
     expect(res).toBeNull()
   })
+
+  it("GET /api/business/meta returns 404 when meta.json missing", async () => {
+    const res = await handleBusinessRequest(
+      { pathname: "/api/business/meta", searchParams: new URLSearchParams() }, ctx)
+    expect(res?.statusCode).toBe(404)
+  })
+
+  it("GET /api/business/meta returns meta.json when present", async () => {
+    const meta = {
+      contentHash: "abc123",
+      sourceHashes: { "domains.json": "def456" },
+      generatedAt: "2026-06-09T00:00:00Z",
+      version: "1.0",
+      status: "complete" as const,
+    }
+    fs.writeFileSync(
+      path.join(dir, ".understand-anything/business-landscape/meta.json"),
+      JSON.stringify(meta),
+    )
+    const res = await handleBusinessRequest(
+      { pathname: "/api/business/meta", searchParams: new URLSearchParams() }, ctx)
+    expect(res?.statusCode).toBe(200)
+    expect(res?.body).toEqual(meta)
+  })
+
+  it("GET /api/business/panorama returns 404 when business.json missing", async () => {
+    const res = await handleBusinessRequest(
+      { pathname: "/api/business/panorama", searchParams: new URLSearchParams() }, ctx)
+    expect(res?.statusCode).toBe(404)
+  })
+
+  it("GET /api/business/panorama returns business.json when present", async () => {
+    const panorama = { title: "Business Panorama", domains: ["domain:order"] }
+    fs.mkdirSync(path.join(dir, ".understand-anything/wiki/domains"), { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, ".understand-anything/wiki/domains/business.json"),
+      JSON.stringify(panorama),
+    )
+    const res = await handleBusinessRequest(
+      { pathname: "/api/business/panorama", searchParams: new URLSearchParams() }, ctx)
+    expect(res?.statusCode).toBe(200)
+    expect(res?.body).toEqual(panorama)
+  })
+
+  it("GET /api/business/cross-facet-links?domain=order filters links", async () => {
+    const res = await handleBusinessRequest(
+      { pathname: "/api/business/cross-facet-links", searchParams: new URLSearchParams({ domain: "order" }) },
+      ctx,
+    )
+    expect(res?.statusCode).toBe(200)
+    const body = res?.body as { links: Array<{ domain: string }> }
+    expect(body.links).toHaveLength(1)
+    expect(body.links[0].domain).toBe("domain:order")
+  })
+
+  it("GET /api/business/cross-facet-links?domain=missing returns empty links", async () => {
+    const res = await handleBusinessRequest(
+      { pathname: "/api/business/cross-facet-links", searchParams: new URLSearchParams({ domain: "missing" }) },
+      ctx,
+    )
+    expect(res?.statusCode).toBe(200)
+    expect((res?.body as { links: unknown[] }).links).toHaveLength(0)
+  })
 })

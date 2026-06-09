@@ -42,8 +42,17 @@ export async function handleBusinessRequest(req: ApiRequest, _ctx: ApiContext): 
   }
 
   if (pathname === "/api/business/cross-facet-links") {
-    const data = readJsonFile(path.join(blDir, "cross-facet-links.json"))
+    const data = readJsonFile<{ links: Array<{ domain: string }>; unmatchedEndpoints: unknown }>(
+      path.join(blDir, "cross-facet-links.json"),
+    )
     if (!data) return { statusCode: 404, body: { error: "cross-facet-links.json not found" } }
+    const domain = searchParams.get("domain")
+    if (domain) {
+      return {
+        statusCode: 200,
+        body: { ...data, links: data.links.filter((link) => link.domain.includes(domain)) },
+      }
+    }
     return { statusCode: 200, body: data }
   }
 
@@ -64,6 +73,25 @@ export async function handleBusinessRequest(req: ApiRequest, _ctx: ApiContext): 
     const q = searchParams.get("q") ?? ""
     if (!q.trim()) return { statusCode: 400, body: { error: "q parameter required" } }
     return { statusCode: 200, body: { results: searchDomains(blDir, q) } }
+  }
+
+  if (pathname === "/api/business/meta") {
+    const data = readJsonFile<{
+      contentHash: string
+      sourceHashes: Record<string, string>
+      generatedAt: string
+      version: string
+      status: "complete" | "degraded"
+    }>(path.join(blDir, "meta.json"))
+    if (!data) return { statusCode: 404, body: { error: "meta.json not found" } }
+    return { statusCode: 200, body: data }
+  }
+
+  if (pathname === "/api/business/panorama") {
+    const panoramaPath = path.join(resolveProjectRoot(), ".understand-anything/wiki/domains/business.json")
+    const data = readJsonFile(panoramaPath)
+    if (!data) return { statusCode: 404, body: { error: "business.json panorama not found" } }
+    return { statusCode: 200, body: data }
   }
 
   const slugMatch = pathname.match(/^\/api\/business\/domains\/([^/]+)$/)
