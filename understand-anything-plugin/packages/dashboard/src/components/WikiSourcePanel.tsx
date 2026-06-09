@@ -35,13 +35,16 @@ function wikiSourceUrl(
 export function WikiSourcePanel({
   path,
   lineRange,
+  service,
   onClose,
 }: {
   path: string;
   lineRange?: [number, number];
+  service?: string | null;
   onClose: () => void;
 }) {
-  const activeService = useDashboardStore((s) => s.activeService);
+  const storeService = useDashboardStore((s) => s.activeService);
+  const activeService = service ?? storeService;
   const [state, setState] = useState<PanelState>({
     status: "loading",
     data: null,

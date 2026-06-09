@@ -66,6 +66,7 @@ export interface EndpointMethodSignature {
   name: string;
   params: Array<{ name: string; type: string }>;
   returnType: string;
+  description?: string;
   lineRange?: [number, number];
 }
 
@@ -86,6 +87,7 @@ export interface ServiceEndpointDoc {
     protocol: string;
     framework: string;
     targetInterface: string;
+    targetService?: string;
     sourceRef?: { file: string; lineRange?: [number, number] };
   }>;
   kafkaTopics: Array<{

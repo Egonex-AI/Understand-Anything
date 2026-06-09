@@ -13,11 +13,11 @@ Extracts business domain knowledge — domains, business flows, and process step
 - If a knowledge graph already exists (`.understand-anything/knowledge-graph.json`), derives domain knowledge from it (cheap, no file scanning)
 - If no knowledge graph exists **and `--standalone` is passed**, performs a lightweight scan: file tree + entry point detection + sampled files
 - If no knowledge graph exists **without `--standalone`**, reports an error — run `/understand` first to build the knowledge graph
-- Use `--full` flag to force a fresh scan even if a knowledge graph exists
+- Use `--full` flag to force fresh domain derivation, bypassing checkpoints and cached intermediate files
 
 ## Options
 
-- `--full` — Force full regeneration even if a knowledge graph exists
+- `--full` — Force full regeneration. Deletes `domain-discovery-checkpoint.json` and existing `flows-*.json` in `intermediate/`, then re-derives from the knowledge graph (if KG exists) or runs the lightweight scan (if KG is missing). Bypasses all incremental checkpoints.
 - `--standalone` — Allow lightweight scan when no knowledge graph exists (Path 1). Without this flag, a knowledge graph is required (Path 2). Use when running `/understand-domain` independently without prior `/understand` execution.
 
 ## Instructions
@@ -94,20 +94,25 @@ Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases
 
 ### Phase 1: Detect Existing Graph
 
-1. Check knowledge graph completeness using the artifact validator:
+1. If `--full` was passed, delete cached domain intermediates to force fresh generation:
    ```bash
-   VALIDATOR="<SKILL_DIR>/../understand/validate-artifact.mjs"
-   KG_RESULT=$(node "$VALIDATOR" \
-     $PROJECT_ROOT/.understand-anything/knowledge-graph.json \
+   rm -f "$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery-checkpoint.json"
+   rm -f "$PROJECT_ROOT/.understand-anything/intermediate/flows-"*.json
+   ```
+2. Check knowledge graph completeness using the artifact validator:
+   ```bash
+   KG_RESULT=$(node "$PLUGIN_ROOT/skills/understand/validate-artifact.mjs" \
+     "$PROJECT_ROOT/.understand-anything/knowledge-graph.json" \
      knowledge-graph:complete 2>/dev/null || echo '{"status":"missing"}')
    KG_STATUS=$(echo "$KG_RESULT" | node -e "d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));console.log(d.status)")
    ```
-2. If `KG_STATUS` is `complete` AND `--full` was NOT passed → proceed to Phase 3 (derive from graph)
-3. If `KG_STATUS` is `degraded` or `stale`:
+3. If `KG_STATUS` is `complete` AND `--full` was NOT passed → proceed to Phase 3 (derive from graph)
+4. If `KG_STATUS` is `complete` AND `--full` was passed → proceed to Phase 3 (re-derive from graph, bypassing checkpoints — cleanup done in step 1)
+5. If `KG_STATUS` is `degraded` or `stale`:
    - Report: `Knowledge graph is ${KG_STATUS}: $(echo "$KG_RESULT" | node -e "d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8'));console.log(d.reason)"). Rebuilding upstream...`
    - Dispatch an `/understand` subagent to rebuild the KG, then re-verify
    - If still degraded after rebuild → **report error and stop**
-4. If `KG_STATUS` is `missing`:
+6. If `KG_STATUS` is `missing`:
    - If `--standalone` OR `--full` was passed → proceed to Phase 2 (lightweight scan; `--full` without KG implies standalone re-scan)
    - Otherwise → **report error and stop**:
      > `Error: Knowledge graph not found at .understand-anything/knowledge-graph.json. Run /understand first, or use --standalone for lightweight scan without a knowledge graph.`
@@ -117,8 +122,8 @@ Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases
 The preprocessing script does NOT produce a domain graph — it produces **raw material** (file tree, entry points, exports/imports) so the domain-analyzer agent can focus on the actual domain analysis instead of spending dozens of tool calls exploring the codebase. Think of it as a cheat sheet: cheap Python preprocessing → expensive LLM gets a clean, small input → better results for less cost.
 
 1. Run the preprocessing script bundled with this skill, passing `$PROJECT_ROOT` from Phase 0:
-   ```
-   python ./extract-domain-context.py "$PROJECT_ROOT"
+   ```bash
+   python3 "$PLUGIN_ROOT/skills/understand-domain/extract-domain-context.py" "$PROJECT_ROOT"
    ```
    This outputs `$PROJECT_ROOT/.understand-anything/intermediate/domain-context.json` containing:
    - File tree (respecting `.gitignore`)
@@ -150,7 +155,7 @@ This phase uses different strategies depending on Path:
 
 #### Phase 4a: Domain Discovery
 
-1. **Checkpoint detection:** Check if `$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery-checkpoint.json` exists and contains valid JSON with `_checkpoint.status == "complete"`. If so, read `domain-discovery.json` and skip to Phase 4a-audit.
+1. **Checkpoint detection:** Unless `--full` was passed (checkpoints deleted in Phase 1), check if `$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery-checkpoint.json` exists and contains valid JSON with `_checkpoint.status == "complete"`. If so, read `domain-discovery.json` and skip to Phase 4a-audit.
 2. Read the `domain-discoverer` agent prompt from `$PLUGIN_ROOT/agents/domain-discoverer.md`
 3. Dispatch a subagent with the `domain-discoverer` prompt + `kg-summary.json` content as context
 4. The agent writes to `$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery.json`
@@ -211,7 +216,7 @@ This phase uses different strategies depending on Path:
 
 1. Read the `domain-flow-extractor` agent prompt from `$PLUGIN_ROOT/agents/domain-flow-extractor.md`
 2. **Domain-level incremental detection:** For each domain in `domain-discovery.json`, compute a content fingerprint of the domain's KG subset (`intermediate/domain-<name>.json`). Store fingerprints in `$PROJECT_ROOT/.understand-anything/intermediate/domain-fingerprints.json`. Compare against the previous run's fingerprints (if file exists). Domains with unchanged fingerprints are eligible for skip.
-3. **Before dispatching**, detect already-extracted domains by checking if `intermediate/flows-<name>.json` exists, is non-empty, and contains **valid JSON with a non-empty `flows` array**. Skip domains that pass all three checks (this enables automatic resume when a previous run was interrupted). If an output file exists but contains invalid JSON (e.g. truncated from a crash), or the `flows` array is empty/missing, treat it as incomplete and re-process. If all domains are complete, skip directly to Phase 4d.
+3. **Before dispatching**, unless `--full` was passed, detect already-extracted domains by checking if `intermediate/flows-<name>.json` exists, is non-empty, and contains **valid JSON with a non-empty `flows` array**. Skip domains that pass all three checks (this enables automatic resume when a previous run was interrupted). If `--full` was passed, re-extract all domains (checkpoint and `flows-*.json` files were deleted in Phase 1). If an output file exists but contains invalid JSON (e.g. truncated from a crash), or the `flows` array is empty/missing, treat it as incomplete and re-process. If all domains are complete, skip directly to Phase 4d.
 4. For each remaining domain in `domain-discovery.json`:
    - Read `intermediate/domain-<name>.json` as context
    - Dispatch a subagent with the `domain-flow-extractor` prompt + domain KG subset
@@ -231,15 +236,17 @@ This phase uses different strategies depending on Path:
 
 ### Phase 5: Validate and Save
 
+The merge script (`merge_domain_results.py`) stamps `project.provenance` with `completedStages: ["derive"]`, `analyzedAt`, and `gitCommitHash` so downstream `domain-graph:complete` validation passes.
+
 1. Validate the domain analysis output using the shared validation script (zod schemas + auto-fix):
    ```bash
-   node <SKILL_DIR>/../understand/validate-graph.mjs \
+   node "$PLUGIN_ROOT/skills/understand/validate-graph.mjs" \
      "$PROJECT_ROOT/.understand-anything/intermediate/domain-analysis.json" \
      "$PROJECT_ROOT/.understand-anything/intermediate/domain-validation-report.json"
    ```
 2. Read the validation report. Log any warnings (auto-corrected or dropped issues).
 3. If validation exits with fatal (exit code 1), log error but save what's valid (error tolerance).
-4. Save the validated graph to `$PROJECT_ROOT/.understand-anything/domain-graph.json`
+4. Save the validated graph to `$PROJECT_ROOT/.understand-anything/domain-graph.json`. Use the auto-fixed `data` field from the validation report (not the raw input file) — `validate-graph.mjs` does not overwrite the input JSON on disk.
 5. Clean up `$PROJECT_ROOT/.understand-anything/intermediate/domain-analysis.json` and `$PROJECT_ROOT/.understand-anything/intermediate/domain-context.json`
 
 ### Phase 6: Launch Dashboard

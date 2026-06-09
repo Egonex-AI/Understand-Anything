@@ -326,6 +326,7 @@ edgeLabels: {
     endpointIdentifier: "Identifier",
     endpointMethods: "Methods",
     endpointMethodName: "Method",
+    endpointDescription: "Description",
     endpointParams: "Params",
     endpointReturnType: "Return Type",
     endpointTargetInterface: "Target Interface",

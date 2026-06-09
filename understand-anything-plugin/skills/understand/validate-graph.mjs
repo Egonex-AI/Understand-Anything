@@ -62,6 +62,7 @@ const report = {
   passed: result.success && !result.issues.some((i) => i.level === "dropped"),
   issues: result.issues,
   fatal: result.fatal || null,
+  data: result.data ?? null,
   stats: result.data
     ? {
         totalNodes: result.data.nodes.length,

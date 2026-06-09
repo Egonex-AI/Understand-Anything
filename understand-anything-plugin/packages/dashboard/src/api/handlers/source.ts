@@ -18,19 +18,29 @@ export async function handleSourceRequest(
   const start = searchParams.get("start")
   const end = searchParams.get("end")
 
-  const graphFile = findGraphFile("knowledge-graph.json")
-  if (!graphFile) {
-    return { statusCode: 404, body: { error: "No knowledge graph found" } }
+  let graphFile = findGraphFile("knowledge-graph.json")
+  let baseRoot: string
+
+  if (graphFile) {
+    baseRoot = projectRootFromGraphFile(graphFile)
+  } else {
+    baseRoot = process.env.GRAPH_DIR ?? process.cwd()
   }
-  const baseRoot = projectRootFromGraphFile(graphFile)
 
   let projectRoot = baseRoot
   if (service) {
     const serviceRoot = path.join(baseRoot, service)
-    if (!fs.existsSync(path.join(serviceRoot, ".understand-anything"))) {
-      return { statusCode: 404, body: { error: `Service "${service}" not found` } }
+    if (fs.existsSync(path.join(serviceRoot, ".understand-anything"))) {
+      projectRoot = serviceRoot
+      if (!graphFile) {
+        const serviceGraph = path.join(serviceRoot, ".understand-anything", "knowledge-graph.json")
+        if (fs.existsSync(serviceGraph)) graphFile = serviceGraph
+      }
     }
-    projectRoot = serviceRoot
+  }
+
+  if (!graphFile && mode === "graph") {
+    return { statusCode: 404, body: { error: "No knowledge graph found" } }
   }
 
   let kgAllowlist: Set<string> | undefined

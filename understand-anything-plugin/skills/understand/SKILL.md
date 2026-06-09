@@ -370,29 +370,32 @@ Run `extract-structure.mjs` for **every batch** to produce extraction result fil
 Write a helper script that reads `batches.json` and produces one input JSON per batch. This avoids heredoc issues with special characters in `batchImportData`.
 
 ```bash
-python3 - << 'PYSCRIPT'
+export PROJECT_ROOT
+python3 - "$PROJECT_ROOT" << 'PYSCRIPT'
 import json, sys, os
 project_root = os.environ.get("PROJECT_ROOT", sys.argv[1])
 tmp_dir = os.path.join(project_root, ".understand-anything", "tmp")
 batches_path = os.path.join(project_root, ".understand-anything", "intermediate", "batches.json")
 os.makedirs(tmp_dir, exist_ok=True)
 batches = json.load(open(batches_path))["batches"]
-for i, batch in enumerate(batches):
+for batch in batches:
+    batch_index = batch["batchIndex"]
+    files = batch.get("files", batch.get("batchFiles", []))
     inp = {
         "projectRoot": project_root,
-        "batchFiles": batch["batchFiles"],
+        "batchFiles": files,
         "batchImportData": batch.get("batchImportData", {}),
     }
-    out_path = os.path.join(tmp_dir, f"ua-file-analyzer-input-{i}.json")
+    out_path = os.path.join(tmp_dir, f"ua-file-analyzer-input-{batch_index}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(inp, f, ensure_ascii=False)
-    print(f"  Wrote {out_path} ({len(batch['batchFiles'])} files)")
+    print(f"  Wrote {out_path} ({len(files)} files)")
 PYSCRIPT
 ```
 
 **Step 0b — Run extraction for batches that still need it (up to 5 concurrently):**
 
-Before running extraction, detect already-completed extractions. For each batch `i`, check if `$PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<i>.json` exists and is non-empty. Skip batches that already have extraction results (this enables automatic resume when a previous run was interrupted). If an output file exists but contains invalid JSON (e.g. truncated from a crash), treat it as incomplete and re-process.
+Before running extraction, detect already-completed extractions. For each batch's `batchIndex`, check if `$PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<batchIndex>.json` exists and is non-empty. Skip batches that already have extraction results (this enables automatic resume when a previous run was interrupted). If an output file exists but contains invalid JSON (e.g. truncated from a crash), treat it as incomplete and re-process.
 
 If all extraction results already exist, skip directly to Step 0c.
 
@@ -402,33 +405,51 @@ For remaining batches, run the extraction script with retry logic. Process up to
 MAX_RETRIES=2
 for attempt in $(seq 0 $MAX_RETRIES); do
   node <SKILL_DIR>/extract-structure.mjs \
-    $PROJECT_ROOT/.understand-anything/tmp/ua-file-analyzer-input-<i>.json \
-    $PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<i>.json && break
+    $PROJECT_ROOT/.understand-anything/tmp/ua-file-analyzer-input-<batchIndex>.json \
+    $PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<batchIndex>.json && break
   if [ $attempt -eq $MAX_RETRIES ]; then
-    echo "FATAL: extraction failed for batch <i> after $MAX_RETRIES retries" >&2; exit 1;
+    echo "FATAL: extraction failed for batch <batchIndex> after $MAX_RETRIES retries" >&2; exit 1;
   fi
-  echo "Extraction failed for batch <i>, retrying ($((attempt+1))/$MAX_RETRIES)..."
+  echo "Extraction failed for batch <batchIndex>, retrying ($((attempt+1))/$MAX_RETRIES)..."
 done
 ```
 
 **Step 0c — Verify all outputs:**
 
 ```bash
-for i in $(seq 0 $((TOTAL_BATCHES - 1))); do
-  test -s $PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-$i.json || {
-    echo "FATAL: extraction results missing for batch $i" >&2; exit 1;
+BATCH_INDICES=$(python3 -c "import json; print(' '.join(str(b['batchIndex']) for b in json.load(open('$PROJECT_ROOT/.understand-anything/intermediate/batches.json'))['batches']))")
+for batchIndex in $BATCH_INDICES; do
+  test -s $PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-$batchIndex.json || {
+    echo "FATAL: extraction results missing for batch $batchIndex" >&2; exit 1;
   }
   # Verify scriptCompleted=true in output (exits non-zero if files were skipped)
   node -e "
     const d = JSON.parse(require('fs').readFileSync(process.argv[1],'utf-8'));
-    if (!d.scriptCompleted) { console.error('FATAL: batch $i extraction degraded'); process.exit(1); }
-  " $PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-$i.json || exit 1
+    if (!d.scriptCompleted) { console.error('FATAL: batch ' + process.argv[2] + ' extraction degraded'); process.exit(1); }
+  " $PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-$batchIndex.json $batchIndex || exit 1
 done
 ```
 
 If any extraction script exits non-zero or any output file is missing/empty or `scriptCompleted` is false, report the error and abort Phase 2. Do NOT proceed with agent dispatch without extraction results.
 
-Report: `[Phase 2/7] Structural extraction complete for <totalBatches> batches. Dispatching analyzers...`
+Report: `[Phase 2/7] Structural extraction complete for <totalBatches> batches. Computing dispatch plan...`
+
+#### Step 0d — Compute dispatch plan (fusion groups + quality gate)
+
+Run the batch dispatch planner to compute context-aware fusion groups. This groups multiple batches into fewer subagent dispatches using LPT (Longest Processing Time) load balancing based on estimated token consumption:
+
+```bash
+python <SKILL_DIR>/batch-dispatch-planner.py --plan $PROJECT_ROOT
+```
+
+Read the output at `$PROJECT_ROOT/.understand-anything/tmp/dispatch-plan.json`. The plan contains:
+- `fusionGroups[]`: each group specifies `batchIndices` (which batches to assign), `totalLoc`, `totalFiles`, `estimatedTokens`, and `budgetUsage`
+- `wavesNeeded`: how many sequential waves are needed given the `MAX_CONCURRENT=5` constraint
+- `oversizedGroups[]`: groups that exceed the context budget — warn the user but proceed
+
+If the script fails, fall back to 1:1 dispatch (one subagent per batch, up to 5 concurrent).
+
+Report: `Dispatch plan: <totalBatches> batches → <actualGroups> groups (<wavesNeeded> wave(s), max 5 concurrent)`
 
 #### Step 1 — Dispatch file-analyzer agents
 
@@ -443,7 +464,11 @@ If an output file exists but contains invalid JSON (e.g. truncated from a crash)
 Filter to only include batches **without** existing output. If all batches are complete, skip directly to the merge step. If some batches were skipped, report:
 > `Resuming: <N>/<total> batches already complete. Dispatching remaining <M>...`
 
-For remaining batches, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
+For remaining batches, use the fusion groups from `dispatch-plan.json` (Step 0d) to determine subagent dispatch. Each fusion group becomes **one subagent invocation** handling multiple batches. Run up to **5 subagents concurrently** (one wave at a time if `wavesNeeded > 1`).
+
+If `dispatch-plan.json` is unavailable (Step 0d failed), fall back to 1:1 dispatch (one subagent per batch, up to 5 concurrent).
+
+For each fusion group, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -452,16 +477,23 @@ For remaining batches, dispatch a subagent using the `file-analyzer` agent defin
 >
 > $LANGUAGE_DIRECTIVE
 
-Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
+Dispatch prompt template — fill in values per fusion group. When a group contains multiple batches, concatenate all batch sections into the same prompt:
 
 > Analyze these files and produce GraphNode and GraphEdge objects.
 > Project root: `$PROJECT_ROOT`
 > Project: `<projectName>`
 > Languages: `<languages>`
-> Batch: `<batchIndex>/<totalBatches>`
 > Skill directory (for bundled scripts): `<SKILL_DIR>`
+>
+> **You are processing fusion group <groupIndex> containing <N> batch(es): [<batchIndices>].**
+> **You MUST write one output file per batch** — `batch-<batchIndex>.json` or `batch-<batchIndex>-part-<k>.json` for split mode.
+
+For EACH batch in the fusion group, include a batch section:
+
+> ---
+> ### Batch <batchIndex>/<totalBatches>
 > **Extraction results (already generated — do NOT re-run extract-structure.mjs):** `$PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<batchIndex>.json`
-> Output: write to `$PROJECT_ROOT/.understand-anything/intermediate/batch-<batchIndex>.json` (single-file mode) OR `batch-<batchIndex>-part-<k>.json` (split mode, per Step B of your output protocol).
+> **Output:** write to `$PROJECT_ROOT/.understand-anything/intermediate/batch-<batchIndex>.json` (single-file mode) OR `batch-<batchIndex>-part-<k>.json` (split mode, per Step B of your output protocol).
 >
 > Pre-resolved import data for this batch (use directly — do NOT re-resolve imports from source):
 > ```json
@@ -480,7 +512,48 @@ Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 
 **Output naming is per-batchIndex — no fusion.** If you fuse multiple small batches into a single file-analyzer dispatch for token efficiency, the dispatched agent must STILL write one output file per original `batchIndex` using `batch-<batchIndex>.json` or `batch-<batchIndex>-part-<k>.json`. The merge script's regex (`batch-(\d+)(?:-part-(\d+))?\.json`) silently drops any other naming (e.g., `batch-fused-8-13.json`, `batch-8-13.json`), losing every node and edge in that file. After each dispatch returns, verify each `batchIndex` in the dispatched input has a corresponding `batch-<batchIndex>.json` (or `batch-<batchIndex>-part-*.json`) on disk before proceeding to the next dispatch.
 
-After ALL batches complete, report to the user: `Phase 2 complete. All <totalBatches> batches analyzed.`
+After ALL batches complete, report to the user: `All <totalBatches> batches dispatched. Running quality validation...`
+
+#### Step 1.5 — Per-batch quality gate
+
+Run the batch dispatch planner in validate mode to check each batch's output quality:
+
+```bash
+python <SKILL_DIR>/batch-dispatch-planner.py --validate $PROJECT_ROOT
+```
+
+Read the output at `$PROJECT_ROOT/.understand-anything/tmp/batch-validation.json`. The validation checks per-batch:
+- **Node coverage**: ≥80% of batch files should have a file-level node
+- **Edge ratio**: ≥30% of node count
+- **Description coverage**: ≥50% of file nodes should have descriptions
+
+The result contains:
+- `summary`: `{ total, passed, warned, failed }`
+- `retryBatches[]`: list of batch indices that failed quality checks
+
+Report: `Quality gate: <passed> passed, <warned> warned, <failed> failed out of <total> batches`
+
+The script exits with code **2** when one or more batches failed quality checks (`summary.failed > 0`). Exit code **0** means all batches passed or were warned only. Exit code **1** indicates a fatal error (e.g., missing `batches.json`).
+
+If `failed == 0`, skip Step 1.6 and proceed to merge.
+
+#### Step 1.6 — Selective retry for failed batches
+
+If `retryBatches` is non-empty, re-dispatch **only** the failed batches using 1:1 dispatch (one subagent per failed batch, no fusion — these need maximum attention). Use the same dispatch template as Step 1, but append:
+
+> **RETRY RUN — Previous attempt produced low-quality output.** Pay extra attention to generating complete file-level nodes for every file in this batch, with meaningful descriptions and edges.
+
+After retry completes, re-run the quality gate (validates all batches). If any batches still fail, proceed to Step 1.7.
+
+Maximum retry: **1 attempt** per failed batch. Do not retry more than once.
+
+#### Step 1.7 — Deterministic recovery fallback
+
+Batches that still fail after retry will be handled by `merge-batch-graphs.py`'s deterministic recovery logic (e.g., `injects` edge recovery from extraction results). No further action needed here — the merge script's built-in recovery is the final safety net.
+
+Report: `Phase 2 complete. <totalBatches> batches analyzed (<retryCount> retried, <stillFailedCount> deferred to deterministic recovery).`
+
+#### Step 2 — Merge
 
 Run the merge-and-normalize script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
 ```bash
@@ -500,9 +573,13 @@ The merge script also runs a `tested_by` linker that canonicalizes test-coverage
 
 Output: `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`
 
+The merge script also writes `$PROJECT_ROOT/.understand-anything/manifest.json` for cross-repo sharing.
+
 Include the script's warnings in `$PHASE_WARNINGS` for the reviewer.
 
 ### Incremental update path
+
+**Prerequisite:** Incremental runs require `scan-result.json` from a prior full analysis (Phase 1) or preserved from Phase 7 cleanup. Without it, run a full analysis first.
 
 Write the changed-files list (one path per line) to a temp file:
 ```bash
@@ -517,13 +594,13 @@ node <SKILL_DIR>/compute-batches.mjs $PROJECT_ROOT \
 
 This produces a `batches.json` that contains only batches with changed files, but neighborMap entries still reference unchanged files (with their full-graph batchIndex) so cross-batch edges remain emittable.
 
-Run deterministic structural extraction for all changed batches (same Step 0 as the full path above), then dispatch file-analyzer subagents per the same template as the full path.
+Run deterministic structural extraction for all changed batches (same Step 0 as the full path above), then compute a dispatch plan (Step 0d), dispatch file-analyzer subagents using fusion groups (Step 1), and run the quality gate (Step 1.5–1.7) per the same template as the full path.
 
 After batches complete:
 1. Remove old nodes whose `filePath` matches any changed file from the existing graph
 2. Remove old edges whose `source` or `target` references a removed node
-3. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory
-4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
+3. Write the pruned existing nodes/edges as `batch-0.json` in the intermediate directory (reserved index 0 — live batches use 1-based `batchIndex`)
+4. Run the same merge script — it will combine `batch-0.json` with the fresh `batch-*.json` files:
    ```bash
    python <SKILL_DIR>/merge-batch-graphs.py $PROJECT_ROOT
    ```
@@ -934,7 +1011,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 ## Reference: KnowledgeGraph Schema
 
-### Node Types (13 total)
+### Node Types (14 total)
 | Type | Description | ID Convention |
 |---|---|---|
 | `file` | Source code file | `file:<relative-path>` |
@@ -942,6 +1019,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 | `class` | Class, interface, or type | `class:<relative-path>:<name>` |
 | `module` | Logical module or package | `module:<name>` |
 | `concept` | Abstract concept or pattern | `concept:<name>` |
+| `topic` | Message queue topic (e.g., Kafka) | `topic:__synthetic__:<topic-name>` |
 | `config` | Configuration file (YAML, JSON, TOML, env) | `config:<relative-path>` |
 | `document` | Documentation file (Markdown, RST, TXT) | `document:<relative-path>` |
 | `service` | Deployable service definition (Dockerfile, K8s) | `service:<relative-path>` |

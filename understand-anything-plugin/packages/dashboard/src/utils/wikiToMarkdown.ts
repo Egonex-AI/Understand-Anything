@@ -625,7 +625,8 @@ export function endpointDocToMarkdown(doc: ServiceEndpointDoc, labels: WikiLabel
     lines.push("| --- | --- | --- | --- |");
     for (const p of providers) {
       const methodCount = Array.isArray(p.methods) ? p.methods.length : 0;
-      lines.push(`| \`${p.identifier}\` | ${p.protocol} | ${p.framework} | ${methodCount} |`);
+      const anchor = p.identifier.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      lines.push(`| [${p.identifier}](#${anchor}) | ${p.protocol} | ${p.framework} | ${methodCount} |`);
     }
     lines.push("");
 
@@ -640,13 +641,29 @@ export function endpointDocToMarkdown(doc: ServiceEndpointDoc, labels: WikiLabel
         lines.push(`> ${meta.join(" | ")}`);
         lines.push("");
       }
-      lines.push(`| ${labels.endpointMethodName ?? "Method"} | ${labels.endpointParams ?? "Params"} | ${labels.endpointReturnType ?? "Return Type"} |`);
-      lines.push("| --- | --- | --- |");
+      const hasDescriptions = p.methods.some((m: { description?: string }) => m.description);
+      if (hasDescriptions) {
+        lines.push(`| ${labels.endpointMethodName ?? "Method"} | ${labels.endpointDescription ?? "Description"} | ${labels.endpointReturnType ?? "Return Type"} |`);
+        lines.push("| --- | --- | --- |");
+      } else {
+        lines.push(`| ${labels.endpointMethodName ?? "Method"} | ${labels.endpointParams ?? "Params"} | ${labels.endpointReturnType ?? "Return Type"} |`);
+        lines.push("| --- | --- | --- |");
+      }
       for (const m of p.methods) {
-        const params = Array.isArray(m.params)
-          ? m.params.map((pp: { name: string; type: string }) => `${pp.name}: ${pp.type}`).join(", ")
-          : "";
-        lines.push(`| \`${m.name}\` | \`${params || "—"}\` | \`${m.returnType || "void"}\` |`);
+        const lineRange = Array.isArray(m.lineRange) && m.lineRange[0] > 0 ? m.lineRange : null;
+        const sourceFile = p.sourceRef?.file ?? "";
+        const methodLink = sourceFile && lineRange
+          ? `[${m.name}](source://${sourceFile}#L${lineRange[0]}-L${lineRange[1]})`
+          : `\`${m.name}\``;
+        if (hasDescriptions) {
+          const desc = (m as { description?: string }).description ?? "";
+          lines.push(`| ${methodLink} | ${desc} | \`${m.returnType || "void"}\` |`);
+        } else {
+          const params = Array.isArray(m.params)
+            ? m.params.map((pp: { name: string; type: string }) => `${pp.name}: ${pp.type}`).join(", ")
+            : "";
+          lines.push(`| ${methodLink} | \`${params || "—"}\` | \`${m.returnType || "void"}\` |`);
+        }
       }
       lines.push("");
       if (p.sourceRef?.file) {
@@ -663,7 +680,10 @@ export function endpointDocToMarkdown(doc: ServiceEndpointDoc, labels: WikiLabel
     lines.push(`| ${labels.endpointIdentifier ?? "Identifier"} | ${labels.endpointProtocol ?? "Protocol"} | ${labels.endpointFramework ?? "Framework"} | ${labels.endpointTargetInterface ?? "Target Interface"} |`);
     lines.push("| --- | --- | --- | --- |");
     for (const c of consumers) {
-      lines.push(`| \`${c.identifier}\` | ${c.protocol} | ${c.framework} | \`${c.targetInterface}\` |`);
+      const targetLink = c.targetService
+        ? `[${c.targetInterface}](wiki://${c.targetService}/endpoints)`
+        : `\`${c.targetInterface}\``;
+      lines.push(`| \`${c.identifier}\` | ${c.protocol} | ${c.framework} | ${targetLink} |`);
     }
     lines.push("");
   }
@@ -677,25 +697,6 @@ export function endpointDocToMarkdown(doc: ServiceEndpointDoc, labels: WikiLabel
     for (const t of kafkaTopics) {
       lines.push(`| \`${t.topic}\` | ${t.role} | \`${t.handlerMethod ?? "—"}\` |`);
     }
-    lines.push("");
-  }
-
-  if (providers.length > 0 || consumers.length > 0) {
-    lines.push(`## ${labels.systemArchitecture ?? "Topology"}`);
-    lines.push("");
-    lines.push("```mermaid");
-    lines.push("graph LR");
-    for (const c of consumers) {
-      const safeName = sanitizeMermaidLabel(c.targetInterface);
-      const safeId = sanitizeMermaidLabel(c.identifier);
-      lines.push(`  ${safeId}["${c.identifier}"] -->|${c.protocol}| ${safeName}["${c.targetInterface}"]`);
-    }
-    for (const p of providers) {
-      const safeId = sanitizeMermaidLabel(p.identifier);
-      lines.push(`  ${safeId}["${p.identifier}"]:::provider`);
-    }
-    lines.push("  classDef provider fill:#3b82f6,stroke:#1e40af,color:white");
-    lines.push("```");
     lines.push("");
   }
 
@@ -740,7 +741,7 @@ export function endpointIndexToMarkdown(index: Record<string, unknown>, labels: 
       lines.push("| Service | Identifier | Methods |");
       lines.push("| --- | --- | --- |");
       for (const entry of byProtocol[proto]) {
-        lines.push(`| ${entry.service} | \`${entry.identifier}\` | ${entry.methodCount ?? 0} |`);
+        lines.push(`| [${entry.service}](wiki://${entry.service}/endpoints) | \`${entry.identifier}\` | ${entry.methodCount ?? 0} |`);
       }
       lines.push("");
     }
@@ -755,7 +756,9 @@ export function endpointIndexToMarkdown(index: Record<string, unknown>, labels: 
     lines.push("| --- | --- | --- |");
     for (const topic of topics) {
       const t = byTopic[topic];
-      lines.push(`| \`${topic}\` | ${(t.publishers ?? []).join(", ")} | ${(t.subscribers ?? []).join(", ")} |`);
+      const pubs = (t.publishers ?? []).map((s: string) => `[${s}](wiki://${s}/endpoints)`).join(", ");
+      const subs = (t.subscribers ?? []).map((s: string) => `[${s}](wiki://${s}/endpoints)`).join(", ");
+      lines.push(`| \`${topic}\` | ${pubs || "—"} | ${subs || "—"} |`);
     }
     lines.push("");
   }

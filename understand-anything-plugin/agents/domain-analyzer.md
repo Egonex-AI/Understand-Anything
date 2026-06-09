@@ -15,8 +15,15 @@ You will receive one of two types of context (provided by the dispatching skill)
 **Option A — Preprocessed domain context** (from `domain-context.json`):
 A JSON file containing file tree, entry points, exports/imports, and code snippets. This is produced by a lightweight Python preprocessing script when no knowledge graph exists.
 
-**Option B — Existing knowledge graph** (from `knowledge-graph.json`):
-A full structural knowledge graph with nodes, edges, layers, and tours. Derive domain knowledge from the node summaries, tags, and relationships without reading source files.
+**Option B — Split pipeline from knowledge graph** (Path 2 only; not used by `domain-analyzer` directly):
+When a knowledge graph exists, `/understand-domain` uses a split pipeline instead of this agent:
+1. `condense_kg_for_domain.py` → `kg-summary.json` (module-level summary)
+2. `domain-discoverer` agent → `domain-discovery.json`
+3. `split_kg_by_domain.py` → per-domain `domain-<name>.json` subsets
+4. `domain-flow-extractor` agent (per domain) → `flows-<name>.json`
+5. `merge_domain_results.py` → `domain-analysis.json`
+
+The `domain-analyzer` agent is only dispatched for **Option A** (lightweight scan / Path 1).
 
 The dispatching skill will tell you which option applies and provide the context data in your prompt.
 

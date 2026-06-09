@@ -8,6 +8,57 @@
 | `index.json` | `entries[]` each with `id`, `name`, `type`, `summary`; domain entries MUST include `service`; flow entries MUST include `service` + `domain` (parent domain id) |
 | `service.json` | `name`, `description`, `techStack[]`, `modules[]`, `entryPoints[]` |
 | `domains/<slug>.json` | `id`, `name`, `summary`, `entities[]`, `flows[]` |
+| `endpoints/<service>.json` | `service`, `description`, `providers[]`, `consumers[]`, `kafkaTopics[]` |
+
+### Endpoint Document Structure
+
+Each `endpoints/<service>.json` contains RPC/MQ endpoint metadata extracted deterministically from source annotations.
+
+```json
+{
+  "service": "order-service",
+  "description": "RPC/MQ endpoints for order-service",
+  "providers": [
+    {
+      "identifier": "OrderMoaService",
+      "protocol": "moa",
+      "framework": "MoaProvider",
+      "methods": [
+        {
+          "name": "createOrder",
+          "params": [{"name": "req", "type": "CreateOrderReq"}],
+          "returnType": "DataResponse<CreateOrderResp>",
+          "lineRange": [45, 82],
+          "description": "创建订单并发起支付"
+        }
+      ],
+      "sourceRef": {"file": "src/main/java/.../OrderMoaServiceImpl.java"}
+    }
+  ],
+  "consumers": [
+    {
+      "identifier": "PaymentFacade",
+      "protocol": "moa",
+      "framework": "MoaConsumer",
+      "targetInterface": "PaymentFacade",
+      "sourceRef": {"file": "src/main/java/.../OrderService.java"}
+    }
+  ],
+  "kafkaTopics": [
+    {
+      "topic": "order.created",
+      "role": "subscriber",
+      "handlerMethod": "onOrderCreated",
+      "sourceRef": {"file": "src/main/java/.../OrderEventListener.java"}
+    }
+  ]
+}
+```
+
+**Method `description` sources (priority order):**
+1. Javadoc from interface source file (deterministic, via `--project-root`)
+2. Javadoc from implementation class (fallback)
+3. LLM-generated description (via `enrich-endpoint-descriptions.py`, post-processing)
 
 ### Domain Page Structure (Bounded Context Canvas)
 

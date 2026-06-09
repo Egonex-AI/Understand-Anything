@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-merge-domain-results.py — Combine per-domain flow extraction results into final domain-analysis.json.
+merge_domain_results.py — Combine per-domain flow extraction results into final domain-analysis.json.
 
 Input: intermediate/domain-discovery.json + intermediate/flows-*.json
 Output: intermediate/domain-analysis.json
@@ -8,9 +8,48 @@ Output: intermediate/domain-analysis.json
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def _get_git_commit_hash(project_root: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(project_root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return ""
+
+
+def build_project_with_provenance(
+    project: dict[str, Any],
+    project_root: Path,
+    *,
+    generation_mode: str = "full",
+) -> dict[str, Any]:
+    """Stamp project metadata with derive-stage provenance for artifact validation."""
+    analyzed_at = datetime.now(timezone.utc).isoformat()
+    git_hash = _get_git_commit_hash(project_root)
+
+    stamped = dict(project)
+    stamped.setdefault("analyzedAt", analyzed_at)
+    stamped.setdefault("gitCommitHash", git_hash)
+    stamped["provenance"] = {
+        "generationMode": generation_mode,
+        "completedStages": ["derive"],
+        "degraded": False,
+        "gitCommitHash": git_hash,
+        "toolVersion": "1.0.0",
+        "analyzedAt": analyzed_at,
+    }
+    return stamped
 
 
 def merge_domain_results(
@@ -113,7 +152,7 @@ def merge_domain_results(
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python merge-domain-results.py <project-root>", file=sys.stderr)
+        print("Usage: python merge_domain_results.py <project-root>", file=sys.stderr)
         return 1
 
     project_root = Path(sys.argv[1])
@@ -142,6 +181,7 @@ def main() -> int:
         else:
             print(f"[merge-domain] WARNING: Missing flows for {domain_id}")
 
+    project = build_project_with_provenance(project, project_root)
     result = merge_domain_results(discovery, flows_by_domain, project)
 
     out_path = inter_dir / "domain-analysis.json"

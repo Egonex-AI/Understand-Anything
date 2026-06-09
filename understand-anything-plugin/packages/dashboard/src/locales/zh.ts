@@ -326,6 +326,7 @@ export const zh = {
     endpointIdentifier: "标识符",
     endpointMethods: "方法列表",
     endpointMethodName: "方法",
+    endpointDescription: "描述",
     endpointParams: "参数",
     endpointReturnType: "返回类型",
     endpointTargetInterface: "目标接口",

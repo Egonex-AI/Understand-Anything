@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-condense-kg-for-domain.py — Condense a full KG into module-level summary for domain discovery.
+condense_kg_for_domain.py — Condense a full KG into module-level summary for domain discovery.
 
 Input: knowledge-graph.json (2000+ nodes)
 Output: intermediate/kg-summary.json (~15k tokens)
@@ -177,7 +177,7 @@ def condense_kg(kg: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python condense-kg-for-domain.py <project-root>", file=sys.stderr)
+        print("Usage: python condense_kg_for_domain.py <project-root>", file=sys.stderr)
         return 1
 
     project_root = Path(sys.argv[1])

@@ -63,6 +63,21 @@ export function WikiLinkRenderer({
     if (!SAFE_EXTERNAL_HREF.test(href)) {
       return <span className="text-text-muted">{props.children}</span>;
     }
+    if (href.startsWith("#")) {
+      const handleAnchorClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const target = document.getElementById(href.slice(1));
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
+      return (
+        <a
+          {...props}
+          href={href}
+          onClick={handleAnchorClick}
+          className="text-accent hover:text-accent/80 cursor-pointer underline decoration-accent/40 transition-colors"
+        />
+      );
+    }
     return <a {...props} target="_blank" rel="noopener noreferrer" />;
   }
 

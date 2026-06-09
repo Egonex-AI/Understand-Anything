@@ -5,7 +5,6 @@ import os from "os"
 import request from "supertest"
 import { handleBusinessRequest } from "../api/handlers/business"
 import { createApp } from "../../server"
-import { useDashboardStore } from "../store"
 
 // ─────────────────────────────────────────────────────────────────────
 // Bug 1 (C1): Business handler path traversal via slug

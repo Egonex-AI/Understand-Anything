@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-split-kg-by-domain.py — Split a full KG into per-domain subsets using domain discovery results.
+split_kg_by_domain.py — Split a full KG into per-domain subsets using domain discovery results.
 
 Input: knowledge-graph.json + intermediate/domain-discovery.json
 Output: intermediate/domain-<id>.json for each domain
@@ -30,20 +30,32 @@ def _node_module(node: dict) -> str:
     return fp.replace("\\", "/")
 
 
-def split_kg_by_domain(kg: dict[str, Any], discovery: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def split_kg_by_domain(
+    kg: dict[str, Any],
+    discovery: dict[str, Any],
+    *,
+    warn_on_overlap: bool = True,
+) -> dict[str, dict[str, Any]]:
     """Split KG nodes and edges by domain. Returns {domain_id: {domain, nodes, edges, stats}}."""
     domains = discovery.get("domains", [])
     nodes = kg.get("nodes", [])
     edges = kg.get("edges", [])
 
     node_to_domain: dict[str, str] = {}
-    for domain in domains:
-        domain_id = domain["id"]
-        modules = domain.get("modules", [])
-        for node in nodes:
-            fp = _node_module(node)
-            if _file_matches_modules(fp, modules):
-                node_to_domain[node["id"]] = domain_id
+    for node in nodes:
+        fp = _node_module(node)
+        matching_domains = [
+            domain["id"]
+            for domain in domains
+            if _file_matches_modules(fp, domain.get("modules", []))
+        ]
+        if warn_on_overlap and len(matching_domains) > 1:
+            print(
+                f"[split-kg] WARNING: {fp} matches multiple domains: {matching_domains}",
+                file=sys.stderr,
+            )
+        if matching_domains:
+            node_to_domain[node["id"]] = matching_domains[-1]
 
     result: dict[str, dict[str, Any]] = {}
     for domain in domains:
@@ -68,7 +80,7 @@ def split_kg_by_domain(kg: dict[str, Any], discovery: dict[str, Any]) -> dict[st
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python split-kg-by-domain.py <project-root>", file=sys.stderr)
+        print("Usage: python split_kg_by_domain.py <project-root>", file=sys.stderr)
         return 1
 
     project_root = Path(sys.argv[1])

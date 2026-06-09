@@ -417,6 +417,21 @@ function WikiContent({
           onSourceOpen={onSourceOpen}
         />
       ),
+      h1: ({ children, ...rest }: HTMLAttributes<HTMLHeadingElement>) => {
+        const text = typeof children === "string" ? children : String(children ?? "");
+        const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        return <h1 id={id} {...rest}>{children}</h1>;
+      },
+      h2: ({ children, ...rest }: HTMLAttributes<HTMLHeadingElement>) => {
+        const text = typeof children === "string" ? children : String(children ?? "");
+        const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        return <h2 id={id} {...rest}>{children}</h2>;
+      },
+      h3: ({ children, ...rest }: HTMLAttributes<HTMLHeadingElement>) => {
+        const text = typeof children === "string" ? children : String(children ?? "");
+        const id = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        return <h3 id={id} {...rest}>{children}</h3>;
+      },
       pre: ({ children, ...rest }: HTMLAttributes<HTMLPreElement>) => {
         const child = Array.isArray(children) ? children[0] : children;
         if (
@@ -526,7 +541,7 @@ export default function WikiView() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<NavEntry[]>([]);
-  const [sourcePanel, setSourcePanel] = useState<{ path: string; lineRange?: [number, number] } | null>(null);
+  const [sourcePanel, setSourcePanel] = useState<{ path: string; lineRange?: [number, number]; service?: string } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 900,
   );
@@ -698,9 +713,9 @@ export default function WikiView() {
 
   const handleSourceOpen = useCallback(
     (nav: WikiLinkNavigation) => {
-      setSourcePanel({ path: nav.path, lineRange: nav.lineRange });
+      setSourcePanel({ path: nav.path, lineRange: nav.lineRange, service: wikiActivePage?.service });
     },
-    [],
+    [wikiActivePage?.service],
   );
 
   const handleMermaidNodeClick = useCallback(
@@ -806,6 +821,7 @@ export default function WikiView() {
               <WikiSourcePanel
                 path={sourcePanel.path}
                 lineRange={sourcePanel.lineRange}
+                service={sourcePanel.service}
                 onClose={() => setSourcePanel(null)}
               />
             </div>

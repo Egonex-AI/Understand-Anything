@@ -6,7 +6,7 @@ After wiki-worker writes raw content to `$PROJECT_ROOT/.understand-anything/inte
 
 ### Pipeline Sequence
 
-Four scripts run in strict order:
+Five steps run in strict order (Script 0b is conditional on endpoint extraction success):
 
 #### Script 0: Endpoint Extraction (`extract-endpoints.py`)
 
@@ -15,16 +15,68 @@ mkdir -p "$PROJECT_ROOT/.understand-anything/intermediate/wiki/endpoints"
 python3 "$SKILL_DIR/extract-endpoints.py" \
   "$SERVICE_ROOT/.understand-anything/tmp" \
   "$SERVICE_NAME" \
-  --output="$PROJECT_ROOT/.understand-anything/intermediate/wiki/endpoints/$SERVICE_NAME.json"
+  --output="$PROJECT_ROOT/.understand-anything/intermediate/wiki/endpoints/$SERVICE_NAME.json" \
+  --project-root="$SERVICE_ROOT"
 ```
 
 **Behavior:**
 - Reads `ua-file-extract-results-*.json` from the extraction directory
 - Detects MoaProvider, DubboService, GrpcService, FeignClient, KafkaListener annotations
 - Produces `ServiceEndpointDoc` JSON with `providers`, `consumers`, and `kafkaTopics` arrays
+- When `--project-root` is provided, extracts Javadoc descriptions from interface source files and enriches each method with a `description` field (interface files are checked first, then falls back to implementation classes)
 - Skips gracefully if extraction directory is missing or empty
 
 **On failure:** Log warning and continue (endpoint data is optional for wiki assembly).
+
+#### Script 0b: LLM Description Enrichment (`enrich-endpoint-descriptions.py`)
+
+```bash
+ENDPOINT_FILE="$PROJECT_ROOT/.understand-anything/intermediate/wiki/endpoints/$SERVICE_NAME.json"
+if [ -f "$ENDPOINT_FILE" ]; then
+  PROMPT_FILE="$PROJECT_ROOT/.understand-anything/tmp/ua-endpoint-enrich-prompt-$SERVICE_NAME.json"
+  RESPONSE_FILE="$PROJECT_ROOT/.understand-anything/tmp/ua-endpoint-enrich-response-$SERVICE_NAME.json"
+
+  # Step 1: Generate prompt for undescribed methods
+  python3 "$SKILL_DIR/enrich-endpoint-descriptions.py" generate-prompt \
+    "$ENDPOINT_FILE" \
+    --project-root="$SERVICE_ROOT" \
+    --output="$PROMPT_FILE"
+
+  # Step 2: Feed prompt to LLM sub-agent, save output as RESPONSE_FILE
+  # (The sub-agent reads PROMPT_FILE, generates JSON array of descriptions,
+  #  writes to RESPONSE_FILE)
+
+  # Step 3: Merge LLM responses back into endpoint JSON
+  python3 "$SKILL_DIR/enrich-endpoint-descriptions.py" merge-responses \
+    "$ENDPOINT_FILE" \
+    "$RESPONSE_FILE"
+fi
+```
+
+**Behavior:**
+- `generate-prompt`: Reads the endpoint JSON, collects methods without descriptions, reads source code context around each method, and outputs a structured JSON prompt for the LLM
+- The LLM sub-agent generates concise Chinese descriptions (≤30 chars) for each undescribed method based on method signature + source context
+- `merge-responses`: Merges LLM-generated descriptions back into the endpoint JSON
+- Methods that already have Javadoc descriptions (from Script 0) are skipped
+
+**Quality gate (after merge):**
+
+```bash
+python3 "$SKILL_DIR/enrich-endpoint-descriptions.py" validate \
+  "$ENDPOINT_FILE" \
+  --prompt-json="$PROMPT_FILE"
+```
+
+Checks:
+- **Coverage**: every method has a description (error if missing)
+- **Language**: descriptions contain CJK characters (warn if not)
+- **Length**: descriptions between 2–50 chars (warn if out of range)
+- **Specificity**: no placeholder text like "TODO", "待补充" (error if found)
+- **Enrichment gap**: methods from the prompt that still lack descriptions after merge (error if any)
+
+Exit 0 = PASS (proceed), Exit 1 = FAIL (log issues, retry LLM once with feedback).
+
+**On failure:** Log warning and continue — endpoint enrichment is best-effort.
 
 #### Script 1: Schema Validation (`validate-wiki-schema.mjs`)
 
@@ -138,6 +190,7 @@ When running in incremental mode (only dirty domains regenerated):
 | Script | Error | Action |
 |--------|-------|--------|
 | extract-endpoints.py | Extraction dir missing or empty | Log warning, skip (endpoint data optional) |
+| enrich-endpoint-descriptions.py | LLM sub-agent fails or times out | Log warning, skip (enrichment is best-effort) |
 | validate-wiki-schema.mjs | Auto-fixable issues | Fix in-place, re-validate with `--verify-only`, log as warnings |
 | validate-wiki-schema.mjs | Hard schema errors | **Halt** — log errors, do not proceed to assembly. Fix the root cause or use `--continue-on-error` to override |
 | build-wiki-index.py | No wiki files found | Write empty index, log warning |
