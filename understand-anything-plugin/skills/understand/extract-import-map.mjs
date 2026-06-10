@@ -81,7 +81,7 @@ try {
   core = await import(pathToFileURL(resolve(pluginRoot, 'packages/core/dist/index.js')).href);
 }
 
-const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers } = core;
+const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers, parseCargoManifest } = core;
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -300,6 +300,67 @@ async function loadGoModules(projectRoot, files) {
 }
 
 /**
+ * Load every `Cargo.toml` discovered in the input file list and build a map
+ * from crate identifier to the crate's source directory. Mirrors
+ * loadGoModules.
+ *
+ * The crate identifier used in `use <ident>::...` is `[lib].name` if present,
+ * else `[package].name` with hyphens replaced by underscores. The source dir
+ * is `<cargo-dir>/<dirname([lib].path ?? 'src/lib.rs')>` — i.e. `src/` even
+ * when the crate root is overridden to `src/mod.rs`. `srcDirs` collects every
+ * crate's source dir so findRustCrateSrc can locate the importer's own crate.
+ *
+ * On parse failure for a specific Cargo.toml, buffers a Warning: and skips it.
+ * Virtual manifests (workspace roots with no [package]/[lib]) yield null and
+ * are skipped.
+ */
+async function loadCargoCrates(projectRoot, files) {
+  const crates = new Map();   // crateIdent -> srcDir
+  const srcDirs = new Set();  // every crate srcDir
+  const warnings = [];
+  const candidates = [];
+  for (const f of files) {
+    const p = toPosix(f.path);
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (base !== 'Cargo.toml') continue;
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    candidates.push({ key: p, absPath });
+  }
+  const reads = await readFilesParallel(candidates);
+  for (const { key: p, raw, err } of reads) {
+    if (err) continue;
+    let info;
+    try {
+      info = parseCargoManifest(raw);
+    } catch (e) {
+      warnings.push(
+        `Warning: extract-import-map: Cargo.toml at ${join(projectRoot, p)} ` +
+        `failed to parse (${e.message}) — cross-crate imports for this crate unresolved\n`,
+      );
+      continue;
+    }
+    if (!info) continue;
+    const ident = info.libName
+      ?? (info.packageName ? info.packageName.replaceAll('-', '_') : null);
+    if (!ident) continue;
+    const cargoDir = dirOf(p);
+    const rootRel = info.libPath ?? 'src/lib.rs';
+    const srcDir = resolveRelative(cargoDir, posix.dirname(rootRel));
+    if (crates.has(ident)) {
+      warnings.push(
+        `Warning: extract-import-map: duplicate Rust crate identifier '${ident}' ` +
+        `(keeping first) — check the workspace for clashing [lib] names\n`,
+      );
+      continue;
+    }
+    crates.set(ident, srcDir);
+    srcDirs.add(srcDir);
+  }
+  return { crates, srcDirs, warnings };
+}
+
+/**
  * Walk up from `startDir` (project-relative POSIX, '' for project root)
  * and return the DEEPEST ancestor directory that exists as a key in
  * `configMap`, or undefined if no ancestor matches.
@@ -356,17 +417,21 @@ async function buildResolutionContext(projectRoot, files) {
   // flaky. Drain the buffers in canonical order *after* Promise.all, so
   // a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
-  const [tsResult, goResult, phpResult] = await Promise.all([
+  const [tsResult, goResult, phpResult, cargoResult] = await Promise.all([
     loadTsConfigs(projectRoot, files),
     loadGoModules(projectRoot, files),
     loadPhpAutoloads(projectRoot, files),
+    loadCargoCrates(projectRoot, files),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
   for (const w of phpResult.warnings) process.stderr.write(w);
+  for (const w of cargoResult.warnings) process.stderr.write(w);
   const tsConfigs = tsResult.configs;
   const goModules = goResult.modules;
   const phpAutoloads = phpResult.autoloads;
+  const rustCrates = cargoResult.crates;
+  const rustCrateSrcDirs = cargoResult.srcDirs;
 
   // Index .go files by their parent directory so the Go resolver can
   // expand a package-level import to all member .go files in O(1).
@@ -398,6 +463,8 @@ async function buildResolutionContext(projectRoot, files) {
     kotlinIndex,
     csIndex,
     phpAutoloads,
+    rustCrates,
+    rustCrateSrcDirs,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
     _warnedNoRustCrateRoot: new Set(),
