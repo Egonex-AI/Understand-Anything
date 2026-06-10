@@ -1,4 +1,5 @@
 export * from "./types.js";
+export { parseCargoManifest, type CargoManifestInfo } from "./manifests/cargo.js";
 export * from "./persistence/index.js";
 export {
   KnowledgeGraphSchema,
