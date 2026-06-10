@@ -32,6 +32,7 @@ gemini|$HOME/.agents/skills|per-skill
 codex|$HOME/.agents/skills|per-skill
 opencode|$HOME/.agents/skills|per-skill
 pi|$HOME/.agents/skills|per-skill
+omp|$HOME/.omp/agent/skills|per-skill
 openclaw|$HOME/.openclaw/skills|folder
 antigravity|$HOME/.gemini/antigravity/skills|folder
 vibe|$HOME/.vibe/skills|per-skill
@@ -241,6 +242,12 @@ $(platform_ids | sed 's/^/  - /')
 Environment:
   UA_REPO_URL  Override clone URL (default: official repo)
   UA_DIR       Override clone destination (default: \$HOME/.understand-anything/repo)
+
+Notes:
+  omp (oh-my-pi) is a fork of Pi. Skills installed for pi
+  (under ~/.agents/skills) are also discovered by omp automatically.
+  The dedicated 'omp' platform installs to omp's native path
+  (~/.omp/agent/skills) for better isolation.
 USAGE
 }
 

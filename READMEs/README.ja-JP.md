@@ -234,6 +234,7 @@ copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 | Antigravity | ✅ サポート | `install.sh antigravity` |
 | Gemini CLI | ✅ サポート | `install.sh gemini` |
 | Pi Agent | ✅ サポート | `install.sh pi` |
+| oh-my-pi / omp | ✅ サポート | `install.sh omp` |
 | Vibe CLI | ✅ サポート | `install.sh vibe` |
 | Hermes | ✅ サポート | `install.sh hermes` |
 | Cline | ✅ サポート | `install.sh cline` |
