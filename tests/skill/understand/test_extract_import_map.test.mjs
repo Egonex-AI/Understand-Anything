@@ -1218,6 +1218,36 @@ describe('extract-import-map.mjs — Rust resolver', () => {
     expect(result.status).toBe(0);
     expect(result.output.importMap['src/text.rs']).toEqual(['src/math.rs']);
   });
+
+  it('resolves grouped bare-module use crate::{a, b};', () => {
+    projectRoot = setupTree({
+      'Cargo.toml': `[package]\nname = "cu2"\nversion = "0.1.0"\n`,
+      'src/lib.rs': `pub mod math;\npub mod text;\npub mod api;\n`,
+      'src/math.rs': `pub fn add(a: i32, b: i32) -> i32 { a + b }\n`,
+      'src/text.rs': `pub fn shout(n: i32) -> String { format!("{}", n) }\n`,
+      // grouped bare-module import: both `math` and `text` are sibling modules
+      // declared in lib.rs, brought into scope here in one `use`.
+      'src/api.rs': `use crate::{math, text};\npub fn go(n: i32) -> i32 { let _ = text::shout(n); math::add(n, n) }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'src/lib.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/math.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/text.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/api.rs', language: 'rust', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Both grouped modules resolve (importMap values are sorted).
+    expect(result.output.importMap['src/api.rs']).toEqual([
+      'src/math.rs',
+      'src/text.rs',
+    ]);
+  });
 });
 
 describe('extract-import-map.mjs — C/C++ resolver', () => {

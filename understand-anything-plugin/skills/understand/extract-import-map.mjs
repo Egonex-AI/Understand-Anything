@@ -1418,14 +1418,16 @@ export function resolveRustImport(rawImport, file, ctx, specifiers = []) {
   // Bare-module import: `use crate::config;`, `use super::sibling;`,
   // `use other_crate::thing;`. tree-sitter puts the module name in
   // `specifiers`, not in `source`, so the loop above sees an empty `rest`.
-  // Probe each plain specifier as a module under baseDir.
+  // Probe each plain specifier as a module under baseDir and return every match.
   if (rest.length === 0) {
+    const matches = [];
     for (const spec of specifiers) {
-      if (!spec || spec === '*' || spec === 'self') continue;
+      if (!spec || spec === '*' || spec === 'self' || spec.includes('::')) continue;
       const base = baseDir ? `${baseDir}/${spec}` : spec;
       const match = probeRustModule(base, ctx.fileSet);
-      if (match) return [match];
+      if (match) matches.push(match);
     }
+    if (matches.length > 0) return matches;
   }
   return [];
 }
