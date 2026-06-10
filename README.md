@@ -3,7 +3,7 @@
 <p align="center">
   <strong>Turn any codebase, knowledge base, or docs into an interactive knowledge graph you can explore, search, and ask questions about.</strong>
   <br />
-  <em>Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, and more.</em>
+  <em>Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, Kiro, and more.</em>
 </p>
 
 <p align="center">
@@ -30,6 +30,7 @@
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#kiro"><img src="https://img.shields.io/badge/Kiro-10b981" alt="Kiro" /></a>
   <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Homepage-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Live_Demo-00c853" alt="Live Demo" /></a>
@@ -193,6 +194,7 @@ Understand-Anything works across multiple AI coding platforms.
 /plugin install understand-anything
 ```
 
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Kiro)
 ### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae)
 
 **macOS / Linux:**
@@ -231,6 +233,21 @@ For personal skills (available across all projects), run the `install.sh` above 
 copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 ```
 
+### Kiro
+
+Kiro users can install via the one-line installer or import as a native Kiro Power for dynamic activation:
+
+**Via installer:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s kiro
+```
+
+**Via Kiro Power (recommended):** 
+
+Open the Powers panel in Kiro → Import from GitHub → `Lum1104/Understand-Anything`. This enables keyword-based auto-activation and dynamic context loading — the power only loads into context when you mention relevant terms like "codebase", "knowledge graph", or "architecture", saving tokens.
+
+
 ### Platform Compatibility
 
 | Platform | Status | Install Method |
@@ -249,6 +266,7 @@ copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ Supported | `install.sh hermes` |
 | Cline | ✅ Supported | `install.sh cline` |
 | KIMI CLI | ✅ Supported | `install.sh kimi` |
+| Kiro | ✅ Supported | `install.sh kiro` / Kiro Power import |
 | Trae | ✅ Supported | `install.sh trae` |
 
 ---
@@ -349,9 +367,10 @@ Please open an issue first for major changes so we can discuss the approach.
 </a>
 
 <p align="center">
-  <em>Thanks to everyone who's used and contributed — knowing this saves people time is what made it worth building.</em>
+  <em>Thanks to everyone who's used and contributed — knowing this saves people time is what made it worth building. ❤️</em>
 </p>
 
 <p align="center">
   MIT License &copy; Yuxiang Lin and Infinite Universe, Inc.
 </p>
+

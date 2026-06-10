@@ -39,7 +39,8 @@ vscode|$HOME/.copilot/skills|per-skill
 hermes|$HOME/.hermes/skills|folder
 cline|$HOME/.cline/skills|folder
 kimi|$HOME/.kimi/skills|folder
-trae|$HOME/.trae/skills|per-skill
+kiro|$HOME/.kiro/skills|folder
+trae|$HOME/.trae/skills|folder
 EOF
 }
 
