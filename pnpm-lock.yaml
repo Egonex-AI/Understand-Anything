@@ -66,6 +66,9 @@ importers:
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
+      smol-toml:
+        specifier: ^1.6.0
+        version: 1.6.0
       tree-sitter-c-sharp:
         specifier: ^0.23.1
         version: 0.23.5
