@@ -197,7 +197,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 설치 스크립트는 저장소를 `~/.understand-anything/repo`에 클론하고 선택한 플랫폼에 맞는 심볼릭 링크를 생성합니다. 설치 후 CLI 또는 IDE를 재시작하세요.
 
-- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`
+- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `codeflicker`
 - 이후 업데이트: `./install.sh --update`
 - 제거: `./install.sh --uninstall <platform>`
 
@@ -237,6 +237,7 @@ copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ 지원 | `install.sh hermes` |
 | Cline | ✅ 지원 | `install.sh cline` |
 | KIMI CLI | ✅ 지원 | `install.sh kimi` |
+| CodeFlicker | ✅ 지원 | `install.sh codeflicker` |
 
 ---
 

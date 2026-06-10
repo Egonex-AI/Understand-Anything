@@ -31,6 +31,7 @@
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
   <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
+  <a href="#codeflicker"><img src="https://img.shields.io/badge/CodeFlicker-f97316" alt="CodeFlicker" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Homepage-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Live_Demo-00c853" alt="Live Demo" /></a>
   <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
@@ -250,6 +251,7 @@ copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 | Cline | ✅ Supported | `install.sh cline` |
 | KIMI CLI | ✅ Supported | `install.sh kimi` |
 | Trae | ✅ Supported | `install.sh trae` |
+| CodeFlicker | ✅ Supported | `install.sh codeflicker` |
 
 ---
 

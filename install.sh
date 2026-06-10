@@ -40,6 +40,7 @@ hermes|$HOME/.hermes/skills|folder
 cline|$HOME/.cline/skills|folder
 kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
+codeflicker|$HOME/.codeflicker/skills|per-skill
 EOF
 }
 

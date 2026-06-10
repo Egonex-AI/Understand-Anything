@@ -198,7 +198,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 Установщик клонирует репозиторий в `~/.understand-anything/repo` и создаёт нужные симлинки для выбранной платформы. После установки перезапустите свой CLI/IDE.
 
-- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`
+- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `codeflicker`
 - Обновление: `./install.sh --update`
 - Удаление: `./install.sh --uninstall <platform>`
 
@@ -238,6 +238,7 @@ copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ Поддерживается | `install.sh hermes` |
 | Cline | ✅ Поддерживается | `install.sh cline` |
 | KIMI CLI | ✅ Поддерживается | `install.sh kimi` |
+| CodeFlicker | ✅ Поддерживается | `install.sh codeflicker` |
 
 ---
 

@@ -125,6 +125,7 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 ```
 
 `--language` 参数会影响：
+
 - 知识图谱中的节点摘要和描述
 - Dashboard UI 的标签、按钮和提示
 - 导览路线的解释说明
@@ -184,6 +185,7 @@ Understand-Anything 可在多个 AI 编码平台上运行。
 ### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI）
 
 **macOS / Linux：**
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
 # 也可以直接传入平台名跳过交互提示：
@@ -191,13 +193,14 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 ```
 
 **Windows（PowerShell）：**
+
 ```powershell
 iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
 ```
 
 安装脚本会将仓库克隆到 `~/.understand-anything/repo`，并为所选平台创建相应的符号链接。安装完成后请重启 CLI 或 IDE。
 
-- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`
+- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`codeflicker`
 - 后续更新：`./install.sh --update`
 - 卸载：`./install.sh --uninstall <platform>`
 
@@ -237,6 +240,7 @@ copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ 支持 | `install.sh hermes` |
 | Cline | ✅ 支持 | `install.sh cline` |
 | KIMI CLI | ✅ 支持 | `install.sh kimi` |
+| CodeFlicker | ✅ 支持 | `install.sh codeflicker` |
 
 ---
 
