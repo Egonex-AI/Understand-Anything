@@ -4,7 +4,12 @@ import { join } from "node:path";
 
 /**
  * Hardcoded default ignore patterns matching the project-scanner agent's
- * exclusion rules, plus bin/obj for .NET projects.
+ * exclusion rules, plus obj/ for .NET build output.
+ *
+ * Note: bin/ is intentionally NOT excluded. Although it holds .NET build
+ * output, it doubles as the conventional location for CLI entrypoint source
+ * in Node and Ruby projects, which should still be analyzed. See the
+ * "does not contain bin" case in ignore-filter.test.ts.
  */
 export const DEFAULT_IGNORE_PATTERNS: string[] = [
   // Dependency directories
