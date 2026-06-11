@@ -21,6 +21,7 @@ export const en = {
     pressKeyboard: "Press ? for keyboard shortcuts",
     path: "Path",
     theme: "Theme",
+    language: "Language",
   },
   projectOverview: {
     nodes: "Nodes",
@@ -81,6 +82,10 @@ export const en = {
   sidebar: {
     info: "Info",
     files: "Files",
+    moveLeft: "Move sidebar left",
+    moveRight: "Move sidebar right",
+    collapse: "Collapse sidebar",
+    expand: "Expand sidebar",
   },
   mobile: {
     graph: "Graph",
@@ -179,6 +184,7 @@ export const en = {
     closeExpanded: "Close expanded code viewer",
     closeViewer: "Close code viewer",
     sourceUnavailable: "Source unavailable",
+    goBack: "Go back",
   },
   customNode: {
     tested: "Tested",

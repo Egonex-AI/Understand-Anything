@@ -2,12 +2,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme, PRESETS } from "../themes/index.ts";
 import type { HeadingFont } from "../themes/index.ts";
 import { useI18n } from "../contexts/I18nContext";
+import { type LocaleKey } from "../locales/index.ts";
+
+const LANGUAGE_OPTIONS: { key: LocaleKey; label: string }[] = [
+  { key: "en", label: "English" },
+  { key: "zh", label: "简体中文" },
+  { key: "zh-TW", label: "繁體中文" },
+  { key: "ja", label: "日本語" },
+  { key: "ko", label: "한국어" },
+  { key: "ru", label: "Русский" },
+];
 
 export function ThemePicker() {
   const { config, preset, setPreset, setAccent, setHeadingFont } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { t } = useI18n();
+  const { t, localeKey, setLanguage } = useI18n();
 
   // Close on outside click
   useEffect(() => {
@@ -167,6 +177,28 @@ export function ThemePicker() {
                           ? "var(--font-mono)"
                           : "var(--font-sans)",
                   }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Language */}
+          <div>
+            <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-2">
+              {t.common.language}
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setLanguage(opt.key)}
+                  className={`px-2 py-1 rounded text-xs transition-colors ${
+                    localeKey === opt.key
+                      ? "bg-accent/15 text-accent"
+                      : "text-text-secondary hover:text-text-primary hover:bg-elevated"
+                  }`}
                 >
                   {opt.label}
                 </button>

@@ -21,6 +21,7 @@ export const ko = {
     pressKeyboard: "? 키를 눌러 키보드 단축키 보기",
     path: "경로",
     theme: "테마",
+    language: "언어",
   },
   projectOverview: {
     nodes: "노드",
@@ -81,6 +82,10 @@ export const ko = {
   sidebar: {
     info: "정보",
     files: "파일",
+    moveLeft: "사이드바 왼쪽으로 이동",
+    moveRight: "사이드바 오른쪽으로 이동",
+    collapse: "사이드바 축소",
+    expand: "사이드바 확장",
   },
   mobile: {
     graph: "그래프",
@@ -179,6 +184,7 @@ export const ko = {
     closeExpanded: "확장된 코드 뷰어 닫기",
     closeViewer: "코드 뷰어 닫기",
     sourceUnavailable: "소스 사용 불가",
+    goBack: "돌아가기",
   },
   customNode: {
     tested: "테스트됨",
