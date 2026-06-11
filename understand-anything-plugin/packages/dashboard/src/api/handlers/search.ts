@@ -56,9 +56,13 @@ interface KgEdgeEntry {
 
 interface SearchIndexState {
   items: SearchIndexItem[]
+  itemById: Map<string, SearchIndexItem>
   tokenizedDocs: string[][]
+  tokenizedDocSets: Set<string>[]
+  cjkInvertedIndex: Map<string, number[]>
   lumo: LumoSearch<LumoDocument>
   edges: KgEdgeEntry[]
+  adjacency: Map<string, Set<string>>
   mtimes: Record<string, number>
 }
 
@@ -136,29 +140,32 @@ function applyResultBoosts(item: SearchIndexItem, baseScore: number, query: stri
   return score
 }
 
-/** CJK bigram token overlap — LumoSearch strips non-ASCII during normalization. */
+/** CJK bigram token overlap — uses inverted index instead of linear scan. */
 function cjkTokenScores(
   state: SearchIndexState,
   query: string,
   scope: SearchScope,
+  serviceFilter?: string | null,
 ): Map<string, number> {
   const queryTokens = tokenize(query).filter((t) => CJK_REGEX.test(t))
   if (queryTokens.length === 0) return new Map()
 
+  // Collect candidate item indices from inverted index
+  const candidateCounts = new Map<number, number>()
+  for (const qt of queryTokens) {
+    const postings = state.cjkInvertedIndex.get(qt)
+    if (!postings) continue
+    for (const idx of postings) {
+      candidateCounts.set(idx, (candidateCounts.get(idx) ?? 0) + 1)
+    }
+  }
+
   const scores = new Map<string, number>()
 
-  for (let i = 0; i < state.items.length; i++) {
+  for (const [i, matchCount] of candidateCounts) {
     const item = state.items[i]
     if (scope !== "all" && item.meta.layer !== scope) continue
-
-    const docTokens = state.tokenizedDocs[i]
-    const docSet = new Set(docTokens)
-
-    let matchCount = 0
-    for (const qt of queryTokens) {
-      if (docSet.has(qt)) matchCount++
-    }
-    if (matchCount === 0) continue
+    if (serviceFilter && item.meta.service !== serviceFilter) continue
 
     let score = (matchCount / queryTokens.length) * 10
     if ((item.meta.summary ?? "").includes(query) || (item.meta.name ?? "").includes(query)) score += 10
@@ -194,14 +201,7 @@ function kgGraphExpansion(
   seedIds: string[],
   maxNeighbors: number = 50,
 ): Map<string, number> {
-  const adj = new Map<string, Set<string>>()
-  for (const edge of state.edges) {
-    if (!adj.has(edge.source)) adj.set(edge.source, new Set())
-    if (!adj.has(edge.target)) adj.set(edge.target, new Set())
-    adj.get(edge.source)!.add(edge.target)
-    adj.get(edge.target)!.add(edge.source)
-  }
-
+  const adj = state.adjacency
   const seedSet = new Set(seedIds)
   const neighborScores = new Map<string, number>()
 
@@ -244,7 +244,7 @@ function rrfFuse(
   for (const [id, rank] of kgRanks) {
     rrfScores.set(id, (rrfScores.get(id) ?? 0) + 1 / (RRF_K + rank))
     if (!resultById.has(id)) {
-      const item = state.items.find((it) => it.id === id)
+      const item = state.itemById.get(id)
       if (item) {
         resultById.set(id, { id, score: 0, ...item.meta })
       }
@@ -269,15 +269,22 @@ function lumoSearch(
   limit: number,
   scope: SearchScope = "all",
   fusion: "none" | "rrf" = "none",
+  serviceFilter?: string | null,
 ): { results: UnifiedSearchResult[]; total: number } {
   if (!query.trim() || state.items.length === 0) {
     return { results: [], total: 0 }
   }
 
+  const predicate = (doc: LumoDocument) => {
+    if (scope !== "all" && doc.layer !== scope) return false
+    if (serviceFilter && doc.service !== serviceFilter) return false
+    return true
+  }
+
   const lumoResults = state.lumo.search(query, {
     limit: LUMO_CANDIDATE_LIMIT,
     candidateLimit: LUMO_CANDIDATE_LIMIT,
-    ...(scope !== "all" ? { predicate: (doc) => doc.layer === scope } : {}),
+    predicate,
   })
 
   const scoreById = new Map<string, UnifiedSearchResult>()
@@ -290,12 +297,12 @@ function lumoSearch(
     scoreById.set(item.id, { id: item.id, score, ...item.meta })
   }
 
-  for (const [id, cjkScore] of cjkTokenScores(state, query, scope)) {
+  for (const [id, cjkScore] of cjkTokenScores(state, query, scope, serviceFilter)) {
     const existing = scoreById.get(id)
     if (existing) {
       existing.score = Math.max(existing.score, cjkScore)
     } else {
-      const item = state.items.find((i) => i.id === id)
+      const item = state.itemById.get(id)
       if (item) scoreById.set(id, { id, score: cjkScore, ...item.meta })
     }
   }
@@ -489,15 +496,44 @@ function buildSearchIndex(projectRoot: string, serviceFilter: string | null): Se
   }
 
   const lumo = buildLumoIndex(items)
+  const itemById = new Map<string, SearchIndexItem>()
+  for (const item of items) itemById.set(item.id, item)
   const tokenizedDocs = buildTokenizedDocs(items)
-  return { items, tokenizedDocs, lumo, edges, mtimes }
+  const tokenizedDocSets = tokenizedDocs.map((tokens) => new Set(tokens))
+  const cjkInvertedIndex = new Map<string, number[]>()
+  for (let i = 0; i < tokenizedDocs.length; i++) {
+    for (const token of tokenizedDocSets[i]) {
+      if (CJK_REGEX.test(token)) {
+        let postings = cjkInvertedIndex.get(token)
+        if (!postings) { postings = []; cjkInvertedIndex.set(token, postings) }
+        postings.push(i)
+      }
+    }
+  }
+  const adjacency = new Map<string, Set<string>>()
+  for (const edge of edges) {
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, new Set())
+    if (!adjacency.has(edge.target)) adjacency.set(edge.target, new Set())
+    adjacency.get(edge.source)!.add(edge.target)
+    adjacency.get(edge.target)!.add(edge.source)
+  }
+  return { items, itemById, tokenizedDocs, tokenizedDocSets, cjkInvertedIndex, lumo, edges, adjacency, mtimes }
 }
 
 function getOrBuildIndex(projectRoot: string, serviceFilter: string | null): SearchIndexState {
-  const cacheKey = serviceFilter ?? "__all__"
-  const currentMtimes = collectIndexMtimes(projectRoot, serviceFilter)
-  const cached = searchIndexCache.get(cacheKey)
+  // Prefer the full ("__all__") index — it contains all services and avoids
+  // rebuilding per-service indexes. Service filtering happens in Lumo search
+  // via predicate, not at index build time.
+  const allMtimes = collectIndexMtimes(projectRoot, null)
+  const allCached = searchIndexCache.get("__all__")
+  if (allCached && mtimesEqual(allCached.mtimes, allMtimes)) {
+    return allCached
+  }
 
+  // No valid __all__ cache — build for the requested scope
+  const cacheKey = serviceFilter ?? "__all__"
+  const currentMtimes = serviceFilter ? collectIndexMtimes(projectRoot, serviceFilter) : allMtimes
+  const cached = searchIndexCache.get(cacheKey)
   if (cached && mtimesEqual(cached.mtimes, currentMtimes)) {
     return cached
   }
@@ -555,7 +591,7 @@ function handleSearch(searchParams: URLSearchParams): ApiResponse {
     return { statusCode: 200, body: { results: [], total: 0, query } }
   }
 
-  const { results, total } = lumoSearch(indexState, query, limit, scope, fusion)
+  const { results, total } = lumoSearch(indexState, query, limit, scope, fusion, serviceName)
   return { statusCode: 200, body: { results, total, query } }
 }
 
@@ -581,12 +617,16 @@ export async function handleSearchRequest(
   return handleSearch(req.searchParams)
 }
 
-/** Pre-build the search index so the first query is fast. */
+/** Pre-build the search index and run a dummy search to trigger V8 JIT optimization. */
 export function warmupSearchIndex(projectRoot?: string): void {
   const root = projectRoot ?? resolveProjectRoot()
   const t0 = Date.now()
   const state = getOrBuildIndex(root, null)
+  const tBuild = Date.now() - t0
+  // Trigger V8 JIT on the hot search path (Lumo + CJK + RRF + graph expansion)
+  lumoSearch(state, "warmup test", 5, "all", "rrf")
+  lumoSearch(state, "预热测试", 5, "kg", "rrf")
   console.log(
-    `  Search index warmed: ${state.items.length} items, ${state.edges.length} edges (${Date.now() - t0}ms)`,
+    `  Search index warmed: ${state.items.length} items, ${state.edges.length} edges (${tBuild}ms build, ${Date.now() - t0}ms total)`,
   )
 }
