@@ -3,6 +3,20 @@ import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
+ * Synthetic caller name for calls made at file scope (outside any function or
+ * method). Used so procedural PHP scripts still produce call-graph edges.
+ */
+const FILE_SCOPE_CALLER = "<file>";
+
+/** PHP include/require expression node types (file-include dependencies). */
+const INCLUDE_EXPRESSION_TYPES = new Set([
+  "include_expression",
+  "include_once_expression",
+  "require_expression",
+  "require_once_expression",
+]);
+
+/**
  * Extract parameter names from a PHP `formal_parameters` node.
  *
  * Each child is a `simple_parameter` containing an optional type hint
@@ -174,6 +188,17 @@ export class PhpExtractor implements LanguageExtractor {
           this.extractUseDeclaration(node, imports);
           break;
 
+        case "expression_statement": {
+          // include/require expressions are wrapped in an expression_statement,
+          // e.g. `require_once __DIR__ . '/helpers.php';`. These wire files
+          // together in procedural PHP, so treat them as import edges (#367).
+          const includeExpr = this.findIncludeExpression(node);
+          if (includeExpr) {
+            this.extractIncludeDeclaration(includeExpr, imports);
+          }
+          break;
+        }
+
         case "namespace_definition": {
           // Block-scoped namespaces (`namespace Foo { ... }`) nest declarations
           // inside a compound_statement body. Declarative namespaces (`namespace Foo;`)
@@ -204,9 +229,15 @@ export class PhpExtractor implements LanguageExtractor {
         }
       }
 
-      // Extract call expressions
-      if (functionStack.length > 0) {
-        const caller = functionStack[functionStack.length - 1];
+      // Extract call expressions. Calls made outside any function/method are
+      // file-scope (top-level) calls — common in procedural PHP scripts. We
+      // attribute them to a synthetic `<file>` caller instead of dropping
+      // them, otherwise such scripts produce ~0% call-graph coverage (#367).
+      {
+        const caller =
+          functionStack.length > 0
+            ? functionStack[functionStack.length - 1]
+            : FILE_SCOPE_CALLER;
 
         if (node.type === "function_call_expression") {
           // Standalone function call: baz($x), strtoupper($x), error_log($msg)
@@ -405,6 +436,58 @@ export class PhpExtractor implements LanguageExtractor {
         }
       }
     }
+  }
+
+  /**
+   * Find an include/require expression directly inside an `expression_statement`.
+   * Returns null if the statement is not a file-include expression.
+   */
+  private findIncludeExpression(
+    statement: TreeSitterNode,
+  ): TreeSitterNode | null {
+    for (let i = 0; i < statement.childCount; i++) {
+      const child = statement.child(i);
+      if (child && INCLUDE_EXPRESSION_TYPES.has(child.type)) {
+        return child;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extract an import edge from an include/require expression.
+   *
+   * The path argument follows the keyword and may be:
+   * - a string literal: `include 'config.php'`
+   * - an encapsed string: `require "bootstrap.php"`
+   * - a dynamic expression: `require_once __DIR__ . '/helpers.php'`
+   *
+   * For string literals we use the literal contents as the source; for dynamic
+   * expressions we fall back to the raw expression text so the dependency
+   * (e.g. `helpers.php`) remains visible.
+   */
+  private extractIncludeDeclaration(
+    includeExpr: TreeSitterNode,
+    imports: StructuralAnalysis["imports"],
+  ): void {
+    // The argument is the last child (the keyword token is first).
+    const argNode = includeExpr.child(includeExpr.childCount - 1);
+    if (!argNode) return;
+
+    let source: string;
+    if (argNode.type === "string" || argNode.type === "encapsed_string") {
+      const content = findChild(argNode, "string_content");
+      source = content ? content.text : argNode.text;
+    } else {
+      // Dynamic path (concatenation, variable, etc.) — keep the raw text.
+      source = argNode.text;
+    }
+
+    imports.push({
+      source,
+      specifiers: [],
+      lineNumber: includeExpr.startPosition.row + 1,
+    });
   }
 
   /**
