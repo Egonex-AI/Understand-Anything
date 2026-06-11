@@ -593,6 +593,7 @@ def link_tests(
     file_paths_to_nodes: dict[str, dict[str, Any]] = {}
     node_id_to_classification: dict[str, str] = {}  # id → "test" | "prod"
     test_nodes: list[tuple[str, dict[str, Any]]] = []
+    prod_nodes_by_basename: dict[str, list[dict[str, Any]]] = {}
     for node in nodes_by_id.values():
         path = _file_node_path(node)
         if path is None:
@@ -603,6 +604,7 @@ def link_tests(
             test_nodes.append((path, node))
         else:
             node_id_to_classification[node["id"]] = "prod"
+            prod_nodes_by_basename.setdefault(_basename(path), []).append(node)
 
     # ── Pass 1: walk existing tested_by edges, canonicalize or drop.
     # `covered` tracks (production_id, test_id) pairs that have a kept edge
@@ -684,27 +686,44 @@ def link_tests(
     for test_path, test_node in test_nodes:
         if test_node["id"] in paired_test_ids:
             continue
-        for cand_path in production_candidates(test_path):
+        candidate_paths = production_candidates(test_path)
+        prod_node = None
+        for cand_path in candidate_paths:
             prod_node = file_paths_to_nodes.get(cand_path)
             if prod_node is None:
                 continue
             if is_test_path(cand_path):
                 # Don't link a test to another test even if naming aligns.
+                prod_node = None
                 continue
-            pair = (prod_node["id"], test_node["id"])
-            if pair in covered:
-                continue
-            edges.append({
-                "source": prod_node["id"],
-                "target": test_node["id"],
-                "type": "tested_by",
-                "direction": "forward",
-                "weight": 0.5,
-                "description": "Path-based pairing (deterministic)",
-            })
-            covered.add(pair)
-            added += 1
             break
+
+        if prod_node is None and test_path.endswith(".py"):
+            candidate_basenames: list[str] = []
+            for cand_path in candidate_paths:
+                _add_unique(candidate_basenames, _basename(cand_path))
+            for cand_basename in candidate_basenames:
+                matches = prod_nodes_by_basename.get(cand_basename, [])
+                if len(matches) == 1:
+                    prod_node = matches[0]
+                    break
+
+        if prod_node is None:
+            continue
+
+        pair = (prod_node["id"], test_node["id"])
+        if pair in covered:
+            continue
+        edges.append({
+            "source": prod_node["id"],
+            "target": test_node["id"],
+            "type": "tested_by",
+            "direction": "forward",
+            "weight": 0.5,
+            "description": "Path-based pairing (deterministic)",
+        })
+        covered.add(pair)
+        added += 1
 
     # ── Tag every production node that ended up sourcing a tested_by edge
     # (covers Pass 1 canonical + swapped + Pass 2 supplements in one place).
