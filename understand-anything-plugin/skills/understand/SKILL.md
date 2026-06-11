@@ -342,6 +342,8 @@ Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 
 **Output naming is per-batchIndex — no fusion.** If you fuse multiple small batches into a single file-analyzer dispatch for token efficiency, the dispatched agent must STILL write one output file per original `batchIndex` using `batch-<batchIndex>.json` or `batch-<batchIndex>-part-<k>.json`. The merge script's regex (`batch-(\d+)(?:-part-(\d+))?\.json`) silently drops any other naming (e.g., `batch-fused-8-13.json`, `batch-8-13.json`), losing every node and edge in that file. After each dispatch returns, verify each `batchIndex` in the dispatched input has a corresponding `batch-<batchIndex>.json` (or `batch-<batchIndex>-part-*.json`) on disk before proceeding to the next dispatch.
 
+**Write-permission fallback.** If a batch file is missing after the agent returns, do not silently continue — the agent was likely denied the Write tool by the host project's permission settings. In that case, inspect the agent's result message for a JSON object containing `nodes` and `edges` arrays (agents blocked from writing almost always return their output as inline JSON in the result text). If found, write it yourself to the correct `batch-<batchIndex>.json` path using your own Write tool before continuing. If neither the file nor inline JSON is present, log a warning to `$PHASE_WARNINGS` and proceed — the merge script will produce a partial graph, which is better than failing the entire run.
+
 After ALL batches complete, report to the user: `Phase 2 complete. All <totalBatches> batches analyzed.`
 
 Run the merge-and-normalize script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
