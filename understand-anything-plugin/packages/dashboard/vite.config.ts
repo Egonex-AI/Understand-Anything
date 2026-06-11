@@ -184,9 +184,27 @@ export default defineConfig({
 
   // FIX 1 — bind only to localhost, not 0.0.0.0
   // This blocks access from any other device on the same LAN / WiFi.
+  //
+  // FIX 2 (#234) — port is configurable via UNDERSTAND_DASHBOARD_PORT and
+  // we set `strictPort: true`. The combination matters:
+  //
+  //   * Without strictPort, Vite silently falls back to the next free port
+  //     when 5173 is taken. The skill prints the *intended* token URL, but
+  //     the user opens it and gets whatever other app already owns 5173 —
+  //     usually some unrelated Vite project. The token endpoint isn't on
+  //     that server, so the dashboard fails to load with no clear error.
+  //
+  //   * strictPort makes the collision a hard failure (`Port 5173 is in use`)
+  //     instead of a silent foot-gun. The user then knows to either kill
+  //     the other process or rerun with `UNDERSTAND_DASHBOARD_PORT=5180`.
+  //
+  // We still default to 5173 so existing flows keep working unchanged when
+  // the port is free. Env-var override matches the existing GRAPH_DIR
+  // pattern in this skill.
   server: {
     host: "127.0.0.1",
-    port: 5173,
+    port: Number(process.env.UNDERSTAND_DASHBOARD_PORT) || 5173,
+    strictPort: true,
     open: `/?token=${ACCESS_TOKEN}`,
   },
 
