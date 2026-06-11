@@ -181,27 +181,65 @@ function TourFitView() {
 /** Centers the graph on the selected node (e.g. from search). */
 function SelectedNodeFitView() {
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
-  const { fitView } = useReactFlow();
+  const nodes = useNodes();
+  const { fitView, setCenter } = useReactFlow();
   const prevRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (selectedNodeId && selectedNodeId !== prevRef.current) {
-      // Delay slightly so this runs after any layer-level fitView triggered
-      // by navigateToNodeInLayer (which also changes activeLayerId).
-      const timer = setTimeout(() => {
-        fitView({
-          nodes: [{ id: selectedNodeId }],
-          duration: 500,
-          padding: 0.3,
-          maxZoom: 1.2,
-          minZoom: 0.01,
-        });
-      }, 100);
-      prevRef.current = selectedNodeId;
-      return () => clearTimeout(timer);
+    if (!selectedNodeId) {
+      prevRef.current = null;
+      return;
     }
-    prevRef.current = selectedNodeId;
-  }, [selectedNodeId, fitView]);
+
+    // Function/class nodes can live inside an expandable container. When a
+    // sidebar link or Focus selects one of those children, the node is not
+    // present in React Flow until the container expands and its child layout
+    // has been computed. Waiting for the rendered node avoids fitting the
+    // viewport to a missing/stale id, which can look like a random jump.
+    if (!nodes.some((node) => node.id === selectedNodeId)) {
+      return;
+    }
+
+    if (selectedNodeId !== prevRef.current) {
+      const raf = requestAnimationFrame(() => {
+        const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+        if (!selectedNode) return;
+
+        if (selectedNode.parentId) {
+          let x = selectedNode.position.x;
+          let y = selectedNode.position.y;
+          let parentId: string | undefined = selectedNode.parentId;
+          while (parentId) {
+            const parent = nodes.find((node) => node.id === parentId);
+            if (!parent) break;
+            x += parent.position.x;
+            y += parent.position.y;
+            parentId = parent.parentId;
+          }
+          const width =
+            (selectedNode.width as number | undefined) ??
+            ((selectedNode.style?.width as number | undefined) ?? NODE_WIDTH);
+          const height =
+            (selectedNode.height as number | undefined) ??
+            ((selectedNode.style?.height as number | undefined) ?? NODE_HEIGHT);
+          setCenter(x + width / 2, y + height / 2, {
+            zoom: 1,
+            duration: 500,
+          });
+        } else {
+          fitView({
+            nodes: [{ id: selectedNodeId }],
+            duration: 500,
+            padding: 0.3,
+            maxZoom: 1.2,
+            minZoom: 0.01,
+          });
+        }
+      });
+      prevRef.current = selectedNodeId;
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [selectedNodeId, nodes, fitView, setCenter]);
 
   return null;
 }
@@ -265,7 +303,7 @@ function useOverviewGraph() {
     });
 
     // Aggregate edges between layers
-    const aggregated = aggregateLayerEdges(graph);
+    const aggregated = aggregateLayerEdges(graph, nodeIdToLayerId);
     const flowEdges: Edge[] = aggregated.map((agg, i) => ({
       id: `le-${i}`,
       source: agg.sourceLayerId,
@@ -358,16 +396,18 @@ const EMPTY_TOPOLOGY: LayerDetailTopology = {
  * Topology hook: derives containers, aggregates inter-container edges, then
  * runs Stage 1 ELK on container atoms (no children rendered yet — Task 12
  * lazy-expands them). Only recomputes when the graph structure, active
- * layer, persona, diff state, focus, or filters change. Does NOT depend on
- * selectedNodeId, searchResults, tourHighlightedNodeIds, or
- * expandedContainers (Stage 2 concern).
+ * layer, persona, diff state, selected/focused node, or filters change. Does
+ * NOT depend on searchResults, tourHighlightedNodeIds, or expandedContainers
+ * (Stage 2 concern).
  */
 function useLayerDetailTopology(): LayerDetailTopology & {
   layoutStatus: "computing" | "ready";
 } {
   const graph = useDashboardStore((s) => s.graph);
   const nodesById = useDashboardStore((s) => s.nodesById);
+  const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
+  const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const persona = useDashboardStore((s) => s.persona);
   const diffMode = useDashboardStore((s) => s.diffMode);
@@ -421,6 +461,11 @@ function useLayerDetailTopology(): LayerDetailTopology & {
             expandedLayerNodeIds.add(edge.target);
           }
         }
+      }
+    }
+    for (const nodeId of [selectedNodeId, focusNodeId]) {
+      if (nodeId && nodeIdToLayerId.get(nodeId) === activeLayerId) {
+        expandedLayerNodeIds.add(nodeId);
       }
     }
 
@@ -585,7 +630,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     });
 
     // Portal nodes for connected external layers (unchanged)
-    const portals = computePortals(graph, activeLayerId);
+    const portals = computePortals(graph, activeLayerId, undefined, nodeIdToLayerId);
     const layerIndexMap = new Map(graph.layers.map((l, i) => [l.id, i]));
 
     const portalNodes: PortalFlowNode[] = portals.map((portal) => ({
@@ -640,11 +685,13 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   }, [
     graph,
     nodesById,
+    nodeIdToLayerId,
     activeLayerId,
     persona,
     diffMode,
     changedNodeIds,
     affectedNodeIds,
+    selectedNodeId,
     focusNodeId,
     nodeTypeFilters,
     drillIntoLayer,
@@ -1300,6 +1347,7 @@ function GraphViewInner() {
   const graph = useDashboardStore((s) => s.graph);
   const navigationLevel = useDashboardStore((s) => s.navigationLevel);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
+  const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
@@ -1389,6 +1437,14 @@ function GraphViewInner() {
   // ── Auto-expand triggers (Task 13) ─────────────────────────────────────
   // Only meaningful in layer-detail; in overview mode there are no
   // containers so all three effects no-op.
+
+  // Selection: when a search/sidebar action selects a child node inside a
+  // container, expand that container even before Focus mode is enabled.
+  useEffect(() => {
+    if (!selectedNodeId || !nodeToContainer) return;
+    const cid = nodeToContainer.get(selectedNodeId);
+    if (cid && cid !== selectedNodeId) expandContainer(cid);
+  }, [selectedNodeId, nodeToContainer, expandContainer]);
 
   // Focus: when focusNodeId resolves to a node inside a container, expand it.
   // Reading expandContainer is stable (Zustand setter); intentionally omitting

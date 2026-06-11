@@ -311,6 +311,10 @@ export default function NodeInfo() {
   const typeBadge = typeBadgeColors[knownType] ?? typeBadgeColors.file;
   const complexityBadge =
     complexityBadgeColors[node.complexity] ?? complexityBadgeColors.simple;
+  const navigateToGraphNode = (nodeId: string) => {
+    navigateToNode(nodeId);
+    setFocusNode(nodeId);
+  };
 
   if (import.meta.env.DEV && !(knownType in typeBadgeColors)) {
     console.warn(`[NodeInfo] Unknown node type "${node.type}" — using "file" badge colors`);
@@ -478,7 +482,7 @@ export default function NodeInfo() {
                 <div
                   key={child.id}
                   className="text-xs bg-elevated rounded-lg px-3 py-2 border border-border-subtle cursor-pointer hover:border-gold/40 hover:bg-gold/5 transition-colors"
-                  onClick={() => navigateToNode(child.id)}
+                  onClick={() => navigateToGraphNode(child.id)}
                 >
                   <div className="flex items-center gap-2">
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${childTypeBadge}`}>
@@ -520,7 +524,7 @@ export default function NodeInfo() {
                   key={i}
                   className="text-xs bg-elevated rounded-lg px-3 py-2 border border-border-subtle flex items-center gap-2 cursor-pointer hover:border-gold/40 hover:bg-gold/5 transition-colors"
                   onClick={() => {
-                    navigateToNode(otherId);
+                    navigateToGraphNode(otherId);
                   }}
                 >
                   <span className="text-gold font-mono">{arrow}</span>
