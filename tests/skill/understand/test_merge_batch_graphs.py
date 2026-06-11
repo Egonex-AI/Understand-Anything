@@ -1072,9 +1072,11 @@ class TestMultiPart(unittest.TestCase):
 class TestUnrecognizedBatchFilename(unittest.TestCase):
     """File-analyzer fuses multiple batches into one output (e.g.,
     `batch-fused-8-13.json`, `batch-8-13.json`) — the merge script's regex
-    requires `batch-<N>.json` or `batch-<N>-part-<K>.json` and would
-    otherwise silently drop the contents. The script must warn loudly and
-    surface the drop in its report so the downstream review step catches it.
+    requires `batch-<N>.json`, `batch-<N>-part-<K>.json`, or
+    `batch-existing.json`. Anything else would historically have been
+    silently dropped (see #292), losing every node/edge in the misnamed
+    file. The script now hard-exits with a clear error so this kind of
+    silent data loss is impossible.
     """
 
     def setUp(self) -> None:
@@ -1105,9 +1107,9 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         assembled = _j.loads(out_path.read_text()) if out_path.exists() else {}
         return result.returncode, result.stderr, assembled
 
-    def test_fused_filename_emits_stderr_warning(self) -> None:
+    def test_fused_filename_hard_exits_with_clear_error(self) -> None:
         # `batch-fused-3-5.json` does not match the merge regex —
-        # script must warn on stderr (not silently drop).
+        # the script must abort, not silently drop the contents.
         self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
         self._write_batch("batch-2.json", [_file_node("src/b.ts")], [])
         self._write_batch(
@@ -1115,36 +1117,24 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
             [_file_node("src/c.ts"), _file_node("src/d.ts"), _file_node("src/e.ts")],
             [],
         )
-        rc, stderr, _assembled = self._run_merge()
-        self.assertEqual(rc, 0)
-        self.assertIn("Warning: merge-batch-graphs:", stderr)
-        self.assertIn("unrecognized filenames", stderr)
+        rc, stderr, assembled = self._run_merge()
+        self.assertNotEqual(rc, 0)
+        self.assertIn("Error: merge-batch-graphs:", stderr)
         self.assertIn("batch-fused-3-5.json", stderr)
         # Remediation hint must be present so users know what to fix.
         self.assertIn("file-analyzer", stderr)
         self.assertIn("batch-<N>.json", stderr)
+        # New `batch-existing.json` filename must be in the remediation hint.
+        self.assertIn("batch-existing.json", stderr)
+        # No assembled-graph.json should be produced when the script aborts —
+        # callers should never see a partial merged graph for this failure.
+        self.assertEqual(assembled, {})
 
-    def test_fused_filename_surfaces_in_report(self) -> None:
-        # The merge report (printed after the per-file load lines) must
-        # also flag the drop so Phase 3 review picks it up.
-        self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
-        self._write_batch(
-            "batch-fused-2-4.json", [_file_node("src/x.ts")], [],
-        )
-        rc, stderr, _assembled = self._run_merge()
-        self.assertEqual(rc, 0)
-        # "dropped N batch file(s) with unrecognized filenames" appears in the
-        # report section (printed after "Output: ..." line).
-        self.assertIn("dropped 1 batch file(s) with unrecognized filenames", stderr)
-        self.assertIn("batch-fused-2-4.json", stderr)
-        self.assertIn(
-            "every node/edge in these files was excluded from the final graph",
-            stderr,
-        )
-
-    def test_recognized_batches_still_loaded(self) -> None:
-        # With both recognized and unrecognized files present, recognized
-        # ones must still produce a valid assembled graph.
+    def test_no_partial_graph_written_on_hard_exit(self) -> None:
+        # Even when most batches are valid, a single unrecognized filename
+        # blocks the merge entirely. Producing a partial graph here is the
+        # exact bug #292 was about — silent data loss is worse than a loud
+        # failure that forces the user to investigate.
         self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
         self._write_batch("batch-2.json", [_file_node("src/b.ts")], [])
         self._write_batch(
@@ -1153,20 +1143,15 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
             [],
         )
         rc, _stderr, assembled = self._run_merge()
-        self.assertEqual(rc, 0)
-        node_ids = {n["id"] for n in assembled["nodes"]}
-        # batch-1 + batch-2 survive
-        self.assertIn("file:src/a.ts", node_ids)
-        self.assertIn("file:src/b.ts", node_ids)
-        # batch-fused-3-5.json content is excluded
-        self.assertNotIn("file:src/dropped-c.ts", node_ids)
-        self.assertEqual(node_ids, {"file:src/a.ts", "file:src/b.ts"})
+        self.assertNotEqual(rc, 0)
+        # No assembled-graph.json written.
+        self.assertEqual(assembled, {})
 
     def test_range_filename_also_unrecognized(self) -> None:
         # A bare range like `batch-8-13.json` is just as broken as
         # `batch-fused-8-13.json` — both must be flagged. The regex
-        # `batch-(\d+)(?:-part-(\d+))?\.json` requires the literal
-        # `-part-` separator before a second number.
+        # `batch-(\d+|existing)(?:-part-(\d+))?\.json` requires the
+        # literal `-part-` separator before a second number.
         self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
         self._write_batch(
             "batch-8-13.json",
@@ -1174,13 +1159,144 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
             [],
         )
         rc, stderr, assembled = self._run_merge()
-        self.assertEqual(rc, 0)
-        self.assertIn("Warning: merge-batch-graphs:", stderr)
+        self.assertNotEqual(rc, 0)
+        self.assertIn("Error: merge-batch-graphs:", stderr)
         self.assertIn("batch-8-13.json", stderr)
-        # Content is dropped
+        # No graph produced.
+        self.assertEqual(assembled, {})
+
+
+# ── batch-existing.json incremental-update handling ────────────────────────
+
+
+class TestBatchExistingFilename(unittest.TestCase):
+    """`batch-existing.json` is the filename SKILL.md's incremental update
+    path writes to carry the pruned existing graph (nodes/edges that
+    survived the prune for unchanged files). Historically the merge regex
+    didn't recognize it and silently dropped it — losing up to ~70% of the
+    graph (see #292). It must now be accepted alongside numeric batches.
+    """
+
+    def setUp(self) -> None:
+        import tempfile
+        self.tmp = Path(tempfile.mkdtemp(prefix="ua-mbg-existing-"))
+        self.intermediate = self.tmp / ".understand-anything" / "intermediate"
+        self.intermediate.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write_batch(self, name: str, nodes: list, edges: list) -> None:
+        import json as _j
+        (self.intermediate / name).write_text(
+            _j.dumps({"nodes": nodes, "edges": edges}),
+            encoding="utf-8",
+        )
+
+    def _run_merge(self) -> tuple[int, str, dict]:
+        import subprocess
+        import json as _j
+        result = subprocess.run(
+            ["python3", str(_MODULE_PATH), str(self.tmp)],
+            capture_output=True, text=True,
+        )
+        out_path = self.intermediate / "assembled-graph.json"
+        assembled = _j.loads(out_path.read_text()) if out_path.exists() else {}
+        return result.returncode, result.stderr, assembled
+
+    def test_batch_existing_alongside_numeric_batch_is_merged(self) -> None:
+        # Incremental update: pruned existing nodes/edges go into
+        # batch-existing.json; fresh re-analysis of changed files goes into
+        # batch-0.json. Both must show up in the assembled graph.
+        self._write_batch(
+            "batch-existing.json",
+            [
+                _file_node("src/unchanged-a.ts"),
+                _file_node("src/unchanged-b.ts"),
+            ],
+            [
+                {
+                    "source": "file:src/unchanged-a.ts",
+                    "target": "file:src/unchanged-b.ts",
+                    "type": "imports",
+                    "direction": "forward",
+                    "weight": 0.7,
+                }
+            ],
+        )
+        self._write_batch(
+            "batch-0.json",
+            [_file_node("src/changed.ts")],
+            [],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0, f"merge should succeed, stderr was:\n{stderr}")
         node_ids = {n["id"] for n in assembled["nodes"]}
-        self.assertNotIn("file:src/x.ts", node_ids)
-        self.assertNotIn("file:src/y.ts", node_ids)
+        # All three nodes from both files survived the merge.
+        self.assertEqual(
+            node_ids,
+            {
+                "file:src/unchanged-a.ts",
+                "file:src/unchanged-b.ts",
+                "file:src/changed.ts",
+            },
+        )
+        # The cross-node edge from batch-existing.json is preserved.
+        edge_keys = {
+            (e["source"], e["target"], e["type"]) for e in assembled["edges"]
+        }
+        self.assertIn(
+            (
+                "file:src/unchanged-a.ts",
+                "file:src/unchanged-b.ts",
+                "imports",
+            ),
+            edge_keys,
+        )
+
+    def test_batch_existing_alone_is_accepted(self) -> None:
+        # Edge case: a re-analysis where every changed file ended up
+        # producing zero new nodes still has `batch-existing.json` to merge.
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node("src/keep.ts")],
+            [],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0, f"merge should succeed, stderr was:\n{stderr}")
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertEqual(node_ids, {"file:src/keep.ts"})
+
+    def test_batch_existing_is_loaded_before_numeric_batches(self) -> None:
+        # Sort order matters for the "keep last" dedup at Step 5: when a
+        # node id appears in both `batch-existing.json` (the baseline) and
+        # in a freshly-analyzed numeric batch, the fresh version must win.
+        # batch-existing.json sorts first (synthetic index -1).
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node("src/foo.ts", summary="stale baseline")],
+            [],
+        )
+        self._write_batch(
+            "batch-0.json",
+            [_file_node("src/foo.ts", summary="fresh analysis")],
+            [],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0, f"merge should succeed, stderr was:\n{stderr}")
+        nodes = [n for n in assembled["nodes"] if n["id"] == "file:src/foo.ts"]
+        self.assertEqual(len(nodes), 1)
+        # Fresh batch wins (it was loaded after batch-existing.json so the
+        # "keep last" dedup keeps its copy).
+        self.assertEqual(nodes[0]["summary"], "fresh analysis")
+        # The per-file load order line must list batch-existing.json before
+        # batch-0.json so the precedence is observable from logs.
+        existing_idx = stderr.find("batch-existing.json")
+        zero_idx = stderr.find("batch-0.json")
+        self.assertGreaterEqual(existing_idx, 0)
+        self.assertGreaterEqual(zero_idx, 0)
+        self.assertLess(existing_idx, zero_idx)
 
 
 if __name__ == "__main__":
