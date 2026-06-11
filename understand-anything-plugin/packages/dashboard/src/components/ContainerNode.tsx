@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useEffect } from "react";
+import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getLayerColor } from "./LayerLegend";
 
@@ -13,13 +14,19 @@ export interface ContainerNodeData extends Record<string, unknown> {
   searchHitCount?: number;
   isDiffAffected: boolean;
   isFocusedViaChild: boolean;
-  onToggle: (containerId: string) => void;
+  onToggle: (containerId: string, name?: string) => void;
 }
 
 export type ContainerFlowNode = Node<ContainerNodeData, "container">;
 
-function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlowNode>) {
+function ContainerNodeComponent({ id, data, width, height }: NodeProps<ContainerFlowNode>) {
   const color = getLayerColor(data.colorIndex);
+  // Re-measure handles when the container resizes on expand/collapse —
+  // otherwise edges keep pointing at the stale (pre-expansion) bounds.
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, width, height, data.isExpanded, updateNodeInternals]);
 
   const borderColor = data.isDiffAffected
     ? "var(--color-diff-changed)"
@@ -33,7 +40,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
 
   const handleToggle = (e: React.SyntheticEvent) => {
     e.stopPropagation();
-    data.onToggle(data.containerId);
+    data.onToggle(data.containerId, data.name);
   };
 
   return (
@@ -58,6 +65,11 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
         }
       }}
     >
+      {/* Invisible handles — without them React Flow cannot anchor
+          container→portal / container→container aggregated edges and
+          silently skips rendering them. */}
+      <Handle type="target" position={Position.Top} className="!opacity-0 !pointer-events-none !w-1 !h-1" />
+      <Handle type="source" position={Position.Bottom} className="!opacity-0 !pointer-events-none !w-1 !h-1" />
       <div
         className="flex items-center justify-between font-heading"
         style={{

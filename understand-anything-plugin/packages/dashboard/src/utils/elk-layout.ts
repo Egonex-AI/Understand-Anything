@@ -6,6 +6,7 @@ export interface ElkChild {
   id: string;
   width?: number;
   height?: number;
+  layoutOptions?: Record<string, string>;
   /** Set by ELK after layout; absent on input. Downstream consumers must default. */
   x?: number;
   y?: number;

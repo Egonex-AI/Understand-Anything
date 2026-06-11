@@ -79,6 +79,13 @@ function shouldFallbackToCommunity(
   rooted: string[],
   totalNodes: number,
 ): boolean {
+  // A single folder covering the whole set is a meaningful unit (e.g. a
+  // Redux slice folder like src/store/meetingTypes) — keep it as ONE named
+  // container instead of splitting into anonymous Louvain communities.
+  if (groups.size === 1 && rooted.length === 0) return false;
+  // A single folder covering the whole set is a meaningful unit — keep it
+  // as ONE named container instead of splitting into Louvain communities.
+  if (groups.size === 1 && rooted.length === 0) return false;
   const bucketCount = groups.size + (rooted.length > 0 ? 1 : 0);
   if (bucketCount < MIN_BUCKET_COUNT) return true;
   for (const ids of groups.values()) {
@@ -88,12 +95,47 @@ function shouldFallbackToCommunity(
   return false;
 }
 
+export interface PredefinedGroup {
+  id?: string;
+  name: string;
+  nodeIds: string[];
+}
+
+export function slug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9\u0400-\u04ff]+/gi, "-").replace(/^-+|-+$/g, "");
+}
+
 export function deriveContainers(
   nodes: GraphNode[],
   edges: GraphEdge[],
+  predefined?: PredefinedGroup[],
 ): DeriveResult {
   if (nodes.length === 0) {
     return { containers: [], ungrouped: [] };
+  }
+
+  // Manual grouping from the graph data (layer.containers) wins over
+  // folder/community derivation. Nodes not claimed by any group stay
+  // ungrouped — they render as standalone cards one level above.
+  if (predefined && predefined.length > 0) {
+    const present = new Set(nodes.map((n) => n.id));
+    const claimed = new Set<string>();
+    const containers: DerivedContainer[] = [];
+    for (const g of predefined) {
+      const ids = g.nodeIds.filter((id) => present.has(id) && !claimed.has(id));
+      if (ids.length === 0) continue; // singleton FEATURE containers are allowed
+      for (const id of ids) claimed.add(id);
+      containers.push({
+        id: g.id ?? `container:${slug(g.name)}`,
+        name: g.name,
+        nodeIds: ids,
+        strategy: "folder",
+      });
+    }
+    if (containers.length > 0) {
+      const ungrouped = nodes.map((n) => n.id).filter((id) => !claimed.has(id));
+      return { containers, ungrouped };
+    }
   }
 
   const { groups, rooted } = groupByFolder(nodes);
@@ -113,11 +155,33 @@ export function deriveContainers(
       byCommunity.set(cid, arr);
     }
     const sorted = [...byCommunity.entries()].sort((a, b) => a[0] - b[0]);
+    // Name community clusters by their member files instead of "Cluster A/B/C".
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    const FILE_LEVEL = new Set([
+      "file", "config", "document", "service", "pipeline",
+      "table", "schema", "resource", "endpoint",
+    ]);
+    const labelFor = (ids: string[]): string => {
+      let members = ids
+        .map((id) => nodeById.get(id))
+        .filter((n): n is GraphNode => Boolean(n));
+      const fileMembers = members.filter((m) => FILE_LEVEL.has(m.type));
+      if (fileMembers.length > 0) members = fileMembers;
+      const bases = [
+        ...new Set(
+          members.map((m) =>
+            (m.name ?? m.id).replace(/\.(tsx?|jsx?|java|py|go|rb|cs|kt)$/i, ""),
+          ),
+        ),
+      ];
+      const head = bases.slice(0, 3).join(" · ");
+      return bases.length > 3 ? `${head} +${bases.length - 3}` : head;
+    };
     containers = sorted.map(([cid, ids], i) => ({
       id: `container:cluster-${cid}`,
-      // A-Z for the first 26, then numeric. Avoids `String.fromCharCode(65+i)`
-      // wrapping into `[`, `\`, `]` ... once the cluster count exceeds 26.
-      name: i < 26 ? `Cluster ${String.fromCharCode(65 + i)}` : `Cluster ${i + 1}`,
+      name:
+        labelFor(ids) ||
+        (i < 26 ? `Cluster ${String.fromCharCode(65 + i)}` : `Cluster ${i + 1}`),
       nodeIds: ids,
       strategy: "community" as const,
     }));

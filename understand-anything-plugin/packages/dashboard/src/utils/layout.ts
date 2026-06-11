@@ -12,8 +12,11 @@ import type { SimulationNodeDatum, SimulationLinkDatum } from "d3-force";
 import type { Node, Edge } from "@xyflow/react";
 import type { ElkInput } from "./elk-layout";
 
-export const NODE_WIDTH = 280;
-export const NODE_HEIGHT = 120;
+export const NODE_WIDTH = 330;
+export const DENSE_THRESHOLD = 12;
+export const DENSE_NODE_WIDTH = 250;
+export const DENSE_NODE_HEIGHT = 44;
+export const NODE_HEIGHT = 150;
 export const LAYER_CLUSTER_WIDTH = 320;
 export const LAYER_CLUSTER_HEIGHT = 180;
 export const PORTAL_NODE_WIDTH = 240;
@@ -208,16 +211,19 @@ export function nodesToElkInput(
   edges: Edge[],
   dims: Map<string, { width: number; height: number }>,
   layoutOptionsOverride?: Record<string, string>,
+  childOptions?: Map<string, Record<string, string>>,
 ): ElkInput {
   return {
     id: "root",
     layoutOptions: { ...ELK_DEFAULT_LAYOUT_OPTIONS, ...layoutOptionsOverride },
     children: nodes.map((n) => {
       const d = dims.get(n.id);
+      const opts = childOptions?.get(n.id);
       return {
         id: n.id,
         width: d?.width ?? NODE_WIDTH,
         height: d?.height ?? NODE_HEIGHT,
+        ...(opts ? { layoutOptions: opts } : {}),
       };
     }),
     edges: edges.map((e, i) => ({

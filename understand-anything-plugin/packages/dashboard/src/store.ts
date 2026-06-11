@@ -115,6 +115,9 @@ interface DashboardStore {
   // Lens navigation
   navigationLevel: NavigationLevel;
   activeLayerId: string | null;
+  /** Drilled-in container (third navigation level: project → layer → feature). */
+  activeContainerId: string | null;
+  activeContainerName: string | null;
 
   codeViewerOpen: boolean;
   codeViewerNodeId: string | null;
@@ -161,6 +164,8 @@ interface DashboardStore {
   navigateToHistoryIndex: (index: number) => void;
   goBackNode: () => void;
   drillIntoLayer: (layerId: string) => void;
+  drillIntoContainer: (containerId: string, name: string) => void;
+  exitContainer: () => void;
   navigateToOverview: () => void;
   setFocusNode: (nodeId: string | null) => void;
   setSearchQuery: (query: string) => void;
@@ -299,6 +304,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   navigationLevel: "overview",
   activeLayerId: null,
+  activeContainerId: null,
+  activeContainerName: null,
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
@@ -471,10 +478,30 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }
   },
 
+  drillIntoContainer: (containerId, name) =>
+    set({
+      activeContainerId: containerId,
+      activeContainerName: name,
+      selectedNodeId: null,
+      focusNodeId: null,
+      expandedContainers: new Set(),
+      pendingFocusContainer: null,
+    }),
+
+  exitContainer: () =>
+    set({
+      activeContainerId: null,
+      activeContainerName: null,
+      selectedNodeId: null,
+      focusNodeId: null,
+    }),
+
   drillIntoLayer: (layerId) =>
     set({
       navigationLevel: "layer-detail",
       activeLayerId: layerId,
+      activeContainerId: null,
+      activeContainerName: null,
       selectedNodeId: null,
       focusNodeId: null,
       codeViewerOpen: false,
@@ -493,6 +520,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     set({
       navigationLevel: "overview",
       activeLayerId: null,
+      activeContainerId: null,
+      activeContainerName: null,
       selectedNodeId: null,
       focusNodeId: null,
       codeViewerOpen: false,

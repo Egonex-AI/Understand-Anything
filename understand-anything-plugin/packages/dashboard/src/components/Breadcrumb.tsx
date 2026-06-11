@@ -4,6 +4,9 @@ import { useI18n } from "../contexts/I18nContext";
 export default function Breadcrumb() {
   const navigationLevel = useDashboardStore((s) => s.navigationLevel);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
+  const activeContainerId = useDashboardStore((s) => s.activeContainerId);
+  const activeContainerName = useDashboardStore((s) => s.activeContainerName);
+  const exitContainer = useDashboardStore((s) => s.exitContainer);
   const graph = useDashboardStore((s) => s.graph);
   const navigateToOverview = useDashboardStore((s) => s.navigateToOverview);
   const { t } = useI18n();
@@ -27,9 +30,22 @@ export default function Breadcrumb() {
             {t.breadcrumb.project}
           </button>
           <span className="text-text-muted">›</span>
-          <span className="text-text-primary">
-            {activeLayer?.name ?? t.layer.defaultName}
-          </span>
+          {activeContainerId ? (
+            <>
+              <button
+                onClick={exitContainer}
+                className="text-gold hover:text-gold-bright transition-colors"
+              >
+                {activeLayer?.name ?? t.layer.defaultName}
+              </button>
+              <span className="text-text-muted">›</span>
+              <span className="text-text-primary">{activeContainerName}</span>
+            </>
+          ) : (
+            <span className="text-text-primary">
+              {activeLayer?.name ?? t.layer.defaultName}
+            </span>
+          )}
           <span className="text-text-muted ml-1 text-[10px] normal-case tracking-normal">
             ({t.breadcrumb.escBack})
           </span>

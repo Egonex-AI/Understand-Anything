@@ -299,6 +299,8 @@ function DashboardContent({
             state.closeCodeViewer();
           } else if (state.selectedNodeId) {
             state.selectNode(null);
+          } else if (state.activeContainerId) {
+            state.exitContainer();
           } else if (state.navigationLevel === "layer-detail") {
             state.navigateToOverview();
           } else if (state.tourActive) {

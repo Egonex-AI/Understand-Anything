@@ -23,6 +23,7 @@ import type { PortalFlowNode } from "./PortalNode";
 import ContainerNode from "./ContainerNode";
 import type { ContainerFlowNode, ContainerNodeData } from "./ContainerNode";
 import Breadcrumb from "./Breadcrumb";
+import LayerIndexView from "./LayerIndexView";
 import { useDashboardStore } from "../store";
 import type {
   GraphEdge,
@@ -33,6 +34,9 @@ import type {
 import { useTheme } from "../themes/index.ts";
 import {
   NODE_WIDTH,
+  DENSE_THRESHOLD,
+  DENSE_NODE_WIDTH,
+  DENSE_NODE_HEIGHT,
   NODE_HEIGHT,
   LAYER_CLUSTER_WIDTH,
   LAYER_CLUSTER_HEIGHT,
@@ -48,6 +52,7 @@ import {
   aggregateContainerEdges,
   aggregateLayerEdges,
   computePortals,
+  findExternalNeighborFiles,
   findCrossLayerFileNodes,
 } from "../utils/edgeAggregation";
 import { deriveContainers } from "../utils/containers";
@@ -179,6 +184,24 @@ function TourFitView() {
 }
 
 /** Centers the graph on the selected node (e.g. from search). */
+function ContainerDrillFitView() {
+  const activeContainerId = useDashboardStore((s) => s.activeContainerId);
+  const { fitView } = useReactFlow();
+  const prevRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (activeContainerId !== prevRef.current) {
+      prevRef.current = activeContainerId;
+      const timer = setTimeout(() => {
+        fitView({ duration: 400, padding: 0.2 });
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [activeContainerId, fitView]);
+
+  return null;
+}
+
 function SelectedNodeFitView() {
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const { fitView } = useReactFlow();
@@ -266,17 +289,35 @@ function useOverviewGraph() {
 
     // Aggregate edges between layers
     const aggregated = aggregateLayerEdges(graph);
-    const flowEdges: Edge[] = aggregated.map((agg, i) => ({
-      id: `le-${i}`,
-      source: agg.sourceLayerId,
-      target: agg.targetLayerId,
-      label: `${agg.count}`,
+    // With pinned tiers, edges flowing AGAINST the vertical order (lower
+    // tier → higher tier) would leave the lower card's bottom handle, loop
+    // around and enter the upper card's top handle. The overview shows no
+    // arrowheads, so flip such edges visually: exit the upper card's
+    // bottom, enter the lower card's top.
+    const tierOf = new Map<string, number>();
+    for (const layer of graph.layers) {
+      if (typeof layer.tier === "number") tierOf.set(layer.id, layer.tier);
+    }
+    const flowEdges: Edge[] = aggregated.map((agg, i) => {
+      let src = agg.sourceLayerId;
+      let tgt = agg.targetLayerId;
+      const ts = tierOf.get(src);
+      const tt = tierOf.get(tgt);
+      if (ts !== undefined && tt !== undefined && ts > tt) {
+        [src, tgt] = [tgt, src];
+      }
+      return {
+        id: `le-${i}`,
+        source: src,
+        target: tgt,
+        label: `${agg.count}`,
       style: {
         stroke: "rgba(212,165,116,0.4)",
         strokeWidth: Math.min(1 + Math.log2(agg.count + 1), 5),
       },
       labelStyle: { fill: "#a39787", fontSize: 11, fontWeight: 600 },
-    }));
+      };
+    });
 
     const dims = new Map<string, { width: number; height: number }>();
     for (const n of clusterNodes) {
@@ -301,7 +342,31 @@ function useOverviewGraph() {
     let cancelled = false;
     const { clusterNodes, flowEdges, dims } = built;
     const baseNodes = clusterNodes as unknown as Node[];
-    const elkInput = nodesToElkInput(baseNodes, flowEdges, dims);
+    // Tier pinning: when layers carry a tier, use ELK partitioning so the
+    // vertical order follows the declared architecture.
+    const tiers = new Map<string, number>();
+    for (const layer of graph?.layers ?? []) {
+      if (typeof layer.tier === "number") tiers.set(layer.id, layer.tier);
+    }
+    let layoutOverride: Record<string, string> | undefined;
+    let childOptions: Map<string, Record<string, string>> | undefined;
+    if (tiers.size > 0) {
+      const maxTier = Math.max(...Array.from(tiers.values()));
+      layoutOverride = {
+        "elk.partitioning.activate": "true",
+        // Post-compaction moves nodes across layer boundaries and silently
+        // violates partitions (a tier-2 node ends up in the top row) —
+        // disable it whenever partitioning is active.
+        "elk.layered.compaction.postCompaction.strategy": "NONE",
+      };
+      childOptions = new Map(
+        baseNodes.map((n) => [
+          n.id,
+          { "elk.partitioning.partition": String(tiers.get(n.id) ?? maxTier + 1) },
+        ]),
+      );
+    }
+    const elkInput = nodesToElkInput(baseNodes, flowEdges, dims, layoutOverride, childOptions);
     setLayoutStatus("computing");
     applyElkLayout(elkInput, { strict: import.meta.env.DEV })
       .then(({ positioned, issues }) => {
@@ -340,6 +405,7 @@ interface LayerDetailTopology {
   containers: DerivedContainer[];
   nodeToContainer: Map<string, string>;
   intraContainer: GraphEdge[];
+  portalCrossFiles: Map<string, string[]>;
 }
 
 const EMPTY_TOPOLOGY: LayerDetailTopology = {
@@ -352,6 +418,7 @@ const EMPTY_TOPOLOGY: LayerDetailTopology = {
   containers: [],
   nodeToContainer: new Map(),
   intraContainer: [],
+  portalCrossFiles: new Map(),
 };
 
 /**
@@ -366,6 +433,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   layoutStatus: "computing" | "ready";
 } {
   const graph = useDashboardStore((s) => s.graph);
+  const activeContainerId = useDashboardStore((s) => s.activeContainerId);
   const nodesById = useDashboardStore((s) => s.nodesById);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
   const selectNode = useDashboardStore((s) => s.selectNode);
@@ -389,10 +457,11 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   // Stable across renders so ContainerNode's memo() actually short-circuits.
   // Reading toggleContainer via getState() avoids subscribing this hook to
   // expandedContainers — Stage 1 must not relayout on expand.
-  const handleContainerToggle = useCallback(
-    (id: string) => useDashboardStore.getState().toggleContainer(id),
-    [],
-  );
+  const handleContainerToggle = useCallback((id: string, name?: string) => {
+    // Containers are a navigation level (project → layer → feature):
+    // clicking drills in instead of expanding dozens of cards in place.
+    useDashboardStore.getState().drillIntoContainer(id, name ?? id.replace(/^container:/, ""));
+  }, []);
 
   // ── Structural build (synchronous): filtering + containers + nodes/edges
   // pre-layout. Re-runs whenever the inputs that drive container derivation
@@ -474,10 +543,33 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     }
 
     // Derive containers + bucket edges
-    const { containers, ungrouped } = deriveContainers(
-      filteredGraphNodes,
-      filteredGraphEdges,
-    );
+    // Small layers read better as plain full cards with real edges than as
+    // a couple of half-empty folder chips — skip auto-grouping (data-defined
+    // layer.containers still win).
+    const skipAutoGrouping =
+      !activeLayer.containers?.length && filteredGraphNodes.length <= 10;
+    let { containers, ungrouped } = skipAutoGrouping
+      ? { containers: [], ungrouped: filteredGraphNodes.map((n) => n.id) }
+      : deriveContainers(
+          filteredGraphNodes,
+          filteredGraphEdges,
+          activeLayer.containers,
+        );
+    // Container drill-in view: only the active container's children, all
+    // ungrouped (full cards), no sibling containers on the canvas.
+    if (activeContainerId) {
+      const active = containers.find((c) => c.id === activeContainerId);
+      if (active) {
+        const childSet = new Set(active.nodeIds);
+        filteredGraphNodes = filteredGraphNodes.filter((n) => childSet.has(n.id));
+        filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
+        filteredGraphEdges = filteredGraphEdges.filter(
+          (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
+        );
+        containers = [];
+        ungrouped = [...childSet];
+      }
+    }
     const ungroupedSet = new Set(ungrouped);
     const nodeToContainer = new Map<string, string>();
     for (const c of containers) {
@@ -497,20 +589,17 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     // Caps prevent first-paint sprawl: at 100 children sqrt() yields
     // ~3360px which renders as a huge empty box pre-expansion. Stage 2
     // sets the actual size once it's measured, and Task 15 re-flows.
-    const STAGE1_MAX_CONTAINER_WIDTH = 800;
-    const STAGE1_MAX_CONTAINER_HEIGHT = 600;
     const sizeMemory = useDashboardStore.getState().containerSizeMemory;
+    // Containers render as compact navigation chips (click = drill in).
     const containerWidth = (c: DerivedContainer) => {
       const memo = sizeMemory.get(c.id)?.width;
       if (memo) return memo;
-      const estimate = Math.sqrt(c.nodeIds.length) * NODE_WIDTH * 1.2;
-      return Math.min(STAGE1_MAX_CONTAINER_WIDTH, Math.max(NODE_WIDTH, estimate));
+      return 230;
     };
     const containerHeight = (c: DerivedContainer) => {
       const memo = sizeMemory.get(c.id)?.height;
       if (memo) return memo;
-      const estimate = Math.sqrt(c.nodeIds.length) * NODE_HEIGHT * 1.2;
-      return Math.min(STAGE1_MAX_CONTAINER_HEIGHT, Math.max(NODE_HEIGHT, estimate));
+      return 64;
     };
 
     // Build container flow nodes (children NOT rendered yet — Task 12)
@@ -575,7 +664,10 @@ function useLayerDetailTopology(): LayerDetailTopology & {
         id: `agg-${i}`,
         source: agg.sourceContainerId,
         target: agg.targetContainerId,
-        label: String(agg.count),
+        label:
+          agg.count === 1 && agg.edgeTypes.length === 1
+            ? agg.edgeTypes[0]
+            : String(agg.count),
         style: baseStyle,
         labelStyle: {
           fill: diffMode ? "rgba(163,151,135,0.3)" : "#a39787",
@@ -588,6 +680,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     const portals = computePortals(graph, activeLayerId);
     const layerIndexMap = new Map(graph.layers.map((l, i) => [l.id, i]));
 
+    const nodeNameById = new Map(graph.nodes.map((n) => [n.id, n.name ?? n.id]));
     const portalNodes: PortalFlowNode[] = portals.map((portal) => ({
       id: `portal:${portal.layerId}`,
       type: "portal" as const,
@@ -597,14 +690,24 @@ function useLayerDetailTopology(): LayerDetailTopology & {
         targetLayerName: portal.layerName,
         connectionCount: portal.connectionCount,
         layerColorIndex: layerIndexMap.get(portal.layerId) ?? 0,
+        externalFileNames: [
+          ...findExternalNeighborFiles(graph, activeLayerId, portal.layerId),
+        ]
+          .map((id) => nodeNameById.get(id) ?? id)
+          .sort(),
         onNavigate: drillIntoLayer,
       },
     }));
 
     const portalEdges: Edge[] = [];
+    const portalCrossFiles = new Map<string, string[]>();
     let portalEdgeIdx = aggEdges.length;
     for (const portal of portals) {
       const crossFiles = findCrossLayerFileNodes(graph, activeLayerId, portal.layerId);
+      portalCrossFiles.set(
+        `portal:${portal.layerId}`,
+        [...crossFiles].filter((id) => filteredNodeIds.has(id)),
+      );
       // Dedupe by atom — multiple files in the same container hitting the
       // same portal collapse to one Stage 1 edge. Task 12 will re-route to
       // the actual file ids when the source container expands.
@@ -618,7 +721,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           id: `e-${portalEdgeIdx++}`,
           source: atomId,
           target: `portal:${portal.layerId}`,
-          style: { stroke: "rgba(212,165,116,0.2)", strokeWidth: 1, strokeDasharray: "4 4" },
+          style: { stroke: "rgba(212,165,116,0.55)", strokeWidth: 1.6, strokeDasharray: "5 4" },
           animated: false,
         });
       }
@@ -636,11 +739,13 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       aggEdges,
       portalNodes,
       portalEdges,
+      portalCrossFiles,
     };
   }, [
     graph,
     nodesById,
     activeLayerId,
+    activeContainerId,
     persona,
     diffMode,
     changedNodeIds,
@@ -681,6 +786,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       aggEdges,
       portalNodes,
       portalEdges,
+      portalCrossFiles,
     } = built;
 
     // Build Stage 1 ELK input: containers as opaque atoms + ungrouped files
@@ -707,11 +813,17 @@ function useLayerDetailTopology(): LayerDetailTopology & {
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
       })),
-      ...portalNodes.map((pn) => ({
-        id: pn.id,
-        width: PORTAL_NODE_WIDTH,
-        height: PORTAL_NODE_HEIGHT,
-      })),
+      ...portalNodes.map((pn) => {
+        // Portal cards grew a member-name list — account for it in the
+        // layout estimate or ELK packs them at 80px and cards overlap.
+        const names = (pn.data.externalFileNames ?? []).length;
+        const listLines = Math.min(names, 6) + (names > 6 ? 1 : 0);
+        return {
+          id: pn.id,
+          width: PORTAL_NODE_WIDTH,
+          height: PORTAL_NODE_HEIGHT + (listLines > 0 ? 6 + listLines * 15 : 0),
+        };
+      }),
     ];
 
     const stage1Edges: ElkEdge[] = [
@@ -758,6 +870,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           containers,
           nodeToContainer,
           intraContainer,
+          portalCrossFiles,
         });
         setLayoutStatus("ready");
       })
@@ -806,6 +919,36 @@ function useLayerDetailTopology(): LayerDetailTopology & {
         const childEdges = stage2Intra.filter(
           (e) => childIds.has(e.source) && childIds.has(e.target),
         );
+
+        // Dense path: large containers skip ELK and pack compact rows into
+        // a name-sorted grid — dozens of full cards produce an unusable
+        // multi-thousand-pixel canvas.
+        if (c.nodeIds.length > DENSE_THRESHOLD) {
+          const GAP_X = 14;
+          const GAP_Y = 10;
+          const sorted = [...c.nodeIds].sort((a, b) => {
+            const an = a.split("/").pop() ?? a;
+            const bn = b.split("/").pop() ?? b;
+            return an.localeCompare(bn);
+          });
+          const cols = Math.max(2, Math.round(0.62 * Math.sqrt(sorted.length)));
+          const childPositions = new Map<string, { x: number; y: number }>();
+          sorted.forEach((id, i) => {
+            const col = i % cols;
+            const row = Math.floor(i / cols);
+            childPositions.set(id, {
+              x: 20 + col * (DENSE_NODE_WIDTH + GAP_X),
+              y: 56 + row * (DENSE_NODE_HEIGHT + GAP_Y),
+            });
+          });
+          const rows = Math.ceil(sorted.length / cols);
+          const actualSize = {
+            width: 40 + cols * (DENSE_NODE_WIDTH + GAP_X) - GAP_X,
+            height: 76 + rows * (DENSE_NODE_HEIGHT + GAP_Y) - GAP_Y,
+          };
+          return { containerId, childPositions, actualSize, deviated: true };
+        }
+
         const stage2Children: ElkChild[] = c.nodeIds.map((id) => ({
           id,
           width: NODE_WIDTH,
@@ -997,6 +1140,9 @@ function useLayerDetailGraph() {
           affectedNodeIds,
           onNodeClick: handleNodeSelect,
         });
+        if (container.nodeIds.length > DENSE_THRESHOLD) {
+          (base.data as Record<string, unknown>).dense = true;
+        }
         out.push({
           ...base,
           parentId: containerId,
@@ -1258,10 +1404,39 @@ function useLayerDetailGraph() {
     expandedContainers,
   ]);
 
+  // Re-route portal edges: when a container is expanded, replace its single
+  // container→portal edge with per-file edges from the actual cross-layer
+  // files inside it (e.g. service.ts → "REST API" portal).
+  const portalEdgesFinal = useMemo<Edge[]>(() => {
+    if (expandedContainers.size === 0) return topo.portalEdges;
+    const out: Edge[] = [];
+    const seen = new Set<string>();
+    for (const pe of topo.portalEdges) {
+      const srcAtom = String(pe.source);
+      if (!expandedContainers.has(srcAtom)) {
+        out.push(pe);
+        continue;
+      }
+      const portalId = String(pe.target);
+      const files = topo.portalCrossFiles.get(portalId) ?? [];
+      let emitted = false;
+      for (const f of files) {
+        if (topo.nodeToContainer.get(f) !== srcAtom) continue;
+        const key = `${f}|${portalId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ...pe, id: `portal-file-${key}`, source: f });
+        emitted = true;
+      }
+      if (!emitted) out.push(pe);
+    }
+    return out;
+  }, [topo.portalEdges, topo.portalCrossFiles, topo.nodeToContainer, expandedContainers]);
+
   const edges = useMemo(() => {
-    // Compose: Stage 1 / inflated edges, plus portal edges (Stage 1 sources
-    // them off container atoms — re-sourcing on expand is deferred).
-    const base = [...expandedEdges, ...topo.portalEdges];
+    // Compose: Stage 1 / inflated edges, plus portal edges (re-routed to
+    // actual files for expanded containers).
+    const base = [...expandedEdges, ...portalEdgesFinal];
     if (!selectedNodeId) return base;
 
     // Apply selection-based edge styling on top of topology edges
@@ -1276,7 +1451,7 @@ function useLayerDetailGraph() {
       // Fade unrelated edges
       return { ...edge, animated: false, style: { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 }, labelStyle: { fill: "rgba(163,151,135,0.2)", fontSize: 10 } };
     });
-  }, [expandedEdges, topo.portalEdges, selectedNodeId]);
+  }, [expandedEdges, portalEdgesFinal, selectedNodeId]);
 
   // Expose container topology so the parent component can wire auto-expand
   // triggers (focus, tour, zoom) without having to re-derive containers.
@@ -1300,6 +1475,7 @@ function GraphViewInner() {
   const graph = useDashboardStore((s) => s.graph);
   const navigationLevel = useDashboardStore((s) => s.navigationLevel);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
+  const activeContainerIdNav = useDashboardStore((s) => s.activeContainerId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
@@ -1460,10 +1636,8 @@ function GraphViewInner() {
         if (vp.zoom <= 1.0) return;
         // Only fire when zoom actually increased — pan and zoom-out are no-ops.
         if (prev !== null && vp.zoom <= prev) return;
-        const expanded = useDashboardStore.getState().expandedContainers;
-        for (const cid of containerIds) {
-          if (!expanded.has(cid)) expandContainer(cid);
-        }
+        // Zoom-driven auto-expand disabled: containers open only by
+        // explicit click (drill-in), focus or tour navigation.
       }, 200);
     },
     [containerIds, getViewport, expandContainer],
@@ -1501,6 +1675,21 @@ function GraphViewInner() {
     return (
       <div className="h-full w-full flex items-center justify-center bg-root rounded-lg">
         <p className="text-text-muted text-sm">No knowledge graph loaded</p>
+      </div>
+    );
+  }
+
+  const indexLayer =
+    navigationLevel === "layer-detail" && !activeContainerIdNav
+      ? graph.layers.find((l) => l.id === activeLayerId)
+      : undefined;
+  const indexMode = (indexLayer?.containers?.length ?? 0) > 8;
+
+  if (indexMode) {
+    return (
+      <div className="h-full w-full relative">
+        <Breadcrumb />
+        <LayerIndexView />
       </div>
     );
   }
@@ -1549,6 +1738,7 @@ function GraphViewInner() {
         />
         <TourFitView />
         <SelectedNodeFitView />
+      <ContainerDrillFitView />
       </ReactFlow>
       {(layoutStatus === "computing" || tourFitPending) && (
         <div

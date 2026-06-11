@@ -399,6 +399,17 @@ export const LayerSchema = z.object({
   name: z.string(),
   description: z.string(),
   nodeIds: z.array(z.string()),
+  containers: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        name: z.string(),
+        nodeIds: z.array(z.string()),
+        group: z.string().optional(),
+      }),
+    )
+    .optional(),
+  tier: z.number().optional(),
 });
 
 export const TourStepSchema = z.object({

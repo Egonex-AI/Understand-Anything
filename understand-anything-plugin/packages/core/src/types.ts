@@ -66,6 +66,10 @@ export interface Layer {
   name: string;
   description: string;
   nodeIds: string[];
+  /** Optional manual grouping of this layer's nodes into named feature containers. */
+  containers?: { id?: string; name: string; nodeIds: string[]; group?: string }[];
+  /** Optional vertical tier for the project overview (0 = top). */
+  tier?: number;
 }
 
 // TourStep (for learn mode)
