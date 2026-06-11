@@ -1012,13 +1012,17 @@ def main() -> None:
         print(f"Error: {intermediate_dir} does not exist", file=sys.stderr)
         sys.exit(1)
 
-    # Discover batch files, sorted by numeric index (not lexicographic)
-    batch_files = sorted(
-        intermediate_dir.glob("batch-*.json"),
-        key=lambda p: int(re.search(r"batch-(\d+)", p.stem).group(1))
-        if re.search(r"batch-(\d+)", p.stem)
-        else 0,
-    )
+    # Discover batch files, sorted by numeric index (not lexicographic).
+    # `batch-existing.json` (the pruned existing-graph payload written during an
+    # incremental update) sorts first so it loads before the freshly-analyzed
+    # numbered batches.
+    def _batch_sort_key(p: Path) -> int:
+        if p.stem == "batch-existing":
+            return -1
+        m = re.search(r"batch-(\d+)", p.stem)
+        return int(m.group(1)) if m else 0
+
+    batch_files = sorted(intermediate_dir.glob("batch-*.json"), key=_batch_sort_key)
     if not batch_files:
         print("Error: no batch-*.json files found in intermediate/", file=sys.stderr)
         sys.exit(1)
@@ -1033,9 +1037,15 @@ def main() -> None:
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
     for f in batch_files:
-        m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
+        m = re.match(r"batch-(\d+|existing)(?:-part-(\d+))?\.json", f.name)
         if m:
-            by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
+            # `existing` = the pruned existing-graph payload written during an
+            # incremental update; bucket it as logical batch -1 so it loads
+            # before the freshly-analyzed numbered batches. Before this fix it
+            # failed the `\d+`-only match → landed in `unrecognized` → was
+            # silently dropped, losing ~75% of nodes on incremental runs (#292).
+            idx = -1 if m.group(1) == "existing" else int(m.group(1))
+            by_batch[idx].append((f.name, int(m.group(2)) if m.group(2) else None))
         else:
             unrecognized_batch_files.append(f.name)
 
