@@ -62,14 +62,9 @@ interface SearchIndexState {
   mtimes: Record<string, number>
 }
 
-interface SearchIndexCache {
-  serviceFilter: string | null
-  state: SearchIndexState
-}
-
 const DOMAIN_NODE_TYPES = new Set(["flow", "step", "domain"])
 
-let cachedSearchIndex: SearchIndexCache | null = null
+const searchIndexCache = new Map<string, SearchIndexState>()
 
 const TYPE_BOOST: Record<string, number> = {
   class: 2,
@@ -166,7 +161,7 @@ function cjkTokenScores(
     if (matchCount === 0) continue
 
     let score = (matchCount / queryTokens.length) * 10
-    if (item.meta.summary.includes(query) || item.meta.name.includes(query)) score += 10
+    if ((item.meta.summary ?? "").includes(query) || (item.meta.name ?? "").includes(query)) score += 10
 
     score = applyResultBoosts(item, score, query)
     scores.set(item.id, score)
@@ -499,18 +494,16 @@ function buildSearchIndex(projectRoot: string, serviceFilter: string | null): Se
 }
 
 function getOrBuildIndex(projectRoot: string, serviceFilter: string | null): SearchIndexState {
+  const cacheKey = serviceFilter ?? "__all__"
   const currentMtimes = collectIndexMtimes(projectRoot, serviceFilter)
+  const cached = searchIndexCache.get(cacheKey)
 
-  if (
-    cachedSearchIndex &&
-    cachedSearchIndex.serviceFilter === serviceFilter &&
-    mtimesEqual(cachedSearchIndex.state.mtimes, currentMtimes)
-  ) {
-    return cachedSearchIndex.state
+  if (cached && mtimesEqual(cached.mtimes, currentMtimes)) {
+    return cached
   }
 
   const state = buildSearchIndex(projectRoot, serviceFilter)
-  cachedSearchIndex = { serviceFilter, state }
+  searchIndexCache.set(cacheKey, state)
   return state
 }
 
@@ -586,4 +579,14 @@ export async function handleSearchRequest(
 ): Promise<ApiResponse | null> {
   if (req.pathname !== "/api/search") return null
   return handleSearch(req.searchParams)
+}
+
+/** Pre-build the search index so the first query is fast. */
+export function warmupSearchIndex(projectRoot?: string): void {
+  const root = projectRoot ?? resolveProjectRoot()
+  const t0 = Date.now()
+  const state = getOrBuildIndex(root, null)
+  console.log(
+    `  Search index warmed: ${state.items.length} items, ${state.edges.length} edges (${Date.now() - t0}ms)`,
+  )
 }

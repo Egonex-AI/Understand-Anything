@@ -3,6 +3,7 @@ import cors from "cors"
 import { WikiDataService } from "./wiki-api"
 import { createApiRouter } from "./src/api/index"
 import { resolveProjectRoot } from "./src/api/utils"
+import { warmupSearchIndex } from "./src/api/handlers/search"
 
 export interface ServerOptions {
   projectRoot?: string
@@ -61,5 +62,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const app = createApp()
   app.listen(port, host, () => {
     console.log(`\n  API Server: http://${host}:${port}/\n`)
+    warmupSearchIndex()
   })
 }

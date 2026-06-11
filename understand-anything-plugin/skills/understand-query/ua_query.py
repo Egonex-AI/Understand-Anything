@@ -11,7 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote as url_quote, urlencode
 
 DEFAULT_SERVER = "http://172.18.228.71:3001"
-DEFAULT_TIMEOUT = 3
+DEFAULT_TIMEOUT = 5
 
 _IMPL_SUFFIXES = ("ServiceImpl", "WebServiceImpl", "WebService", "Service", "Controller", "Handler", "Manager", "Facade")
 _CONFIG_SUFFIXES = ("Properties", "Config", "Configuration", "Constants", "Enum", "DTO", "BO", "VO", "Request", "Response", "Param")
@@ -537,39 +537,44 @@ def _search_api(server: str, query: str, service: str | None = None, scope: str 
 
 
 def _auto_discover_service(server: str, query: str) -> tuple[str | None, list[dict]]:
-    """Search business landscape + wiki + KG to find which service hosts a feature. Returns (service_name, biz_results)."""
+    """Search wiki + business landscape + KG to find which service hosts a feature. Returns (service_name, biz_results)."""
     service_votes: dict[str, int] = {}
     biz_results: list[dict] = []
+    parts = [p.strip() for p in query.split(",") if p.strip()]
+    short_parts = [p for p in parts if len(p) <= 20]
+    search_query = " ".join(short_parts[:3]) if short_parts else " ".join(parts[:2])
 
-    # Strategy 1: Business landscape search
+    # Strategy 1: Wiki search — fast even on cold server, returns service associations directly
     try:
-        biz_results = _search_api(server, query, scope="business", limit=10)
-        for r in biz_results:
-            for svc in r.get("services", []):
-                svc_name = svc if isinstance(svc, str) else svc.get("name", "")
-                if svc_name:
-                    service_votes[svc_name] = service_votes.get(svc_name, 0) + 3
-            facets = r.get("facets", {})
-            if isinstance(facets, dict):
-                for _facet_name, facet_data in facets.items():
-                    if isinstance(facet_data, dict):
-                        for svc in facet_data.get("services", []):
-                            svc_name = svc if isinstance(svc, str) else svc.get("name", "")
-                            if svc_name:
-                                service_votes[svc_name] = service_votes.get(svc_name, 0) + 2
+        wiki_results = _search_api(server, search_query, scope="wiki", limit=10)
+        for r in wiki_results:
+            svc_name = r.get("service", "")
+            if svc_name:
+                service_votes[svc_name] = service_votes.get(svc_name, 0) + 2
+        if wiki_results:
+            biz_results = wiki_results
     except RuntimeError:
         pass
 
-    # Strategy 2: Wiki search (catches service-local domains not in business landscape)
+    # Strategy 2: Business landscape search (slower on cold start, supplements wiki)
     if not service_votes:
         try:
-            wiki_results = _search_api(server, query, scope="wiki", limit=10)
-            for r in wiki_results:
-                svc_name = r.get("service", "")
-                if svc_name:
-                    service_votes[svc_name] = service_votes.get(svc_name, 0) + 2
-            if wiki_results:
-                biz_results = wiki_results
+            biz_hits = _search_api(server, search_query, scope="business", limit=10)
+            for r in biz_hits:
+                for svc in r.get("services", []):
+                    svc_name = svc if isinstance(svc, str) else svc.get("name", "")
+                    if svc_name:
+                        service_votes[svc_name] = service_votes.get(svc_name, 0) + 3
+                facets = r.get("facets", {})
+                if isinstance(facets, dict):
+                    for _facet_name, facet_data in facets.items():
+                        if isinstance(facet_data, dict):
+                            for svc in facet_data.get("services", []):
+                                svc_name = svc if isinstance(svc, str) else svc.get("name", "")
+                                if svc_name:
+                                    service_votes[svc_name] = service_votes.get(svc_name, 0) + 2
+            if biz_hits and not biz_results:
+                biz_results = biz_hits
         except RuntimeError:
             pass
 
@@ -583,9 +588,9 @@ def _auto_discover_service(server: str, query: str) -> tuple[str | None, list[di
                 if not (layers.get("wiki") or layers.get("kg")):
                     continue
                 try:
-                    kg_hits = _search_api(server, query, service=svc_name, scope="kg", limit=3)
+                    kg_hits = _search_api(server, search_query, service=svc_name, scope="kg", limit=3)
                     if kg_hits:
-                        best_score = max(_score_node_relevance(n, query) for n in kg_hits)
+                        best_score = max(_score_node_relevance(n, search_query) for n in kg_hits)
                         if best_score > 3.0:
                             service_votes[svc_name] = service_votes.get(svc_name, 0) + int(best_score)
                 except RuntimeError:
@@ -677,21 +682,41 @@ def cmd_trace(args: argparse.Namespace) -> Any:
         result["autoDiscovered"] = True
         result["businessSearchHits"] = len(auto_biz)
 
-    # Step 1: Search KG — batch keywords into one space-joined request + one individual fallback
+    # Step 1: Search KG — try batch first, fallback to per-keyword on server error
     seen_ids: dict[str, tuple[dict, float, str]] = {}
-    batch_query = " ".join(keywords[:4])
-    batch_matched = _search_api(args.server, batch_query, service=service, scope="kg", limit=50, fusion=args.fusion)
-    if args.type:
-        batch_matched = [n for n in batch_matched if n.get("type") == args.type]
     best_keyword = keywords[0] if keywords else args.query
-    for node in batch_matched:
-        nid = node.get("id", "")
-        score = _score_node_relevance(node, best_keyword)
-        if nid not in seen_ids or score > seen_ids[nid][1]:
-            seen_ids[nid] = (node, score, best_keyword)
-    # One supplemental search with the best English keyword for broader coverage
+
+    batch_query = " ".join(keywords[:4])
+    try:
+        batch_matched = _search_api(args.server, batch_query, service=service, scope="kg", limit=50, fusion=args.fusion)
+        if args.type:
+            batch_matched = [n for n in batch_matched if n.get("type") == args.type]
+        for node in batch_matched:
+            nid = node.get("id", "")
+            score = _score_node_relevance(node, best_keyword)
+            if nid not in seen_ids or score > seen_ids[nid][1]:
+                seen_ids[nid] = (node, score, best_keyword)
+    except RuntimeError:
+        # Batch query failed (e.g. server 500 on certain char combos) — fallback per keyword
+        for kw in keywords[:3]:
+            try:
+                kw_matched = _search_api(args.server, kw, service=service, scope="kg", limit=50, fusion=args.fusion)
+                if args.type:
+                    kw_matched = [n for n in kw_matched if n.get("type") == args.type]
+                for node in kw_matched:
+                    nid = node.get("id", "")
+                    score = _score_node_relevance(node, kw)
+                    if nid not in seen_ids or score > seen_ids[nid][1]:
+                        seen_ids[nid] = (node, score, kw)
+                if seen_ids:
+                    best_keyword = kw
+                    break
+            except RuntimeError:
+                continue
+
+    # Supplemental search with best ASCII keyword for broader coverage
     eng_kws = [k for k in keywords if k.isascii() and len(k) > 3]
-    if eng_kws and eng_kws[0] != batch_query:
+    if eng_kws and eng_kws[0] != batch_query and not seen_ids:
         try:
             sup = _search_api(args.server, eng_kws[0], service=service, scope="kg", limit=50, fusion=args.fusion)
             if args.type:
@@ -701,6 +726,8 @@ def cmd_trace(args: argparse.Namespace) -> Any:
                 score = _score_node_relevance(node, eng_kws[0])
                 if nid not in seen_ids or score > seen_ids[nid][1]:
                     seen_ids[nid] = (node, score, eng_kws[0])
+            if seen_ids:
+                best_keyword = eng_kws[0]
         except RuntimeError:
             pass
     matched = [item[0] for item in seen_ids.values()]
@@ -926,7 +953,9 @@ def cmd_ask(args: argparse.Namespace) -> Any:
     # Step 2: Business context
     if not biz_results:
         try:
-            biz_results = _search_api(args.server, query, scope="business", limit=5)
+            biz_parts = [p.strip() for p in query.split(",") if p.strip() and len(p.strip()) <= 20]
+            biz_q = " ".join(biz_parts[:3]) if biz_parts else query.split(",")[0][:20]
+            biz_results = _search_api(args.server, biz_q, scope="business", limit=5)
         except RuntimeError:
             pass
     result["businessContext"] = biz_results[:5] if biz_results else []
@@ -963,8 +992,8 @@ def cmd_ask(args: argparse.Namespace) -> Any:
         result["domainFlows"] = trace_result["domainFlows"]
     if trace_result.get("source"):
         result["source"] = trace_result["source"]
-    if trace_result.get("sourceVerification"):
-        result["sourceVerification"] = trace_result["sourceVerification"]
+    if trace_result.get("sourceReads"):
+        result["sourceReads"] = trace_result["sourceReads"]
     if trace_result.get("discoveredVia"):
         result["discoveredVia"] = trace_result["discoveredVia"]
 
