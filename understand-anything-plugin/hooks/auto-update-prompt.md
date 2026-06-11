@@ -157,7 +157,7 @@ Only re-analyze files with structural changes. This is the **only** phase that c
 
 2. Batch the files from `filesToReanalyze` (from Phase 1). Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
 
-3. For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Append:
+3. For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `$PLUGIN_ROOT/agents/file-analyzer.md`, using the `$PLUGIN_ROOT` resolved in Phase 0 step 9). Append:
 
    > **Additional context from main session:**
    >
@@ -200,7 +200,7 @@ Only re-analyze files with structural changes. This is the **only** phase that c
 
 If the change analysis flagged `ARCHITECTURE_UPDATE`:
 
-1. Dispatch a subagent using the `architecture-analyzer` agent definition (at `agents/architecture-analyzer.md`), passing the full merged node set and import edges. Include previous layer definitions for naming consistency:
+1. Dispatch a subagent using the `architecture-analyzer` agent definition (at `$PLUGIN_ROOT/agents/architecture-analyzer.md`, using the `$PLUGIN_ROOT` resolved in Phase 0 step 9), passing the full merged node set and import edges. Include previous layer definitions for naming consistency:
 
    > Previous layer definitions (for naming consistency):
    > ```json
