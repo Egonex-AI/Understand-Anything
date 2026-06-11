@@ -114,11 +114,21 @@ Determine whether to run a full analysis or incremental update.
    fi
 
    if [ ! -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
-     cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
+     cd "$PLUGIN_ROOT" || exit 1
+     if command -v pnpm >/dev/null 2>&1; then
+       pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+       pnpm --filter @understand-anything/core build
+     elif command -v npm >/dev/null 2>&1; then
+       npm install --workspaces --include-workspace-root --ignore-scripts
+       npm run --workspace @understand-anything/core build
+     else
+       echo "Error: Install Node.js ≥ 22 with either pnpm ≥ 10 or npm, then re-run /understand."
+       exit 1
+     fi
    fi
    ```
 
-   If `pnpm` is missing, report to the user: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
+   Prefer `pnpm` when available because this repository is pinned with `packageManager`, but fall back to `npm` for environments where pnpm is unavailable.
 
 2. Get the current git commit hash:
    ```bash

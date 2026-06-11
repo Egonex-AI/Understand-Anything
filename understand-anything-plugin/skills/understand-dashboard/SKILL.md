@@ -70,11 +70,17 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 4. Install dependencies and build if needed:
    ```bash
-   cd <dashboard-dir> && pnpm install --frozen-lockfile 2>/dev/null || pnpm install
-   ```
-   Then ensure the core package is built (the dashboard depends on it):
-   ```bash
-   cd <plugin-root> && pnpm --filter @understand-anything/core build
+   cd <plugin-root> || exit 1
+   if command -v pnpm >/dev/null 2>&1; then
+     cd <dashboard-dir> && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
+     cd <plugin-root> && pnpm --filter @understand-anything/core build
+   elif command -v npm >/dev/null 2>&1; then
+     cd <plugin-root> && npm install --workspaces --include-workspace-root --ignore-scripts
+     cd <plugin-root> && npm run --workspace @understand-anything/core build
+   else
+     echo "Error: Install Node.js ≥ 22 with either pnpm ≥ 10 or npm, then re-run /understand-dashboard."
+     exit 1
+   fi
    ```
 
 5. Start the Vite dev server pointing at the project's knowledge graph:
