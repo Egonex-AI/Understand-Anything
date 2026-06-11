@@ -1,39 +1,90 @@
-/* Font declarations — self-hosted, no external CDN dependency */
-@font-face {
-  font-family: 'DM Serif Display';
-  src: url('/fonts/DMSerifDisplay-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+/* ==========================================================================
+   New Additions: Scroll Progress Bar & Interactive Button
+   ========================================================================== */
+
+/* Top Scroll Progress Indicator */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--surface);
+  z-index: 10000;
+  transform-origin: 0 50%;
+  animation: scrollProgress linear;
+  animation-timeline: scroll();
 }
 
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+.scroll-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient);
 }
 
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
+@keyframes scrollProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Luxury Interactive Button Component */
+.btn-premium {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 2rem;
+  font-family: var(--font-body);
   font-weight: 600;
-  font-style: normal;
-  font-display: swap;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  color: var(--bg);
+  background: var(--gradient);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease;
+  box-shadow: 0 4px 20px -5px rgba(201, 134, 122, 0.3);
 }
 
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+.btn-premium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 1;
 }
 
-/* Design tokens */
-:root {
-  --bg: #0a0a0a;
+.btn-premium > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Hover States matching editorial style */
+.btn-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--accent-glow), 0 0 0 1px var(--accent);
+}
+
+.btn-premium:hover::before {
+  opacity: 0.08;
+}
+
+.btn-premium:active {
+  transform: translateY(0);
+}
+
+/* Optional styling fallback for code snippet tags inside feature sections */
+code, pre {
+  font-family: var(--font-code);
+}
   --surface: #141414;
   --border: #1a1a1a;
   --accent: #d4a574;
