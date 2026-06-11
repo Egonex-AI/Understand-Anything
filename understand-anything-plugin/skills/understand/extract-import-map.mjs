@@ -1398,7 +1398,11 @@ export function resolveRustImport(rawImport, file, ctx, specifiers = []) {
   } else if (head === 'self') {
     baseDir = importerDir;
   } else if (ctx.rustCrates && ctx.rustCrates.has(head)) {
-    // Cross-crate: `use other_crate::module::Item;`
+    // Cross-crate: `use other_crate::module::Item;`. We match the crate name
+    // against the whole-workspace ident map, NOT the importing crate's
+    // declared [dependencies]. In a coherent workspace this is correct; the
+    // only failure mode is two crates sharing an ident (see loadCargoCrates'
+    // duplicate-ident warning), which is vanishingly rare and out of scope.
     baseDir = ctx.rustCrates.get(head);
   } else {
     return [];

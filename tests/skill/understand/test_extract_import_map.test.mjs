@@ -1248,6 +1248,78 @@ describe('extract-import-map.mjs — Rust resolver', () => {
       'src/text.rs',
     ]);
   });
+
+  it('does not let a root crate src become a false ancestor of a nested crate', () => {
+    projectRoot = setupTree({
+      // root crate at repo root
+      'Cargo.toml': `[package]\nname = "rootcrate"\nversion = "0.1.0"\n`,
+      'src/lib.rs': `pub mod util;\nuse crate::util::helper;\nfn boot() { helper(); }\n`,
+      'src/util.rs': `pub fn helper() {}\n`,
+      // nested crate under crates/leaf
+      'crates/leaf/Cargo.toml': `[package]\nname = "leaf"\nversion = "0.1.0"\n`,
+      'crates/leaf/src/lib.rs': `pub mod inner;\nuse crate::inner::go;\nfn boot() { go(); }\n`,
+      'crates/leaf/src/inner.rs': `pub fn go() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'src/lib.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'src/util.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'crates/leaf/Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'crates/leaf/src/lib.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'crates/leaf/src/inner.rs', language: 'rust', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // root crate's crate:: resolves within the root crate only
+    expect(result.output.importMap['src/lib.rs']).toEqual(['src/util.rs']);
+    // nested crate's crate:: resolves within the nested crate only (NOT to root's src)
+    expect(result.output.importMap['crates/leaf/src/lib.rs']).toEqual([
+      'crates/leaf/src/inner.rs',
+    ]);
+  });
+
+  it('keeps the first crate on a duplicate identifier and warns', () => {
+    // `foo-bar` and `foo_bar` both normalize to the ident `foo_bar`.
+    projectRoot = setupTree({
+      'Cargo.toml': `[workspace]\nresolver = "2"\nmembers = ["crates/*"]\n`,
+      'crates/a/Cargo.toml': `[package]\nname = "foo-bar"\nversion = "0.1.0"\n`,
+      'crates/a/src/lib.rs': `pub mod thing;\n`,
+      'crates/a/src/thing.rs': `pub fn t() {}\n`,
+      'crates/b/Cargo.toml': `[package]\nname = "foo_bar"\nversion = "0.1.0"\n`,
+      'crates/b/src/lib.rs': `pub mod thing;\n`,
+      'crates/b/src/thing.rs': `pub fn t() {}\n`,
+      'crates/app/Cargo.toml':
+        `[package]\nname = "consumer"\nversion = "0.1.0"\n`,
+      'crates/app/src/lib.rs': `use foo_bar::thing::t;\nfn boot() { t(); }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Cargo.toml', language: 'toml', fileCategory: 'config' },
+        // crates/a is listed FIRST, so it wins the `foo_bar` ident.
+        { path: 'crates/a/Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'crates/a/src/lib.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'crates/a/src/thing.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'crates/b/Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'crates/b/src/lib.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'crates/b/src/thing.rs', language: 'rust', fileCategory: 'code' },
+        { path: 'crates/app/Cargo.toml', language: 'toml', fileCategory: 'config' },
+        { path: 'crates/app/src/lib.rs', language: 'rust', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toContain("duplicate Rust crate identifier 'foo_bar'");
+    // first-by-file-order crate (crates/a) wins deterministically
+    expect(result.output.importMap['crates/app/src/lib.rs']).toEqual([
+      'crates/a/src/thing.rs',
+    ]);
+  });
 });
 
 describe('extract-import-map.mjs — C/C++ resolver', () => {
