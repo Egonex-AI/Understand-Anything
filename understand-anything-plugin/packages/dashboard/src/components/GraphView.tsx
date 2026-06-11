@@ -48,6 +48,7 @@ import {
   aggregateContainerEdges,
   aggregateLayerEdges,
   computePortals,
+  findExternalNeighborFiles,
   findCrossLayerFileNodes,
 } from "../utils/edgeAggregation";
 import { deriveContainers } from "../utils/containers";
@@ -340,6 +341,7 @@ interface LayerDetailTopology {
   containers: DerivedContainer[];
   nodeToContainer: Map<string, string>;
   intraContainer: GraphEdge[];
+  portalCrossFiles: Map<string, string[]>;
 }
 
 const EMPTY_TOPOLOGY: LayerDetailTopology = {
@@ -352,6 +354,7 @@ const EMPTY_TOPOLOGY: LayerDetailTopology = {
   containers: [],
   nodeToContainer: new Map(),
   intraContainer: [],
+  portalCrossFiles: new Map(),
 };
 
 /**
@@ -588,6 +591,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     const portals = computePortals(graph, activeLayerId);
     const layerIndexMap = new Map(graph.layers.map((l, i) => [l.id, i]));
 
+    const nodeNameById = new Map(graph.nodes.map((n) => [n.id, n.name ?? n.id]));
     const portalNodes: PortalFlowNode[] = portals.map((portal) => ({
       id: `portal:${portal.layerId}`,
       type: "portal" as const,
@@ -597,14 +601,24 @@ function useLayerDetailTopology(): LayerDetailTopology & {
         targetLayerName: portal.layerName,
         connectionCount: portal.connectionCount,
         layerColorIndex: layerIndexMap.get(portal.layerId) ?? 0,
+        externalFileNames: [
+          ...findExternalNeighborFiles(graph, activeLayerId, portal.layerId),
+        ]
+          .map((id) => nodeNameById.get(id) ?? id)
+          .sort(),
         onNavigate: drillIntoLayer,
       },
     }));
 
     const portalEdges: Edge[] = [];
+    const portalCrossFiles = new Map<string, string[]>();
     let portalEdgeIdx = aggEdges.length;
     for (const portal of portals) {
       const crossFiles = findCrossLayerFileNodes(graph, activeLayerId, portal.layerId);
+      portalCrossFiles.set(
+        `portal:${portal.layerId}`,
+        [...crossFiles].filter((id) => filteredNodeIds.has(id)),
+      );
       // Dedupe by atom — multiple files in the same container hitting the
       // same portal collapse to one Stage 1 edge. Task 12 will re-route to
       // the actual file ids when the source container expands.
@@ -618,7 +632,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           id: `e-${portalEdgeIdx++}`,
           source: atomId,
           target: `portal:${portal.layerId}`,
-          style: { stroke: "rgba(212,165,116,0.2)", strokeWidth: 1, strokeDasharray: "4 4" },
+          style: { stroke: "rgba(212,165,116,0.55)", strokeWidth: 1.6, strokeDasharray: "5 4" },
           animated: false,
         });
       }
@@ -636,6 +650,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       aggEdges,
       portalNodes,
       portalEdges,
+      portalCrossFiles,
     };
   }, [
     graph,
@@ -681,6 +696,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       aggEdges,
       portalNodes,
       portalEdges,
+      portalCrossFiles,
     } = built;
 
     // Build Stage 1 ELK input: containers as opaque atoms + ungrouped files
@@ -758,6 +774,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           containers,
           nodeToContainer,
           intraContainer,
+          portalCrossFiles,
         });
         setLayoutStatus("ready");
       })
@@ -1258,10 +1275,39 @@ function useLayerDetailGraph() {
     expandedContainers,
   ]);
 
+  // Re-route portal edges: when a container is expanded, replace its single
+  // container→portal edge with per-file edges from the actual cross-layer
+  // files inside it (e.g. service.ts → "REST API" portal).
+  const portalEdgesFinal = useMemo<Edge[]>(() => {
+    if (expandedContainers.size === 0) return topo.portalEdges;
+    const out: Edge[] = [];
+    const seen = new Set<string>();
+    for (const pe of topo.portalEdges) {
+      const srcAtom = String(pe.source);
+      if (!expandedContainers.has(srcAtom)) {
+        out.push(pe);
+        continue;
+      }
+      const portalId = String(pe.target);
+      const files = topo.portalCrossFiles.get(portalId) ?? [];
+      let emitted = false;
+      for (const f of files) {
+        if (topo.nodeToContainer.get(f) !== srcAtom) continue;
+        const key = `${f}|${portalId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ ...pe, id: `portal-file-${key}`, source: f });
+        emitted = true;
+      }
+      if (!emitted) out.push(pe);
+    }
+    return out;
+  }, [topo.portalEdges, topo.portalCrossFiles, topo.nodeToContainer, expandedContainers]);
+
   const edges = useMemo(() => {
-    // Compose: Stage 1 / inflated edges, plus portal edges (Stage 1 sources
-    // them off container atoms — re-sourcing on expand is deferred).
-    const base = [...expandedEdges, ...topo.portalEdges];
+    // Compose: Stage 1 / inflated edges, plus portal edges (re-routed to
+    // actual files for expanded containers).
+    const base = [...expandedEdges, ...portalEdgesFinal];
     if (!selectedNodeId) return base;
 
     // Apply selection-based edge styling on top of topology edges
@@ -1276,7 +1322,7 @@ function useLayerDetailGraph() {
       // Fade unrelated edges
       return { ...edge, animated: false, style: { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 }, labelStyle: { fill: "rgba(163,151,135,0.2)", fontSize: 10 } };
     });
-  }, [expandedEdges, topo.portalEdges, selectedNodeId]);
+  }, [expandedEdges, portalEdgesFinal, selectedNodeId]);
 
   // Expose container topology so the parent component can wire auto-expand
   // triggers (focus, tour, zoom) without having to re-derive containers.
