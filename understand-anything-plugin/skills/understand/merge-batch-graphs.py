@@ -810,6 +810,27 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
 
     # ── Step 6: Deduplicate edges, drop dangling ─────────────────────
     node_ids = set(nodes_by_id.keys())
+
+    # Build a suffix index: bare filename / bare path → set of canonical node IDs
+    # ending in that suffix. Used to recover edges where an agent emitted a
+    # `file:` source but a BARE target (no prefix). Without this, the dedup
+    # step drops such edges as "missing target", silently losing real
+    # relationships that were correctly identified by the LLM but emitted with
+    # the wrong target-ID shape. Common when files live in different analysis
+    # batches and the LLM only saw the short name on the target side.
+    bare_to_prefixed: dict[str, set[str]] = {}
+    for nid in node_ids:
+        # Suffix forms we want to recover: full path after the type prefix,
+        # plus the bare basename. Both indexed because LLMs emit either.
+        if ":" in nid:
+            path_part = nid.split(":", 1)[1]
+            bare_to_prefixed.setdefault(path_part, set()).add(nid)
+            basename = path_part.rsplit("/", 1)[-1]
+            if basename != path_part:
+                bare_to_prefixed.setdefault(basename, set()).add(nid)
+
+    cross_batch_recovered = 0
+
     # Direction is part of the dedup key so a `forward` edge does not silently
     # overwrite a `bidirectional` one (or vice versa); they're different
     # semantic relationships that the dashboard renders distinctly.
@@ -820,6 +841,23 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         etype = edge.get("type", "")
         direction = normalize_direction(edge.get("direction"))
         edge["direction"] = direction
+
+        # Cross-batch recovery: if target lacks a prefix but matches a known
+        # file-path suffix unambiguously, repair it. Only fires when target is
+        # bare (no `prefix:` separator) AND source IS prefixed (so we know the
+        # agent was operating in the prefixed-ID convention). Unambiguous =
+        # exactly one node has that suffix; ambiguous matches are left alone
+        # and fall through to the unfixable-drop path.
+        if (
+            tgt not in node_ids
+            and ":" not in tgt
+            and ":" in src
+        ):
+            candidates = bare_to_prefixed.get(tgt)
+            if candidates and len(candidates) == 1:
+                tgt = next(iter(candidates))
+                edge["target"] = tgt
+                cross_batch_recovered += 1
 
         if src not in node_ids or tgt not in node_ids:
             missing = []
@@ -849,6 +887,8 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             fixed_lines.append(f"  {count:>4} × complexity {pattern}")
     if edges_rewritten:
         fixed_lines.append(f"  {edges_rewritten:>4} × edge references rewritten after ID normalization")
+    if cross_batch_recovered:
+        fixed_lines.append(f"  {cross_batch_recovered:>4} × cross-batch edges recovered (bare target → prefixed)")
     if duplicate_count:
         fixed_lines.append(f"  {duplicate_count:>4} × duplicate node IDs removed (kept last)")
     if tested_by_swapped:
