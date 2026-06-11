@@ -380,6 +380,7 @@ export const GraphNodeSchema = z.object({
   summary: z.string(),
   tags: z.array(z.string()),
   complexity: z.enum(["simple", "moderate", "complex"]),
+  cyclomaticComplexity: z.number().int().positive().optional(),
   languageNotes: z.string().optional(),
   domainMeta: DomainMetaSchema.optional(),
   knowledgeMeta: KnowledgeMetaSchema.optional(),

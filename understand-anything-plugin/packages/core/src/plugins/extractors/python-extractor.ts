@@ -1,6 +1,17 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { findChild, findChildren } from "./base-extractor.js";
+import { computeCyclomaticComplexity, findChild, findChildren } from "./base-extractor.js";
+
+const BRANCH_TYPES = [
+  "if_statement",
+  "elif_clause",
+  "for_statement",
+  "while_statement",
+  "except_clause",
+  "conditional_expression",
+  "boolean_operator",
+  "match_case",
+] as const;
 
 /**
  * Extract parameter names from a Python `parameters` node.
@@ -209,6 +220,7 @@ export class PythonExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, BRANCH_TYPES),
     });
   }
 
@@ -259,6 +271,7 @@ export class PythonExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, BRANCH_TYPES),
     });
   }
 

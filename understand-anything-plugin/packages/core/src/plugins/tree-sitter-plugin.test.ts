@@ -262,6 +262,31 @@ import * as path from 'path';
     });
   });
 
+  describe("cyclomaticComplexity", () => {
+    it("computes deterministic complexity for TypeScript functions and classes", () => {
+      const code = `
+function decide(value: number): number {
+  if (value > 10 && value < 20) {
+    return 1;
+  }
+  return value === 0 ? 0 : 2;
+}
+
+class Runner {
+  run(items: number[]): number {
+    for (const item of items) {
+      if (item > 0) return item;
+    }
+    return 0;
+  }
+}
+`;
+      const result = plugin.analyzeFile("test.ts", code);
+
+      expect(result.functions[0].cyclomaticComplexity).toBe(4);
+      expect(result.classes[0].cyclomaticComplexity).toBe(3);
+    });
+  });
   describe("extractCallGraph", () => {
     it("should extract function calls within functions", () => {
       const code = `
