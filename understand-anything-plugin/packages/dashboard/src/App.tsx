@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react
 import { validateGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
+import type { GuideAnnotationRecord } from "./store";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
 import KnowledgeGraphView from "./components/KnowledgeGraphView";
@@ -52,6 +53,7 @@ function dataUrl(fileName: string, token: string | null): string {
     const envMap: Record<string, string | undefined> = {
       "knowledge-graph.json": import.meta.env.VITE_GRAPH_URL,
       "domain-graph.json": import.meta.env.VITE_DOMAIN_GRAPH_URL,
+      "guide-annotations.json": import.meta.env.VITE_GUIDE_ANNOTATIONS_URL,
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
       "config.json": import.meta.env.VITE_CONFIG_URL,
@@ -109,6 +111,7 @@ function App() {
 
 function Dashboard({ accessToken }: { accessToken: string }) {
   const setGraph = useDashboardStore((s) => s.setGraph);
+  const setGuideAnnotations = useDashboardStore((s) => s.setGuideAnnotations);
   const setDomainGraph = useDashboardStore((s) => s.setDomainGraph);
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -163,6 +166,33 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         setLoadError(`Failed to load knowledge graph: ${err instanceof Error ? err.message : String(err)}`);
       });
   }, [setGraph]);
+
+  useEffect(() => {
+    fetch(dataUrl("guide-annotations.json", accessToken))
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data: unknown) => {
+        if (!data || typeof data !== "object") return;
+        const annotations = (data as { annotations?: unknown }).annotations;
+        if (!Array.isArray(annotations)) return;
+        setGuideAnnotations(
+          annotations.filter((entry): entry is GuideAnnotationRecord => {
+            if (!entry || typeof entry !== "object") return false;
+            const record = entry as Record<string, unknown>;
+            return (
+              typeof record.nodeId === "string" &&
+              typeof record.line === "number" &&
+              Number.isInteger(record.line) &&
+              record.line > 0 &&
+              typeof record.text === "string"
+            );
+          }),
+        );
+      })
+      .catch(() => {});
+  }, [accessToken, setGuideAnnotations]);
 
   useEffect(() => {
     fetch(dataUrl("diff-overlay.json", accessToken))

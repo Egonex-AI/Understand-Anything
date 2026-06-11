@@ -190,6 +190,7 @@ export function formatExplainPrompt(ctx: ExplainContext): string {
   lines.push("3. How it interacts with connected components");
   lines.push("4. Any patterns, idioms, or design decisions worth noting");
   lines.push("5. Potential gotchas or areas of complexity");
+  lines.push("6. If the user explicitly asks for inline annotated reading in the dashboard, produce scoped sidecar files under .understand-anything/guide-annotations/ only, using the requested node id, 1-based source line numbers, an anchor snippet from the target source line when possible, and concise source-grounded text. Do not mutate knowledge-graph.json or use languageNotes for pseudo-code or walkthrough prose.");
   lines.push("");
 
   return lines.join("\n");

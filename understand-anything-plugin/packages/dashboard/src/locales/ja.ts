@@ -179,6 +179,7 @@ export const ja = {
     closeExpanded: "展開したコードビューアを閉じる",
     closeViewer: "コードビューアを閉じる",
     sourceUnavailable: "ソースが利用できません",
+    resolvingAnnotations: "注釈を解決中...",
   },
   customNode: {
     tested: "テスト済み",

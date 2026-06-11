@@ -179,6 +179,7 @@ export const zh = {
     closeExpanded: "关闭展开的代码查看器",
     closeViewer: "关闭代码查看器",
     sourceUnavailable: "源码不可用",
+    resolvingAnnotations: "正在解析注释...",
   },
   customNode: {
     tested: "已测试",

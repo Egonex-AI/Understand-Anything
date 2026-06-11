@@ -233,6 +233,8 @@ Indicators from script data:
 **Language Notes** (optional, your expert judgment):
 If the structural data reveals notable language-specific patterns (e.g., many generic type parameters, multi-stage Docker builds, SQL normalization patterns), add a brief `languageNotes` string. Only add this when genuinely educational.
 
+**Guide annotations:** This batch analyzer MUST NOT emit guide annotations during normal analysis. They are reserved for lazy, on-demand explanation workflows where a user asks to read a specific node with inline commentary. Those workflows should write scoped sidecar files under `.understand-anything/guide-annotations/`, not mutate `knowledge-graph.json`. Each annotation should include or inherit `nodeId`, include a 1-based `line`, concise `text`, and preferably an `anchor` snippet from the target source line so the dashboard can reattach notes after line-number drift. Do not use `languageNotes` for pseudo-code or guided walkthroughs.
+
 ### Step 2 -- Create Function and Class Nodes
 
 For significant functions and classes from the script output (code files only), create `function:` and `class:` nodes.
