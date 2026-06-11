@@ -57,5 +57,23 @@
       "tree-sitter-rust",
       "tree-sitter-typescript"
     ]
+  },
+  "description": "Turn any code into an interactive knowledge graph \u2014 multi-agent pipeline for Claude Code, Cursor, Copilot and more",
+  "homepage": "https://understand-anything.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lum1104/Understand-Anything.git"
+  },
+  "keywords": [
+    "knowledge-graph",
+    "code-analysis",
+    "claude-code",
+    "multi-agent",
+    "developer-tools",
+    "codebase",
+    "visualization"
+  ],
+  "bugs": {
+    "url": "https://github.com/Lum1104/Understand-Anything/issues"
   }
 }
