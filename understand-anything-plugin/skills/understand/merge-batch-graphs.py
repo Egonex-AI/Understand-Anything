@@ -808,6 +808,60 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         nodes_by_id, all_edges
     )
 
+    # ── Step 5c: Cross-prefix edge reconciliation ────────────────────
+    # The file-analyzer agent emits every imports/references edge with a
+    # hard-coded `file:` prefix on both endpoints. That's correct for
+    # code→code imports, but a code file can also reference a non-code file
+    # (JS importing a `.json` data file, a seed script referencing a `.sql`
+    # migration). After Step 2 the non-code node landed under its correct
+    # canonical prefix (`config:data/x.json`, `table:.../migration.sql`),
+    # so the edge `file:src/x.js → file:data/x.json` points at no node
+    # and gets dropped by Step 6's dangling-edge sweep — silently losing
+    # genuine cross-category edges on essentially every project.
+    #
+    # Reconcile by re-prefixing edge endpoints that don't match an existing
+    # node ID but DO match a node's path under a different prefix.
+    node_ids_pass1 = set(nodes_by_id.keys())
+    # Map path-string → canonical node ID, but only for nodes whose ID
+    # has the simple `<prefix>:<path>` shape. Function/class nodes use
+    # `<prefix>:<filePath>:<name>` (3-part) and would generate ambiguous
+    # lookups, so we skip them.
+    path_to_canonical_id: dict[str, str] = {}
+    for nid in node_ids_pass1:
+        # Split on the FIRST colon only — paths can contain colons (rare,
+        # but Windows drive letters can sneak in), and we want everything
+        # after the prefix verbatim.
+        if ":" not in nid:
+            continue
+        prefix, rest = nid.split(":", 1)
+        if prefix not in VALID_NODE_PREFIXES:
+            continue
+        # Skip 3-part IDs (`function:path:name`, `class:path:name`) since
+        # the same `path` may host many functions and a single path-keyed
+        # lookup would be ambiguous.
+        if rest.count(":") >= 1 and prefix in ("function", "func", "class"):
+            continue
+        # Last-write-wins is fine here; we only use this map as a tiebreaker
+        # for missing edge endpoints, and the canonical node's existence is
+        # what matters, not which one was registered first.
+        path_to_canonical_id[rest] = nid
+
+    edges_reconciled = 0
+    for edge in all_edges:
+        for endpoint_key in ("source", "target"):
+            ep = edge.get(endpoint_key, "")
+            if ep in node_ids_pass1:
+                continue
+            if ":" not in ep:
+                continue
+            prefix, rest = ep.split(":", 1)
+            if prefix not in VALID_NODE_PREFIXES:
+                continue
+            canonical = path_to_canonical_id.get(rest)
+            if canonical and canonical != ep:
+                edge[endpoint_key] = canonical
+                edges_reconciled += 1
+
     # ── Step 6: Deduplicate edges, drop dangling ─────────────────────
     node_ids = set(nodes_by_id.keys())
     # Direction is part of the dedup key so a `forward` edge does not silently
@@ -849,6 +903,8 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             fixed_lines.append(f"  {count:>4} × complexity {pattern}")
     if edges_rewritten:
         fixed_lines.append(f"  {edges_rewritten:>4} × edge references rewritten after ID normalization")
+    if edges_reconciled:
+        fixed_lines.append(f"  {edges_reconciled:>4} × edge endpoints re-prefixed to match canonical node IDs (cross-category)")
     if duplicate_count:
         fixed_lines.append(f"  {duplicate_count:>4} × duplicate node IDs removed (kept last)")
     if tested_by_swapped:
@@ -862,6 +918,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             sum(id_fix_patterns.values())
             + sum(complexity_fix_patterns.values())
             + edges_rewritten
+            + edges_reconciled
             + duplicate_count
             + tested_by_swapped
             + tested_by_dropped
