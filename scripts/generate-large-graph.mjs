@@ -62,16 +62,25 @@ function generateEdges(nodes, edgeCount) {
   const seen = new Set();
   const n = nodes.length;
 
-  for (let i = 0; i < edgeCount; i++) {
-    let src, tgt;
-    // Forward-only edges to avoid cycles (dagre blows the stack on large cyclic graphs)
-    do {
-      src = Math.floor(Math.random() * (n - 1));
-      const offset = Math.floor(Math.random() * Math.min(50, n - src - 1)) + 1;
-      tgt = src + offset;
-    } while (tgt >= n || src === tgt || seen.has(`${src}-${tgt}`));
+for (let i = 0; i < edgeCount; i++) {
+  let src, tgt;
+  let attempts = 0;
 
-    seen.add(`${src}-${tgt}`);
+  // Forward-only edges to avoid cycles
+  do {
+    src = Math.floor(Math.random() * (n - 1));
+    const offset = Math.floor(Math.random() * Math.min(50, n - src - 1)) + 1;
+    tgt = src + offset;
+    attempts++;
+  } while (
+    attempts < 20 &&
+    (tgt >= n || src === tgt || seen.has(`${src}-${tgt}`))
+  );
+
+  if (attempts >= 20) continue;
+
+  seen.add(`${src}-${tgt}`);
+  
     edges.push({
       source: nodes[src].id,
       target: nodes[tgt].id,
