@@ -18,6 +18,8 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
 
+Full-analysis checkpointing is automatic. If a previous run was interrupted after writing valid `batch-*.json` files, rerunning `/understand --full` reuses those completed batches and dispatches only missing or invalid batches. Delete `.understand-anything/intermediate/batch-*.json` before rerunning if you intentionally want to discard checkpoints.
+
 ---
 
 ## Progress Reporting
@@ -302,11 +304,28 @@ If the script exits non-zero, the failure is hard — relay the full stderr to t
 
 ### Full analysis path
 
-Load `.understand-anything/intermediate/batches.json` (produced by Phase 1.5). Iterate the `batches[]` array.
+Load `.understand-anything/intermediate/batches.json` (produced by Phase 1.5).
+
+Build the resume plan before dispatching file analyzers:
+```bash
+node <SKILL_DIR>/plan-resume-batches.mjs $PROJECT_ROOT
+```
+
+This writes `$PROJECT_ROOT/.understand-anything/intermediate/resume-plan.json`. Load it and use `pendingBatchIndexes` to decide which batches still need analysis. A batch is considered complete only when a valid `batch-<batchIndex>.json` or `batch-<batchIndex>-part-<k>.json` already exists with `nodes` and `edges` arrays.
+
+If `completed > 0`, report:
+> `Resume checkpoint: found <completed>/<totalBatches> completed batches; analyzing <pending> remaining batches.`
+
+If `invalidBatchFiles` is non-empty, report:
+> `Ignoring invalid checkpoint files: <file list>`
+
+Iterate only the `batches[]` entries whose `batchIndex` appears in `pendingBatchIndexes`.
 
 Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
 
-For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
+If `pending` is `0`, skip file-analyzer dispatch and proceed directly to the merge step.
+
+For each pending batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -342,7 +361,7 @@ Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 
 **Output naming is per-batchIndex — no fusion.** If you fuse multiple small batches into a single file-analyzer dispatch for token efficiency, the dispatched agent must STILL write one output file per original `batchIndex` using `batch-<batchIndex>.json` or `batch-<batchIndex>-part-<k>.json`. The merge script's regex (`batch-(\d+)(?:-part-(\d+))?\.json`) silently drops any other naming (e.g., `batch-fused-8-13.json`, `batch-8-13.json`), losing every node and edge in that file. After each dispatch returns, verify each `batchIndex` in the dispatched input has a corresponding `batch-<batchIndex>.json` (or `batch-<batchIndex>-part-*.json`) on disk before proceeding to the next dispatch.
 
-After ALL batches complete, report to the user: `Phase 2 complete. All <totalBatches> batches analyzed.`
+After ALL pending batches complete, report to the user: `Phase 2 complete. All <totalBatches> batches available.`
 
 Run the merge-and-normalize script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
 ```bash
