@@ -335,6 +335,11 @@ Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 > <neighborMap JSON from batches.json[i].neighborMap>
 > ```
 >
+> Canonical node IDs owned by OTHER batches (use these verbatim for any cross-batch edge target — DO NOT invent IDs; drop the edge if the target is not in this list):
+> ```json
+> <knownCrossBatchNodeIds JSON from batches.json[i].knownCrossBatchNodeIds>
+> ```
+>
 > Files to analyze in this batch (every entry MUST be passed through to `batchFiles` with all four fields — `path`, `language`, `sizeLines`, `fileCategory`):
 > 1. `<path>` (<sizeLines> lines, language: `<language>`, fileCategory: `<fileCategory>`)
 > 2. `<path>` (<sizeLines> lines, language: `<language>`, fileCategory: `<fileCategory>`)

@@ -1,0 +1,35 @@
+{
+  "name": "fixture-known-cross-batch-ids",
+  "description": "Multi-batch input exercising knownCrossBatchNodeIds: one code clique (3 mutually-importing TS files survives merge-small) + a Dockerfile cluster (infra → service:) + .github/workflows/* (infra → pipeline:) + a docs/ batch (docs → document:) so each batch's knownCrossBatchNodeIds covers the other batches' IDs with the correct per-category prefix. Mirrors the issue #303 scenario where a docs batch needs to emit edges to non-docs files with the right prefix.",
+  "languages": ["typescript", "dockerfile", "yaml", "markdown"],
+  "frameworks": [],
+  "files": [
+    {"path": "src/index.ts", "language": "typescript", "sizeLines": 10, "fileCategory": "code"},
+    {"path": "src/server.ts", "language": "typescript", "sizeLines": 15, "fileCategory": "code"},
+    {"path": "src/router.ts", "language": "typescript", "sizeLines": 12, "fileCategory": "code"},
+    {"path": "Dockerfile", "language": "dockerfile", "sizeLines": 20, "fileCategory": "infra"},
+    {"path": "docker-compose.yml", "language": "yaml", "sizeLines": 15, "fileCategory": "infra"},
+    {"path": ".github/workflows/ci.yml", "language": "yaml", "sizeLines": 30, "fileCategory": "infra"},
+    {"path": ".github/workflows/deploy.yml", "language": "yaml", "sizeLines": 25, "fileCategory": "infra"},
+    {"path": "README.md", "language": "markdown", "sizeLines": 100, "fileCategory": "docs"},
+    {"path": "CLAUDE.md", "language": "markdown", "sizeLines": 80, "fileCategory": "docs"},
+    {"path": "docs/getting-started.md", "language": "markdown", "sizeLines": 60, "fileCategory": "docs"},
+    {"path": "tsconfig.json", "language": "json", "sizeLines": 15, "fileCategory": "config"}
+  ],
+  "totalFiles": 11,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "small",
+  "importMap": {
+    "src/index.ts": ["src/server.ts", "src/router.ts"],
+    "src/server.ts": ["src/router.ts"],
+    "src/router.ts": [],
+    "Dockerfile": [],
+    "docker-compose.yml": [],
+    ".github/workflows/ci.yml": [],
+    ".github/workflows/deploy.yml": [],
+    "README.md": [],
+    "CLAUDE.md": [],
+    "docs/getting-started.md": [],
+    "tsconfig.json": []
+  }
+}

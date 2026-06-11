@@ -63,6 +63,18 @@ Use neighborMap as a confidence boost for cross-batch edges (`calls`, `related`,
 
 The merge script's dangling-edge dropper is the safety net for genuinely unresolvable targets.
 
+### Cross-batch node IDs (knownCrossBatchNodeIds) — STRICT prefix authority
+
+Your dispatch prompt also includes a `knownCrossBatchNodeIds` array — a flat list of canonical `<prefix>:<path>` node IDs allocated by **every other batch** in the project (e.g. `file:src/server.ts`, `document:CLAUDE.md`, `config:tsconfig.json`, `pipeline:.github/workflows/ci.yml`). This list is the **authoritative source of truth** for the file-level node ID of any cross-batch target.
+
+Rules — apply to ALL edge types (`documents`, `configures`, `deploys`, `related`, `imports`, `calls`, etc.) whose `target` (or `source` for inverted relationships) lives in another batch:
+
+1. **Use these IDs verbatim.** When you need to reference a file owned by another batch, find its entry in `knownCrossBatchNodeIds` and copy the ID exactly. Do NOT guess the prefix — `CLAUDE.md` is `document:CLAUDE.md`, not `file:CLAUDE.md`; `Dockerfile` is `service:Dockerfile`, not `file:Dockerfile`.
+2. **Do NOT invent node IDs.** If you need to reference a cross-batch file by a sub-node (e.g. a function), the file-level ID's prefix in `knownCrossBatchNodeIds` still wins — never construct `file:<path>` for a file that appears in the list under a different prefix.
+3. **Drop the edge if the target is not in the list.** A target path absent from both your own batch AND `knownCrossBatchNodeIds` is not part of the project graph (most commonly because `.understandignore` excluded it). Do NOT emit the edge — the merge script will drop it anyway, and forcing a guess wastes the assemble-reviewer's repair budget. The recoveredFromImportMap pass in merge-batch-graphs.py covers `imports` edges deterministically when the source/target both have `file:` nodes; for non-`imports` cross-batch edges, your discipline here is the only signal.
+
+Note: sub-node IDs (`function:<path>:<symbol>`, `class:<path>:<symbol>`, `table:<path>:<table>`, `endpoint:<path>:<METHOD-path>`) are NOT enumerated in `knownCrossBatchNodeIds` — only the file-level node ID for each cross-batch file is listed. Use `neighborMap[file].symbols` (as above) to construct sub-node IDs with confidence.
+
 ### Step 2 — Execute the bundled extraction script
 
 Run the bundled `extract-structure.mjs` script. The `<SKILL_DIR>` path is provided in your dispatch prompt.
