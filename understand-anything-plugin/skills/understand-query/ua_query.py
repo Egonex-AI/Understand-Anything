@@ -790,12 +790,95 @@ def _search_api(server: str, query: str, service: str | None = None, scope: str 
 
 
 def _find_symbol_node(server: str, service: str, symbol: str) -> dict[str, Any]:
-    """Search KG for a symbol and return the best-matching node."""
+    """Search KG for a symbol and return the best-matching node.
+
+    Precision logic:
+    1. If the specified service has an exact name match, return it immediately.
+    2. If it only has fuzzy matches, do a global search. If another service
+       has an exact match (especially an Impl class), prefer that cross-service result.
+    3. If the specified service has no matches at all, fall back to cross-service search.
+    """
     results = _search_api(server, symbol, service=service, scope="kg", limit=30)
-    if not results:
-        raise RuntimeError(f"No KG node found for symbol '{symbol}' in service '{service}'")
-    results.sort(key=lambda n: _score_node_relevance(n, symbol), reverse=True)
-    return results[0]
+
+    if results:
+        exact_local = [n for n in results if n.get("name", "").lower() == symbol.lower()]
+        if exact_local:
+            exact_local.sort(key=lambda n: _score_node_relevance(n, symbol), reverse=True)
+            return exact_local[0]
+
+        # Local service has only fuzzy matches — check if another service has exact match
+        global_exact = _cross_service_symbol_search(server, service, symbol, exact_only=True)
+        if global_exact:
+            node = global_exact["node"]
+            node["crossServiceOrigin"] = {
+                "originalService": service,
+                "actualService": global_exact["service"],
+                "hint": (
+                    f"'{symbol}' 在 '{service}' 中仅有模糊匹配，"
+                    f"精确实现在 '{global_exact['service']}' 中 ('{node.get('name', symbol)}')。"
+                ),
+            }
+            return node
+
+        # No exact match anywhere — return best local fuzzy match
+        results.sort(key=lambda n: _score_node_relevance(n, symbol), reverse=True)
+        return results[0]
+
+    # No results in specified service — full cross-service fallback
+    found_in = _cross_service_symbol_search(server, service, symbol, exact_only=False)
+    if found_in:
+        node = found_in["node"]
+        node["crossServiceOrigin"] = {
+            "originalService": service,
+            "actualService": found_in["service"],
+            "hint": (
+                f"'{symbol}' 未在 '{service}' 中找到，"
+                f"已在 '{found_in['service']}' 中定位到 '{node.get('name', symbol)}'。"
+            ),
+        }
+        return node
+
+    raise RuntimeError(f"No KG node found for symbol '{symbol}' in service '{service}' or any other indexed service")
+
+
+def _cross_service_symbol_search(server: str, exclude_service: str, symbol: str, *, exact_only: bool = False) -> dict[str, Any] | None:
+    """Single global search to find a symbol across all services (O(1) HTTP call)."""
+    try:
+        hits = _search_api(server, symbol, scope="kg", limit=30)
+    except RuntimeError:
+        return None
+
+    # Filter out results from the excluded service
+    candidates = [h for h in hits if h.get("service", "") != exclude_service]
+    if not candidates:
+        return None
+
+    if exact_only:
+        candidates = [h for h in candidates if h.get("name", "").lower() == symbol.lower()]
+        if not candidates:
+            return None
+
+    # Score with implementation class bonus
+    def _impl_score(node: dict) -> float:
+        base = _score_node_relevance(node, symbol)
+        name = node.get("name", "")
+        if any(name.endswith(suf) for suf in _IMPL_SUFFIXES):
+            base += 10.0
+        if node.get("type") == "class":
+            base += 2.0
+        return base
+
+    candidates.sort(key=_impl_score, reverse=True)
+    best = candidates[0]
+    return {"service": best.get("service", ""), "node": best}
+
+
+def _effective_service(node: dict[str, Any], fallback_service: str) -> str:
+    """Return the actual service to query — respects cross-service resolution."""
+    origin = node.get("crossServiceOrigin")
+    if origin and origin.get("actualService"):
+        return origin["actualService"]
+    return fallback_service
 
 
 def _fetch_neighbors(
@@ -858,6 +941,40 @@ def _auto_discover_service(server: str, query: str) -> tuple[str | None, list[di
     parts = [p.strip() for p in query.split(",") if p.strip()]
     short_parts = [p for p in parts if len(p) <= 20]
     search_query = " ".join(short_parts[:3]) if short_parts else " ".join(parts[:2])
+
+    # Strategy 0: Exact class name matching — highest priority for PascalCase identifiers.
+    # When keywords contain class-like names (PascalCase), search KG for exact class/service
+    # nodes across all services. A service owning the Impl/DomainService class gets a
+    # decisive vote boost, solving the "found reporter not implementer" problem.
+    class_keywords = [p for p in parts if p[0:1].isupper() and len(p) > 5 and any(c.islower() for c in p)]
+    if class_keywords:
+        try:
+            svc_list = fetch_json(build_url(server, "/api/services", {}))
+            for class_kw in class_keywords[:3]:
+                for svc in svc_list.get("services", []):
+                    svc_name = svc.get("name", "")
+                    layers = svc.get("dataLayers", {})
+                    if not (layers.get("kg")):
+                        continue
+                    try:
+                        hits = _search_api(server, class_kw, service=svc_name, scope="kg", limit=5)
+                        for h in hits:
+                            node_name = h.get("name", "")
+                            node_type = h.get("type", "")
+                            if node_name == class_kw and node_type in ("class", "service", "function"):
+                                bonus = 20 if any(s in node_name for s in _IMPL_SUFFIXES) else 15
+                                service_votes[svc_name] = service_votes.get(svc_name, 0) + bonus
+                                break
+                            elif class_kw.lower() in node_name.lower() and node_type in ("class", "service"):
+                                service_votes[svc_name] = service_votes.get(svc_name, 0) + 8
+                    except RuntimeError:
+                        continue
+        except RuntimeError:
+            pass
+        if service_votes:
+            best = max(service_votes, key=lambda k: service_votes[k])
+            if service_votes[best] >= 15:
+                return best, biz_results
 
     # Strategy 1: Wiki search — fast even on cold server, returns service associations directly
     try:
@@ -1110,14 +1227,56 @@ def cmd_trace(args: argparse.Namespace) -> Any:
         except RuntimeError:
             pass
 
-    # Empty result guidance
+    # Empty result — cross-service fallback with auto-trace
     if not matched:
-        result["hint"] = (
-            f"No KG nodes matched '{args.query}' in service '{service}'. "
-            f"Try: (1) grep workspace for '{args.query}' directly, "
-            f"(2) check if Flutter/client code is in a separate module not indexed in this service's KG, "
-            f"(3) use 'business --search \"{args.query}\"' for domain-level context."
-        )
+        cross_svc_fallback = None
+        class_keywords = [k for k in keywords if k[0:1].isupper() and len(k) > 5]
+        if class_keywords:
+            for ck in class_keywords[:2]:
+                found = _cross_service_symbol_search(args.server, service, ck, exact_only=False)
+                if found and ck.lower() in found["node"].get("name", "").lower():
+                    cross_svc_fallback = {"service": found["service"], "matchedClass": found["node"].get("name"), "keyword": ck}
+                    break
+
+        if cross_svc_fallback:
+            target_svc = cross_svc_fallback["service"]
+            result["hint"] = (
+                f"'{args.query}' 未在 '{service}' 中找到，"
+                f"在 '{target_svc}' 中发现 '{cross_svc_fallback['matchedClass']}'，正在自动追踪..."
+            )
+            result["crossServiceSuggestion"] = cross_svc_fallback
+
+            # Auto-trace in the target service
+            try:
+                follow_args = argparse.Namespace(
+                    server=args.server, service=target_svc,
+                    query=cross_svc_fallback["keyword"],
+                    limit=args.limit, business=False,
+                    wiki=getattr(args, "wiki", False),
+                    verify_source=getattr(args, "verify_source", False),
+                    domain_flows=getattr(args, "domain_flows", False),
+                    auto_discover=False,
+                    fusion=getattr(args, "fusion", "rrf"),
+                    format=getattr(args, "format", "json"),
+                    type=getattr(args, "type", None),
+                    source=getattr(args, "source", False),
+                    grouped=getattr(args, "grouped", False),
+                    symbol=getattr(args, "symbol", None),
+                )
+                follow_result = cmd_trace(follow_args)
+                result["crossServiceTrace"] = {
+                    "targetService": target_svc,
+                    "traceResult": follow_result,
+                }
+            except (RuntimeError, SystemExit):
+                pass
+        else:
+            result["hint"] = (
+                f"No KG nodes matched '{args.query}' in service '{service}'. "
+                f"Try: (1) grep workspace for '{args.query}' directly, "
+                f"(2) check if Flutter/client code is in a separate module not indexed in this service's KG, "
+                f"(3) use 'business --search \"{args.query}\"' for domain-level context."
+            )
         if args.business:
             try:
                 biz_results = _search_api(args.server, args.query, scope="business", limit=5)
@@ -1327,7 +1486,166 @@ def cmd_trace(args: argparse.Namespace) -> Any:
         if source_reads:
             result["sourceReads"] = source_reads
 
+    # Cross-service RPC detection: find injected RPC interfaces and locate their implementations
+    if result.get("neighbors") and getattr(args, "verify_source", False):
+        _RPC_PATTERNS = ("MoaService", "MoaWebService", "FeignClient", "Feign", "GrpcService", "RpcService")
+        rpc_outbound = [
+            n for n in result["neighbors"].get("neighbors", [])
+            if n.get("direction") == "outbound"
+            and (
+                n.get("edgeType") in ("consumes_rpc",)
+                or (n.get("edgeType") == "injects" and any(p in n.get("name", "") for p in _RPC_PATTERNS))
+            )
+        ]
+        if rpc_outbound:
+            rpc_names = [n.get("name", "") for n in rpc_outbound if n.get("name")]
+            if rpc_names:
+                rpc_details: list[dict[str, str]] = []
+                for rpc_name in rpc_names[:5]:
+                    impl_name = rpc_name + "Impl" if not rpc_name.endswith("Impl") else rpc_name
+                    found = _cross_service_symbol_search(args.server, service, impl_name, exact_only=False)
+                    if not found:
+                        found = _cross_service_symbol_search(args.server, service, rpc_name, exact_only=False)
+                    if found:
+                        rpc_details.append({"interface": rpc_name, "implementedIn": found["service"], "implClass": found["node"].get("name", "")})
+                    else:
+                        rpc_details.append({"interface": rpc_name, "implementedIn": "unknown", "implClass": ""})
+
+                result["crossServiceRpcHint"] = {
+                    "message": (
+                        f"当前类注入了远程 RPC 接口: {', '.join(rpc_names[:5])}。"
+                    ),
+                    "rpcInterfaces": rpc_details,
+                }
+
     return result
+
+
+def _detect_and_follow_cross_service_rpc(
+    server: str, current_service: str, query: str, trace_result: dict
+) -> dict | None:
+    """Detect outbound RPC calls in trace neighbors and follow to the target service.
+
+    When auto-discovery lands on a service that only *consumes* an RPC interface
+    (e.g., a data reporter), this function identifies the provider service and
+    performs a secondary trace there to surface the actual implementation.
+    """
+    neighbors = trace_result.get("neighbors")
+    if not neighbors:
+        return None
+
+    rpc_edges = [
+        n for n in neighbors.get("neighbors", [])
+        if n.get("edgeType") in ("consumes_rpc", "provides_rpc")
+        and n.get("direction") == "outbound"
+    ]
+    if not rpc_edges:
+        return None
+
+    rpc_interface_names: list[str] = []
+    for edge in rpc_edges:
+        name = edge.get("name", "")
+        if name:
+            rpc_interface_names.append(name)
+
+    if not rpc_interface_names:
+        return None
+
+    # Search for provider services via cross-service KG lookup
+    target_service: str | None = None
+    target_interface: str = rpc_interface_names[0]
+
+    try:
+        svc_list = fetch_json(build_url(server, "/api/services", {}))
+        for svc in svc_list.get("services", []):
+            svc_name = svc.get("name", "")
+            if svc_name == current_service:
+                continue
+            layers = svc.get("dataLayers", {})
+            if not (layers.get("wiki") or layers.get("kg")):
+                continue
+            try:
+                hits = _search_api(server, target_interface, service=svc_name, scope="kg", limit=5)
+                for h in hits:
+                    node_name = h.get("name", "")
+                    node_summary = h.get("summary", "")
+                    if (target_interface.lower() in node_name.lower()
+                            and ("impl" in node_name.lower()
+                                 or "provider" in node_summary.lower()
+                                 or h.get("type") in ("class", "service"))):
+                        target_service = svc_name
+                        break
+                if target_service:
+                    break
+            except RuntimeError:
+                continue
+    except RuntimeError:
+        pass
+
+    if not target_service:
+        return {
+            "hint": (
+                f"检测到当前服务 '{current_service}' 通过 RPC 调用了外部接口: "
+                f"{', '.join(rpc_interface_names[:3])}。"
+                f"该接口的实现可能在其他服务中，建议使用 --service 指定目标服务追踪。"
+            ),
+            "rpcInterfaces": rpc_interface_names[:5],
+            "targetService": None,
+        }
+
+    # Follow: run trace in target service
+    try:
+        rpc_keywords = [target_interface]
+        parts = [p.strip() for p in query.split(",") if p.strip()]
+        rpc_keywords.extend(parts[:2])
+        rpc_query = ",".join(rpc_keywords)
+
+        class _NS:
+            pass
+        follow_args = _NS()
+        follow_args.server = server
+        follow_args.service = target_service
+        follow_args.query = rpc_query
+        follow_args.type = None
+        follow_args.limit = 5
+        follow_args.source = True
+        follow_args.symbol = None
+        follow_args.business = False
+        follow_args.wiki = True
+        follow_args.domain_flows = True
+        follow_args.verify_source = True
+        follow_args.auto_discover = False
+        follow_args.fusion = "rrf"
+        follow_args.format = "json"
+        follow_args.grouped = False
+
+        follow_result = cmd_trace(follow_args)
+
+        return {
+            "hint": (
+                f"当前服务 '{current_service}' 仅消费 RPC 接口 '{target_interface}'，"
+                f"实际实现位于 '{target_service}'。以下为目标服务的追踪结果。"
+            ),
+            "rpcInterfaces": rpc_interface_names[:5],
+            "targetService": target_service,
+            "targetTrace": {
+                "matchedNodes": follow_result.get("matchedNodes", []),
+                "source": follow_result.get("source"),
+                "sourceReads": follow_result.get("sourceReads"),
+                "wikiDomain": follow_result.get("wikiDomain"),
+                "domainFlows": follow_result.get("domainFlows"),
+            },
+        }
+    except (RuntimeError, SystemExit):
+        return {
+            "hint": (
+                f"检测到 '{current_service}' 消费 RPC 接口 '{target_interface}'，"
+                f"实现服务为 '{target_service}'，但追踪失败。建议手动执行: "
+                f"python ua_query.py trace --service {target_service} --query \"{target_interface}\" --source --verify-source"
+            ),
+            "rpcInterfaces": rpc_interface_names[:5],
+            "targetService": target_service,
+        }
 
 
 def cmd_ask(args: argparse.Namespace) -> Any:
@@ -1397,17 +1715,26 @@ def cmd_ask(args: argparse.Namespace) -> Any:
     if trace_result.get("discoveredVia"):
         result["discoveredVia"] = trace_result["discoveredVia"]
 
+    # Step 4: Cross-service RPC follow (depth=full only)
+    if depth == "full":
+        cross_svc = _detect_and_follow_cross_service_rpc(
+            args.server, service, query, trace_result
+        )
+        if cross_svc:
+            result["crossServiceTrace"] = cross_svc
+
     return result
 
 
 def cmd_impact(args: argparse.Namespace) -> Any:
     center = _find_symbol_node(args.server, args.service, args.symbol)
     center_id = center["id"]
+    effective_service = _effective_service(center, args.service)
     max_depth = min(max(args.depth, 1), 10)
     direction = args.direction
 
     params: dict[str, str] = {
-        "service": args.service,
+        "service": effective_service,
         "graph": "kg",
         "node": center_id,
         "direction": direction,
@@ -1426,42 +1753,53 @@ def cmd_impact(args: argparse.Namespace) -> Any:
         }
         for n in data.get("impacted", [])
     ]
-    return {
-        "service": args.service,
+    result: dict[str, Any] = {
+        "service": effective_service,
         "center": {"id": center_id, "name": center.get("name", ""), "type": center.get("type", "")},
         "depth": max_depth,
         "direction": direction,
         "impactRadius": len(affected),
         "affectedNodes": affected,
     }
+    if center.get("crossServiceOrigin"):
+        result["crossServiceOrigin"] = center["crossServiceOrigin"]
+    return result
 
 
 def cmd_callers(args: argparse.Namespace) -> Any:
     center = _find_symbol_node(args.server, args.service, args.symbol)
+    effective_service = _effective_service(center, args.service)
     depth = min(max(args.depth, 1), 3)
-    nbr_data = _fetch_neighbors(args.server, args.service, center["id"], "inbound", depth, "calls")
+    nbr_data = _fetch_neighbors(args.server, effective_service, center["id"], "inbound", depth, "calls")
     callers = _neighbor_entries(nbr_data)
-    return {
-        "service": args.service,
+    result: dict[str, Any] = {
+        "service": effective_service,
         "center": {"id": center["id"], "name": center.get("name", ""), "type": center.get("type", "")},
         "depth": depth,
         "callers": callers,
         "total": len(callers),
     }
+    if center.get("crossServiceOrigin"):
+        result["crossServiceOrigin"] = center["crossServiceOrigin"]
+    return result
 
 
 def cmd_callees(args: argparse.Namespace) -> Any:
     center = _find_symbol_node(args.server, args.service, args.symbol)
+    effective_service = _effective_service(center, args.service)
     depth = min(max(args.depth, 1), 3)
-    nbr_data = _fetch_neighbors(args.server, args.service, center["id"], "outbound", depth, "calls")
+    nbr_data = _fetch_neighbors(args.server, effective_service, center["id"], "outbound", depth, "calls")
     callees = _neighbor_entries(nbr_data)
-    return {
-        "service": args.service,
+    result: dict[str, Any] = {
+        "service": effective_service,
         "center": {"id": center["id"], "name": center.get("name", ""), "type": center.get("type", "")},
         "depth": depth,
         "callees": callees,
         "total": len(callees),
     }
+    if center.get("crossServiceOrigin"):
+        result["crossServiceOrigin"] = center["crossServiceOrigin"]
+    return result
 
 
 def cmd_hotspots(args: argparse.Namespace) -> Any:

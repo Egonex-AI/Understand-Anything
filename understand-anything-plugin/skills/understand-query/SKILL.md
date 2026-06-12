@@ -23,6 +23,17 @@ Query codebase knowledge through a lightweight CLI (`ua_query.py`) backed by the
 3. **Flag discrepancies**: If source code contradicts wiki/domain data, report the discrepancy explicitly.
 4. **Never trust wiki alone** for: parameter validation logic, error codes, conditional branches, or concurrency controls.
 
+### CRITICAL: Default Depth Must Be `full`
+
+**When answering user-facing questions, agents MUST use `--depth full` (not `standard` or `quick`).** The `standard` depth skips source verification and may return unverified wiki/domain claims. Only use `standard`/`quick` for internal exploratory searches where the output is not directly presented to the user as factual.
+
+**Decision table:**
+| Scenario | Required Depth |
+|----------|---------------|
+| Answering a user question | `full` (mandatory) |
+| Agent internal exploration | `standard` (acceptable) |
+| Quick service/domain check | `quick` (acceptable) |
+
 ---
 
 ## Execution Mode: Sub-Agent (Default)
@@ -61,7 +72,12 @@ and verifies source code — all in one call.
 IMPORTANT: Review the sourceVerification section in the output. If source code contradicts
 wiki/domain descriptions, explicitly note the discrepancy in your answer.
 
-Return a structured Chinese summary with: 业务概述、完整流程、关键实体、业务规则、源码校验结果。
+CROSS-SERVICE RPC: When depth=full, `ask` automatically detects outbound RPC calls
+(consumes_rpc edges) and follows them to the provider service. If the output contains
+a `crossServiceTrace` section, include its findings in your answer — the actual
+implementation logic is in the target service, not the initially discovered one.
+
+Return a structured Chinese summary with: 业务概述、完整流程、关键实体、业务规则、源码校验结果、跨服务追踪（如有）。
 ```
 
 #### Intent B: Code Location / Implementation
@@ -211,7 +227,11 @@ python ua_query.py trace --service svc-b --query "keyword" --source --verify-sou
 |-------|-------|----------|
 | `quick` | Business search only | Quick domain overview |
 | `standard` | + KG trace + wiki domain | Understanding a feature |
-| `full` | + domain flows + source verification | **Answering factual questions (RECOMMENDED)** |
+| `full` | + domain flows + source verification + **cross-service RPC follow** | **Answering factual questions (RECOMMENDED)** |
+
+**Cross-service RPC follow (depth=full):** When the traced service has outbound `consumes_rpc` edges, `ask` automatically identifies the provider service and runs a follow-up trace there. The output includes a `crossServiceTrace` section with the target service's implementation details. This solves the "found the reporter, not the implementer" problem.
+
+**Universal Cross-Service Symbol Resolution:** ALL commands (`trace`, `callers`, `callees`, `impact`) now automatically search other indexed services when a symbol is not found in the specified service. When cross-service resolution occurs, the output includes a `crossServiceOrigin` field indicating the original service, the actual service where the symbol was found, and a user-friendly hint. The commands transparently query the correct service — no manual `--service` switching needed.
 
 **Examples:**
 
