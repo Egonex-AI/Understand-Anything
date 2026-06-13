@@ -252,6 +252,70 @@ function kgGraphExpansion(
   return rankMap
 }
 
+function bidirectionalBFS(
+  state: SearchIndexState,
+  startIds: string[],
+  endIds: string[],
+  maxDepth: number = 3,
+): Map<string, number> {
+  const adj = state.adjacency
+  const startSet = new Set(startIds)
+  const endSet = new Set(endIds)
+
+  // 前向 BFS
+  const forwardVisited = new Map<string, number>()
+  const forwardQueue: Array<{ id: string; depth: number }> = []
+
+  for (const id of startIds) {
+    forwardVisited.set(id, 0)
+    forwardQueue.push({ id, depth: 0 })
+  }
+
+  while (forwardQueue.length > 0) {
+    const { id, depth } = forwardQueue.shift()!
+    if (depth >= maxDepth) continue
+
+    const neighbors = adj.get(id) ?? new Set()
+    for (const neighborId of neighbors) {
+      if (forwardVisited.has(neighborId)) continue
+      forwardVisited.set(neighborId, depth + 1)
+      forwardQueue.push({ id: neighborId, depth: depth + 1 })
+    }
+  }
+
+  // 后向 BFS
+  const backwardVisited = new Map<string, number>()
+  const backwardQueue: Array<{ id: string; depth: number }> = []
+
+  for (const id of endIds) {
+    backwardVisited.set(id, 0)
+    backwardQueue.push({ id, depth: 0 })
+  }
+
+  while (backwardQueue.length > 0) {
+    const { id, depth } = backwardQueue.shift()!
+    if (depth >= maxDepth) continue
+
+    const neighbors = adj.get(id) ?? new Set()
+    for (const neighborId of neighbors) {
+      if (backwardVisited.has(neighborId)) continue
+      backwardVisited.set(neighborId, depth + 1)
+      backwardQueue.push({ id: neighborId, depth: depth + 1 })
+    }
+  }
+
+  // 找到交集
+  const intersection = new Map<string, number>()
+  for (const [id, forwardDepth] of forwardVisited) {
+    const backwardDepth = backwardVisited.get(id)
+    if (backwardDepth !== undefined) {
+      intersection.set(id, forwardDepth + backwardDepth)
+    }
+  }
+
+  return intersection
+}
+
 function rrfFuse(
   bm25Results: UnifiedSearchResult[],
   kgRanks: Map<string, number>,
