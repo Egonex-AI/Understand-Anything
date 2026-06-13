@@ -47,6 +47,7 @@ interface LumoDocument extends Record<string, unknown> {
   service: string
   content: string
   layer: string
+  tags: string  // 新增
 }
 
 interface KgEdgeEntry {
@@ -122,6 +123,7 @@ export function tokenize(text: string): string[] {
 const LUMO_SEARCH_KEYS = [
   { name: "name", weight: 3 },
   { name: "summary", weight: 2 },
+  { name: "tags", weight: 2.5 },   // 新增：高于 summary
   { name: "type", weight: 0.5 },
   { name: "content", weight: 1 },
 ] as const
@@ -195,6 +197,7 @@ function buildLumoIndex(items: SearchIndexItem[]): LumoSearch<LumoDocument> {
     service: item.meta.service ?? "",
     content: item.text,
     layer: item.meta.layer,
+    tags: (item.meta as any).tags ?? "",  // 新增：tags 字段
   }))
 
   return new LumoSearch(lumoDocs, {
@@ -386,7 +389,7 @@ function pushKgItems(
       : undefined
     items.push({
       id: node.id,
-      text: [node.name, node.summary, node.type, ...(node.tags ?? [])].join(" "),
+      text: [node.name, node.summary, node.type].join(" "),  // 不再包含 tags
       meta: {
         name: node.name,
         type: node.type,
@@ -395,6 +398,7 @@ function pushKgItems(
         service: serviceName,
         filePath: fp,
         lineRange: node.lineRange,
+        tags: (node.tags ?? []).join(" "),  // 新增：tags 字段
       },
     })
   }
