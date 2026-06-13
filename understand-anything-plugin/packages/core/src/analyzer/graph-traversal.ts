@@ -51,10 +51,8 @@ export function traverseNeighbors(
           edge: { source: edge.source, target: edge.target, type: edge.type },
         });
 
-        if (!expanded.has(neighborId)) {
-          expanded.add(neighborId);
-          nextFrontier.push(neighborId);
-        }
+        expanded.add(neighborId);
+        nextFrontier.push(neighborId);
       }
     }
     frontier = nextFrontier;

@@ -82,4 +82,16 @@ describe("traverseNeighbors", () => {
     const results = traverseNeighbors(graph, ["A", "B"], "outbound", ["calls"], 1);
     expect(results.map((r) => r.nodeId)).toEqual(["C"]);
   });
+
+  it("returns empty array when maxDepth is 0", () => {
+    const graph = makeGraph(["A", "B"], [["A", "B", "calls"]]);
+    const results = traverseNeighbors(graph, ["A"], "outbound", ["calls"], 0);
+    expect(results).toEqual([]);
+  });
+
+  it("returns empty array when edgeTypes is empty", () => {
+    const graph = makeGraph(["A", "B"], [["A", "B", "calls"]]);
+    const results = traverseNeighbors(graph, ["A"], "outbound", [], 2);
+    expect(results).toEqual([]);
+  });
 });
