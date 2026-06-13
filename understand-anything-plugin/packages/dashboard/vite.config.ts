@@ -7,6 +7,7 @@ import { createApiRouter } from "./src/api/index";
 import { writeApiResponse } from "./src/api/vite-adapter";
 import { WikiDataService } from "./wiki-api";
 import { findGraphFile, projectRootFromGraphFile } from "./src/api/utils";
+import { VITEST_REACT_ALIASES } from "./vitest-react-aliases";
 
 export default defineConfig({
   test: {
@@ -16,7 +17,11 @@ export default defineConfig({
     ],
     include: ["src/**/__tests__/**/*.test.{ts,tsx}"],
     setupFiles: ["src/__tests__/setup-dom.ts"],
+    // Force single React instance — pnpm workspace creates two copies
+    // (repo-level and plugin-level) which causes "Invalid hook call" errors.
+    // Paths are validated at startup by vitest-react-aliases.ts.
     alias: {
+      ...VITEST_REACT_ALIASES,
       "@understand-anything/core/schema": path.resolve(__dirname, "../core/src/schema.ts"),
       "@understand-anything/core/search": path.resolve(__dirname, "../core/src/search.ts"),
       "@understand-anything/core/types": path.resolve(__dirname, "../core/src/types.ts"),

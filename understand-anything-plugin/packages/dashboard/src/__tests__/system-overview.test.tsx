@@ -6,6 +6,21 @@ import { useDashboardStore } from "../store";
 import { I18nProvider } from "../contexts/I18nContext";
 import { ThemeProvider } from "../themes/index.ts";
 
+// Mock hooks from @xyflow/react — jsdom lacks the DOM APIs these hooks need
+// (SVG measurement, ResizeObserver, etc.). Non-hook exports (ReactFlow,
+// Handle, Position, etc.) come from the real module via importOriginal.
+// The vitest-react-aliases.ts @xyflow/react alias ensures the real module
+// uses the same React instance as the test, avoiding "Invalid hook call".
+vi.mock("@xyflow/react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@xyflow/react")>();
+  return {
+    ...actual,
+    ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    useNodesState: (init: import("@xyflow/react").Node[]) => [init, () => {}, () => {}],
+    useEdgesState: (init: import("@xyflow/react").Edge[]) => [init, () => {}, () => {}],
+  };
+});
+
 const mockSystemGraph: SystemGraph = {
   version: "1.0.0",
   generatedAt: "2026-06-04T12:00:00Z",

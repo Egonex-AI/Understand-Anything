@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { VITEST_REACT_ALIASES } from './understand-anything-plugin/packages/dashboard/vitest-react-aliases';
 
 // Single-config aggregation for the whole monorepo. Picks up:
 //   - tests/**                                          — relocated skill tests (out-of-plugin so they
@@ -27,5 +28,11 @@ export default defineConfig({
     setupFiles: [
       'understand-anything-plugin/packages/dashboard/vitest-setup.ts',
     ],
+    alias: {
+      // Force single React instance — pnpm workspace creates two copies
+      // (repo-level and plugin-level) which causes "Invalid hook call" errors.
+      // Paths are resolved dynamically by vitest-react-aliases.ts.
+      ...VITEST_REACT_ALIASES,
+    },
   },
 });

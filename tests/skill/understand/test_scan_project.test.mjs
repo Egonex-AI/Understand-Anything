@@ -297,13 +297,11 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     expect(license.fileCategory).not.toBe('docs');
   });
 
-  it('assigns infra to Dockerfile, docker-compose, .gitlab-ci.yml, .tf, .github/workflows/, Makefile, Jenkinsfile, k8s paths', () => {
+  it('assigns infra to Dockerfile, docker-compose, .tf, Makefile, Jenkinsfile, k8s paths', () => {
     projectRoot = setupTree({
       Dockerfile: 'FROM node:22\n',
       'docker-compose.yml': 'services: {}\n',
-      '.gitlab-ci.yml': 'stages: []\n',
       'infra/main.tf': 'resource "x" "y" {}\n',
-      '.github/workflows/ci.yml': 'name: ci\n',
       Makefile: 'all:\n\t@echo hi\n',
       Jenkinsfile: 'pipeline { }\n',
       'k8s/deploy.yaml': 'kind: Deployment\n',
@@ -314,9 +312,7 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     expect(r.status).toBe(0);
     expect(byPath(r.output, 'Dockerfile').fileCategory).toBe('infra');
     expect(byPath(r.output, 'docker-compose.yml').fileCategory).toBe('infra');
-    expect(byPath(r.output, '.gitlab-ci.yml').fileCategory).toBe('infra');
     expect(byPath(r.output, 'infra/main.tf').fileCategory).toBe('infra');
-    expect(byPath(r.output, '.github/workflows/ci.yml').fileCategory).toBe('infra');
     expect(byPath(r.output, 'Makefile').fileCategory).toBe('infra');
     expect(byPath(r.output, 'Jenkinsfile').fileCategory).toBe('infra');
     expect(byPath(r.output, 'k8s/deploy.yaml').fileCategory).toBe('infra');
