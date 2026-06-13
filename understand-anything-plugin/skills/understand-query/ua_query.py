@@ -922,8 +922,8 @@ def _cmd_kg_file_summary(args: argparse.Namespace) -> Any:
                     if edge_type == "calls" and name not in seen_callees:
                         seen_callees.add(name)
                         callees.append(entry)
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            sys.stderr.write(f"[ua_query] fetch_neighbors failed: {e}")
 
     imports: list[str] = []
     try:
@@ -936,8 +936,8 @@ def _cmd_kg_file_summary(args: argparse.Namespace) -> Any:
             short = _short_type_name(str(raw))
             if short and short not in imports:
                 imports.append(short)
-    except RuntimeError:
-        pass
+    except RuntimeError as e:
+        sys.stderr.write(f"[ua_query] structure/file fetch failed: {e}")
 
     return {
         "file": args.file,
@@ -1182,7 +1182,7 @@ def _score_node_relevance(node: dict[str, Any], query: str) -> float:
     if summary and q in summary:
         score += 3.0
 
-    return score
+    return max(score, 0.0)
 
 
 def _extract_code_keywords(flow_name: str) -> list[str]:
@@ -1272,7 +1272,8 @@ def _cross_service_symbol_search(server: str, exclude_service: str, symbol: str,
     """Single global search to find a symbol across all services (O(1) HTTP call)."""
     try:
         hits = _search_api(server, symbol, scope="kg", limit=30)
-    except RuntimeError:
+    except RuntimeError as e:
+        sys.stderr.write(f"[ua_query] cross-service search failed: {e}")
         return None
 
     # Filter out results from the excluded service
@@ -1694,8 +1695,8 @@ def cmd_trace(args: argparse.Namespace) -> Any:
                     "targetService": target_svc,
                     "traceResult": follow_result,
                 }
-            except (RuntimeError, SystemExit):
-                pass
+            except (RuntimeError, SystemExit) as e:
+                sys.stderr.write(f"[ua_query] cross-service trace failed: {e}")
         else:
             result["hint"] = (
                 f"No KG nodes matched '{args.query}' in service '{service}'. "

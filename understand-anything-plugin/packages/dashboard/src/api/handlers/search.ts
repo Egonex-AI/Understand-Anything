@@ -1,7 +1,9 @@
 import path from "path"
 import fs from "fs"
-import { cut } from "@node-rs/jieba"
+import jieba from "@node-rs/jieba"
 import { LumoSearch } from "@lumosearch/search"
+
+const { cut } = jieba
 import type { ApiRequest, ApiContext, ApiResponse } from "../types"
 import {
   graphFileCandidates,
@@ -16,6 +18,7 @@ import {
   validateServiceName,
   isApiResponse,
 } from "../service-resolver"
+import { rrfFuse } from "./rrf-fuse"
 import type { KnowledgeGraph, WikiIndex } from "@understand-anything/core"
 
 export interface UnifiedSearchResult {
@@ -28,12 +31,13 @@ export interface UnifiedSearchResult {
   service?: string
   filePath?: string
   lineRange?: [number, number]
+  tags?: string
 }
 
 type SearchLayer = UnifiedSearchResult["layer"]
 type SearchScope = SearchLayer | "all"
 
-interface SearchIndexItem {
+export interface SearchIndexItem {
   id: string
   text: string
   meta: Omit<UnifiedSearchResult, "id" | "score">
@@ -56,7 +60,7 @@ interface KgEdgeEntry {
   type: string
 }
 
-interface SearchIndexState {
+export interface SearchIndexState {
   items: SearchIndexItem[]
   itemById: Map<string, SearchIndexItem>
   tokenizedDocs: string[][]
@@ -99,6 +103,16 @@ export function tokenize(text: string): string[] {
     }
   }
 
+  // Extract numbers from text
+  const numbers = text.match(/\d+/g)
+  if (numbers) {
+    for (const num of numbers) {
+      if (num.length >= 2) {
+        tokens.push(num)
+      }
+    }
+  }
+
   const cjk = text.match(/[\u4e00-\u9fff]+/g)
   if (cjk) {
     for (const segment of cjk) {
@@ -107,7 +121,8 @@ export function tokenize(text: string): string[] {
         for (const word of words) {
           if (word.length > 0) tokens.push(word)
         }
-      } catch {
+      } catch (e) {
+        console.warn("[search] jieba cut failed, falling back to bigram:", e)
         // Fallback to bigram if jieba fails
         for (let i = 0; i < segment.length - 1; i++) {
           tokens.push(segment.slice(i, i + 2))
@@ -130,9 +145,9 @@ const LUMO_SEARCH_KEYS = [
 
 const LUMO_CANDIDATE_LIMIT = 500
 
-const CJK_REGEX = /[\u4e00-\u9fff]/
+export const CJK_REGEX = /[\u4e00-\u9fff]/
 
-function buildTokenizedDocs(items: SearchIndexItem[]): string[][] {
+export function buildTokenizedDocs(items: SearchIndexItem[]): string[][] {
   return items.map((item) => tokenize(item.text))
 }
 
@@ -188,7 +203,7 @@ function cjkTokenScores(
   return scores
 }
 
-function buildLumoIndex(items: SearchIndexItem[]): LumoSearch<LumoDocument> {
+export function buildLumoIndex(items: SearchIndexItem[]): LumoSearch<LumoDocument> {
   const lumoDocs: LumoDocument[] = items.map((item) => ({
     id: item.id,
     name: item.meta.name,
@@ -197,7 +212,7 @@ function buildLumoIndex(items: SearchIndexItem[]): LumoSearch<LumoDocument> {
     service: item.meta.service ?? "",
     content: item.text,
     layer: item.meta.layer,
-    tags: (item.meta as any).tags ?? "",  // 新增：tags 字段
+    tags: item.meta.tags ?? "",
   }))
 
   return new LumoSearch(lumoDocs, {
@@ -206,7 +221,6 @@ function buildLumoIndex(items: SearchIndexItem[]): LumoSearch<LumoDocument> {
   })
 }
 
-const RRF_K = 60
 
 function kgGraphExpansion(
   state: SearchIndexState,
@@ -252,151 +266,6 @@ function kgGraphExpansion(
   return rankMap
 }
 
-function bidirectionalBFS(
-  state: SearchIndexState,
-  startIds: string[],
-  endIds: string[],
-  maxDepth: number = 3,
-): Map<string, number> {
-  const adj = state.adjacency
-  const startSet = new Set(startIds)
-  const endSet = new Set(endIds)
-
-  // 前向 BFS
-  const forwardVisited = new Map<string, number>()
-  const forwardQueue: Array<{ id: string; depth: number }> = []
-
-  for (const id of startIds) {
-    forwardVisited.set(id, 0)
-    forwardQueue.push({ id, depth: 0 })
-  }
-
-  while (forwardQueue.length > 0) {
-    const { id, depth } = forwardQueue.shift()!
-    if (depth >= maxDepth) continue
-
-    const neighbors = adj.get(id) ?? new Set()
-    for (const neighborId of neighbors) {
-      if (forwardVisited.has(neighborId)) continue
-      forwardVisited.set(neighborId, depth + 1)
-      forwardQueue.push({ id: neighborId, depth: depth + 1 })
-    }
-  }
-
-  // 后向 BFS
-  const backwardVisited = new Map<string, number>()
-  const backwardQueue: Array<{ id: string; depth: number }> = []
-
-  for (const id of endIds) {
-    backwardVisited.set(id, 0)
-    backwardQueue.push({ id, depth: 0 })
-  }
-
-  while (backwardQueue.length > 0) {
-    const { id, depth } = backwardQueue.shift()!
-    if (depth >= maxDepth) continue
-
-    const neighbors = adj.get(id) ?? new Set()
-    for (const neighborId of neighbors) {
-      if (backwardVisited.has(neighborId)) continue
-      backwardVisited.set(neighborId, depth + 1)
-      backwardQueue.push({ id: neighborId, depth: depth + 1 })
-    }
-  }
-
-  // 找到交集
-  const intersection = new Map<string, number>()
-  for (const [id, forwardDepth] of forwardVisited) {
-    const backwardDepth = backwardVisited.get(id)
-    if (backwardDepth !== undefined) {
-      intersection.set(id, forwardDepth + backwardDepth)
-    }
-  }
-
-  return intersection
-}
-
-function rrfFuse(
-  bm25Results: UnifiedSearchResult[],
-  kgRanks: Map<string, number>,
-  state: SearchIndexState,
-  limit: number,
-): UnifiedSearchResult[] {
-  const rrfScores = new Map<string, number>()
-  const resultById = new Map<string, UnifiedSearchResult>()
-
-  for (let i = 0; i < bm25Results.length; i++) {
-    const r = bm25Results[i]
-    const rank = i + 1
-    rrfScores.set(r.id, (rrfScores.get(r.id) ?? 0) + 1 / (RRF_K + rank))
-    resultById.set(r.id, r)
-  }
-
-  for (const [id, rank] of kgRanks) {
-    rrfScores.set(id, (rrfScores.get(id) ?? 0) + 1 / (RRF_K + rank))
-    if (!resultById.has(id)) {
-      const item = state.itemById.get(id)
-      if (item) {
-        resultById.set(id, { id, score: 0, ...item.meta })
-      }
-    }
-  }
-
-  const fused = [...rrfScores.entries()]
-    .map(([id, rrfScore]) => {
-      const result = resultById.get(id)
-      if (!result) return null
-      return { ...result, score: rrfScore }
-    })
-    .filter(Boolean) as UnifiedSearchResult[]
-
-  fused.sort((a, b) => b.score - a.score)
-  return fused.slice(0, limit)
-}
-
-interface QueryIntent {
-  type: 'exact' | 'fuzzy' | 'semantic' | 'structural'
-  entities: string[]
-  relations: string[]
-  scope: SearchScope
-}
-
-interface SearchStrategy {
-  methods: Array<{
-    type: 'bm25' | 'vector' | 'graph' | 'hybrid'
-    weight: number
-    params: Record<string, unknown>
-  }>
-  graphExpansion: {
-    enabled: boolean
-    depth: number
-    strategy: 'forward' | 'backward' | 'bidirectional'
-    pruning: boolean
-  }
-  fusion: {
-    method: 'rrf' | 'weighted' | 'learning-to-rank'
-    weights: Record<string, number>
-  }
-}
-
-function understandQuery(query: string): QueryIntent {
-  // 实现查询理解逻辑
-  return {
-    type: 'fuzzy',
-    entities: [],
-    relations: [],
-    scope: 'all'
-  }
-}
-
-function selectStrategy(intent: QueryIntent): SearchStrategy {
-  // 实现策略选择逻辑
-  return {
-    methods: [{ type: 'bm25', weight: 1, params: {} }],
-    graphExpansion: { enabled: true, depth: 2, strategy: 'forward', pruning: false },
-    fusion: { method: 'rrf', weights: {} }
-  }
-}
 
 function lumoSearch(
   state: SearchIndexState,
@@ -448,7 +317,19 @@ function lumoSearch(
   if (fusion === "rrf" && state.edges.length > 0) {
     const seedIds = scored.slice(0, 10).map((r) => r.id)
     const kgRanks = kgGraphExpansion(state, seedIds)
-    const fused = rrfFuse(scored, kgRanks, state, limit)
+    const fused = rrfFuse(
+      [
+        { results: scored },
+        {
+          rankMap: kgRanks,
+          resolve: (id) => {
+            const item = state.itemById.get(id)
+            return item ? { id, score: 0, ...item.meta } : undefined
+          },
+        },
+      ],
+      limit,
+    )
     return { results: fused, total: fused.length }
   }
 
@@ -475,7 +356,7 @@ function resolveProjectDataPath(projectRoot: string, relativePath: string): stri
   return null
 }
 
-function pushKgItems(
+export function pushKgItems(
   items: SearchIndexItem[],
   edges: KgEdgeEntry[],
   graph: KnowledgeGraph,
@@ -512,7 +393,7 @@ function pushKgItems(
   }
 }
 
-function pushWikiItems(items: SearchIndexItem[], index: WikiIndex, serviceName?: string): void {
+export function pushWikiItems(items: SearchIndexItem[], index: WikiIndex, serviceName?: string): void {
   for (const entry of index.entries ?? []) {
     items.push({
       id: entry.id,
