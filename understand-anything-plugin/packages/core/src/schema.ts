@@ -652,6 +652,9 @@ export function validateGraph(data: unknown): ValidationResult {
 
   const graph = {
     version: typeof fixed.version === "string" ? fixed.version : "1.0.0",
+    ...(fixed.kind === "codebase" || fixed.kind === "knowledge"
+      ? { kind: fixed.kind as "codebase" | "knowledge" }
+      : {}),
     project: projectResult.data,
     nodes: validNodes,
     edges: validEdges,

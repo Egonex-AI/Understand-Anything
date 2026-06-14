@@ -66,6 +66,21 @@ describe("schema validation", () => {
     expect(result.issues).toEqual([]);
   });
 
+  it("preserves the kind field for knowledge graphs", () => {
+    const graph = structuredClone(validGraph);
+    (graph as any).kind = "knowledge";
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.kind).toBe("knowledge");
+  });
+
+  it("leaves kind undefined when the input omits it", () => {
+    const result = validateGraph(validGraph);
+    expect(result.success).toBe(true);
+    expect(result.data!.kind).toBeUndefined();
+  });
+
   it("rejects graph with missing required fields", () => {
     const incomplete = { version: "1.0.0" };
     const result = validateGraph(incomplete);
