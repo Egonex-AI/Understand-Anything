@@ -40,6 +40,12 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
         break;
       }
 
+      case "keyword_parameter": {
+        const ident = child.childForFieldName("name");
+        if (ident) params.push(ident.text + ":");
+        break;
+      }
+
       case "splat_parameter": {
         const ident = child.childForFieldName("name");
         if (ident) params.push("*" + ident.text);
@@ -314,7 +320,7 @@ export class RubyExtractor implements LanguageExtractor {
 
     const body = node.childForFieldName("body");
     if (body) {
-      this.extractClassBody(body, methods, properties, functions);
+      this.extractClassBody(body, methods, properties, functions, classes);
     }
 
     classes.push({
@@ -341,7 +347,7 @@ export class RubyExtractor implements LanguageExtractor {
 
     const body = node.childForFieldName("body");
     if (body) {
-      this.extractClassBody(body, methods, properties, functions);
+      this.extractClassBody(body, methods, properties, functions, classes);
     }
 
     classes.push({
@@ -357,13 +363,16 @@ export class RubyExtractor implements LanguageExtractor {
 
   /**
    * Extract methods and properties from a class/module body_statement.
-   * Also pushes each method into the top-level functions array.
+   * Also pushes each method into the top-level functions array, and recurses
+   * into nested class/module declarations (appending them to the shared
+   * `classes` array along with their methods).
    */
   private extractClassBody(
     body: TreeSitterNode,
     methods: string[],
     properties: string[],
     functions: StructuralAnalysis["functions"],
+    classes: StructuralAnalysis["classes"],
   ): void {
     for (let i = 0; i < body.childCount; i++) {
       const member = body.child(i);
@@ -387,6 +396,10 @@ export class RubyExtractor implements LanguageExtractor {
         if (methodNode && ATTR_METHODS.has(methodNode.text)) {
           properties.push(...extractAttrProperties(member));
         }
+      } else if (member.type === "class") {
+        this.extractClass(member, classes, functions);
+      } else if (member.type === "module") {
+        this.extractModule(member, classes, functions);
       }
     }
   }

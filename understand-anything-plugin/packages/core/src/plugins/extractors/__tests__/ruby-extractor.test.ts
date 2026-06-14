@@ -92,6 +92,35 @@ end
       parser.delete();
     });
 
+    it("extracts keyword parameters", () => {
+      const { tree, parser, root } = parse(`
+def configure(name:, age: 30)
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("configure");
+      expect(result.functions[0].params).toEqual(["name:", "age:"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts mixed positional and keyword parameters", () => {
+      const { tree, parser, root } = parse(`
+def build(a, b, name:, opts: {})
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].params).toEqual(["a", "b", "name:", "opts:"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts methods with no parameters", () => {
       const { tree, parser, root } = parse(`
 def noop
@@ -276,6 +305,26 @@ end
       expect(result.classes).toHaveLength(1);
       expect(result.classes[0].name).toBe("Helpers");
       expect(result.classes[0].methods).toContain("format_date");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts classes/modules nested inside a module", () => {
+      const { tree, parser, root } = parse(`
+module Outer
+  class Inner
+    def foo
+    end
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toEqual(
+        expect.arrayContaining(["Outer", "Inner"]),
+      );
+      expect(result.functions.some((f) => f.name === "foo")).toBe(true);
 
       tree.delete();
       parser.delete();
