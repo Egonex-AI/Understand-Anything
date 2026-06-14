@@ -596,4 +596,55 @@ func helper(x int) string {
       parser.delete();
     });
   });
+
+  // ---- Generic receivers ----
+
+  describe("extractStructure - generic receivers", () => {
+    it("attaches methods on generic receivers to their struct", () => {
+      const { tree, parser, root } = parse(`package main
+
+type Stack[T any] struct {
+    items []T
+}
+
+func (s *Stack[T]) Push(item T) {}
+
+func (s Stack[T]) Len() int {
+    return 0
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("Stack");
+      expect(result.classes[0].methods.sort()).toEqual(["Len", "Push"]);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
+  // ---- Grouped type declarations ----
+
+  describe("extractStructure - grouped type declarations", () => {
+    it("handles grouped type declarations", () => {
+      const { tree, parser, root } = parse(`package main
+
+type (
+    Foo struct { A int }
+    Bar struct { B int }
+)
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toEqual(["Foo", "Bar"]);
+
+      const exportNames = result.exports.map((e) => e.name);
+      expect(exportNames).toContain("Foo");
+      expect(exportNames).toContain("Bar");
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });

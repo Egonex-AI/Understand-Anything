@@ -50,16 +50,21 @@ function extractReceiverType(receiverNode: TreeSitterNode): string | undefined {
   const decl = findChild(receiverNode, "parameter_declaration");
   if (!decl) return undefined;
 
-  // Look for type_identifier directly or inside pointer_type
+  // Look for type_identifier directly or inside pointer_type / generic_type.
+  // For generic receivers the receiver is wrapped in a generic_type (and may be
+  // pointer-wrapped too), e.g. `(s *Stack[T])`, so unwrap those layers before
+  // grabbing the base type_identifier.
   for (let i = 0; i < decl.childCount; i++) {
-    const child = decl.child(i);
+    let child: TreeSitterNode | null = decl.child(i);
     if (!child) continue;
-    if (child.type === "type_identifier") {
-      return child.text;
+    while (child && (child.type === "pointer_type" || child.type === "generic_type")) {
+      child =
+        child.type === "generic_type"
+          ? child.childForFieldName("type")
+          : findChild(child, "type_identifier") ?? findChild(child, "generic_type");
     }
-    if (child.type === "pointer_type") {
-      const typeId = findChild(child, "type_identifier");
-      if (typeId) return typeId.text;
+    if (child && child.type === "type_identifier") {
+      return child.text;
     }
   }
   return undefined;
@@ -261,17 +266,20 @@ export class GoExtractor implements LanguageExtractor {
     classes: StructuralAnalysis["classes"],
     exports: StructuralAnalysis["exports"],
   ): void {
-    const typeSpec = findChild(node, "type_spec");
-    if (!typeSpec) return;
+    // A type_declaration can hold multiple type_spec children when types are
+    // grouped, e.g. `type ( Foo struct{...}; Bar struct{...} )`.  Iterate over
+    // all of them so every grouped type is captured, not just the first.
+    const typeSpecs = findChildren(node, "type_spec");
+    for (const typeSpec of typeSpecs) {
+      const nameNode = typeSpec.childForFieldName("name");
+      const typeNode = typeSpec.childForFieldName("type");
+      if (!nameNode || !typeNode) continue;
 
-    const nameNode = typeSpec.childForFieldName("name");
-    const typeNode = typeSpec.childForFieldName("type");
-    if (!nameNode || !typeNode) return;
-
-    if (typeNode.type === "struct_type") {
-      this.extractStruct(node, nameNode, typeNode, classes, exports);
-    } else if (typeNode.type === "interface_type") {
-      this.extractInterface(node, nameNode, typeNode, classes, exports);
+      if (typeNode.type === "struct_type") {
+        this.extractStruct(typeSpec, nameNode, typeNode, classes, exports);
+      } else if (typeNode.type === "interface_type") {
+        this.extractInterface(typeSpec, nameNode, typeNode, classes, exports);
+      }
     }
   }
 
