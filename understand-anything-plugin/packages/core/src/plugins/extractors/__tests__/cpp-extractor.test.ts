@@ -693,4 +693,88 @@ int main() {
       parser.delete();
     });
   });
+
+  // ---- Edge cases ----
+
+  describe("extractStructure - edge cases", () => {
+    it("captures parameters with default values (optional_parameter_declaration)", () => {
+      const { tree, parser, root } = parse(
+        `int add(int a, int b = 10) { return a + b; }`,
+      );
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("add");
+      expect(result.functions[0].params).toEqual(["a", "b"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures all-default-value parameters", () => {
+      const { tree, parser, root } = parse(`void f(int a = 1, int b = 2) {}`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("f");
+      expect(result.functions[0].params).toEqual(["a", "b"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts templated free functions (template_declaration)", () => {
+      const { tree, parser, root } = parse(
+        `template <typename T> T identity(T x) { return x; }`,
+      );
+      const result = extractor.extractStructure(root);
+
+      const identityFn = result.functions.find((f) => f.name === "identity");
+      expect(identityFn).toBeDefined();
+      expect(identityFn!.params).toEqual(["x"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts templated classes (template_declaration)", () => {
+      const { tree, parser, root } = parse(
+        `template <typename T> class Box { public: T get(); };`,
+      );
+      const result = extractor.extractStructure(root);
+
+      const boxClass = result.classes.find((c) => c.name === "Box");
+      expect(boxClass).toBeDefined();
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("resolves method name/qualifier for nested-namespace out-of-class definitions", () => {
+      const { tree, parser, root } = parse(`
+class Server {
+public:
+    void start();
+};
+
+void net::Server::start() {}
+`);
+      const result = extractor.extractStructure(root);
+
+      const startFn = result.functions.find((f) => f.name === "start");
+      expect(startFn).toBeDefined();
+      expect(startFn!.name).toBe("start");
+      // The qualifier must resolve to "Server", not "net"
+      expect(result.functions.some((f) => f.name === "Server::start")).toBe(
+        false,
+      );
+
+      const server = result.classes.find((c) => c.name === "Server");
+      expect(server).toBeDefined();
+      expect(server!.methods).toContain("start");
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });

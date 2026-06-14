@@ -1,6 +1,6 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { findChild, findChildren } from "./base-extractor.js";
+import { findChild } from "./base-extractor.js";
 
 /**
  * Recursively unwrap nested declarators (pointer_declarator, reference_declarator,
@@ -47,13 +47,20 @@ function extractFuncDeclName(
   }
 
   if (declNode.type === "qualified_identifier") {
-    const nameNode = declNode.childForFieldName("name");
-    // The qualifier is the namespace_identifier before ::
-    const nsNode = findChild(declNode, "namespace_identifier");
-    return {
-      name: nameNode ? nameNode.text : declNode.text,
-      qualifier: nsNode ? nsNode.text : null,
-    };
+    // qualified_identifiers nest for deeply scoped names like
+    // `net::Server::start`. Walk down the `name` field to the leaf identifier,
+    // tracking the immediately-enclosing scope as the qualifier (e.g. "Server"
+    // for `net::Server::start`, not "net").
+    let cur: TreeSitterNode = declNode;
+    let qualifier: string | null = null;
+    while (cur.type === "qualified_identifier") {
+      const scope = cur.childForFieldName("scope");
+      if (scope) qualifier = scope.text;
+      const next = cur.childForFieldName("name");
+      if (!next) break;
+      cur = next;
+    }
+    return { name: cur.text, qualifier };
   }
 
   return { name: declNode.text, qualifier: null };
@@ -70,14 +77,22 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
   if (!paramsNode) return [];
   const params: string[] = [];
 
-  const decls = findChildren(paramsNode, "parameter_declaration");
-  for (const decl of decls) {
+  // Iterate over all params in source order. A parameter with a default value
+  // (e.g. `int b = 10`) parses as an `optional_parameter_declaration`, not a
+  // `parameter_declaration`, so both node types must be handled.
+  for (let i = 0; i < paramsNode.childCount; i++) {
+    const decl = paramsNode.child(i);
+    if (!decl) continue;
+    if (
+      decl.type !== "parameter_declaration" &&
+      decl.type !== "optional_parameter_declaration"
+    ) {
+      continue;
+    }
     const declNode = decl.childForFieldName("declarator");
     if (declNode) {
       const name = unwrapDeclaratorName(declNode);
-      if (name) {
-        params.push(name);
-      }
+      if (name) params.push(name);
     }
   }
 
@@ -236,6 +251,20 @@ export class CppExtractor implements LanguageExtractor {
           if (body) {
             this.walkTopLevel(body, functions, classes, imports, exports, methodsByClass);
           }
+          break;
+        }
+
+        case "template_declaration": {
+          // Templated functions/classes are wrapped in a template_declaration
+          // whose body holds the inner function_definition / class_specifier /
+          // struct_specifier. Dispatch the inner declaration through the
+          // existing handlers.
+          const fn = findChild(node, "function_definition");
+          if (fn) this.extractFunctionDef(fn, functions, exports, methodsByClass);
+          const cls = findChild(node, "class_specifier");
+          if (cls) this.extractClassOrStruct(cls, "class", classes, functions, exports);
+          const st = findChild(node, "struct_specifier");
+          if (st) this.extractClassOrStruct(st, "struct", classes, functions, exports);
           break;
         }
 
