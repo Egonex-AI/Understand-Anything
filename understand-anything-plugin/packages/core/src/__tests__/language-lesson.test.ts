@@ -140,6 +140,20 @@ describe("language-lesson", () => {
       expect(concepts).toContain("middleware pattern");
     });
 
+    it("does not flag type guards from the 'is' substring in common words", () => {
+      const plainNode: GraphNode = {
+        id: "function:math:add",
+        type: "function",
+        name: "add",
+        filePath: "src/math/add.ts",
+        summary: "This function adds two numbers",
+        tags: ["utility"],
+        complexity: "simple",
+      };
+      const concepts = detectLanguageConcepts(plainNode, "typescript");
+      expect(concepts).not.toContain("type guards");
+    });
+
     it("returns empty for nodes with no detectable concepts", () => {
       const plainNode: GraphNode = {
         id: "file:src/config.ts",

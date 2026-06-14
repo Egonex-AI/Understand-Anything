@@ -24,7 +24,7 @@ const BASE_CONCEPT_PATTERNS: Record<string, string[]> = {
     "listener",
   ],
   "singleton": ["singleton", "instance", "shared client"],
-  "type guards": ["type guard", "is", "narrowing", "discriminated union"],
+  "type guards": ["type guard", "narrowing", "discriminated union"],
   "higher-order functions": [
     "callback",
     "factory",
