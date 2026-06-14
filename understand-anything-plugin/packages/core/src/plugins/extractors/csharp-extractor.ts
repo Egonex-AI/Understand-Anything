@@ -68,7 +68,20 @@ function extractUsingSource(node: TreeSitterNode): string | null {
   if (hasEquals) {
     // The target namespace is the qualified_name after the `=`
     const qualifiedName = findChild(node, "qualified_name");
-    return qualifiedName ? qualifiedName.text : null;
+    if (qualifiedName) return qualifiedName.text;
+    // Simple-identifier target (`using Alias = System;`): the target is the
+    // identifier AFTER the `=`, not the first identifier (which is the alias).
+    let seenEquals = false;
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (!child) continue;
+      if (child.type === "=") {
+        seenEquals = true;
+        continue;
+      }
+      if (seenEquals && child.type === "identifier") return child.text;
+    }
+    return null;
   }
 
   // Simple or qualified using
@@ -173,8 +186,12 @@ export class CSharpExtractor implements LanguageExtractor {
       // Extract object creation: e.g. new Foo()
       if (node.type === "object_creation_expression") {
         if (functionStack.length > 0) {
-          // The type is the child after `new` — can be identifier or generic_name
-          const typeNode = findChild(node, "identifier") ?? findChild(node, "generic_name");
+          // The type is the child after `new` — can be identifier, generic_name,
+          // or a qualified_name (e.g. `new System.Text.StringBuilder()`).
+          const typeNode =
+            findChild(node, "identifier") ??
+            findChild(node, "generic_name") ??
+            findChild(node, "qualified_name");
           if (typeNode) {
             entries.push({
               caller: functionStack[functionStack.length - 1],

@@ -302,6 +302,20 @@ namespace App {
       tree.delete();
       parser.delete();
     });
+
+    it("extracts aliased using with a simple-identifier target", () => {
+      const { tree, parser, root } = parse(`using Alias = System;
+namespace App { public class C {} }
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        { source: "System", specifiers: ["System"], lineNumber: 1 },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Exports ----
@@ -447,6 +461,20 @@ namespace App {
       expect(result).toHaveLength(1);
       expect(result[0].caller).toBe("Create");
       expect(result[0].callee).toBe("new Bar");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts object creation of a qualified type", () => {
+      const { tree, parser, root } = parse(`namespace App { public class C { public void M() { var x = new System.Text.StringBuilder(); } } }`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({
+        caller: "M",
+        callee: "new System.Text.StringBuilder",
+        lineNumber: 1,
+      });
 
       tree.delete();
       parser.delete();
