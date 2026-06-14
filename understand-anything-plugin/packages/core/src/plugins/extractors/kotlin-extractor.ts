@@ -294,7 +294,10 @@ export class KotlinExtractor implements LanguageExtractor {
 
     // 2. Body members (if any). Some Kotlin declarations have no body
     //    (e.g. `class Empty` or `data class Point(...)` without `{}`).
-    const body = findChild(declNode, "class_body");
+    //    An `enum class` body is parsed as `enum_class_body`, not `class_body`.
+    const body =
+      findChild(declNode, "class_body") ??
+      findChild(declNode, "enum_class_body");
     if (body) {
       collectClassBody(body, methods, properties, functions, exports);
     }
