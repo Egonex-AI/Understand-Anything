@@ -55,14 +55,29 @@ beforeEach(() => {
 
 describe("getChangedFiles", () => {
   it("returns changed file list from git diff", () => {
-    mockedExecFileSync.mockReturnValue("src/index.ts\nsrc/utils.ts\n");
+    mockedExecFileSync.mockReturnValue("src/index.ts\0src/utils.ts\0");
 
     const result = getChangedFiles("/project", "abc123");
 
     expect(result).toEqual(["src/index.ts", "src/utils.ts"]);
     expect(mockedExecFileSync).toHaveBeenCalledWith(
       "git",
-      ["diff", "abc123..HEAD", "--name-only"],
+      ["diff", "abc123..HEAD", "--name-only", "-z"],
+      { cwd: "/project", encoding: "utf-8" },
+    );
+  });
+
+  it("detects non-ASCII and quoted/spaced paths via NUL-terminated output", () => {
+    // git with -z emits unquoted, NUL-terminated paths (no C-quoting).
+    mockedExecFileSync.mockReturnValue("uni-café.txt\0with space.txt\0");
+
+    const result = getChangedFiles("/project", "abc123");
+
+    expect(result).toEqual(["uni-café.txt", "with space.txt"]);
+    // The -z flag must be passed so git does not C-quote non-ASCII paths.
+    expect(mockedExecFileSync).toHaveBeenCalledWith(
+      "git",
+      ["diff", "abc123..HEAD", "--name-only", "-z"],
       { cwd: "/project", encoding: "utf-8" },
     );
   });
@@ -88,7 +103,7 @@ describe("getChangedFiles", () => {
 
 describe("isStale", () => {
   it("returns stale when files have changed", () => {
-    mockedExecFileSync.mockReturnValue("src/index.ts\n");
+    mockedExecFileSync.mockReturnValue("src/index.ts\0");
 
     const result = isStale("/project", "abc123");
 

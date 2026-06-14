@@ -15,12 +15,16 @@ export function getChangedFiles(
   lastCommitHash: string,
 ): string[] {
   try {
-    const output = execFileSync('git', ['diff', `${lastCommitHash}..HEAD`, '--name-only'], {
+    // -z makes git emit NUL-terminated, unquoted paths. Without it git
+    // C-quotes any path containing non-ASCII bytes (e.g. `uni-café.txt`
+    // becomes `"uni-caf\303\251.txt"`), which never matches the stored
+    // filePath and silently skips incremental updates for that file.
+    const output = execFileSync('git', ['diff', `${lastCommitHash}..HEAD`, '--name-only', '-z'], {
       cwd: projectDir,
       encoding: "utf-8",
     });
     return output
-      .split("\n")
+      .split("\0")
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
   } catch {
