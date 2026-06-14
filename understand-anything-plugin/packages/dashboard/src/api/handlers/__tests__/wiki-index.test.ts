@@ -59,4 +59,42 @@ describe("WikiIndex", () => {
     const results = index.search({ q: "anything" })
     expect(results.results.length).toBe(0)
   })
+
+  describe("isEmpty / docCount", () => {
+    it("isEmpty returns true for empty wiki", () => {
+      const index = new WikiIndex({ entries: [] })
+      expect(index.isEmpty()).toBe(true)
+    })
+    it("isEmpty returns false for non-empty wiki", () => {
+      const index = new WikiIndex(mockWiki)
+      expect(index.isEmpty()).toBe(false)
+    })
+    it("docCount returns correct count", () => {
+      const index = new WikiIndex(mockWiki)
+      expect(index.docCount()).toBe(2)
+    })
+  })
+
+  describe("addDocs", () => {
+    it("adds new docs and makes them searchable", () => {
+      const index = new WikiIndex({ entries: [] })
+      index.addDocs([
+        { id: "wiki::cache", name: "Cache", summary: "Redis caching", type: "concept", service: "cache-svc" },
+      ])
+      expect(index.isEmpty()).toBe(false)
+      expect(index.docCount()).toBe(1)
+      const results = index.search({ q: "Redis" })
+      expect(results.results.some((r) => r.name === "Cache")).toBe(true)
+    })
+    it("deduplicates by id", () => {
+      const index = new WikiIndex(mockWiki)
+      index.addDocs([
+        { id: "wiki::auth", name: "Auth Dup", summary: "duplicate", type: "concept" },
+        { id: "wiki::new", name: "New Entry", summary: "fresh", type: "concept" },
+      ])
+      expect(index.docCount()).toBe(3)
+      const results = index.search({ q: "Auth" })
+      expect(results.results[0].name).toBe("Authentication")
+    })
+  })
 })

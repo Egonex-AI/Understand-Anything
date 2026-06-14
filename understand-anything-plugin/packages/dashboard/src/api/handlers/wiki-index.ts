@@ -89,15 +89,18 @@ export class WikiIndex {
   docCount(): number { return this.docs.length }
 
   addDocs(docs: Array<{ id: string; name: string; summary: string; content?: string; type: string; service?: string; domain?: string }>): void {
-    const newDocs = docs.map((d) => ({
-      id: d.id,
-      name: d.name,
-      summary: d.summary ?? "",
-      content: d.content ?? "",
-      type: d.type,
-      service: d.service ?? "",
-      domain: d.domain,
-    }))
+    const existingIds = new Set(this.docs.map((d) => d.id))
+    const newDocs = docs
+      .filter((d) => !existingIds.has(d.id))
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        summary: d.summary ?? "",
+        content: d.content ?? "",
+        type: d.type,
+        service: d.service ?? "",
+        domain: d.domain,
+      }))
     if (newDocs.length > 0) {
       this.docs.push(...newDocs)
       this.miniSearch.addAll(newDocs)

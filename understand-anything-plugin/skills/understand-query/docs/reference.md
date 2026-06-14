@@ -48,22 +48,40 @@ python ua_query.py meta --stale
 
 ## Search Algorithm & Cross-Language Matching
 
-All search endpoints (wiki, kg, domain, business) forward to unified `/api/search?scope=...` with consistent LumoSearch scoring.
+All search endpoints (wiki, kg, domain, business) forward to unified `/api/search?scope=...` with consistent MiniSearch scoring. Structure search uses `/api/structure/search` with its own MiniSearch index.
 
-### LumoSearch (BM25F + Trigram Fuzzy)
+### MiniSearch (BM25 + code-aware tokenization)
 
-All `--search` and `trace --query` use LumoSearch (BM25F) with intelligent tokenization:
-- **PascalCase/camelCase splitting**: `OrderPaymentService` → [order, payment, service]
+All `--search` and `trace --query` use MiniSearch with intelligent tokenization:
+- **CamelCase/snake_case splitting**: `OrderPaymentService` → [order, payment, service], `get_user` → [get, user]
 - **Multi-word queries**: `"sendInvite acceptInvite"` matches nodes containing either term
-- **Trigram fuzzy matching**: typos tolerated — e.g. `"Authentcation"` finds `AuthenticationService` via trigram Jaccard similarity
+- **Fuzzy matching**: typos tolerated (fuzzy=0.2 edit distance)
 - **Prefix matching**: `"Auth"` finds `AuthenticationService`
-- **Field-weighted scoring**: name (3×), summary (2×), content (1×), type (0.5×)
-- **CJK bigrams** (fallback layer): `"订单支付"` → [订单, 单支, 支付] for matching against non-English summaries
-- **Mixed queries**: `"Order创建"` → [order] + CJK bigrams
+- **Field-weighted scoring**: KG: name (3×), tags (2.5×), summary (2×), type (0.5×); Wiki: name (3×), summary (2×), content (1×)
+- **CJK segmentation** (jieba with bigram fallback): `"订单支付"` → [订单, 支付] for matching against non-English summaries
+- **Mixed queries**: `"Order创建"` → [order] + CJK words
+- **Number extraction**: `v2` → [v2], `123` → [123]
+
+### Filtering & Pagination
+
+`/api/search` supports server-side filtering to avoid post-filtering in CLI:
+- **type**: Filter by node type (class, endpoint, function, etc.)
+- **tag**: Filter by tag (auth, service, domain, business, etc.)
+- **offset**: Pagination offset for large result sets
+- **facets**: Response includes type/service/layer distribution counts
+
+`/api/structure/search` supports precise filtering:
+- **q**: Fuzzy search across name, annotations, paramTypes, returnType, content
+- **annotation/paramType/returnType/interface/propertyType**: Precise filters
+- **sectionKey/sectionValue**: Filter by section name or content substring
+- **pathPattern**: Filter by file path substring
+- **symbol**: Post-filter by symbol name substring
+- **offset**: Pagination offset
+- **facets**: Response includes type/service distribution counts
 
 ### RRF Fusion (trace default)
 
-`trace` defaults to `fusion=rrf`, combining LumoSearch text relevance with KG graph traversal signals:
+`trace` defaults to `fusion=rrf`, combining MiniSearch text relevance with KG graph traversal signals:
 - Surfaces structurally related nodes even without text match — e.g. searching `"AuthService"` also boosts `UserRepository` connected via KG edges
 - Standard formula: score = Σ 1/(60 + rank_i)
 - Disable with `--fusion none` for pure text search
@@ -71,14 +89,14 @@ All `--search` and `trace --query` use LumoSearch (BM25F) with intelligent token
 ### Domain-Flow Auto-Fallback
 
 When non-English keywords have no KG match, `trace` automatically:
-1. Searches domain graph flows via LumoSearch (flow summaries often contain non-English text)
+1. Searches domain graph flows via MiniSearch (flow summaries often contain non-English text)
 2. Extracts English code keywords from the matching flow name (e.g., "Create Order Flow" → "CreateOrder")
 3. Re-searches KG with extracted English keyword → success!
 
 ```
 trace --query "非英文关键词"
-  → KG LumoSearch: 0 matches (KG nodes are English-named)
-  → Domain flow LumoSearch: finds flow whose summary matches
+  → KG MiniSearch: 0 matches (KG nodes are English-named)
+  → Domain flow MiniSearch: finds flow whose summary matches
   → Extract keyword from flow name: "EnglishCodeKeyword"
   → KG re-search: ServiceImpl, ManagerClass, ...
   → Response: discoveredVia: "domain-flow:<flow-name>"
@@ -98,7 +116,7 @@ trace --query "非英文关键词"
    - Service suffix patterns: `"Payment,PaymentService,PayService"`
    - Verb+noun: `"sendGift,GiftSender"`
 
-3. **Keep the original**: Always include the user's original term — BM25 with Chinese bigrams + domain-flow fallback can match it.
+3. **Keep the original**: Always include the user's original term — MiniSearch with jieba CJK segmentation + domain-flow fallback can match it.
 
 **Rule: ALWAYS pass multiple keywords in one `trace` call. This searches all variants in parallel and returns the best matches — no retry needed.**
 
@@ -115,7 +133,7 @@ trace --query "非英文关键词"
 | `business --domain slug` returned 404 for valid slugs | API fallback: tries `domain-${slug}.json` | Unprefixed slugs resolve correctly |
 | `business --domain "中文名"` returned 404 | API fallback: looks up domain by name/id in `domains.json` | Chinese domain names work directly |
 | `wiki --domain "中文名"` returned 404 | `getServiceDomain` falls back to index name matching | Chinese wiki domain names work |
-| Search upgraded to LumoSearch + RRF | BM25F with trigram fuzzy, prefix search, and RRF fusion | Typos tolerated, related nodes surfaced |
+| Replaced Fuse.js/LumoSearch with MiniSearch | Single lightweight engine: BM25 + code-aware tokenizer + jieba CJK + RRF graph fusion + server-side type/tag filtering | Faster, fewer deps, consistent scoring |
 
 ### Current Limits
 

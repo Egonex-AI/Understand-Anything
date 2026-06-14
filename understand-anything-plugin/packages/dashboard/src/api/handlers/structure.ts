@@ -48,7 +48,13 @@ interface StructureCache {
   mtime: number
 }
 
+interface StructureIndexCache {
+  index: StructureIndex
+  mtime: number
+}
+
 const cache = new Map<string, StructureCache>()
+const indexCache = new Map<string, StructureIndexCache>()
 
 function loadStructuralAnalysis(serviceName: string): StructuralAnalysis | null {
   const filePath = resolveServiceDataPath(
@@ -169,7 +175,16 @@ function handleSearch(
     }
   }
 
-  const index = new StructureIndex(service, data)
+  const filePath = resolveServiceDataPath(service, "intermediate/extraction/structural-analysis.json")
+  const mtime = filePath ? fs.statSync(filePath).mtimeMs : 0
+  const cachedIndex = indexCache.get(service)
+  let index: StructureIndex
+  if (cachedIndex && cachedIndex.mtime === mtime) {
+    index = cachedIndex.index
+  } else {
+    index = new StructureIndex(service, data)
+    indexCache.set(service, { index, mtime })
+  }
   const result = index.search({
     q, annotation, paramType, returnType, iface, propertyType,
     symbol, pathPattern, sectionKey, sectionValue, limit, offset,

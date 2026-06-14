@@ -48,79 +48,6 @@ Query codebase knowledge through a lightweight CLI (`ua_query.py`) backed by the
 | **Claude Code** | `dispatch_agent` / `Task` tool | General-purpose agent with shell access |
 | **Codex** | Platform-native sub-agent / task dispatch | Agent with shell access |
 
-### Intent Classification + Sub-Agent Templates
-
-Before dispatching, classify the user's question into one of these intents and use the corresponding template:
-
-#### Intent A: Business Function Understanding
-**Trigger:** "X是什么功能？", "X的完整流程是什么？", "How does X work?"
-
-```
-You are executing an understand-query skill task.
-
-**User Question:** <the actual question>
-**Project Directory:** <path>
-**CLI Path:** <path to ua_query.py>
-**API Server:** http://172.18.228.71:3001 (default). If unreachable, report to user and stop.
-
-Execute this single command:
-python ua_query.py --format md ask --query "<expanded keywords>" --depth full
-
-The `ask` command auto-discovers the service, traces KG, fetches wiki, domain flows,
-and verifies source code — all in one call.
-
-IMPORTANT: Review the sourceVerification section in the output. If source code contradicts
-wiki/domain descriptions, explicitly note the discrepancy in your answer.
-
-CROSS-SERVICE RPC: When depth=full, `ask` automatically detects outbound RPC calls
-(consumes_rpc edges) and follows them to the provider service. If the output contains
-a `crossServiceTrace` section, include its findings in your answer — the actual
-implementation logic is in the target service, not the initially discovered one.
-
-Return a structured Chinese summary with: 业务概述、完整流程、关键实体、业务规则、源码校验结果、跨服务追踪（如有）。
-```
-
-#### Intent B: Code Location / Implementation
-**Trigger:** "X在哪里实现？", "Where is X implemented?", "Find the code for X"
-
-```
-You are executing an understand-query skill task.
-
-**User Question:** <the actual question>
-**CLI Path:** <path to ua_query.py>
-
-Execute:
-python ua_query.py --format md trace --service <SERVICE> --query "<keywords>" --source --business
-
-If service is unknown, add --auto-discover and omit --service.
-
-Return: file paths, class names, method signatures, and key source excerpts.
-```
-
-#### Intent C: Impact Analysis
-**Trigger:** "修改X会影响什么？", "What breaks if I change X?"
-
-```
-Execute in sequence:
-1. python ua_query.py trace --service S --query "X" --source --business
-2. python ua_query.py impact --service S --symbol <ClassName> --depth 3 --direction inbound
-3. python ua_query.py structure --service S --property-type <ClassName>
-
-Return: transitive dependency graph (with distance + path), affected callers, and risk assessment.
-```
-
-#### Intent D: Cross-Service Investigation
-**Trigger:** "X和Y服务之间怎么交互？", "Cross-service flow for X"
-
-```
-Execute:
-1. python ua_query.py business --panorama
-2. python ua_query.py trace --service svc-a --query "X" --source --business
-3. python ua_query.py trace --service svc-b --query "X" --source
-
-Return: interaction points, RPC contracts, event flows between services.
-```
-
 ### When NOT to Use Sub-Agent
 
 Skip sub-agent dispatch only when:
@@ -162,6 +89,9 @@ python ua_query.py trace --service svc-b --query "keyword" --source
 4. **Use `--format md`** when the output will be read by an agent (not parsed as JSON).
 5. **Use `--source`** for any answer that will be presented as factual to the user.
 6. **RRF is default for trace** — `trace` uses `fusion=rrf` automatically.
+7. **Use server-side filters**: Pass `--type`/`--tag` to `kg --search` and `trace` instead of post-filtering results client-side. Reduces payload and improves accuracy.
+8. **Use `--q` for structure fuzzy search**: `structure --q "getUser"` is faster and more accurate than iterating `--annotation`/`--param-type` separately.
+9. **Paginate large results**: Use `--offset N` with `--limit` for large result sets instead of fetching everything.
 
 ---
 
@@ -248,67 +178,6 @@ python ua_query.py ask --query "家族,Family" --service ultron-relation --depth
 
 ---
 
-## Updated `trace` Flags
-
-New flags added to `trace` for richer context:
-
-| Flag | Description |
-|------|-------------|
-| `--wiki` | Include wiki domain detail for matched feature |
-| `--domain-flows` | Include domain flow steps |
-| `--source` | Read source code of matched nodes (top 1 inline + top 3 as `sourceReads`) |
-| `--auto-discover` | Auto-detect service via business+wiki+KG search (omit `--service`) |
-| `--grouped` | With `--source`: return source for all matched nodes grouped by file, plus `relationshipMap` |
-| `--symbol NAME` | With `--source`: extract a specific method/class block from the top match's file |
-
-**`matchedNodes` blast radius:** Top 3 matches include `blastRadius: {"inbound": N, "outbound": M, "total": N+M}` — direct dependent/callee counts for quick risk triage.
-
-**Full trace example:**
-
-```bash
-python ua_query.py trace --auto-discover --query "火箭,rocket" --source --business --wiki --domain-flows --format md
-```
-
-**Grouped source across matches:**
-
-```bash
-python ua_query.py trace --service S --query "Order" --source --grouped --format md
-```
-
----
-
-## Impact & Call Graph Commands (NEW)
-
-Quick reference for dependency and impact analysis:
-
-```bash
-# Transitive impact: all nodes affected within 3 hops (inbound)
-python ua_query.py impact --service S --symbol OrderService --depth 3 --direction inbound
-
-# Direct and transitive callers (calls edges only)
-python ua_query.py callers --service S --symbol OrderService --depth 2
-
-# Direct and transitive callees
-python ua_query.py callees --service S --symbol OrderService --depth 1
-
-# Most critical nodes by fan-in/fan-out score
-python ua_query.py hotspots --service S --limit 20 --type class
-
-# Test files to run after editing source files
-python ua_query.py affected --service S --files src/OrderService.java,src/PaymentRpc.java --depth 2
-
-# Cross-file symbol search (signatures, params, annotations)
-python ua_query.py structure --service S --symbol createOrder
-
-# Symbol search with source code included
-python ua_query.py structure --service S --symbol createOrder --source
-
-# File overview: symbols, imports, callers, callees, blast radius
-python ua_query.py kg --service S --file OrderServiceImpl.java --summary
-```
-
----
-
 ## Eight-Layer Drill-Down Model
 
 | Layer | Subcommand | Answers |
@@ -322,28 +191,6 @@ python ua_query.py kg --service S --file OrderServiceImpl.java --summary
 | 6. Source Code | `kg --service S --file PATH` | Read actual implementation source code |
 | 7. Code Structure | `structure --service S --annotation X` | Function signatures, annotations, param/return types |
 | **NEW** 8. Source Verify | `trace --source` / `ask --depth full` | Cross-check wiki/domain against live source code |
-
----
-
-## Source Code Access Guide
-
-Agents **cannot read local files directly** — all source code must come through CLI commands. Choose the right approach:
-
-| Scenario | Command | What You Get |
-|----------|---------|-------------|
-| Answer a business question (recommended) | `ask --depth full` | Auto: top matches + source reads (up to 500 lines each) |
-| Trace + read source for a feature | `trace --query X --source` | Top 1 inline + top 3 as `sourceReads` |
-| Read entire file by path | `kg --service S --file PATH` | Full file content (or `--start N --end M` for range) |
-| Read file with structure metadata | `structure --service S --file PATH --source` | Structure info + source code (supports `--start`/`--end`) |
-| Find and read specific method | `structure --service S --symbol methodName --source` | Method signature + source code |
-| Read specific line range | `structure --service S --file PATH --source --start 50 --end 150` | Lines 50-150 of the file |
-
-**Key rules:**
-1. `ask --depth full` is the fastest path — it auto-discovers, traces, and reads source in ONE call
-2. `trace --source` is the unified source code flag — one flag for all source needs
-3. When source is truncated (>500 lines), use `structure --file --source --start/--end` to read segments
-4. All source comes from the API server — if the server is down, source code is unavailable
-5. RPC detection is automatic (always runs when neighbors exist, no flag needed)
 
 ---
 
@@ -365,6 +212,31 @@ Agents **cannot read local files directly** — all source code must come throug
 | Architecture | "How is system structured?" | `wiki --architecture` → `services --list` |
 | Data Quality | "Is KB data reliable?" | `meta --stale` |
 | Code-Level Detail | "Find all @X annotations" | `structure --annotation X` |
+
+---
+
+## Troubleshooting: Empty Results & Errors
+
+When a command returns empty or unexpected results, follow the fallback chain:
+
+| Symptom | Likely Cause | Fallback |
+|---------|-------------|----------|
+| `trace` returns empty `matchedNodes` | Keywords don't match KG node names | 1. Add more keyword variants (Chinese + English + abbreviation) 2. Try `--fusion none` for pure text search 3. Search domain flows: `domain --service S --flows` then extract English keywords and retry |
+| `ask` returns "No service discovered" | Keywords too vague or service has no data layers | 1. Run `services --list` to see available services 2. Try `business --search "keyword"` to find the domain first 3. Specify `--service` manually |
+| `structure --symbol X` returns empty | Symbol name doesn't match exactly | 1. Try `structure --q "X"` for fuzzy search 2. Try `structure --annotation X` if it might be an annotation 3. Try `kg --service S --search "X"` to find the node first |
+| `kg --neighbors X` returns "node not found" | Node name is wrong or not in KG | 1. Run `kg --service S --search "X"` to find exact name 2. Check "Did you mean" suggestions in error output 3. Try partial name match |
+| `impact` / `callers` / `callees` returns empty | Symbol exists but has no edges in specified direction | 1. Try `--direction both` 2. Try without `--edge-type` filter 3. Check if symbol is in the KG: `kg --service S --search "X"` |
+| `business --domain X` returns 404 | Domain slug or name doesn't match | 1. Run `business --list` to see exact domain names 2. Try Chinese name directly: `--domain "中文名"` |
+| `wiki --service S --domain D` returns 404 | Domain not indexed for this service | 1. Run `wiki --service S` to see available domains 2. Try `wiki --search "D"` across all services |
+| `trace --auto-discover` picks wrong service | Ambiguous keywords match multiple services | 1. Use `ask --service S --query "..."` to override 2. Add more specific keywords (e.g., include class name) |
+| API server unreachable (exit 2) | Server not running | Report to user: "Start the API server with `pnpm run serve`". Do NOT attempt auto-start. |
+| `meta --stale` shows stale layers | Data out of sync with code | Recommend user run the corresponding `/understand-*` skill to regenerate stale layers. |
+
+**General recovery pattern:**
+1. **Broaden search**: Add keyword variants, remove filters, increase `--limit`
+2. **Narrow scope**: Specify `--service`, use `--path` to filter by file path
+3. **Change approach**: If `trace` fails, try `kg --search` → `kg --neighbors` manually
+4. **Verify data exists**: `services --list` + `meta --stale` before blaming the query
 
 ---
 
@@ -398,21 +270,55 @@ The CLI uses `http://172.18.228.71:3001` as the default API server.
 
 ---
 
-## Combination Recipes (Reduce Tool Calls)
+## Quick-Reference: Common Agent Questions
 
-| Scenario | Calls | Recipe |
-|----------|-------|--------|
-| "What is X business function?" | **1** | `ask --query "X,英文" --depth full` |
-| "How does X work?" | **1** | `trace --auto-discover --query "X" --source --business --wiki` |
-| "Find RPC endpoints + types" | 2 | `structure --annotation` → `kg --edges --type consumes_rpc` |
-| "Impact of changing X" | 2 | `impact --symbol X --direction inbound --depth 3` → `structure --property-type X` |
-| "Who calls X?" | 1 | `callers --service S --symbol X --depth 2` |
-| "What does X call?" | 1 | `callees --service S --symbol X --depth 2` |
-| "Blast radius of X" | 2 | `trace --query X` (check `blastRadius` on matches) → `impact --symbol X --depth 3` |
-| "Which tests to run after edit?" | 1 | `affected --files src/A.java,src/B.java --depth 2` |
-| "Most critical classes in service" | 1 | `hotspots --type class --limit 20` |
-| "Show me source of createOrder" | 1 | `structure --symbol createOrder --source --limit 3` |
-| "Cross-service dep" | 3 | `business --panorama` → `trace` in source svc → `trace` in target svc |
+Agents receiving natural-language questions (Chinese or English) can map directly to commands:
+
+| User Question Pattern | Recommended Command | Notes |
+|----------------------|---------------------|-------|
+| **Business & Discovery** |||
+| "What is X?" / "X是什么功能？" | `ask --query "X,EnglishName" --depth full` | Auto-discovers service + full trace |
+| "Complete flow of X?" / "X的完整流程？" | `ask --query "X,FlowEnglish" --depth full` | Includes domain flow steps |
+| "Business rules for X?" / "X的业务规则？" | `business --domain X --type rules` | Business rule query |
+| "How do users interact with X?" / "X的用户交互？" | `business --domain X --type interactions` | User interaction steps |
+| "Business landscape overview" / "业务全景？" | `business --panorama` | All facets and services |
+| "What services exist?" / "有哪些服务？" | `services --list` | Service discovery + data layer readiness |
+| **Code Location & Source** |||
+| "Where is X implemented?" / "X在哪里实现？" | `trace --auto-discover --query "X,English" --source` | Auto-locates service + source |
+| "Show me code for X" / "X方法的源码" | `structure --service S --symbol X --source` | Precise symbol + source |
+| "Read file F" / "读取文件F" | `kg --service S --file F` | Full file content |
+| "Read lines 100-200 of F" / "读F的100-200行" | `kg --service S --file F --start 100 --end 200` | Line range read |
+| "Methods in file F" / "文件F有哪些方法？" | `kg --service S --file F --toc` | Method index (cheap, no source) |
+| "File overview for F" / "文件F概览？" | `kg --service S --file F --summary` | Symbols, imports, callers, blast radius |
+| "Methods with validate in name?" / "带validate的方法？" | `structure --service S --q "validate"` | Fuzzy name search |
+| **Structure & Type Analysis** |||
+| "Who implements interface IX?" / "哪些类实现了IX？" | `structure --service S --implementors IX` | Interface implementation search |
+| "All classes with @X annotation" / "所有@X注解的类" | `structure --service S --annotation X` | Annotation batch search |
+| "Who injects X class?" / "谁注入了X类？" | `structure --service S --property-type X` | Dependency injection analysis |
+| "Inheritance chain of X" / "X的继承链" | `structure --service S --chain X --direction up` | Trace superclass hierarchy |
+| "All subclasses of X" / "X的子类" | `structure --service S --chain X --direction down` | Descendant enumeration |
+| "RPC contract for X?" / "RPC接口的参数和返回值？" | `structure --service S --annotation MoaProvider --path X` | RPC contract inspection |
+| "Which classes use OrderDTO?" / "谁用了OrderDTO？" | `structure --service S --param-type OrderDTO` + `--return-type OrderDTO` | Type usage across codebase |
+| **Dependency & Impact** |||
+| "What breaks if I change X?" / "改X会影响什么？" | `impact --service S --symbol X --depth 3 --direction inbound` | Transitive impact analysis |
+| "Who calls X?" / "谁调用了X？" | `callers --service S --symbol X --depth 2` | Inbound call graph |
+| "What does X call?" / "X调用了谁？" | `callees --service S --symbol X --depth 2` | Outbound call graph |
+| "Which tests for changed files?" / "改了要跑哪些测试？" | `affected --service S --files src/X.java --depth 2` | Affected test discovery |
+| "Most critical classes?" / "最关键的类？" | `hotspots --service S --type class --limit 20` | Fan-in/fan-out hotspot scoring |
+| "Blast radius of X?" / "X的影响半径？" | `trace --query X` → check `blastRadius` → `impact --symbol X --depth 3` | Quick triage + transitive |
+| **Cross-Service & Wiki** |||
+| "How do X and Y interact?" / "X和Y怎么交互？" | `trace` in svc-a + `trace` in svc-b | Dual-service comparison |
+| "Architecture overview" / "系统架构？" | `wiki --architecture` | System architecture wiki |
+| "Endpoints for service S" / "S有哪些接口？" | `wiki --service S --type endpoint` | API endpoint documentation |
+| "Domain flow steps" / "X流程的步骤？" | `domain --service S --flow F --steps` | Ordered flow steps |
+| "Related domains for X" / "X的相关领域？" | `wiki --service S --domain X --related` | Cross-service related domains |
+| **Data & Freshness** |||
+| "Is data stale?" / "数据是否过期？" | `meta --stale` | Stale layer detection |
+| "KG layers for service S" / "S有哪些数据层？" | `services --name S` | Per-layer readiness |
+| "Guided tour of service S" / "S的引导式探索？" | `kg --service S --tour` | Guided exploration steps |
+| "Package/module structure" / "S的模块结构？" | `kg --service S --layers` | Layer summary |
+
+**Keyword expansion rule:** When the user's question is in Chinese/non-English, ALWAYS expand keywords to include English variants (comma-separated). Example: "亲密度" → `--query "亲密度,intimacy,IntimacyService"`. Multi-keyword parallel search eliminates retry loops.
 
 ---
 
@@ -435,7 +341,7 @@ The CLI uses `http://172.18.228.71:3001` as the default API server.
 2. **Code change:** `trace --source` → confirm implementation → edit files
 3. **Impact check:** `impact --symbol X --direction inbound` + `affected --files` → assess risk and test scope
 4. **Freshness gate:** `meta --stale` → decide if data is trustworthy
-5. **Cross-reference:** Check `sourceVerification` output before modifying domain logic
+5. **Cross-reference:** Check `sourceReads` output before modifying domain logic
 
 **Related skills:**
 

@@ -63,6 +63,10 @@ describe("codeTokenize", () => {
       expect(tokens).toEqual(expect.arrayContaining(["user", "service"]))
       expect(tokens.some((t) => /[一-鿿]/.test(t))).toBe(true)
     })
+    it("handles CJK Extension A characters (U+3400-U+4DBF)", () => {
+      const tokens = codeTokenize("㐀䶵")
+      expect(tokens.some((t) => /[㐀-䶿]/.test(t))).toBe(true)
+    })
   })
 
   describe("edge cases", () => {

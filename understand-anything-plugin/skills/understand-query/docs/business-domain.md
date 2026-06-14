@@ -116,6 +116,7 @@ Answers business questions end-to-end with a single command. Auto-discovers the 
 | `--depth LEVEL` | string | `standard` | `quick`, `standard`, or `full` |
 | `--service S` | string | auto | Override service auto-discovery |
 | `--limit N` | int | 5 | Max matched nodes |
+| `--fusion MODE` | string | `rrf` | Search fusion: `rrf` (default) or `none` |
 
 **Depth levels:**
 
@@ -138,14 +139,19 @@ python ua_query.py ask --query "家族,Family" --service ultron-relation --depth
 
 **Auto-discovery strategy:**
 
-1. Search business landscape for matching domains
-2. If no business results, search wiki across all services
-3. If no wiki results, scan KG of services with data layers
-4. Select service with highest vote count
+0. **Class-name matching (highest priority):** If keywords contain PascalCase class-like names (e.g., `ClosedFriendService`), search all service KGs for exact class matches. Services owning the Impl class receive a decisive vote boost (20 points). Early exit if score >= 15.
+1. **Wiki search:** Search wiki across all services for keyword matches.
+2. **Business landscape:** Search business domains for matching services.
+3. **KG scan:** Scan KG of all services with data layers.
+4. Select service with highest vote count.
 
 **Source verification (--depth full):**
 
-The response includes a `sourceVerification` section with actual source code for the top 3 matched nodes. This allows agents to confirm that wiki/domain descriptions match the actual implementation.
+The response includes a `sourceReads` array with source code for the top 3 matched nodes (up to 300 lines each). This allows agents to confirm that wiki/domain descriptions match the actual implementation.
+
+**Cross-service RPC follow (--depth full):**
+
+When matched nodes inject RPC interfaces (`consumes_rpc` edges), `ask --depth full` auto-detects the provider service and performs a secondary trace there. Results appear in `crossServiceTrace` — include these findings when the actual implementation lives in a different service.
 
 ---
 

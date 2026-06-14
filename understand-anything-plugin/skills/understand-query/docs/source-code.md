@@ -145,7 +145,7 @@ python ua_query.py --format md ask --query "中文名,EnglishName,Synonym" --dep
 **Optimized:**
 
 ```bash
-python ua_query.py trace --auto-discover --query "中文名,ClassName,Synonym" --source --business --wiki --domain-flows --verify-source
+python ua_query.py trace --auto-discover --query "中文名,ClassName,Synonym" --source --business --wiki --domain-flows
 ```
 
 If `trace` returns `matchedNodes` with `filePath` + `lineRange`, you have everything. Only call `structure --file` if you need param/return types.
@@ -269,7 +269,7 @@ python ua_query.py structure --service order-svc --file OrderServiceImpl.java
 | Question Type | Start With | Then (if needed) |
 |---------------|-----------|------------------|
 | "What is X business function?" | `ask --depth full` | Nothing — one call covers all |
-| "How does X work?" | `trace --auto-discover --source --business --wiki --verify-source` | `structure --file` for types |
+| "How does X work?" | `ask --depth full` or `trace --auto-discover --source --business --wiki` | `structure --file` for types |
 | "Find all @Annotation classes" | `structure --annotation` | `kg --neighbors` for relationships |
 | "Who calls X?" | `callers --symbol X` | `impact --symbol X --direction inbound` for transitive |
 | "What does X call?" | `callees --symbol X` | `impact --symbol X --direction outbound` for transitive |

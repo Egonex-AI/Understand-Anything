@@ -16,6 +16,37 @@ Complements the KG (which has names/summaries but not full type info).
 - "Find all definitions of `createOrder` across the codebase" → `structure --symbol createOrder`
 - "Show me the source code of `createOrder`" → `structure --symbol createOrder --source`
 
+**Flags (search mode):**
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--service NAME` | string | Target service (required) |
+| `--q QUERY` | string | Fuzzy search across name, annotations, paramTypes, returnType, content |
+| `--annotation NAME` | string | Filter by annotation (e.g. `@Service`, `@MoaProvider`) |
+| `--param-type TYPE` | string | Filter by function parameter type |
+| `--return-type TYPE` | string | Filter by function return type |
+| `--interface NAME` | string | Filter by implemented interface |
+| `--property-type TYPE` | string | Filter by class property/field type |
+| `--section-key NAME` | string | Filter by section name substring (function/class name) |
+| `--section-value TEXT` | string | Filter by section content substring |
+| `--path PATTERN` | string | Filter by file path substring |
+| `--symbol NAME` | string | Cross-file symbol search (post-filter by name) |
+| `--limit N` | int | Max results (default: 50) |
+| `--offset N` | int | Pagination offset (default: 0) |
+
+**Flags (file/chain mode):**
+
+| Flag | Type | Description |
+|------|------|-------------|
+| `--file PATH` | string | Get structure for a specific file (exact or suffix match) |
+| `--start N` | int | Start line for `--file --source` (1-based) |
+| `--end N` | int | End line for `--file --source` (1-based) |
+| `--files` | boolean | List all indexed file paths |
+| `--chain CLASS` | string | Traverse inheritance chain for a class name |
+| `--direction DIR` | string | Chain direction: `up` (superclasses) or `down` (subclasses, default: `up`) |
+| `--implementors IFACE` | string | Find all classes implementing an interface |
+| `--source` | boolean | Include source code. With `--symbol`: returns source per matched symbol. With `--file`: appends `sourceContent` to the file structure response. |
+
 ---
 
 ### Cross-file symbol search
@@ -86,6 +117,25 @@ Find classes with specific dependency types:
 python ua_query.py structure --service S --property-type UserRepository
 ```
 
+### Fuzzy search (new)
+
+Full-text fuzzy search across name, annotations, param types, return type:
+
+```bash
+python ua_query.py structure --service S --q "getUser"
+python ua_query.py structure --service S --q "Service" --annotation @Service
+python ua_query.py structure --service S --q "Order" --path order/ --limit 10 --offset 20
+```
+
+### Section key/value filtering (new)
+
+Filter by section name or content substring:
+
+```bash
+python ua_query.py structure --service S --section-key "getUser"
+python ua_query.py structure --service S --section-value "UserService"
+```
+
 ### List all indexed files
 
 ```bash
@@ -128,7 +178,13 @@ python ua_query.py structure --service S --implementors IUserService
 | `--interface NAME` | No | Search by implemented interface |
 | `--property-type TYPE` | No | Search by class property type |
 | `--path PATTERN` | No | Filter results by path substring |
+| `--q QUERY` | No | Fuzzy search across name, annotations, paramTypes, returnType, content |
+| `--section-key NAME` | No | Filter by section name substring (function/class name) |
+| `--section-value TEXT` | No | Filter by section content substring |
 | `--limit N` | No | Max results (default 50) |
+| `--offset N` | No | Pagination offset (default 0) |
+| `--start N` | No | Start line for `--file --source` (1-based) |
+| `--end N` | No | End line for `--file --source` (1-based) |
 | `--chain CLASS` | No | Traverse inheritance chain for a class |
 | `--direction up\|down` | No | Chain direction (default: up) |
 | `--implementors IFACE` | No | Find all classes implementing an interface |

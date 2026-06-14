@@ -51,7 +51,7 @@ python ua_query.py impact --service order-svc --symbol OrderController --depth 3
 
 ## `callers` / `callees` — Call Graph Navigation
 
-Shortcuts for call-graph traversal. Equivalent to `kg --neighbors` with `--edge-type calls` pre-set.
+Shortcuts for call-graph traversal. Equivalent to `kg --neighbors` with `--edge-type calls` pre-set. If no `calls` edges are found, automatically retries with `--edge-type injects` to capture Spring DI dependencies.
 
 ### `callers` — Who calls this symbol?
 

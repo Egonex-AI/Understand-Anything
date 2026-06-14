@@ -1,9 +1,10 @@
 import path from "path"
 import fs from "fs"
-import jieba from "@node-rs/jieba"
-
-const { cut } = jieba
 import type { ApiRequest, ApiContext, ApiResponse } from "../types"
+import { codeTokenize } from "./code-tokenizer"
+
+export const tokenize = codeTokenize
+export const CJK_REGEX = /[一-鿿㐀-䶿]/
 import {
   graphFileCandidates,
   readJsonFile,
@@ -46,7 +47,7 @@ interface KgEdgeEntry {
   type: string
 }
 
-interface SearchIndexState {
+export interface SearchIndexState {
   kgIndex: KgIndex
   wikiIndex: WikiIndex
   edges: KgEdgeEntry[]
@@ -58,58 +59,9 @@ const DOMAIN_NODE_TYPES = new Set(["flow", "step", "domain"])
 
 const searchIndexCache = new Map<string, SearchIndexState>()
 
-export function tokenize(text: string): string[] {
-  const tokens: string[] = []
-  const parts = text
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
-    .split(/[\s_\-./\\:,;()[\]{}'"]+/)
+const CANDIDATE_LIMIT = 500
 
-  for (const part of parts) {
-    if (!part) continue
-    const lower = part.toLowerCase()
-    if (lower.length >= 2 && /^[\x00-\x7F]+$/.test(lower)) {
-      tokens.push(lower)
-    }
-  }
-
-  // Extract numbers from text
-  const numbers = text.match(/\d+/g)
-  if (numbers) {
-    for (const num of numbers) {
-      if (num.length >= 2) {
-        tokens.push(num)
-      }
-    }
-  }
-
-  const cjk = text.match(/[一-鿿]+/g)
-  if (cjk) {
-    for (const segment of cjk) {
-      try {
-        const words = cut(segment, true)  // 精确模式
-        for (const word of words) {
-          if (word.length > 0) tokens.push(word)
-        }
-      } catch (e) {
-        console.warn("[search] jieba cut failed, falling back to bigram:", e)
-        // Fallback to bigram if jieba fails
-        for (let i = 0; i < segment.length - 1; i++) {
-          tokens.push(segment.slice(i, i + 2))
-        }
-        if (segment.length === 1) tokens.push(segment)
-      }
-    }
-  }
-
-  return tokens
-}
-
-const LUMO_CANDIDATE_LIMIT = 500
-
-export const CJK_REGEX = /[一-鿿]/
-
-function kgGraphExpansion(
+export function kgGraphExpansion(
   state: SearchIndexState,
   seedIds: string[],
   maxNeighbors: number = 50,
@@ -154,7 +106,7 @@ function kgGraphExpansion(
 }
 
 
-function unifiedSearch(
+export function unifiedSearch(
   state: SearchIndexState,
   query: string,
   limit: number,
@@ -175,14 +127,14 @@ function unifiedSearch(
     type: typeFilter ?? undefined,
     tag: tagFilter ?? undefined,
     service: serviceFilter ?? undefined,
-    limit: LUMO_CANDIDATE_LIMIT,
+    limit: CANDIDATE_LIMIT,
     offset: 0,
   }
 
   const wikiOpts: WikiSearchOptions = {
     q: query,
     service: serviceFilter ?? undefined,
-    limit: LUMO_CANDIDATE_LIMIT,
+    limit: CANDIDATE_LIMIT,
     offset: 0,
   }
 
@@ -522,14 +474,17 @@ export async function handleSearchRequest(
 
 /** Pre-build the search index and run a dummy search to trigger V8 JIT optimization. */
 export function warmupSearchIndex(projectRoot?: string): void {
-  const root = projectRoot ?? resolveProjectRoot()
-  const t0 = Date.now()
-  const state = getOrBuildIndex(root, null)
-  const tBuild = Date.now() - t0
-  // Trigger V8 JIT on the hot search path (KgIndex + WikiIndex + RRF + graph expansion)
-  unifiedSearch(state, "warmup test", 5, "all", "rrf")
-  unifiedSearch(state, "预热测试", 5, "kg", "rrf")
-  console.log(
-    `  Search index warmed: ${state.kgIndex.docCount()} KG docs, ${state.wikiIndex.docCount()} wiki docs, ${state.edges.length} edges (${tBuild}ms build, ${Date.now() - t0}ms total)`,
-  )
+  try {
+    const root = projectRoot ?? resolveProjectRoot()
+    const t0 = Date.now()
+    const state = getOrBuildIndex(root, null)
+    const tBuild = Date.now() - t0
+    unifiedSearch(state, "warmup test", 5, "all", "rrf")
+    unifiedSearch(state, "预热测试", 5, "kg", "rrf")
+    console.log(
+      `  Search index warmed: ${state.kgIndex.docCount()} KG docs, ${state.wikiIndex.docCount()} wiki docs, ${state.edges.length} edges (${tBuild}ms build, ${Date.now() - t0}ms total)`,
+    )
+  } catch (e) {
+    console.warn("[search] warmup failed:", e)
+  }
 }

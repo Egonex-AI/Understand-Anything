@@ -1,5 +1,74 @@
 import { describe, it, expect } from "vitest"
-import { tokenize } from "../search"
+import { tokenize, handleSearchRequest } from "../search"
+import type { ApiRequest, ApiContext } from "../../types"
+
+function makeReq(params: Record<string, string>): ApiRequest {
+  const searchParams = new URLSearchParams(params)
+  return {
+    pathname: "/api/search",
+    searchParams,
+    method: "GET",
+    url: `/api/search?${searchParams.toString()}`,
+    headers: {},
+    body: undefined,
+  } as ApiRequest
+}
+
+const mockCtx = {} as ApiContext
+
+describe("handleSearchRequest", () => {
+  it("returns 400 when q is missing", async () => {
+    const res = await handleSearchRequest(makeReq({}), mockCtx)
+    expect(res?.statusCode).toBe(400)
+  })
+  it("returns 400 for invalid scope", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "test", scope: "invalid" }), mockCtx)
+    expect(res?.statusCode).toBe(400)
+  })
+  it("returns 400 for invalid limit", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "test", limit: "0" }), mockCtx)
+    expect(res?.statusCode).toBe(400)
+  })
+  it("returns 400 for limit over 200", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "test", limit: "201" }), mockCtx)
+    expect(res?.statusCode).toBe(400)
+  })
+  it("returns 400 for negative offset", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "test", offset: "-1" }), mockCtx)
+    expect(res?.statusCode).toBe(400)
+  })
+  it("returns 400 for invalid fusion", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "test", fusion: "invalid" }), mockCtx)
+    expect(res?.statusCode).toBe(400)
+  })
+  it("accepts type filter", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "user", type: "class" }), mockCtx)
+    expect(res?.statusCode).not.toBe(400)
+  })
+  it("accepts tag filter", async () => {
+    const res = await handleSearchRequest(makeReq({ q: "user", tag: "auth" }), mockCtx)
+    expect(res?.statusCode).not.toBe(400)
+  })
+  it("accepts valid scope values", async () => {
+    for (const scope of ["all", "kg", "wiki", "domain", "business"]) {
+      const res = await handleSearchRequest(makeReq({ q: "test", scope }), mockCtx)
+      expect(res?.statusCode).not.toBe(400)
+    }
+  })
+  it("ignores requests for other paths", async () => {
+    const searchParams = new URLSearchParams({ q: "test" })
+    const req = {
+      pathname: "/api/other",
+      searchParams,
+      method: "GET",
+      url: "/api/other?q=test",
+      headers: {},
+      body: undefined,
+    } as ApiRequest
+    const res = await handleSearchRequest(req, mockCtx)
+    expect(res).toBeNull()
+  })
+})
 
 describe("search.ts", () => {
   describe("tokenize", () => {

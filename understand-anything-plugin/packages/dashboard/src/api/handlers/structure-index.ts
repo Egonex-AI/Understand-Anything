@@ -173,6 +173,8 @@ export class StructureIndex {
       if (opts.iface && !(doc.returnType as string ?? "").includes(opts.iface)) return false
       if (opts.propertyType && !(doc.paramTypes as string ?? "").includes(opts.propertyType)) return false
       if (opts.pathPattern && !(doc.filePath as string ?? "").toLowerCase().includes(opts.pathPattern.toLowerCase())) return false
+      if (opts.sectionKey && !(doc.name as string ?? "").toLowerCase().includes(opts.sectionKey.toLowerCase())) return false
+      if (opts.sectionValue && !(doc.content as string ?? "").toLowerCase().includes(opts.sectionValue.toLowerCase())) return false
       return true
     }
 

@@ -1,5 +1,5 @@
 import type { ApiRequest, ApiContext, ApiResponse } from "../types"
-import { tokenize } from "./search"
+import { codeTokenize as tokenize } from "./code-tokenizer"
 import { readJsonFile } from "../utils"
 import {
   resolveServiceDataPath,

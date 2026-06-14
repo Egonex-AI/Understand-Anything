@@ -33,7 +33,7 @@ export function codeTokenize(text: string): string[] {
   }
 
   // CJK segmentation via jieba
-  const cjk = text.match(/[一-鿿]+/g)
+  const cjk = text.match(/[一-鿿㐀-䶿]+/g)
   if (cjk) {
     for (const segment of cjk) {
       try {
@@ -41,8 +41,8 @@ export function codeTokenize(text: string): string[] {
         for (const word of words) {
           if (word.length > 0) tokens.push(word)
         }
-      } catch {
-        // Fallback to bigram
+      } catch (e) {
+        console.warn("[code-tokenizer] jieba cut failed, falling back to bigram:", e)
         for (let i = 0; i < segment.length - 1; i++) {
           tokens.push(segment.slice(i, i + 2))
         }
