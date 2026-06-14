@@ -84,6 +84,17 @@ describe("IgnoreFilter", () => {
       expect(filter.isIgnored(".idea/workspace.xml")).toBe(true);
       expect(filter.isIgnored(".vscode/settings.json")).toBe(true);
     });
+
+    it("does not throw on './'-prefixed paths and matches correctly", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("./dist/index.js")).toBe(true);
+      expect(filter.isIgnored("./src/index.ts")).toBe(false);
+    });
+
+    it("treats the empty relative path (project root) as not ignored", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("")).toBe(false);
+    });
   });
 
   describe("createIgnoreFilter with user .understandignore", () => {

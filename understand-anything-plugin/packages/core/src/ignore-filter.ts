@@ -105,7 +105,10 @@ export function createIgnoreFilter(projectRoot: string): IgnoreFilter {
 
   return {
     isIgnored(relativePath: string): boolean {
-      return ig.ignores(relativePath);
+      if (!relativePath) return false;
+      const normalized = relativePath.replace(/^\.\//, "");
+      if (!normalized) return false;
+      return ig.ignores(normalized);
     },
   };
 }
