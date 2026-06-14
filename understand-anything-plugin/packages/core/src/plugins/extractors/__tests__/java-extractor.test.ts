@@ -408,6 +408,25 @@ public class Foo {}
       parser.delete();
     });
 
+    it("strips inner call args from chained method-call callee", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void run() {
+        builder().build();
+    }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      // The chained call should yield a clean method name "build" for the
+      // outer call (not the malformed "builder().build"), plus an entry for
+      // the inner "builder" call.
+      expect(result.some((e) => e.callee === "build")).toBe(true);
+      expect(result.some((e) => e.callee.includes("()"))).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("tracks correct caller for constructors", () => {
       const { tree, parser, root } = parse(`public class Foo {
     public Foo() {

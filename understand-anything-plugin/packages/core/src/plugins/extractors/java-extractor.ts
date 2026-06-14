@@ -200,7 +200,7 @@ export class JavaExtractor implements LanguageExtractor {
     if (!nameNode) return null;
 
     const objectNode = node.childForFieldName("object");
-    if (objectNode) {
+    if (objectNode && objectNode.type !== "method_invocation") {
       return `${objectNode.text}.${nameNode.text}`;
     }
 
