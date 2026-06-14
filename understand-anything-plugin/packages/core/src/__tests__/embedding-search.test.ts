@@ -33,6 +33,13 @@ describe("embedding-search", () => {
     it("handles zero vectors", () => {
       expect(cosineSimilarity([0, 0, 0], [1, 0, 0])).toBe(0);
     });
+
+    it("returns 0 (not NaN) for mismatched vector lengths", () => {
+      // a longer than b
+      expect(cosineSimilarity([1, 0, 0, 0.5], [1, 0, 0])).toBe(0);
+      // a shorter than b — today silently returns 1, overstating similarity
+      expect(cosineSimilarity([1, 0, 0], [1, 0, 0, 5])).toBe(0);
+    });
   });
 
   describe("SemanticSearchEngine", () => {
