@@ -470,6 +470,17 @@ export class RustExtractor implements LanguageExtractor {
             } else if (ch.type === "scoped_identifier") {
               // Nested scoped identifier inside a use list
               specifiers.push(ch.text);
+            } else if (ch.type === "use_as_clause") {
+              // Renamed member: `Read as R`
+              const aliasNode = ch.childForFieldName("alias");
+              const pathNode = ch.childForFieldName("path");
+              specifiers.push(
+                aliasNode
+                  ? aliasNode.text
+                  : pathNode
+                    ? pathNode.text
+                    : ch.text,
+              );
             }
           }
         }
@@ -483,13 +494,33 @@ export class RustExtractor implements LanguageExtractor {
       }
 
       case "use_wildcard": {
-        // `use std::prelude::*;`
-        // The path is the scoped_identifier child
-        const scopedId = findChild(argument, "scoped_identifier");
-        const source = scopedId ? scopedId.text : "";
+        // `use std::prelude::*;`, `use crate::*;`, `use foo::*;`
+        // The path is the first named child (scoped_identifier, identifier,
+        // or crate); only `*` itself is excluded.
+        const pathNode = argument.namedChild(0);
+        const source =
+          pathNode && pathNode.type !== "*" ? pathNode.text : "";
         imports.push({
           source,
           specifiers: ["*"],
+          lineNumber: node.startPosition.row + 1,
+        });
+        break;
+      }
+
+      case "use_as_clause": {
+        // `use foo::Bar as Baz;`
+        const pathNode = argument.childForFieldName("path");
+        const aliasNode = argument.childForFieldName("alias");
+        const alias = aliasNode ? aliasNode.text : "";
+        // Source is the path minus its final segment; specifier is the alias.
+        const { path, name } =
+          pathNode && pathNode.type === "scoped_identifier"
+            ? extractScopedPath(pathNode)
+            : { path: "", name: pathNode ? pathNode.text : "" };
+        imports.push({
+          source: path || name,
+          specifiers: [alias || name],
           lineNumber: node.startPosition.row + 1,
         });
         break;

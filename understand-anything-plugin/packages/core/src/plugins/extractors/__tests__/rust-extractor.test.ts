@@ -384,6 +384,65 @@ use crate::config::Settings;
       parser.delete();
     });
 
+    it("handles `use ... as` rename clauses", () => {
+      const { tree, parser, root } = parse(`
+use foo::Bar as Baz;
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toHaveLength(1);
+      expect(result.imports[0].source).toBe("foo");
+      expect(result.imports[0].specifiers).toEqual(["Baz"]);
+      expect(result.imports[0].lineNumber).toBe(2);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures renamed specifiers inside use-lists", () => {
+      const { tree, parser, root } = parse(`
+use std::io::{Read as R, Write};
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toHaveLength(1);
+      expect(result.imports[0].source).toBe("std::io");
+      expect(result.imports[0].specifiers).toEqual(["R", "Write"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("keeps source path for single-segment wildcard imports", () => {
+      {
+        const { tree, parser, root } = parse(`
+use crate::*;
+`);
+        const result = extractor.extractStructure(root);
+
+        expect(result.imports).toHaveLength(1);
+        expect(result.imports[0].source).toBe("crate");
+        expect(result.imports[0].specifiers).toEqual(["*"]);
+
+        tree.delete();
+        parser.delete();
+      }
+
+      {
+        const { tree, parser, root } = parse(`
+use foo::*;
+`);
+        const result = extractor.extractStructure(root);
+
+        expect(result.imports).toHaveLength(1);
+        expect(result.imports[0].source).toBe("foo");
+        expect(result.imports[0].specifiers).toEqual(["*"]);
+
+        tree.delete();
+        parser.delete();
+      }
+    });
+
     it("reports correct import line numbers", () => {
       const { tree, parser, root } = parse(`
 use std::collections::HashMap;
