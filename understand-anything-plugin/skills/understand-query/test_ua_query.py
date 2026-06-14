@@ -205,7 +205,7 @@ class TestParseArgs(unittest.TestCase):
 # ──────────────────────────────────────────────
 
 class TestSearchApi(unittest.TestCase):
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_basic_call(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "1", "name": "Auth"}]}
         results = _search_api("http://localhost:3001", "auth")
@@ -215,76 +215,76 @@ class TestSearchApi(unittest.TestCase):
         assert "q=auth" in call_url
         assert "scope=kg" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_with_service(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", service="svc")
         call_url = mock_fetch.call_args[0][0]
         assert "service=svc" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_with_type_filter(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", type="class")
         call_url = mock_fetch.call_args[0][0]
         assert "type=class" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_with_tag_filter(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", tag="service")
         call_url = mock_fetch.call_args[0][0]
         assert "tag=service" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_with_offset(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", offset=10)
         call_url = mock_fetch.call_args[0][0]
         assert "offset=10" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_offset_zero_not_sent(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", offset=0)
         call_url = mock_fetch.call_args[0][0]
         assert "offset" not in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_with_fusion(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", fusion="rrf")
         call_url = mock_fetch.call_args[0][0]
         assert "fusion=rrf" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_fusion_none_not_sent(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", fusion="none")
         call_url = mock_fetch.call_args[0][0]
         assert "fusion" not in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_type_none_not_sent(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", type=None)
         call_url = mock_fetch.call_args[0][0]
         assert "type" not in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_tag_none_not_sent(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         _search_api("http://localhost:3001", "auth", tag=None)
         call_url = mock_fetch.call_args[0][0]
         assert "tag" not in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_empty_results(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         results = _search_api("http://localhost:3001", "nonexistent")
         assert results == []
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_missing_results_key(self, mock_fetch):
         mock_fetch.return_value = {"total": 0}
         results = _search_api("http://localhost:3001", "test")
@@ -296,7 +296,7 @@ class TestSearchApi(unittest.TestCase):
 # ──────────────────────────────────────────────
 
 class TestFindSymbolNode(unittest.TestCase):
-    @patch("ua_query._search_api")
+    @patch("_helpers._search_api")
     def test_exact_local_match(self, mock_search):
         mock_search.return_value = [
             {"name": "UserService", "type": "class", "id": "kg::UserService"},
@@ -305,8 +305,8 @@ class TestFindSymbolNode(unittest.TestCase):
         result = _find_symbol_node("http://localhost:3001", "svc", "UserService")
         assert result["name"] == "UserService"
 
-    @patch("ua_query._cross_service_symbol_search")
-    @patch("ua_query._search_api")
+    @patch("_helpers._cross_service_symbol_search")
+    @patch("_helpers._search_api")
     def test_fuzzy_local_then_cross_service_exact(self, mock_search, mock_cross):
         mock_search.return_value = [
             {"name": "UserHelper", "type": "class", "id": "kg::UserHelper"},
@@ -319,13 +319,13 @@ class TestFindSymbolNode(unittest.TestCase):
         assert result["name"] == "UserService"
         assert result.get("crossServiceOrigin") is not None
 
-    @patch("ua_query._search_api")
+    @patch("_helpers._search_api")
     def test_no_match(self, mock_search):
         mock_search.return_value = []
         with self.assertRaises(RuntimeError):
             _find_symbol_node("http://localhost:3001", "svc", "NonExistent")
 
-    @patch("ua_query._search_api")
+    @patch("_helpers._search_api")
     def test_prefers_implementation_suffix(self, mock_search):
         mock_search.return_value = [
             {"name": "UserService", "type": "class", "id": "kg::UserService"},
@@ -423,7 +423,7 @@ class TestExtractSymbol(unittest.TestCase):
 # ──────────────────────────────────────────────
 
 class TestCmdKg(unittest.TestCase):
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "1", "name": "UserService"}]}
         args = parse_args(["kg", "--service", "svc", "--search", "UserService"])
@@ -432,7 +432,7 @@ class TestCmdKg(unittest.TestCase):
         assert "nodes" in result
         assert len(result["nodes"]) == 1
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_with_type_api_filter(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "1", "name": "UserService", "type": "class"}]}
         args = parse_args(["kg", "--service", "svc", "--search", "User", "--type", "class"])
@@ -441,7 +441,7 @@ class TestCmdKg(unittest.TestCase):
         call_url = mock_fetch.call_args[0][0]
         assert "type=class" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_with_tag_api_filter(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         args = parse_args(["kg", "--service", "svc", "--search", "User", "--tag", "auth"])
@@ -450,7 +450,7 @@ class TestCmdKg(unittest.TestCase):
         call_url = mock_fetch.call_args[0][0]
         assert "tag=auth" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_node_lookup(self, mock_fetch):
         mock_fetch.return_value = {
             "nodes": [{"name": "UserService", "type": "class", "id": "kg::UserService"}],
@@ -461,7 +461,7 @@ class TestCmdKg(unittest.TestCase):
         result = cmd_kg(args)
         assert "nodes" in result
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_neighbors(self, mock_fetch):
         mock_fetch.return_value = {"neighbors": [{"name": "Auth"}], "center": {"name": "User"}}
         args = parse_args(["kg", "--service", "svc", "--neighbors", "UserService"])
@@ -471,7 +471,7 @@ class TestCmdKg(unittest.TestCase):
 
 
 class TestCmdStructure(unittest.TestCase):
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_annotation(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"name": "UserController", "annotations": "@Controller"}]}
         args = parse_args(["structure", "--service", "svc", "--annotation", "@Controller"])
@@ -479,7 +479,7 @@ class TestCmdStructure(unittest.TestCase):
         result = cmd_structure(args)
         assert "results" in result
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_q(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         args = parse_args(["structure", "--service", "svc", "--q", "getUser"])
@@ -488,7 +488,7 @@ class TestCmdStructure(unittest.TestCase):
         call_url = mock_fetch.call_args[0][0]
         assert "q=getUser" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_section_key(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         args = parse_args(["structure", "--service", "svc", "--section-key", "spring.datasource"])
@@ -497,7 +497,7 @@ class TestCmdStructure(unittest.TestCase):
         call_url = mock_fetch.call_args[0][0]
         assert "sectionKey=spring.datasource" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_section_value(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         args = parse_args(["structure", "--service", "svc", "--section-value", "UserService"])
@@ -506,7 +506,7 @@ class TestCmdStructure(unittest.TestCase):
         call_url = mock_fetch.call_args[0][0]
         assert "sectionValue=UserService" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_offset(self, mock_fetch):
         mock_fetch.return_value = {"results": []}
         args = parse_args(["structure", "--service", "svc", "--q", "test", "--offset", "20"])
@@ -515,14 +515,14 @@ class TestCmdStructure(unittest.TestCase):
         call_url = mock_fetch.call_args[0][0]
         assert "offset=20" in call_url
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search_no_filter_raises(self, mock_fetch):
         args = parse_args(["structure", "--service", "svc"])
         from ua_query import cmd_structure
         with self.assertRaises(SystemExit):
             cmd_structure(args)
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_file_lookup(self, mock_fetch):
         mock_fetch.return_value = {"filePath": "src/UserService.java", "functions": []}
         args = parse_args(["structure", "--service", "svc", "--file", "UserService.java"])
@@ -530,7 +530,7 @@ class TestCmdStructure(unittest.TestCase):
         result = cmd_structure(args)
         assert "functions" in result or "filePath" in result
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_chain(self, mock_fetch):
         mock_fetch.return_value = {"className": "UserEntity", "direction": "up", "chain": []}
         args = parse_args(["structure", "--service", "svc", "--chain", "UserEntity"])
@@ -538,7 +538,7 @@ class TestCmdStructure(unittest.TestCase):
         result = cmd_structure(args)
         assert "chain" in result
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_implementors(self, mock_fetch):
         mock_fetch.return_value = {"interface": "Serializable", "implementors": []}
         args = parse_args(["structure", "--service", "svc", "--implementors", "Serializable"])
@@ -548,7 +548,7 @@ class TestCmdStructure(unittest.TestCase):
 
 
 class TestCmdWiki(unittest.TestCase):
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "wiki::auth", "name": "Authentication"}]}
         args = parse_args(["wiki", "--service", "svc", "--search", "auth"])
@@ -557,7 +557,7 @@ class TestCmdWiki(unittest.TestCase):
         assert isinstance(result, list)
         assert len(result) == 1
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_overview(self, mock_fetch):
         mock_fetch.return_value = {"services": []}
         args = parse_args(["wiki", "--overview"])
@@ -567,7 +567,7 @@ class TestCmdWiki(unittest.TestCase):
 
 
 class TestCmdBusiness(unittest.TestCase):
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_search(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "biz::order", "name": "Order Domain"}]}
         args = parse_args(["business", "--search", "order"])
@@ -575,7 +575,7 @@ class TestCmdBusiness(unittest.TestCase):
         result = cmd_business(args)
         assert "results" in result
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_list(self, mock_fetch):
         mock_fetch.return_value = {"domains": []}
         args = parse_args(["business", "--list"])
@@ -583,7 +583,7 @@ class TestCmdBusiness(unittest.TestCase):
         result = cmd_business(args)
         assert "domains" in result
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_panorama(self, mock_fetch):
         mock_fetch.return_value = {"domains": []}
         args = parse_args(["business", "--panorama"])
@@ -593,8 +593,8 @@ class TestCmdBusiness(unittest.TestCase):
 
 
 class TestCmdTrace(unittest.TestCase):
-    @patch("ua_query._auto_discover_service")
-    @patch("ua_query.fetch_json")
+    @patch("_helpers._auto_discover_service")
+    @patch("_helpers.fetch_json")
     def test_basic_trace(self, mock_fetch, mock_auto):
         mock_auto.return_value = ("svc", [])
         mock_fetch.return_value = {
@@ -607,8 +607,8 @@ class TestCmdTrace(unittest.TestCase):
         result = cmd_trace(args)
         assert "matchedNodes" in result
 
-    @patch("ua_query._auto_discover_service")
-    @patch("ua_query.fetch_json")
+    @patch("_helpers._auto_discover_service")
+    @patch("_helpers.fetch_json")
     def test_trace_with_type_filter(self, mock_fetch, mock_auto):
         mock_auto.return_value = ("svc", [])
         mock_fetch.return_value = {
@@ -627,7 +627,7 @@ class TestCmdTrace(unittest.TestCase):
 # ──────────────────────────────────────────────
 
 class TestErrorHandling(unittest.TestCase):
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_server_unavailable(self, mock_fetch):
         mock_fetch.side_effect = ServerUnavailableError("Server down")
         args = parse_args(["kg", "--service", "svc", "--search", "auth"])
@@ -635,7 +635,7 @@ class TestErrorHandling(unittest.TestCase):
         with self.assertRaises(ServerUnavailableError):
             cmd_kg(args)
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_http_error(self, mock_fetch):
         mock_fetch.side_effect = RuntimeError("HTTP 404: not found")
         args = parse_args(["kg", "--service", "svc", "--search", "auth"])
@@ -657,33 +657,33 @@ class TestMain(unittest.TestCase):
             exit_code = main(argv)
         return exit_code, buf.getvalue()
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_main_kg_search(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "1", "name": "Auth"}]}
         exit_code, output = self._run_main(["kg", "--service", "svc", "--search", "auth"])
         assert exit_code == 0
         assert "Auth" in output
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_main_server_error(self, mock_fetch):
         mock_fetch.side_effect = ServerUnavailableError("Server down")
         exit_code, _ = self._run_main(["kg", "--service", "svc", "--search", "auth"])
         assert exit_code == 2
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_main_runtime_error(self, mock_fetch):
         mock_fetch.side_effect = RuntimeError("HTTP 400: bad request")
         exit_code, _ = self._run_main(["kg", "--service", "svc", "--search", "auth"])
         assert exit_code == 1
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_main_json_output(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"id": "1", "name": "Test"}]}
         _, output = self._run_main(["--format", "json", "kg", "--service", "svc", "--search", "test"])
         parsed = json.loads(output)
         assert parsed["nodes"][0]["name"] == "Test"
 
-    @patch("ua_query.fetch_json")
+    @patch("_helpers.fetch_json")
     def test_main_json_structure(self, mock_fetch):
         mock_fetch.return_value = {"results": [{"name": "getUser", "type": "function"}]}
         _, output = self._run_main(["--format", "json", "structure", "--service", "svc", "--q", "getUser"])
