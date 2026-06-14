@@ -72,6 +72,9 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".h")?.id).toBe("c");
       expect(registry.getByExtension(".lua")?.id).toBe("lua");
       expect(registry.getByExtension(".js")?.id).toBe("javascript");
+      expect(registry.getByExtension(".mts")?.id).toBe("typescript");
+      expect(registry.getByExtension(".cts")?.id).toBe("typescript");
+      expect(registry.getForFile("src/server.mts")?.id).toBe("typescript");
     });
 
     it("has no duplicate extension mappings across configs", () => {
@@ -90,6 +93,13 @@ describe("LanguageRegistry", () => {
       for (const config of registry.getAllLanguages()) {
         expect(config.concepts.length).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe("typescript config test patterns", () => {
+    it("recognizes both .test.tsx and .spec.tsx test files", () => {
+      expect(typescriptConfig.filePatterns.tests).toContain("*.test.tsx");
+      expect(typescriptConfig.filePatterns.tests).toContain("*.spec.tsx");
     });
   });
 
