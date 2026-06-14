@@ -14,12 +14,16 @@ export function traverse(
 
 /** Extract the unquoted string value from a string-like node. */
 export function getStringValue(node: TreeSitterNode): string {
+  let value = "";
+  let found = false;
   for (let i = 0; i < node.childCount; i++) {
     const child = node.child(i);
-    if (child && child.type === "string_fragment") {
-      return child.text;
+    if (child && (child.type === "string_fragment" || child.type === "escape_sequence")) {
+      value += child.text;
+      found = true;
     }
   }
+  if (found) return value;
   return node.text.replace(/^['"`]|['"`]$/g, "");
 }
 
