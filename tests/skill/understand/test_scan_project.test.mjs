@@ -416,6 +416,13 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
   // review on PR #204.
   it('dotfile configs (.env, .env.local, .env.production) map to config + env language', () => {
     projectRoot = setupTree({
+      // A non-dotfile sibling keeps `git ls-files` output non-empty so the
+      // git enumeration path is actually exercised. Without it, a host global
+      // gitignore that hides every dotfile would make `git ls-files` return
+      // nothing, silently tripping the walker fallback (which is unaware of
+      // gitignore) and masking the #427 leak. With a sibling present, the git
+      // path is taken and the dotfiles must survive on their own merits.
+      'keep.ts': 'export const x = 1;\n',
       '.env': 'API_KEY=abc\n',
       '.env.local': 'LOCAL=1\n',
       '.env.production': 'PROD=1\n',
