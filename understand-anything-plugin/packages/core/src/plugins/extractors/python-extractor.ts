@@ -26,6 +26,18 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
         break;
 
       case "typed_parameter": {
+        const splat = findChild(child, "list_splat_pattern");
+        if (splat) {
+          const sid = findChild(splat, "identifier");
+          if (sid) params.push("*" + sid.text);
+          break;
+        }
+        const dsplat = findChild(child, "dictionary_splat_pattern");
+        if (dsplat) {
+          const did = findChild(dsplat, "identifier");
+          if (did) params.push("**" + did.text);
+          break;
+        }
         const ident = findChild(child, "identifier");
         if (ident && ident.text !== "self" && ident.text !== "cls") {
           params.push(ident.text);

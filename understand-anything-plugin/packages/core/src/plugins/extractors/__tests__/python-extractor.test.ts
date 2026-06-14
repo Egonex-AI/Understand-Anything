@@ -114,6 +114,24 @@ def flexible(*args, **kwargs):
       parser.delete();
     });
 
+    it("extracts type-annotated *args and **kwargs", () => {
+      const { tree, parser, root } = parse(`
+def f(a: int, *args: str, b: int = 0, **kwargs: bool):
+    pass
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions[0].params).toEqual([
+        "a",
+        "*args",
+        "b",
+        "**kwargs",
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts decorated functions", () => {
       const { tree, parser, root } = parse(`
 @decorator
