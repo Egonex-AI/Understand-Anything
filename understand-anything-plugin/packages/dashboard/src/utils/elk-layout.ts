@@ -140,28 +140,7 @@ export function repairElkInput(
     maybeThrow(strict, issue);
   }
 
-  // 4. dropOrphanEdges
-  let orphanEdges = 0;
-  const edges = input.edges.filter((e) => {
-    const ok = e.sources.every((s) => allIds.has(s)) &&
-      e.targets.every((t) => allIds.has(t));
-    if (!ok) {
-      orphanEdges++;
-      return false;
-    }
-    return true;
-  });
-  if (orphanEdges > 0) {
-    const issue = makeIssue(
-      "dropped",
-      "elk-orphan-edge",
-      `Dropped ${orphanEdges} edge(s) referencing nonexistent nodes.`,
-    );
-    issues.push(issue);
-    maybeThrow(strict, issue);
-  }
-
-  // 5. dropCircularContainment
+  // 4. dropCircularContainment
   const parentOf = new Map<string, string>();
   const fillParents = (children: ElkChild[], parent?: string) => {
     for (const c of children) {
@@ -200,6 +179,37 @@ export function repairElkInput(
       "dropped",
       "elk-containment-cycle",
       `Dropped ${cyclesRemoved} node(s) in containment cycles.`,
+    );
+    issues.push(issue);
+    maybeThrow(strict, issue);
+  }
+
+  // 5. dropOrphanEdges — validate against the FINAL child tree so edges
+  // pointing at nodes removed by the orphan-child (step 3) or cycle (step 4)
+  // passes are dropped too; otherwise ELK gets edges referencing missing nodes.
+  const finalIds = new Set<string>();
+  const walkFinal = (children: ElkChild[]) => {
+    for (const c of children) {
+      finalIds.add(c.id);
+      if (c.children) walkFinal(c.children);
+    }
+  };
+  walkFinal(childrenD);
+  let orphanEdges = 0;
+  const edges = input.edges.filter((e) => {
+    const ok = e.sources.every((s) => finalIds.has(s)) &&
+      e.targets.every((t) => finalIds.has(t));
+    if (!ok) {
+      orphanEdges++;
+      return false;
+    }
+    return true;
+  });
+  if (orphanEdges > 0) {
+    const issue = makeIssue(
+      "dropped",
+      "elk-orphan-edge",
+      `Dropped ${orphanEdges} edge(s) referencing nonexistent nodes.`,
     );
     issues.push(issue);
     maybeThrow(strict, issue);

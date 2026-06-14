@@ -42,6 +42,21 @@ describe("repairElkInput", () => {
     expect(issues.some((i) => i.level === "dropped" && /edge/.test(i.message))).toBe(true);
   });
 
+  it("drops edges pointing at children removed by the orphan-child pass", () => {
+    const input: ElkInput = {
+      id: "root",
+      children: [
+        { id: "a", width: 1, height: 1 },
+        { id: "orphan", width: 1, height: 1, parentId: "ghost" } as ElkInput["children"][0] & { parentId: string },
+      ],
+      edges: [{ id: "e1", sources: ["a"], targets: ["orphan"] }],
+    };
+    const { input: out, issues } = repairElkInput(input);
+    expect(out.children!.find((c) => c.id === "orphan")).toBeUndefined();
+    expect(out.edges).toHaveLength(0);
+    expect(issues.some((i) => i.level === "dropped" && i.category === "elk-orphan-edge")).toBe(true);
+  });
+
   it("drops children referencing nonexistent parents", () => {
     const input: ElkInput = {
       id: "root",
