@@ -158,5 +158,30 @@ describe("generateStarterIgnoreFile", () => {
       const lines = content.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
       expect(lines).toHaveLength(0);
     });
+
+    it("treats anchored .gitignore patterns as covered by defaults", () => {
+      writeFileSync(join(testDir, ".gitignore"), "/node_modules\n/dist\n.env\n");
+      const content = generateStarterIgnoreFile(testDir);
+      // Extract the pattern lines under the .gitignore section (between its
+      // header and the next "# ---" section header).
+      const lines = content.split("\n");
+      const headerIdx = lines.findIndex((l) => l.includes("From .gitignore"));
+      const nextSectionIdx = lines.findIndex((l, i) => i > headerIdx && l.startsWith("# ---"));
+      const sectionLines = lines.slice(headerIdx + 1, nextSectionIdx === -1 ? undefined : nextSectionIdx);
+      const patterns = sectionLines
+        .filter((l) => l.startsWith("# ") && !l.startsWith("# ---"))
+        .map((l) => l.slice(2));
+      // /node_modules and /dist are anchored forms of defaults node_modules/ and dist/.
+      expect(patterns).not.toContain("/node_modules"); // fails today: '# /node_modules' is present
+      expect(patterns).not.toContain("/dist"); // fails today: '# /dist' is present
+      expect(patterns).toContain(".env"); // still suggested
+    });
+
+    it("does not suggest .gitignore negation (!) patterns", () => {
+      writeFileSync(join(testDir, ".gitignore"), "build/\n!build/keep.txt\n.env\n");
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).not.toContain("!build/keep.txt"); // fails today: '# !build/keep.txt' is emitted
+      expect(content).toContain("# .env");
+    });
   });
 });

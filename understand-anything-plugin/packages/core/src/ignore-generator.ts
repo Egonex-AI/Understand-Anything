@@ -40,15 +40,18 @@ function parseGitignorePatterns(gitignorePath: string): string[] {
   return content
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith("#"));
+    .filter(
+      (line) => line.length > 0 && !line.startsWith("#") && !line.startsWith("!"),
+    );
 }
 
 /**
  * Returns true if a gitignore pattern is already covered by the hardcoded defaults.
- * Normalizes trailing slashes for comparison.
+ * Normalizes a leading root anchor and trailing slashes for comparison so that
+ * anchored forms like `/node_modules` and `/dist/` match defaults `node_modules/`/`dist/`.
  */
 function isCoveredByDefaults(pattern: string): boolean {
-  const normalize = (p: string) => p.replace(/\/+$/, "");
+  const normalize = (p: string) => p.replace(/^\//, "").replace(/\/+$/, "");
   const normalized = normalize(pattern);
   return DEFAULT_IGNORE_PATTERNS.some((d) => normalize(d) === normalized);
 }
