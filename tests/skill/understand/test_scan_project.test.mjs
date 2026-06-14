@@ -20,6 +20,26 @@ const SCRIPT = resolve(
 );
 
 /**
+ * scan-project.mjs enumerates files via `git ls-files -co --exclude-standard`,
+ * which honors the host's global gitignore (core.excludesFile). Many
+ * contributors keep `.env`/`.env.local` in their global gitignore, which would
+ * then hide the fixture dotfiles from the scanner and break tests that assert
+ * on them (e.g. the `.env` dotfile-config test) — see #427. Nulling
+ * GIT_CONFIG_GLOBAL/SYSTEM is NOT enough: core.excludesFile defaults to
+ * $XDG_CONFIG_HOME/git/ignore (or ~/.config/git/ignore) even with no config
+ * file, so the knob itself must be overridden. Passing this env to every git
+ * invocation makes the fixtures hermetic against any host config.
+ */
+const HERMETIC_GIT_ENV = {
+  ...process.env,
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'core.excludesFile',
+  GIT_CONFIG_VALUE_0: '/dev/null',
+};
+
+/**
  * Build a project tree from a `{ relPath: contents }` object. Creates parent
  * directories as needed. Initializes a real git repo so the script's preferred
  * `git ls-files` enumeration path is exercised — tests that need the walker
@@ -36,7 +56,11 @@ function setupTree(files, { gitInit = true } = {}) {
     // `git ls-files -co --exclude-standard` returns BOTH cached and others
     // (modulo gitignore), so an `add` is unnecessary for our tests — the
     // bare repo init is enough for ls-files to enumerate.
-    const init = spawnSync('git', ['init', '-q'], { cwd: root, encoding: 'utf-8' });
+    const init = spawnSync('git', ['init', '-q'], {
+      cwd: root,
+      encoding: 'utf-8',
+      env: HERMETIC_GIT_ENV,
+    });
     if (init.status !== 0) {
       // CI without git: continue without it; the walker fallback will fire.
     }
@@ -66,6 +90,7 @@ function runScript(projectRoot) {
   const outputPath = join(outputDir, 'scan-output.json');
   const result = spawnSync('node', [SCRIPT, projectRoot, outputPath], {
     encoding: 'utf-8',
+    env: HERMETIC_GIT_ENV,
   });
   let output = null;
   try {
@@ -398,10 +423,15 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     for (const p of ['.env', '.env.local', '.env.production']) {
-      expect(byPath(r.output, p).fileCategory).toBe('config');
+      const entry = byPath(r.output, p);
+      // Guard for a clearer failure than "Cannot read properties of
+      // undefined" if a host global gitignore ever hides these dotfiles
+      // (see HERMETIC_GIT_ENV above / #427).
+      expect(entry).toBeDefined();
+      expect(entry.fileCategory).toBe('config');
       // LANGUAGE_BY_EXT['.env'] -> 'config' (the language id itself; not
       // a typo — the language for env files is the 'config' bucket).
-      expect(byPath(r.output, p).language).toBe('config');
+      expect(entry.language).toBe('config');
     }
   });
 });
