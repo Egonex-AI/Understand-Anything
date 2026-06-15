@@ -585,4 +585,116 @@ describe("handleBusinessRequest", () => {
     expect(body.repoName).toBe("ddoversea")
     expect(body.platformDetail.summary).toBe("Android via query param")
   })
+
+  function seedVoiceRoomPlatform(dir: string) {
+    const bl = path.join(dir, ".understand-anything", "business-landscape")
+    const wikiDir = path.join(dir, "mobile", "ddoversea", ".understand-anything", "wiki", "domains")
+    fs.mkdirSync(wikiDir, { recursive: true })
+    const wikiContent = {
+      id: "domain:voice-room",
+      name: "语聊房",
+      summary: "Android voice room",
+      flows: [
+        { id: "flow:pk", name: "PK Battle", steps: [{ description: "Start PK mode" }, { description: "End PK" }] },
+        { id: "flow:pk-rank", name: "PK Ranking", steps: [{ description: "Update leaderboard after PK" }] },
+        { id: "flow:gift", name: "Gift Sending", steps: [{ description: "Send 礼物 to host" }] },
+        { id: "flow:join", name: "Join Room", steps: [{ description: "Enter voice room" }] },
+        { id: "flow:leave", name: "Leave Room", steps: [{ description: "Exit voice room" }] },
+      ],
+    }
+    fs.writeFileSync(path.join(wikiDir, "voice-room.json"), JSON.stringify(wikiContent))
+
+    const featuresWithPlatform = {
+      ...sampleBusinessFeatures,
+      platformMapping: { android: "ddoversea" },
+      features: [
+        {
+          id: "feature:voice-room",
+          name: "语聊房",
+          clientLayer: {
+            implType: "cross-platform" as const,
+            platforms: {
+              ddoversea: {
+                domainName: "语聊房",
+                domainId: "domain:voice-room",
+                summary: "Android voice room",
+                standardPlatform: "android",
+                wikiRef: "mobile/ddoversea/.understand-anything/wiki/domains/voice-room.json",
+              },
+            },
+            deliveryPlatforms: ["ddoversea"],
+            summary: "Voice room feature",
+          },
+          serverLayer: {
+            primaryDomain: null,
+            supportingDomains: [],
+          },
+        },
+        sampleBusinessFeatures.features[1],
+      ],
+      stats: { totalFeatures: 2, withServerAssociation: 0, serverDomainsReferenced: 0 },
+    }
+    fs.writeFileSync(path.join(bl, "business-features.json"), JSON.stringify(featuresWithPlatform))
+  }
+
+  it("GET /api/business/domains/语聊房?platform=android&flow=PK returns only flows matching PK", async () => {
+    seedVoiceRoomPlatform(dir)
+    const res = await handleBusinessRequest(
+      {
+        pathname: `/api/business/domains/${encodeURIComponent("语聊房")}`,
+        searchParams: new URLSearchParams({ platform: "android", flow: "PK" }),
+      },
+      ctx,
+    )
+    expect(res?.statusCode).toBe(200)
+    const platformDetail = (res?.body as { platformDetail: {
+      flows: Array<{ name: string }>
+      filteredBy: string
+      totalFlows: number
+    } }).platformDetail
+    expect(platformDetail.flows).toHaveLength(2)
+    expect(platformDetail.flows.every((f) => f.name.toLowerCase().includes("pk"))).toBe(true)
+    expect(platformDetail.filteredBy).toBe("keyword")
+    expect(platformDetail.totalFlows).toBe(5)
+  })
+
+  it("GET /api/business/domains/语聊房?platform=android&flow=nonexistent returns empty flows array", async () => {
+    seedVoiceRoomPlatform(dir)
+    const res = await handleBusinessRequest(
+      {
+        pathname: `/api/business/domains/${encodeURIComponent("语聊房")}`,
+        searchParams: new URLSearchParams({ platform: "android", flow: "nonexistent" }),
+      },
+      ctx,
+    )
+    expect(res?.statusCode).toBe(200)
+    const platformDetail = (res?.body as { platformDetail: {
+      flows: unknown[]
+      filteredBy: string
+      totalFlows: number
+    } }).platformDetail
+    expect(platformDetail.flows).toHaveLength(0)
+    expect(platformDetail.filteredBy).toBe("keyword")
+    expect(platformDetail.totalFlows).toBe(5)
+  })
+
+  it("GET /api/business/domains/语聊房?platform=android without flow filter returns all flows", async () => {
+    seedVoiceRoomPlatform(dir)
+    const res = await handleBusinessRequest(
+      {
+        pathname: `/api/business/domains/${encodeURIComponent("语聊房")}`,
+        searchParams: new URLSearchParams({ platform: "android" }),
+      },
+      ctx,
+    )
+    expect(res?.statusCode).toBe(200)
+    const platformDetail = (res?.body as { platformDetail: {
+      flows: unknown[]
+      filteredBy?: string
+      totalFlows?: number
+    } }).platformDetail
+    expect(platformDetail.flows).toHaveLength(5)
+    expect(platformDetail.filteredBy).toBeUndefined()
+    expect(platformDetail.totalFlows).toBeUndefined()
+  })
 })

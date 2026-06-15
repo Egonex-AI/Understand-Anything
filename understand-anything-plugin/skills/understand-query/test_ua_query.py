@@ -639,6 +639,33 @@ class TestCmdBusiness(unittest.TestCase):
         assert result["repoName"] == "ddoversea"
         assert result["platformDetail"]["name"] == "语音房"
 
+    def test_parse_args_business_flow_filter(self):
+        args = parse_args(["business", "--domain", "语聊房", "--platform", "android", "--flow", "PK"])
+        assert args.command == "business"
+        assert args.domain == "语聊房"
+        assert args.platform == "android"
+        assert args.flow == "PK"
+
+    @patch("_helpers.fetch_json")
+    def test_platform_flow_filter(self, mock_fetch):
+        mock_fetch.return_value = {
+            "feature": {"id": "feature:voice-room", "name": "语聊房"},
+            "platform": "android",
+            "repoName": "ddoversea",
+            "platformDetail": {
+                "flows": [{"name": "PK Battle"}],
+                "filteredBy": "keyword",
+                "totalFlows": 5,
+            },
+        }
+        args = parse_args(["business", "--domain", "语聊房", "--platform", "android", "--flow", "PK"])
+        from ua_query import cmd_business
+        result = cmd_business(args)
+        call_url = mock_fetch.call_args[0][0]
+        assert "platform=android" in call_url
+        assert "flow=PK" in call_url
+        assert result["platformDetail"]["flows"] == [{"name": "PK Battle"}]
+
 
 class TestCmdTrace(unittest.TestCase):
     @patch("_helpers._auto_discover_service")

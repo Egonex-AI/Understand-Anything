@@ -258,10 +258,13 @@ def cmd_business(args: argparse.Namespace) -> Any:
         return {"results": _search_api(args.server, args.search, scope="business")}
     if args.domain and args.platform:
         encoded_domain = url_quote(args.domain, safe="")
+        params: dict[str, str] = {"platform": args.platform}
+        if args.flow:
+            params["flow"] = args.flow
         return _helpers.fetch_json(build_url(
             args.server,
             f"/api/business/domains/{encoded_domain}",
-            {"platform": args.platform},
+            params,
         ))
     if args.domain:
         slug = args.domain.replace("domain:", "").replace(" ", "-").lower()

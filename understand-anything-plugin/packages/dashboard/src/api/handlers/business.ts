@@ -75,6 +75,31 @@ function readWikiFromRef(projectRoot: string, wikiRef: string): unknown | null {
   return readJsonFile(path.join(projectRoot, wikiRef))
 }
 
+interface WikiFlow {
+  name?: string
+  steps?: Array<{ description?: string }>
+}
+
+function applyFlowFilter(platformDetail: unknown, flowFilter: string): unknown {
+  if (!platformDetail || typeof platformDetail !== "object") return platformDetail
+  const detail = platformDetail as { flows?: WikiFlow[] }
+  if (!detail.flows) return platformDetail
+
+  const keyword = flowFilter.toLowerCase()
+  const totalFlows = detail.flows.length
+  const filtered = detail.flows.filter((flow) => {
+    if (flow.name?.toLowerCase().includes(keyword)) return true
+    return flow.steps?.some((step) => step.description?.toLowerCase().includes(keyword))
+  })
+
+  return {
+    ...detail,
+    flows: filtered,
+    filteredBy: "keyword",
+    totalFlows,
+  }
+}
+
 function basicFeatureInfo(feature: BusinessFeature) {
   return {
     id: feature.id,
@@ -285,13 +310,18 @@ export async function handleBusinessRequest(req: ApiRequest, _ctx: ApiContext): 
       return { statusCode: 404, body: { error: `Platform not found for feature: ${standardPlatform}`, code: "PLATFORM_NOT_FOUND" } }
     }
 
+    const flowFilter = searchParams.get("flow")
+    const platformDetail = flowFilter
+      ? applyFlowFilter(resolved.platformDetail, flowFilter)
+      : resolved.platformDetail
+
     return {
       statusCode: 200,
       body: {
         feature: resolved.feature,
         platform: standardPlatform,
         repoName: resolved.repoName,
-        platformDetail: resolved.platformDetail,
+        platformDetail,
       },
     }
   }
@@ -328,6 +358,12 @@ export async function handleBusinessRequest(req: ApiRequest, _ctx: ApiContext): 
         if (!resolved) {
           return { statusCode: 404, body: { error: `Platform not found for feature: ${standardPlatform}`, code: "PLATFORM_NOT_FOUND" } }
         }
+
+        const flowFilter = searchParams.get("flow")
+        const platformDetail = flowFilter
+          ? applyFlowFilter(resolved.platformDetail, flowFilter)
+          : resolved.platformDetail
+
         return {
           statusCode: 200,
           body: {
@@ -335,7 +371,7 @@ export async function handleBusinessRequest(req: ApiRequest, _ctx: ApiContext): 
             feature: resolved.feature,
             platform: standardPlatform,
             repoName: resolved.repoName,
-            platformDetail: resolved.platformDetail,
+            platformDetail,
           },
         }
       }

@@ -83,6 +83,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     biz = sub.add_parser("business", help="Business landscape queries")
     biz.add_argument("--domain")
     biz.add_argument("--platform", type=str, help="Filter by platform: android, ios, flutter")
+    biz.add_argument("--flow", type=str, help="Filter flows by keyword within platform domain")
     biz.add_argument("--type")
     biz.add_argument("--facet")
     biz.add_argument("--list", action="store_true")
