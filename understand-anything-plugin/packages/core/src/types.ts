@@ -234,6 +234,57 @@ export interface WikiArchitecture {
     publisher: string;
     subscribers: string[];
   }>;
+  // Mobile cross-platform fields (present when repo-type is mobile)
+  featureParity?: Array<{
+    feature: string;
+    platforms: Record<string, {
+      service: string;
+      domain: string;
+      impl: string;
+    }>;
+    note?: string;
+  }>;
+  sharedInfrastructure?: Array<{
+    type: string;
+    resource: string;
+    platforms: string[];
+    detail: string;
+  }>;
+  nativeBridge?: Array<{
+    type: string;
+    from: string;
+    to: string;
+    mechanism: string;
+    detail: string;
+  }>;
+  domainMapping?: Array<{
+    canonicalFeature: string;
+    mappings: Record<string, string>;
+  }>;
+}
+
+export interface ClientGraphFeatureImpl {
+  framework: string;
+  ref?: string;
+}
+
+export interface ClientGraphFeatureEntry {
+  domain: string;
+  implType: string;
+  implementations: Record<string, ClientGraphFeatureImpl>;
+}
+
+export interface ClientGraphDomainLink {
+  canonicalFeature: string;
+  mappings: Record<string, string>;
+}
+
+export interface ClientGraph {
+  platforms: string[];
+  crossPlatformFrameworks?: string[];
+  featureMap: ClientGraphFeatureEntry[];
+  domainLinks?: ClientGraphDomainLink[];
+  contentHash?: string;
 }
 
 export interface WikiCrossDomainStep {
@@ -583,4 +634,47 @@ export interface BusinessRule {
   enforcedBy: string[];
   observedBy?: string[];
   relatedFlows?: string[];
+}
+
+// Feature-centric business document (from association discovery)
+export interface BusinessFeature {
+  id: string;
+  name: string;
+  clientLayer: {
+    implType: "cross-platform" | "flutter-only" | "native-specific" | "unknown";
+    platforms: Record<string, {
+      domainName?: string;
+      domainId?: string;
+      wikiRef?: string;
+      flowCount?: number;
+      summary?: string;
+      standardPlatform?: "android" | "ios" | "flutter" | "react-native" | "kotlin-multiplatform" | "web" | "unknown";
+    }>;
+    deliveryPlatforms: string[];
+    summary: string;
+  };
+  serverLayer: {
+    primaryDomain: {
+      name: string;
+      service: string;
+      confidence: number;
+      wikiRef?: string;
+      flowCount?: number;
+    } | null;
+    supportingDomains: Array<{
+      name: string;
+      service: string;
+      relationship: "calls" | "depends_on" | "displays" | "primary" | "unknown";
+      confidence: number;
+      wikiRef?: string;
+      flowCount?: number;
+    }>;
+  };
+}
+
+export interface BusinessFeaturesDocument {
+  platformMapping?: Record<string, string>;
+  features: BusinessFeature[];
+  serverIndex: Record<string, { features: string[]; refCount: number; service: string }>;
+  stats: { totalFeatures: number; withServerAssociation: number; serverDomainsReferenced: number };
 }

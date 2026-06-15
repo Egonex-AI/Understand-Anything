@@ -8,6 +8,7 @@ import type {
   WikiDomainPage,
   WikiOverview,
   WikiArchitecture,
+  ClientGraph,
   WikiCrossDomain,
   WikiSearchResult,
   WikiTopology,
@@ -252,6 +253,22 @@ export class WikiDataService {
     const topo = this.discoverWikis();
     if (!topo.parentWikiDir) return null;
     return this.readJson<WikiArchitecture>(path.join(topo.parentWikiDir, "architecture.json"));
+  }
+
+  getClientGraph(serviceName?: string): ClientGraph | null {
+    if (serviceName) {
+      const topo = this.discoverWikis();
+      const svc = topo.services.find((s) => s.name === serviceName);
+      if (svc) {
+        const facetGraph = this.readJson<ClientGraph>(
+          path.join(path.dirname(svc.wikiDir), "client-graph.json"),
+        );
+        if (facetGraph) return facetGraph;
+      }
+    }
+    return this.readJson<ClientGraph>(
+      path.join(this.projectRoot, ".understand-anything", "client-graph.json"),
+    );
   }
 
   getServiceArchitecture(serviceName: string): WikiArchitecture | null {

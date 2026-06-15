@@ -106,7 +106,9 @@ def assemble_landscape(project_root_str: str) -> dict | None:
     if assoc_path.exists():
         try:
             assoc_data = json.loads(assoc_path.read_text())
-            for assoc in assoc_data.get('associations', []):
+            # Prefer phase3_compatible (new format), fall back to legacy flat format
+            entries = assoc_data.get('phase3_compatible', assoc_data.get('associations', []))
+            for assoc in entries:
                 s_name = assoc.get('server_domain', '')
                 c_name = assoc.get('client_domain', '')
                 confidence = assoc.get('confidence', 0)

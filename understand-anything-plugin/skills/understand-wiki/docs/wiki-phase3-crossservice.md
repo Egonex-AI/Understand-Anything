@@ -22,6 +22,17 @@ printf "  - %s\n" "${INTEGRATED_SERVICES[@]}"
 
 ### Step 2 — Run Cross-Service Matcher Script (Layer 1)
 
+**Branching by REPO_TYPE:**
+
+```
+IF REPO_TYPE == "mobile":
+  → Run feature-parity-matcher.py (see Mobile Mode below)
+ELSE:
+  → Run cross-service-matcher.py (backend default)
+```
+
+#### Backend Mode (default)
+
 ```bash
 python3 "$SKILL_DIR/cross-service-matcher.py" "$PROJECT_ROOT" \
   --services="${INTEGRATED_SERVICES[*]}" \
@@ -36,9 +47,30 @@ The script reads KG files from all integrated services and performs deterministi
   - `relationships[]`: RPC and database matches (caller/callee format, for `crossServiceCalls`)
   - `eventFlows[]`: Kafka/event matches **pre-aggregated by topic** (topic/publisher/subscribers format, directly usable in `architecture.json`)
 
+#### Mobile Mode (REPO_TYPE=mobile)
+
+```bash
+python3 "$SKILL_DIR/feature-parity-matcher.py" "$PROJECT_ROOT" \
+  --services="${INTEGRATED_SERVICES[*]}" \
+  --output="$PROJECT_ROOT/.understand-anything/tmp/cross-service-candidates.json"
+```
+
+The script analyzes cross-platform feature relationships (NOT RPC/Event/DB):
+- Matches domains across platforms by name similarity (exact, fuzzy, semantic)
+- Detects shared SDKs (PhotonIM, Agora, Firebase, etc.) across platforms
+- Detects Flutter↔Native bridge channels (FlutterBoost, MethodChannel)
+- Outputs:
+  - `domainMappings[]`: Cross-platform domain equivalence candidates
+  - `sharedSdks[]`: SDKs shared across platforms
+  - `bridgeChannels[]`: Native bridge communication channels
+
 ### Step 3 — LLM Review + Supplement + Organize (Layer 2, Always Execute)
 
 The main skill (YOU, the executing agent) performs the LLM layer directly — no separate agent dispatch needed because the data is lightweight.
+
+**Branching by REPO_TYPE:**
+
+#### Backend Mode (default)
 
 **Input for LLM analysis:**
 - Script output: `relationships` (RPC/DB) and `eventFlows` (events) with evidence
@@ -51,6 +83,25 @@ The main skill (YOU, the executing agent) performs the LLM layer directly — no
 1. **Verify** script matches — confirm they are real interactions (remove false positives)
 2. **Discover** missed relationships — identify cross-service calls the script couldn't detect (non-standard RPC, dynamic dispatch, event-driven patterns)
 3. **Organize** into business flows — group related cross-service calls into end-to-end process flows (e.g., "Order Creation Flow" spanning order-service → payment-service → inventory-service)
+
+#### Mobile Mode (REPO_TYPE=mobile)
+
+**Input for LLM analysis:**
+- Script output `confirmedMappings`: exact slug matches (high confidence, pre-verified)
+- Script output `candidateMappings`: fuzzy/semantic matches (need LLM verification)
+- Script output `domainSummaries`: per-platform domain summaries WITH descriptions — **this is the primary input for semantic matching**
+- Script output `sharedSdks` and `bridgeChannels`
+
+**LLM tasks:**
+1. **Verify** candidate mappings — using domain summaries, confirm whether fuzzy/semantic matches truly represent the same feature. Remove false positives (e.g., "audio_chatroom" matched "account-profile" by token overlap is clearly wrong)
+2. **Discover** missed mappings — review ALL domain summaries across platforms and identify feature equivalences the script missed. Focus on domains with:
+   - Completely different naming but same business function (use summaries to determine)
+   - Split domains on one platform that map to a single domain on another
+   - Example: "即时通讯" (iOS: PhotonIM + WCDB) ↔ "即时通讯与私信" (Android: PhotonIM + MVVM) — same feature despite different domain names
+3. **Enrich** feature parity matrix — for each confirmed mapping, produce `featureParity` entries with implementation detail descriptions drawn from domain summaries
+4. **Organize** shared infrastructure — consolidate shared SDK usage and bridge channel information
+
+**Key principle:** The script provides candidates and context (summaries); the LLM does the semantic reasoning. This division avoids false positives from naive text matching while leveraging the script's ability to quickly scan all data.
 
 ### Step 4 — Generate Parent Wiki
 
@@ -110,6 +161,8 @@ mkdir -p "$PROJECT_ROOT/.understand-anything/wiki/domains"
 > When generating multi-facet overview, merge service details from each facet's own `overview.json`.
 
 2. **`architecture.json`** — Cross-service architecture:
+
+**Backend Mode:**
 ```json
 {
   "crossServiceCalls": [
@@ -139,7 +192,46 @@ mkdir -p "$PROJECT_ROOT/.understand-anything/wiki/domains"
 > They MUST NOT use `caller` / `callee` — those fields are only valid inside `crossServiceCalls[]`.
 > The quality gate will reject `eventFlows` entries that use the wrong schema.
 
-3. **`domains/<cross-domain>.json`** — Cross-service business flow pages:
+**Mobile Mode (REPO_TYPE=mobile):**
+```json
+{
+  "crossServiceCalls": [],
+  "sharedResources": [],
+  "eventFlows": [],
+  "featureParity": [
+    {
+      "feature": "即时通讯",
+      "platforms": {
+        "ios": { "service": "Amar", "domain": "instant-messaging", "impl": "PhotonIM SDK + WCDB 本地持久化" },
+        "android": { "service": "ddoversea", "domain": "im-chat", "impl": "PhotonIM SDK + MVVM 架构" },
+        "flutter": { "service": "ddoversea_flutter", "domain": "group-chat", "impl": "MethodChannel 桥接原生 IM SDK" }
+      }
+    }
+  ],
+  "sharedInfrastructure": [
+    { "type": "im_sdk", "resource": "PhotonIM SDK", "platforms": ["ios", "android"], "detail": "双端共享 PhotonIM 即时通讯 SDK" }
+  ],
+  "nativeBridge": [
+    { "type": "flutter_channel", "from": "ddoversea", "to": "ddoversea_flutter", "mechanism": "FlutterBoost + MethodChannel", "detail": "Flutter 模块通过 FlutterBoost 嵌入 Android 壳" }
+  ],
+  "domainMapping": [
+    { "canonicalFeature": "即时通讯", "mappings": { "Amar": "domain:instant-messaging", "ddoversea": "domain:im-chat" } }
+  ]
+}
+```
+
+> **Mobile Mode Notes:**
+> - `crossServiceCalls[]` and `eventFlows[]` are kept as empty arrays for schema compatibility.
+> - `featureParity[]` is the core mobile cross-platform view — each entry shows how the same feature is implemented differently across platforms.
+> - `sharedInfrastructure[]` documents SDKs/APIs shared across platforms.
+> - `nativeBridge[]` documents Flutter↔Native communication channels.
+> - `domainMapping[]` provides machine-readable cross-platform domain equivalences for Dashboard navigation.
+> - The Quality Gate validates `featureParity` structure when present.
+
+3. **`domains/<cross-domain>.json`** — Cross-service business flow pages **(Backend Mode only)**:
+
+> **Mobile Mode:** Skip cross-domain page generation entirely. Mobile platforms don't have cross-service business flows — the "cross-platform" relationship is captured in `featureParity[]` within `architecture.json`.
+
 ```json
 {
   "id": "cross-domain:order-creation",

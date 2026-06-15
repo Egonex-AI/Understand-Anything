@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { serviceOverviewToMarkdown, domainPageToMarkdown } from "../wikiToMarkdown";
+import type { ClientGraph } from "@understand-anything/core";
+import { serviceOverviewToMarkdown, domainPageToMarkdown, clientGraphToMarkdown } from "../wikiToMarkdown";
 
 describe("serviceOverviewToMarkdown", () => {
   it("renders a complete service overview", () => {
@@ -121,5 +122,84 @@ describe("domainPageToMarkdown", () => {
     expect(md).toContain("Nothing here yet.");
     expect(md).not.toContain("## Key Entities");
     expect(md).not.toContain("## Flows");
+  });
+});
+
+describe("clientGraphToMarkdown", () => {
+  it("renders platform implementation table and domain links", () => {
+    const data: ClientGraph = {
+      platforms: ["Amar", "ddoversea", "ddoversea_flutter"],
+      crossPlatformFrameworks: ["flutter"],
+      featureMap: [
+        {
+          domain: "即时通讯",
+          implType: "platform-specific",
+          implementations: { Amar: { framework: "native", ref: "mobile/Amar/.understand-anything/wiki/domains/im.json" } },
+        },
+        {
+          domain: "家族运营",
+          implType: "cross-platform",
+          implementations: { ddoversea_flutter: { framework: "flutter", ref: "mobile/ddoversea_flutter/.understand-anything/wiki/domains/family.json" } },
+        },
+      ],
+      domainLinks: [
+        {
+          canonicalFeature: "即时通讯",
+          mappings: { Amar: "domain:instant-messaging", ddoversea: "domain:im-chat" },
+        },
+      ],
+    };
+
+    const md = clientGraphToMarkdown(data);
+    expect(md).toContain("## 平台实现分布");
+    expect(md).toContain("| 功能域 | 实现类型 | Amar | ddoversea | ddoversea_flutter |");
+    expect(md).toContain("| 即时通讯 | platform-specific | native | - | - |");
+    expect(md).toContain("| 家族运营 | cross-platform | - | - | flutter |");
+    expect(md).toContain("## 跨平台域映射");
+    expect(md).toContain("| 即时通讯 | instant-messaging | im-chat |");
+  });
+
+  it("returns empty string when no feature map or domain links", () => {
+    expect(clientGraphToMarkdown({ platforms: [], featureMap: [] })).toBe("");
+  });
+});
+
+describe("businessFeaturesToMarkdown", () => {
+  const { businessFeaturesToMarkdown } = require("../wikiToMarkdown");
+
+  it("renders feature overview table with server associations", () => {
+    const data = {
+      features: [
+        {
+          id: "feature:即时通讯",
+          name: "即时通讯",
+          clientLayer: {
+            implType: "cross-platform",
+            platforms: { Amar: {}, ddoversea: {} },
+            deliveryPlatforms: ["Amar", "ddoversea"],
+            summary: "IM功能",
+          },
+          serverLayer: {
+            primaryDomain: { name: "Cosmos IM", service: "ultron-group-chat", confidence: 0.95 },
+            supportingDomains: [{ name: "用户关系", service: "ultron-relation", relationship: "depends_on", confidence: 0.7 }],
+          },
+        },
+      ],
+      serverIndex: { "Cosmos IM": { features: ["即时通讯"], refCount: 1, service: "ultron-group-chat" } },
+      stats: { totalFeatures: 1, withServerAssociation: 1, serverDomainsReferenced: 1 },
+    };
+
+    const md = businessFeaturesToMarkdown(data);
+    expect(md).toContain("# 业务功能全景");
+    expect(md).toContain("| 即时通讯 | cross-platform |");
+    expect(md).toContain("Cosmos IM");
+    expect(md).toContain("95%");
+    expect(md).toContain("```mermaid");
+    expect(md).toContain("flowchart LR");
+    expect(md).toContain("## 服务端域引用统计");
+  });
+
+  it("returns empty string for empty features", () => {
+    expect(businessFeaturesToMarkdown({ features: [], serverIndex: {}, stats: { totalFeatures: 0, withServerAssociation: 0, serverDomainsReferenced: 0 } })).toBe("");
   });
 });

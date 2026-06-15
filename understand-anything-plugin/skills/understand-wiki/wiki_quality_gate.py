@@ -342,6 +342,34 @@ def _validate_parent_architecture(
                     f"architecture.json: eventFlows[{i}] missing non-empty subscribers array"
                 )
 
+    # Mobile schema validation (featureParity, sharedInfrastructure, nativeBridge)
+    feature_parity = arch.get("featureParity")
+    if isinstance(feature_parity, list):
+        if len(feature_parity) == 0:
+            warnings.append("architecture.json: featureParity is empty")
+        for i, fp in enumerate(feature_parity):
+            if not isinstance(fp, dict):
+                issues.append(f"architecture.json: featureParity[{i}] is not an object")
+                continue
+            if not fp.get("feature"):
+                issues.append(f"architecture.json: featureParity[{i}] missing 'feature' field")
+            if not isinstance(fp.get("platforms"), dict):
+                issues.append(f"architecture.json: featureParity[{i}] missing 'platforms' dict")
+    elif feature_parity is not None:
+        issues.append("architecture.json: featureParity must be an array if present")
+
+    shared_infra = arch.get("sharedInfrastructure")
+    if isinstance(shared_infra, list) and len(shared_infra) == 0:
+        warnings.append("architecture.json: sharedInfrastructure is empty")
+    elif shared_infra is not None and not isinstance(shared_infra, list):
+        issues.append("architecture.json: sharedInfrastructure must be an array if present")
+
+    native_bridge = arch.get("nativeBridge")
+    if isinstance(native_bridge, list) and len(native_bridge) == 0:
+        warnings.append("architecture.json: nativeBridge is empty")
+    elif native_bridge is not None and not isinstance(native_bridge, list):
+        issues.append("architecture.json: nativeBridge must be an array if present")
+
 
 def _validate_cross_domain_pages(
     domain_dir: str,

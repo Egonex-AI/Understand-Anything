@@ -51,6 +51,24 @@ describe("wiki handler", () => {
     expect((res?.body as { name: string }).name).toBe("Parent")
   })
 
+  it("GET /api/wiki/architecture includes client-graph when present", async () => {
+    writeJson(path.join(dir, ".understand-anything/wiki/architecture.json"), {
+      crossServiceCalls: [],
+      sharedResources: [],
+      eventFlows: [],
+    })
+    writeJson(path.join(dir, ".understand-anything/client-graph.json"), {
+      platforms: ["Amar"],
+      featureMap: [{ domain: "IM", implType: "platform-specific", implementations: { Amar: { framework: "native" } } }],
+    })
+
+    const res = await handleWikiRequest({ pathname: "/api/wiki/architecture", searchParams: new URLSearchParams() }, ctx)
+    expect(res?.statusCode).toBe(200)
+    const body = res?.body as Record<string, unknown>
+    expect(body._clientGraph).toBeDefined()
+    expect((body._clientGraph as { platforms: string[] }).platforms).toEqual(["Amar"])
+  })
+
   it("blocks null byte injection in /wiki/ path", async () => {
     const res = await handleWikiRequest(
       { pathname: "/wiki/foo\0../../etc/passwd", searchParams: new URLSearchParams() },

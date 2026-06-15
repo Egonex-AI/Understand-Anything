@@ -1,4 +1,4 @@
-import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, CrossServiceCall, WikiOverview, WikiArchitecture, WikiCrossDomain, WikiEntity, WikiGlossaryEntry, WikiBusinessRule, WikiIntegrationPoints, ServiceEndpointDoc } from "@understand-anything/core";
+import type { WikiDomainPage, WikiFlow, WikiFlowStep, WikiServiceOverview, CrossServiceCall, WikiOverview, WikiArchitecture, WikiCrossDomain, WikiEntity, WikiGlossaryEntry, WikiBusinessRule, WikiIntegrationPoints, ServiceEndpointDoc, ClientGraph, BusinessFeaturesDocument, BusinessFeature } from "@understand-anything/core";
 import type { Locale } from "../locales";
 import { en } from "../locales/en";
 
@@ -238,6 +238,147 @@ function architectureToMermaidDiagram(data: WikiArchitecture): string {
   }
 
   lines.push("```");
+  return lines.join("\n");
+}
+
+function nativeBridgeToMermaidDiagram(bridges: NonNullable<WikiArchitecture["nativeBridge"]>): string {
+  if (bridges.length === 0) return "";
+
+  const bridgeId = (s: string) => s.replace(/[^a-zA-Z0-9]/g, "_");
+  const lines: string[] = ["```mermaid", "graph LR"];
+  const seen = new Set<string>();
+
+  for (const bridge of bridges) {
+    for (const node of [bridge.from, bridge.to]) {
+      if (node && !seen.has(node)) {
+        lines.push(`    ${bridgeId(node)}["${sanitizeMermaidLabel(node)}"]`);
+        seen.add(node);
+      }
+    }
+  }
+
+  for (const bridge of bridges) {
+    if (!bridge.from || !bridge.to) continue;
+    const mechanism = sanitizeMermaidLabel(bridge.mechanism || bridge.type || "");
+    lines.push(`    ${bridgeId(bridge.from)} -->|"${mechanism}"| ${bridgeId(bridge.to)}`);
+  }
+
+  lines.push("```");
+  return lines.join("\n");
+}
+
+function mobileArchitectureToMarkdown(data: WikiArchitecture): string {
+  const featureParity = Array.isArray(data?.featureParity) ? data.featureParity : [];
+  if (featureParity.length === 0) return "";
+
+  const lines: string[] = [];
+  const sharedInfrastructure = Array.isArray(data?.sharedInfrastructure) ? data.sharedInfrastructure : [];
+  const nativeBridge = Array.isArray(data?.nativeBridge) ? data.nativeBridge : [];
+  const domainMapping = Array.isArray(data?.domainMapping) ? data.domainMapping : [];
+
+  lines.push("## 功能对等矩阵");
+  lines.push("");
+  lines.push("| 功能 | iOS | Android | Flutter | 备注 |");
+  lines.push("|------|-----|---------|---------|------|");
+  for (const entry of featureParity) {
+    const ios = entry.platforms?.ios?.impl ?? "";
+    const android = entry.platforms?.android?.impl ?? "";
+    const flutter = entry.platforms?.flutter?.impl ?? "";
+    const note = entry.note ?? "";
+    lines.push(`| ${escapeTableCell(entry.feature ?? "")} | ${escapeTableCell(ios)} | ${escapeTableCell(android)} | ${escapeTableCell(flutter)} | ${escapeTableCell(note)} |`);
+  }
+  lines.push("");
+
+  if (sharedInfrastructure.length > 0) {
+    lines.push("## 共享基础设施");
+    lines.push("");
+    for (const item of sharedInfrastructure) {
+      const platforms = Array.isArray(item.platforms) ? item.platforms.join(", ") : "";
+      lines.push(`- **${item.resource ?? "?"}** (${item.type ?? "?"}): ${item.detail ?? ""} — ${platforms}`);
+    }
+    lines.push("");
+  }
+
+  if (nativeBridge.length > 0) {
+    const bridgeDiagram = nativeBridgeToMermaidDiagram(nativeBridge);
+    if (bridgeDiagram) {
+      lines.push("## 原生桥接");
+      lines.push("");
+      lines.push(bridgeDiagram);
+      lines.push("");
+    }
+  }
+
+  if (domainMapping.length > 0) {
+    const serviceSet = new Set<string>();
+    for (const entry of domainMapping) {
+      for (const svc of Object.keys(entry.mappings ?? {})) {
+        serviceSet.add(svc);
+      }
+    }
+    const services = [...serviceSet].sort();
+    lines.push("## 跨平台域映射");
+    lines.push("");
+    lines.push(`| 功能 | ${services.join(" | ")} |`);
+    lines.push(`|------|${services.map(() => "------").join("|")}|`);
+    for (const entry of domainMapping) {
+      const cells = services.map(svc => {
+        const val = entry.mappings?.[svc] ?? "";
+        return escapeTableCell(val.replace(/^domain:/, ""));
+      });
+      lines.push(`| ${escapeTableCell(entry.canonicalFeature ?? "")} | ${cells.join(" | ")} |`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+export function clientGraphToMarkdown(data: ClientGraph): string {
+  const featureMap = Array.isArray(data?.featureMap) ? data.featureMap : [];
+  const domainLinks = Array.isArray(data?.domainLinks) ? data.domainLinks : [];
+  if (featureMap.length === 0 && domainLinks.length === 0) return "";
+
+  const lines: string[] = [];
+  const platforms = Array.isArray(data?.platforms) ? data.platforms : [];
+
+  if (featureMap.length > 0 && platforms.length > 0) {
+    lines.push("## 平台实现分布");
+    lines.push("");
+    lines.push(`| 功能域 | 实现类型 | ${platforms.join(" | ")} |`);
+    lines.push(`|--------|----------|${platforms.map(() => "------").join("|")}|`);
+    for (const entry of featureMap) {
+      const cells = platforms.map((platform) => {
+        const impl = entry.implementations?.[platform];
+        return escapeTableCell(impl?.framework ?? "-");
+      });
+      lines.push(`| ${escapeTableCell(entry.domain ?? "")} | ${escapeTableCell(entry.implType ?? "")} | ${cells.join(" | ")} |`);
+    }
+    lines.push("");
+  }
+
+  if (domainLinks.length > 0) {
+    const serviceSet = new Set<string>();
+    for (const entry of domainLinks) {
+      for (const svc of Object.keys(entry.mappings ?? {})) {
+        serviceSet.add(svc);
+      }
+    }
+    const services = [...serviceSet].sort();
+    lines.push("## 跨平台域映射");
+    lines.push("");
+    lines.push(`| 功能 | ${services.join(" | ")} |`);
+    lines.push(`|------|${services.map(() => "------").join("|")}|`);
+    for (const entry of domainLinks) {
+      const cells = services.map((svc) => {
+        const val = entry.mappings?.[svc] ?? "";
+        return escapeTableCell(val.replace(/^domain:/, ""));
+      });
+      lines.push(`| ${escapeTableCell(entry.canonicalFeature ?? "")} | ${cells.join(" | ")} |`);
+    }
+    lines.push("");
+  }
+
   return lines.join("\n");
 }
 
@@ -561,6 +702,11 @@ export function architectureToMarkdown(data: WikiArchitecture, labels: WikiLabel
       lines.push(`- [${res.type ?? "unknown"}] **${res.name}** — used by: ${svcList}`);
     }
     lines.push("");
+  }
+
+  const mobileMd = mobileArchitectureToMarkdown(data);
+  if (mobileMd) {
+    lines.push(mobileMd);
   }
 
   return lines.join("\n");
@@ -986,6 +1132,143 @@ export function endpointIndexToMarkdown(index: Record<string, unknown>, labels: 
       const pubs = (t.publishers ?? []).map((s: string) => `[${s}](wiki://${s}/endpoints)`).join(", ");
       const subs = (t.subscribers ?? []).map((s: string) => `[${s}](wiki://${s}/endpoints)`).join(", ");
       lines.push(`| \`${topic}\` | ${pubs || "—"} | ${subs || "—"} |`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+export function businessFeaturesToMarkdown(data: BusinessFeaturesDocument): string {
+  const features = Array.isArray(data?.features) ? data.features : [];
+  if (features.length === 0) return "";
+
+  const lines: string[] = [];
+  const stats = data.stats;
+
+  lines.push("# 业务功能全景");
+  lines.push("");
+  lines.push(`> ${stats?.totalFeatures ?? 0} 个业务功能，${stats?.withServerAssociation ?? 0} 个已关联后端，涉及 ${stats?.serverDomainsReferenced ?? 0} 个服务端域`);
+  lines.push("");
+
+  // Feature overview table
+  lines.push("## 功能概览");
+  lines.push("");
+  lines.push("| 功能 | 类型 | 平台 | 主要后端域 | 置信度 |");
+  lines.push("|------|------|------|-----------|--------|");
+  for (const f of features) {
+    const implType = f.clientLayer?.implType ?? "unknown";
+    const platforms = Object.keys(f.clientLayer?.platforms ?? {}).join(", ");
+    const primary = f.serverLayer?.primaryDomain;
+    const serverName = primary?.name ?? "—";
+    const conf = primary?.confidence != null ? `${Math.round(primary.confidence * 100)}%` : "—";
+    lines.push(`| ${escapeTableCell(f.name)} | ${implType} | ${escapeTableCell(platforms)} | ${escapeTableCell(serverName)} | ${conf} |`);
+  }
+  lines.push("");
+
+  // Feature-Server dependency graph (Mermaid)
+  const featuresWithServer = features.filter(f => f.serverLayer?.primaryDomain);
+  if (featuresWithServer.length > 0) {
+    lines.push("## 功能-服务依赖图");
+    lines.push("");
+    lines.push("```mermaid");
+    lines.push("flowchart LR");
+    lines.push("  subgraph Client[\"客户端功能\"]");
+    for (const f of featuresWithServer) {
+      const fid = f.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+      lines.push(`    ${fid}["${f.name}"]`);
+    }
+    lines.push("  end");
+    lines.push("  subgraph Server[\"服务端域\"]");
+    const serverNodes = new Set<string>();
+    for (const f of featuresWithServer) {
+      const primary = f.serverLayer?.primaryDomain;
+      if (primary) serverNodes.add(primary.name);
+      for (const s of f.serverLayer?.supportingDomains ?? []) {
+        serverNodes.add(s.name);
+      }
+    }
+    for (const sn of serverNodes) {
+      const sid = sn.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+      lines.push(`    ${sid}["${sn}"]`);
+    }
+    lines.push("  end");
+    for (const f of featuresWithServer) {
+      const fid = f.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+      const primary = f.serverLayer?.primaryDomain;
+      if (primary) {
+        const sid = primary.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+        lines.push(`  ${fid} -->|"primary"| ${sid}`);
+      }
+      for (const s of f.serverLayer?.supportingDomains ?? []) {
+        const sid = s.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, "_");
+        lines.push(`  ${fid} -.->|"${s.relationship}"| ${sid}`);
+      }
+    }
+    lines.push("```");
+    lines.push("");
+  }
+
+  // Server domain reverse index
+  const serverIndex = data.serverIndex ?? {};
+  const sortedServers = Object.entries(serverIndex).sort((a, b) => b[1].refCount - a[1].refCount);
+  if (sortedServers.length > 0) {
+    lines.push("## 服务端域引用统计");
+    lines.push("");
+    lines.push("| 后端域 | 服务 | 引用功能数 | 关联功能 |");
+    lines.push("|--------|------|-----------|----------|");
+    for (const [domain, info] of sortedServers) {
+      const featureList = info.features.join(", ");
+      lines.push(`| ${escapeTableCell(domain)} | ${escapeTableCell(info.service)} | ${info.refCount} | ${escapeTableCell(featureList)} |`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+export function featureDetailToMarkdown(feature: BusinessFeature): string {
+  const lines: string[] = [];
+
+  lines.push(`# ${feature.name}`);
+  lines.push("");
+
+  // Client layer
+  lines.push("## 客户端实现");
+  lines.push("");
+  lines.push(`- **实现类型:** ${feature.clientLayer?.implType ?? "unknown"}`);
+  lines.push(`- **覆盖平台:** ${feature.clientLayer?.deliveryPlatforms?.join(", ") ?? "—"}`);
+  lines.push("");
+
+  const platforms = feature.clientLayer?.platforms ?? {};
+  if (Object.keys(platforms).length > 0) {
+    lines.push("| 平台 | 域名 | 摘要 |");
+    lines.push("|------|------|------|");
+    for (const [platform, info] of Object.entries(platforms)) {
+      const dName = info?.domainName ?? "—";
+      const summary = info?.summary ?? "—";
+      lines.push(`| ${platform} | ${escapeTableCell(dName)} | ${escapeTableCell(summary)} |`);
+    }
+    lines.push("");
+  }
+
+  // Server layer
+  lines.push("## 服务端依赖");
+  lines.push("");
+  const primary = feature.serverLayer?.primaryDomain;
+  if (primary) {
+    const confStr = primary.confidence != null ? `${Math.round(primary.confidence * 100)}%` : "—";
+    lines.push(`**主要后端域:** ${primary.name} (service: ${primary.service}, confidence: ${confStr})`);
+    lines.push("");
+  }
+
+  const supporting = feature.serverLayer?.supportingDomains ?? [];
+  if (supporting.length > 0) {
+    lines.push("| 辅助域 | 服务 | 关系 | 置信度 |");
+    lines.push("|--------|------|------|--------|");
+    for (const s of supporting) {
+      const sConf = s.confidence != null ? `${Math.round(s.confidence * 100)}%` : "—";
+      lines.push(`| ${escapeTableCell(s.name)} | ${escapeTableCell(s.service)} | ${s.relationship} | ${sConf} |`);
     }
     lines.push("");
   }

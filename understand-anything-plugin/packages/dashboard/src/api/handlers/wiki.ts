@@ -26,7 +26,11 @@ export async function handleWikiRequest(
     if (apiPath === "/architecture") {
       const data = ws.getArchitecture()
       if (!data) return { statusCode: 404, body: { error: "No parent wiki architecture found" } }
-      return { statusCode: 200, body: data }
+      const clientGraph = ws.getClientGraph()
+      return {
+        statusCode: 200,
+        body: clientGraph ? { ...data, _clientGraph: clientGraph } : data,
+      }
     }
     if (apiPath === "/services") {
       return { statusCode: 200, body: ws.getServices() }
@@ -81,7 +85,11 @@ export async function handleWikiRequest(
         const svcName = decodeURIComponent(svcArchMatch[1])
         const data = ws.getServiceArchitecture(svcName)
         if (!data) return { statusCode: 404, body: { error: "Service architecture not found" } }
-        return { statusCode: 200, body: data }
+        const clientGraph = ws.getClientGraph(svcName)
+        return {
+          statusCode: 200,
+          body: clientGraph ? { ...data, _clientGraph: clientGraph } : data,
+        }
       } catch {
         return { statusCode: 400, body: { error: "Invalid URL encoding" } }
       }

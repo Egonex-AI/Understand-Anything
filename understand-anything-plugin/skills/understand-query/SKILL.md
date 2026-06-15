@@ -108,7 +108,7 @@ python ua_query.py trace --service svc-b --query "keyword" --source
 | `callees` | What does this symbol call? (outbound `calls` edges) | [graph-analysis.md](docs/graph-analysis.md#callers--callees--call-graph-navigation) |
 | `hotspots` | Server-side fan-in/fan-out scoring for critical nodes | [graph-analysis.md](docs/graph-analysis.md#hotspots--code-hotspot-scoring) |
 | `affected` | Find test files affected by changes to given source files | [graph-analysis.md](docs/graph-analysis.md#affected--affected-test-discovery) |
-| `business` | Business landscape: domains, interactions, rules | [business-domain.md](docs/business-domain.md) |
+| `business` | Business landscape: features, domains, interactions, rules | [business-domain.md](docs/business-domain.md) |
 | `wiki` | Wiki pages, architecture, endpoints, flows | [business-domain.md](docs/business-domain.md) |
 | `domain` | Domain graph: flows, steps, neighbors | [business-domain.md](docs/business-domain.md) |
 | `services` | Service discovery and data layer readiness | [reference.md](docs/reference.md) |
@@ -183,7 +183,7 @@ python ua_query.py ask --query "家族,Family" --service ultron-relation --depth
 | Layer | Subcommand | Answers |
 |-------|-----------|---------|
 | 0. Service Discovery | `services --list` | What services exist? Which data layers are ready? |
-| 1. Business Overview | `business --list` | What business domains exist? |
+| 1. Business Overview | `business --features` / `business --list` | What business features/domains exist? |
 | 2. Domain Interactions | `business --domain X --type interactions` | How do users interact with domain X? |
 | 3. Wiki Detail | `wiki --service S --domain D` | Technical implementation of domain D? |
 | 4. Domain Graph | `domain --service S --flow F` | Business flow structure and steps? |
@@ -208,7 +208,7 @@ python ua_query.py ask --query "家族,Family" --service ultron-relation --depth
 | Call Graph | "Who calls X?" / "What does X call?" | `callers --symbol X` or `callees --symbol X` |
 | Code Hotspots | "What are the most critical classes?" | `hotspots --type class --limit 20` |
 | Test Impact | "Which tests break if I change these files?" | `affected --files path1,path2` |
-| Cross-Platform | "Client/server don't sync" | `business --panorama` → `trace` per service |
+| Cross-Platform | "Client/server don't sync" | `business --features` → `business --domain X --type interactions` → `trace` per service |
 | Architecture | "How is system structured?" | `wiki --architecture` → `services --list` |
 | Data Quality | "Is KB data reliable?" | `meta --stale` |
 | Code-Level Detail | "Find all @X annotations" | `structure --annotation X` |
@@ -226,7 +226,7 @@ When a command returns empty or unexpected results, follow the fallback chain:
 | `structure --symbol X` returns empty | Symbol name doesn't match exactly | 1. Try `structure --q "X"` for fuzzy search 2. Try `structure --annotation X` if it might be an annotation 3. Try `kg --service S --search "X"` to find the node first |
 | `kg --neighbors X` returns "node not found" | Node name is wrong or not in KG | 1. Run `kg --service S --search "X"` to find exact name 2. Check "Did you mean" suggestions in error output 3. Try partial name match |
 | `impact` / `callers` / `callees` returns empty | Symbol exists but has no edges in specified direction | 1. Try `--direction both` 2. Try without `--edge-type` filter 3. Check if symbol is in the KG: `kg --service S --search "X"` |
-| `business --domain X` returns 404 | Domain slug or name doesn't match | 1. Run `business --list` to see exact domain names 2. Try Chinese name directly: `--domain "中文名"` |
+| `business --domain X` returns 404 | Domain slug or name doesn't match | 1. Run `business --features` or `business --list` to see exact names 2. Try Chinese name directly: `--domain "中文名"` |
 | `wiki --service S --domain D` returns 404 | Domain not indexed for this service | 1. Run `wiki --service S` to see available domains 2. Try `wiki --search "D"` across all services |
 | `trace --auto-discover` picks wrong service | Ambiguous keywords match multiple services | 1. Use `ask --service S --query "..."` to override 2. Add more specific keywords (e.g., include class name) |
 | API server unreachable (exit 2) | Server not running | Report to user: "Start the API server with `pnpm run serve`". Do NOT attempt auto-start. |
@@ -260,6 +260,7 @@ The CLI uses `http://172.18.228.71:3001` as the default API server.
 | `trace --source --business` | 1500–4000 | Primary exploration |
 | `services --list` | 200 | Always safe |
 | `business --search Q` | 300 | Prefer over `--list` |
+| `business --features` | 300–800 | Feature-centric overview (client-server projects) |
 | `kg --neighbors X` (depth=1) | 500–1500 | Primary traversal |
 | `impact --depth 3` | 800–3000 | Transitive impact (prefer over manual BFS) |
 | `callers` / `callees` (depth=1) | 300–800 | Direct call graph |
@@ -282,6 +283,7 @@ Agents receiving natural-language questions (Chinese or English) can map directl
 | "Business rules for X?" / "X的业务规则？" | `business --domain X --type rules` | Business rule query |
 | "How do users interact with X?" / "X的用户交互？" | `business --domain X --type interactions` | User interaction steps |
 | "Business landscape overview" / "业务全景？" | `business --panorama` | All facets and services |
+| "What features exist?" / "有哪些业务功能？" | `business --features` | Feature-centric view with server associations (client-server projects) |
 | "What services exist?" / "有哪些服务？" | `services --list` | Service discovery + data layer readiness |
 | **Code Location & Source** |||
 | "Where is X implemented?" / "X在哪里实现？" | `trace --auto-discover --query "X,English" --source` | Auto-locates service + source |

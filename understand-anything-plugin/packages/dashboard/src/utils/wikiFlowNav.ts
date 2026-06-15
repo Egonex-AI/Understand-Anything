@@ -1,4 +1,4 @@
-export type WikiPageType = "service" | "domain" | "overview" | "architecture" | "cross-domain" | "endpoint";
+export type WikiPageType = "service" | "domain" | "overview" | "architecture" | "cross-domain" | "endpoint" | "feature-graph";
 
 export interface WikiTarget {
   type: WikiPageType;

@@ -9,6 +9,8 @@ import json
 import sys
 from pathlib import Path
 
+from detect_platforms import build_mobile_services, detect_platform_type
+
 
 def detect_facets(project_root: Path) -> list[dict]:
     """Scan project root for recognizable facet patterns."""
@@ -24,9 +26,16 @@ def detect_facets(project_root: Path) -> list[dict]:
             continue
         facet_type = _guess_type(d)
         facet = {'id': d.name, 'path': f'{d.name}/', 'type': facet_type}
-        sub_paths = _detect_sub_paths(d)
+        sub_paths = _detect_sub_paths(d, facet_type)
         if sub_paths:
             facet['subPaths'] = sub_paths
+            if facet_type == 'mobile':
+                services, platform_mapping = build_mobile_services(
+                    project_root, facet['path'], sub_paths
+                )
+                facet['services'] = services
+                if platform_mapping:
+                    facet['platformMapping'] = platform_mapping
         facets.append(facet)
     return facets
 
@@ -43,12 +52,17 @@ def _guess_type(d: Path) -> str:
     return 'backend'
 
 
-def _detect_sub_paths(d: Path) -> list[str]:
-    """Detect sub-platform directories for mobile facets."""
-    known = ['android', 'ios', 'flutter', 'react-native']
+def _detect_sub_paths(d: Path, facet_type: str) -> list[str]:
+    """Detect sub-platform directories for facets with multiple clients."""
+    known = {'android', 'ios', 'flutter', 'react-native'}
     found = []
     for sub in sorted(d.iterdir()):
-        if sub.is_dir() and sub.name.lower() in known:
+        if not sub.is_dir() or sub.name.startswith('.'):
+            continue
+        if facet_type == 'mobile':
+            if sub.name.lower() in known or detect_platform_type(str(sub))["platform"] != "unknown":
+                found.append(sub.name)
+        elif sub.name.lower() in known:
             found.append(f'{sub.name}/')
     return found
 

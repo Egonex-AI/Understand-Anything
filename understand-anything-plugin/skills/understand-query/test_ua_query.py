@@ -91,6 +91,16 @@ class TestFormatOutput(unittest.TestCase):
         assert "Ask:" in result
         assert "How does auth work?" in result
 
+    @patch("_utils._format_business_features", return_value="# 业务功能全景\n")
+    def test_md_business_features(self, mock_formatter):
+        data = {
+            "features": [{"name": "Auth", "clientLayer": {}, "serverLayer": {}}],
+            "serverIndex": {"auth": {"service": "auth-svc", "features": ["Auth"], "refCount": 1}},
+        }
+        result = format_output(data, "md")
+        mock_formatter.assert_called_once_with(data)
+        assert "# 业务功能全景" in result
+
 
 # ──────────────────────────────────────────────
 # parse_args
@@ -124,6 +134,11 @@ class TestParseArgs(unittest.TestCase):
         args = parse_args(["business", "--search", "order"])
         assert args.command == "business"
         assert args.search == "order"
+
+    def test_business_features(self):
+        args = parse_args(["business", "--features"])
+        assert args.command == "business"
+        assert args.features is True
 
     def test_trace_basic(self):
         args = parse_args(["trace", "--query", "auth,认证", "--service", "svc"])
@@ -590,6 +605,39 @@ class TestCmdBusiness(unittest.TestCase):
         from ua_query import cmd_business
         result = cmd_business(args)
         assert "domains" in result
+
+    @patch("_helpers.fetch_json")
+    def test_features(self, mock_fetch):
+        mock_fetch.return_value = {
+            "features": [{"name": "Auth", "clientLayer": {}, "serverLayer": {}}],
+            "serverIndex": {"auth": {"service": "auth-svc", "features": ["Auth"], "refCount": 1}},
+            "stats": {"totalFeatures": 1, "withServerAssociation": 1, "serverDomainsReferenced": 1},
+        }
+        args = parse_args(["business", "--features"])
+        from ua_query import cmd_business
+        result = cmd_business(args)
+        call_url = mock_fetch.call_args[0][0]
+        assert "/api/business/features" in call_url
+        assert "features" in result
+        assert "serverIndex" in result
+
+    @patch("_helpers.fetch_json")
+    def test_platform_drilldown(self, mock_fetch):
+        mock_fetch.return_value = {
+            "feature": {"id": "feature:voice-room", "name": "语聊房"},
+            "platform": "android",
+            "repoName": "ddoversea",
+            "platformDetail": {"name": "语音房", "summary": "Android voice room"},
+        }
+        args = parse_args(["business", "--domain", "语聊房", "--platform", "android"])
+        from ua_query import cmd_business
+        result = cmd_business(args)
+        call_url = mock_fetch.call_args[0][0]
+        assert "/api/business/domains/" in call_url
+        assert "platform=android" in call_url
+        assert result["platform"] == "android"
+        assert result["repoName"] == "ddoversea"
+        assert result["platformDetail"]["name"] == "语音房"
 
 
 class TestCmdTrace(unittest.TestCase):

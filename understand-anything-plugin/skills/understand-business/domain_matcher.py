@@ -250,6 +250,185 @@ def _load_manual_mappings(project_root):
         return []
 
 
+# Infrastructure domain detection keywords
+_INFRASTRUCTURE_KEYWORDS = {'网络层', 'UI基础', 'UI 基础', '混合容器', '数据埋点', '数据与配置', '应用启动', '平台基础'}
+
+
+def _consolidate_mobile_domains(project_root: str, facet_path: str, sub_paths: list) -> dict:
+    """Consolidate multi-platform client domains into logical business domains.
+
+    For mobile facets, multiple platforms (iOS/Android/Flutter) may implement the same
+    business feature. This function merges them using domainLinks/featureParity data.
+
+    Flutter modules are not independent apps — they're embedded in native apps via bridges.
+    """
+    root = Path(project_root)
+    facet_dir = root / facet_path
+
+    # Load merge metadata
+    cg_path = facet_dir / '.understand-anything' / 'client-graph.json'
+    arch_path = facet_dir / '.understand-anything' / 'wiki' / 'architecture.json'
+
+    domain_links = []
+    native_bridges = []
+    feature_parity = []
+
+    if cg_path.exists():
+        try:
+            cg = json.loads(cg_path.read_text())
+            domain_links = cg.get('domainLinks', [])
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    if arch_path.exists():
+        try:
+            arch = json.loads(arch_path.read_text())
+            native_bridges = arch.get('nativeBridge', [])
+            feature_parity = arch.get('featureParity', [])
+            if not domain_links:
+                domain_links = arch.get('domainMapping', [])
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    # Determine Flutter bridge accessibility
+    # flutter_service -> [native services that can access it]
+    flutter_services = set()
+    bridge_targets = {}
+    for bridge in native_bridges:
+        from_svc = bridge.get('from', '')
+        to_svc = bridge.get('to', '')
+        # Identify which is Flutter
+        if 'flutter' in from_svc.lower():
+            flutter_services.add(from_svc)
+            bridge_targets.setdefault(from_svc, []).append(to_svc)
+        elif 'flutter' in to_svc.lower():
+            flutter_services.add(to_svc)
+            bridge_targets.setdefault(to_svc, []).append(from_svc)
+
+    # Build merge map: (platform, domain_id) -> canonicalFeature
+    merge_map = {}
+    for link in domain_links:
+        canonical = link.get('canonicalFeature', '')
+        for platform, ref in link.get('mappings', {}).items():
+            domain_id = ref.removeprefix('domain:') if isinstance(ref, str) else ''
+            if canonical and domain_id:
+                merge_map[(platform, domain_id)] = canonical
+
+    # Also use featureParity for domains not in domainLinks
+    for fp in feature_parity:
+        canonical = fp.get('feature', '')
+        for plat_key, plat_info in fp.get('platforms', {}).items():
+            platform_name = plat_info.get('service', '')
+            domain_id = plat_info.get('domain', '')
+            if canonical and platform_name and domain_id:
+                if (platform_name, domain_id) not in merge_map:
+                    merge_map[(platform_name, domain_id)] = canonical
+
+    # Load all raw platform domains
+    raw_domains = []
+    for sp in sub_paths:
+        platform = sp.rstrip('/')
+        wiki_dir = facet_dir / platform / '.understand-anything' / 'wiki' / 'domains'
+        if not wiki_dir.exists():
+            continue
+        for f in wiki_dir.glob('*.json'):
+            try:
+                data = json.loads(f.read_text())
+                name = data.get('name', f.stem)
+                domain_id = data.get('id', f.stem).removeprefix('domain:')
+                summary = data.get('summary', '')
+                raw_domains.append({
+                    'name': name,
+                    'platform': platform,
+                    'domainId': domain_id,
+                    'summary': summary,
+                    'file': str(f),
+                    'data': data,
+                })
+            except (json.JSONDecodeError, IOError):
+                continue
+
+    # Classify and merge
+    consolidated = {}  # canonicalName -> LogicalDomain
+    standalone = []
+    infrastructure = []
+
+    for d in raw_domains:
+        # Check infrastructure
+        is_infra = any(kw in d['name'] for kw in _INFRASTRUCTURE_KEYWORDS)
+        if is_infra:
+            infrastructure.append({
+                'name': d['name'],
+                'platform': d['platform'],
+                'domainId': d['domainId'],
+                'implType': 'infrastructure',
+                'deliveryPlatforms': [d['platform']],
+            })
+            continue
+
+        # Check if this domain should be merged
+        canonical = merge_map.get((d['platform'], d['domainId']))
+        if canonical:
+            if canonical not in consolidated:
+                consolidated[canonical] = {
+                    'name': canonical,
+                    'implType': 'cross-platform',
+                    'platforms': [],
+                    'deliveryPlatforms': [],
+                    'implementations': [],
+                    'mergedSummary': '',
+                }
+            entry = consolidated[canonical]
+            entry['platforms'].append(d['platform'])
+            entry['implementations'].append({
+                'platform': d['platform'],
+                'domainName': d['name'],
+                'domainId': d['domainId'],
+                'summary': d['summary'],
+            })
+            entry['mergedSummary'] += f" [{d['platform']}] {d['summary']}"
+        else:
+            # Standalone (platform-specific) domain
+            delivery = [d['platform']]
+            impl_type = 'native-specific'
+
+            # Flutter-only domains are accessible from native via bridge
+            if d['platform'] in flutter_services:
+                impl_type = 'flutter-only'
+                accessible_natives = bridge_targets.get(d['platform'], [])
+                delivery = list(set([d['platform']] + accessible_natives))
+
+            standalone.append({
+                'name': d['name'],
+                'platform': d['platform'],
+                'domainId': d['domainId'],
+                'implType': impl_type,
+                'deliveryPlatforms': delivery,
+            })
+
+    # Post-process consolidated domains
+    for entry in consolidated.values():
+        platforms_set = set(entry['platforms'])
+        # If ALL implementations are Flutter, it's flutter-only
+        if platforms_set <= flutter_services:
+            entry['implType'] = 'flutter-only'
+            # Add bridge-accessible platforms to deliveryPlatforms
+            all_accessible = set()
+            for fp in platforms_set:
+                all_accessible.update(bridge_targets.get(fp, []))
+            entry['deliveryPlatforms'] = sorted(set(entry['platforms']) | all_accessible)
+        else:
+            entry['deliveryPlatforms'] = sorted(entry['platforms'])
+
+        entry['mergedSummary'] = entry['mergedSummary'].strip()
+
+    return {
+        'consolidated': list(consolidated.values()),
+        'standalone': standalone,
+        'infrastructure': infrastructure,
+    }
+
+
 def match_domains(project_root_str: str, system_config: dict | None = None) -> dict:
     project_root = Path(project_root_str)
 
@@ -281,6 +460,35 @@ def match_domains(project_root_str: str, system_config: dict | None = None) -> d
         client_facet['path'],
         client_facet.get('subPaths', [])
     )
+
+    # Domain consolidation for mobile facets
+    consolidation = _consolidate_mobile_domains(
+        project_root_str, client_facet['path'], client_facet.get('subPaths', [])
+    )
+
+    # Replace raw client_domains with consolidated logical domains for matching
+    if consolidation['consolidated'] or consolidation['standalone']:
+        consolidated_client_domains = {}
+        for d in consolidation['consolidated']:
+            consolidated_client_domains[d['name']] = {
+                'data': {'name': d['name'], 'summary': d['mergedSummary']},
+                'api_calls': [],
+                'platform': 'consolidated',
+                'file': '',
+                'implType': d['implType'],
+                'deliveryPlatforms': d['deliveryPlatforms'],
+            }
+        for d in consolidation['standalone']:
+            consolidated_client_domains[d['name']] = {
+                'data': {'name': d['name']},
+                'api_calls': [],
+                'platform': d['platform'],
+                'file': '',
+                'implType': d['implType'],
+                'deliveryPlatforms': d['deliveryPlatforms'],
+            }
+        # Infrastructure domains are excluded from matching
+        client_domains = consolidated_client_domains
 
     all_matched = []
     matched_server = set()

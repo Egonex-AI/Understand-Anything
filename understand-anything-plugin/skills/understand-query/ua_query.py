@@ -82,12 +82,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     biz = sub.add_parser("business", help="Business landscape queries")
     biz.add_argument("--domain")
+    biz.add_argument("--platform", type=str, help="Filter by platform: android, ios, flutter")
     biz.add_argument("--type")
     biz.add_argument("--facet")
     biz.add_argument("--list", action="store_true")
     biz.add_argument("--search")
     biz.add_argument("--links", action="store_true")
     biz.add_argument("--panorama", action="store_true")
+    biz.add_argument("--features", action="store_true", help="List business features with server associations (feature-centric view)")
     biz.add_argument("--meta", action="store_true")
 
     svc = sub.add_parser("services", help="Service discovery and readiness")

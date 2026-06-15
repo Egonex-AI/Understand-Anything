@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Understand Anything System Configuration",
+  "type": "object",
+  "required": ["facets"],
+  "properties": {
+    "facets": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/facet" }
+    }
+  },
+  "definitions": {
+    "facet": {
+      "type": "object",
+      "required": ["type", "name", "path"],
+      "properties": {
+        "type": { "enum": ["server", "mobile", "frontend", "shared"] },
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "subPaths": { "type": "array", "items": { "type": "string" } },
+        "services": { "type": "array", "items": { "$ref": "#/definitions/service" } },
+        "platformMapping": { "type": "object" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["name", "path", "platform"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "platform": {
+          "enum": [
+            "ios",
+            "android",
+            "flutter",
+            "react-native",
+            "kotlin-multiplatform",
+            "java",
+            "java-spring",
+            "kotlin",
+            "go",
+            "python",
+            "node",
+            "dotnet",
+            "rust",
+            "web",
+            "unknown"
+          ]
+        },
+        "framework": { "type": "string" },
+        "confidence": { "enum": ["high", "low"] }
+      }
+    }
+  }
+}

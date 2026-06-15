@@ -245,6 +245,8 @@ def cmd_business(args: argparse.Namespace) -> Any:
         return _helpers.fetch_json(build_url(args.server, "/api/business/meta", {}))
     if args.panorama:
         return _helpers.fetch_json(build_url(args.server, "/api/business/panorama", {}))
+    if args.features:
+        return _helpers.fetch_json(build_url(args.server, "/api/business/features", {}))
     if args.links:
         params: dict[str, str] = {}
         if args.domain:
@@ -254,6 +256,13 @@ def cmd_business(args: argparse.Namespace) -> Any:
         return _helpers.fetch_json(build_url(args.server, "/api/business/domains", {}))
     if args.search:
         return {"results": _search_api(args.server, args.search, scope="business")}
+    if args.domain and args.platform:
+        encoded_domain = url_quote(args.domain, safe="")
+        return _helpers.fetch_json(build_url(
+            args.server,
+            f"/api/business/domains/{encoded_domain}",
+            {"platform": args.platform},
+        ))
     if args.domain:
         slug = args.domain.replace("domain:", "").replace(" ", "-").lower()
         slug = url_quote(slug, safe="")
@@ -265,7 +274,16 @@ def cmd_business(args: argparse.Namespace) -> Any:
         if args.facet:
             return {"facets": data.get("facets", {}).get(args.facet, {})}
         return data
-    return _helpers.fetch_json(build_url(args.server, "/api/business/overview", {}))
+    overview = _helpers.fetch_json(build_url(args.server, "/api/business/overview", {}))
+    try:
+        features_data = _helpers.fetch_json(build_url(args.server, "/api/business/features", {}))
+        overview["features"] = {
+            "featureCount": len(features_data.get("features", [])),
+            "stats": features_data.get("stats", {}),
+        }
+    except RuntimeError:
+        pass
+    return overview
 
 
 def cmd_services(args: argparse.Namespace) -> Any:

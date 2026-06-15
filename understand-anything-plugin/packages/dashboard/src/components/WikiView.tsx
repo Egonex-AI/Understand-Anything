@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type HTMLAttributes } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type HTMLAttributes } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -9,9 +9,11 @@ import {
   domainPageToMarkdown,
   overviewToMarkdown,
   architectureToMarkdown,
+  clientGraphToMarkdown,
   crossDomainToMarkdown,
   endpointDocToMarkdown,
   endpointIndexToMarkdown,
+  businessFeaturesToMarkdown,
 } from "../utils/wikiToMarkdown";
 import { WikiLinkRenderer, type WikiLinkNavigation } from "./WikiLinkRenderer";
 import { WikiSourcePanel } from "./WikiSourcePanel";
@@ -26,8 +28,10 @@ import type {
   WikiServiceOverview,
   WikiOverview,
   WikiArchitecture,
+  ClientGraph,
   WikiCrossDomain,
   ServiceEndpointDoc,
+  BusinessFeaturesDocument,
 } from "@understand-anything/core";
 
 interface NavEntry {
@@ -121,7 +125,7 @@ function WikiNavTree({
     activePage?.type === type && activePage?.id === id && activePage?.service === service;
 
   const parentEntries = entries.filter(
-    (e) => !e.service && (e.type === "overview" || e.type === "architecture"),
+    (e) => !e.service && (e.type === "overview" || e.type === "architecture" || e.type === "feature-graph"),
   );
   const crossDomainEntries = entries.filter((e) => !e.service && e.type === "cross-domain");
   const domainEntries = entries.filter((e) => !e.service && e.type === "domain");
@@ -137,9 +141,9 @@ function WikiNavTree({
   const showGlobalSection = topology?.hasParentWiki;
   const showServiceSection = services.length > 0;
 
-  // Initialize expanded state on first render (all expanded)
-  const initializedRef = useState({ current: false })[0];
-  if (!initializedRef.current && services.length > 0) {
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current || services.length === 0) return;
     initializedRef.current = true;
     const svcSet = new Set(services.map((s) => s.name));
     const domSet = new Set<string>();
@@ -150,7 +154,7 @@ function WikiNavTree({
     }
     setExpandedServices(svcSet);
     setExpandedDomains(domSet);
-  }
+  }, [services, entries]);
 
   const [expandedFacets, setExpandedFacets] = useState<Set<string>>(
     () => new Set(topology?.facets?.map((f) => f.type) ?? []),
@@ -180,7 +184,7 @@ function WikiNavTree({
                   : "hover:bg-surface-hover text-text"
               }`}
             >
-              {entry.type === "overview" ? "📖 " : "🏗️ "}
+              {entry.type === "overview" ? "📖 " : entry.type === "feature-graph" ? "🗺️ " : "🏗️ "}
               {entry.name}
             </button>
           ))}
@@ -599,8 +603,17 @@ function WikiContent({
       case "overview":
         markdown = overviewToMarkdown(content as WikiOverview, wikiLabels);
         break;
-      case "architecture":
+      case "architecture": {
         markdown = architectureToMarkdown(content as WikiArchitecture, wikiLabels);
+        const clientGraph = (content as Record<string, unknown>)._clientGraph as ClientGraph | undefined;
+        if (clientGraph) {
+          const clientMd = clientGraphToMarkdown(clientGraph);
+          if (clientMd) markdown += `\n${clientMd}`;
+        }
+        break;
+      }
+      case "feature-graph":
+        markdown = businessFeaturesToMarkdown(content as BusinessFeaturesDocument);
         break;
       case "cross-domain":
         markdown = crossDomainToMarkdown(content as WikiCrossDomain, wikiLabels);
@@ -745,7 +758,8 @@ export default function WikiView() {
         break;
     }
 
-    fetch(apiUrl(endpoint), { signal: controller.signal })
+    const fetchUrl = fetchPageType === "feature-graph" ? "/api/business/features" : apiUrl(endpoint);
+    fetch(fetchUrl, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (controller.signal.aborted) return;

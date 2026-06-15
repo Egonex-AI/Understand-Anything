@@ -77,6 +77,49 @@ def format_output(data: Any, fmt: str) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
+def _format_business_features(data: dict) -> str:
+    lines = ["# 业务功能全景", ""]
+    stats = data.get("stats", {})
+    if stats:
+        total = stats.get("totalFeatures", "?")
+        with_server = stats.get("withServerAssociation", "?")
+        domains = stats.get("serverDomainsReferenced", "?")
+        lines.append(f"共 {total} 个功能 | 已关联服务端 {with_server} | 引用服务端域 {domains}")
+        lines.append("")
+    features = data.get("features", [])
+    if features:
+        lines.append("## 功能概览")
+        lines.append("")
+        lines.append("| 功能 | 实现类型 | 平台 | 主服务端 | 置信度 |")
+        lines.append("|------|----------|------|----------|--------|")
+        for f in features:
+            name = f.get("name", "?")
+            client = f.get("clientLayer", {})
+            impl_type = client.get("implType", "-")
+            platforms = ", ".join(client.get("deliveryPlatforms", []) or list(client.get("platforms", {}).keys()))
+            server = f.get("serverLayer", {})
+            primary = server.get("primaryDomain", {})
+            primary_server = primary.get("service", primary.get("name", "-"))
+            confidence = primary.get("confidence", "-")
+            if isinstance(confidence, float):
+                confidence = f"{confidence:.2f}"
+            lines.append(f"| {name} | {impl_type} | {platforms} | {primary_server} | {confidence} |")
+        lines.append("")
+    server_index = data.get("serverIndex", {})
+    if server_index:
+        lines.append("## 服务端反向索引")
+        lines.append("")
+        lines.append("| 服务端域 | 服务 | 关联功能 | 引用次数 |")
+        lines.append("|----------|------|----------|----------|")
+        for domain_name, info in server_index.items():
+            service = info.get("service", "-")
+            feature_list = ", ".join(info.get("features", []))
+            ref_count = info.get("refCount", 0)
+            lines.append(f"| {domain_name} | {service} | {feature_list} | {ref_count} |")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def _format_markdown(data: Any) -> str:
     if isinstance(data, dict) and "domains" in data and not data.get("question"):
         lines = ["# Business Domains", ""]
@@ -408,6 +451,9 @@ def _format_markdown(data: Any) -> str:
             lines.append("")
         return "\n".join(lines)
 
+    if isinstance(data, dict) and "features" in data and "serverIndex" in data:
+        return _format_business_features(data)
+
     # Business panorama / domain detail (must come BEFORE architecture — both can have "facets")
     if isinstance(data, dict) and ("interactions" in data or "businessRules" in data):
         lines = []
@@ -504,7 +550,13 @@ def _format_markdown(data: Any) -> str:
         return "\n".join(lines)
 
     # Wiki architecture (crossServiceCalls at top level — from wiki --architecture)
-    if isinstance(data, dict) and ("crossServiceCalls" in data or ("facets" in data and isinstance(data.get("facets"), list))):
+    _mobile_arch_keys = ("featureParity", "sharedInfrastructure", "nativeBridge", "domainMapping")
+    if isinstance(data, dict) and (
+        "crossServiceCalls" in data
+        or "eventFlows" in data
+        or any(k in data for k in _mobile_arch_keys)
+        or ("facets" in data and isinstance(data.get("facets"), list))
+    ):
         lines = ["# Architecture", ""]
         facets = data.get("facets", [])
         if facets and isinstance(facets, list):
@@ -545,6 +597,70 @@ def _format_markdown(data: Any) -> str:
                 else:
                     lines.append(f"- {e}")
             lines.append("")
+
+        # Mobile architecture fields
+        feature_parity = data.get("featureParity", [])
+        if feature_parity:
+            lines.append("\n## 功能对等矩阵\n")
+            # Collect all platform keys
+            all_platforms = set()
+            for fp in feature_parity:
+                all_platforms.update(fp.get("platforms", {}).keys())
+            platform_cols = sorted(all_platforms)
+            header = "| 功能 | " + " | ".join(platform_cols) + " | 备注 |"
+            separator = "|------|" + "|".join(["------"] * len(platform_cols)) + "|------|"
+            lines.append(header)
+            lines.append(separator)
+            for fp in feature_parity:
+                feature_name = fp.get("feature", "")
+                platforms = fp.get("platforms", {})
+                cells = []
+                for pc in platform_cols:
+                    p_info = platforms.get(pc, {})
+                    if p_info:
+                        cells.append(p_info.get("impl", p_info.get("domain", "-")))
+                    else:
+                        cells.append("-")
+                note = fp.get("note", "")
+                lines.append(f"| {feature_name} | " + " | ".join(cells) + f" | {note} |")
+
+        shared_infra = data.get("sharedInfrastructure", [])
+        if shared_infra:
+            lines.append("\n## 共享基础设施\n")
+            for si in shared_infra:
+                resource = si.get("resource", "")
+                si_type = si.get("type", "")
+                platforms = ", ".join(si.get("platforms", []))
+                detail = si.get("detail", "")
+                lines.append(f"- **{resource}** ({si_type}): {detail} — {platforms}")
+
+        native_bridge = data.get("nativeBridge", [])
+        if native_bridge:
+            lines.append("\n## 原生桥接\n")
+            for nb in native_bridge:
+                from_plat = nb.get("from", "")
+                to_plat = nb.get("to", "")
+                mechanism = nb.get("mechanism", "")
+                detail = nb.get("detail", "")
+                lines.append(f"- {from_plat} → {to_plat}: **{mechanism}** — {detail}")
+
+        domain_mapping = data.get("domainMapping", [])
+        if domain_mapping:
+            lines.append("\n## 跨平台域映射\n")
+            all_platforms = set()
+            for dm in domain_mapping:
+                all_platforms.update(dm.get("mappings", {}).keys())
+            platform_cols = sorted(all_platforms)
+            header = "| 功能 | " + " | ".join(platform_cols) + " |"
+            separator = "|------|" + "|".join(["------"] * len(platform_cols)) + "|"
+            lines.append(header)
+            lines.append(separator)
+            for dm in domain_mapping:
+                feature = dm.get("canonicalFeature", "")
+                mappings = dm.get("mappings", {})
+                cells = [mappings.get(pc, "-").removeprefix("domain:") for pc in platform_cols]
+                lines.append(f"| {feature} | " + " | ".join(cells) + " |")
+
         return "\n".join(lines)
 
     # Domain graph: flows or nodes

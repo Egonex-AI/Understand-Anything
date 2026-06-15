@@ -47,27 +47,45 @@ def _load_platform_domains(platform_path: Path):
     return domains
 
 
-def _detect_cross_platform_frameworks(platform_domains_map):
+def _detect_platform_frameworks(platform_domains_map):
+    """Determine the framework type for each platform based on its name and wiki metadata.
+
+    Returns:
+        frameworks: sorted list of cross-platform framework names found
+        platform_framework_map: dict mapping platform name -> framework type
+    """
+    CROSS_PLATFORM_INDICATORS = {
+        'flutter': ['flutter'],
+        'react-native': ['react_native', 'react-native', 'reactnative'],
+        'kmm': ['kmm', 'kotlin_multiplatform'],
+    }
+
     frameworks = set()
-    for _platform, domains in platform_domains_map.items():
-        for _did, domain in domains.items():
-            for flow in domain.get('flows', []):
-                for step in flow.get('steps', []):
-                    desc = step.get('description', '').lower()
-                    if 'flutter' in desc:
-                        frameworks.add('flutter')
-                    if 'react native' in desc or 'react-native' in desc:
-                        frameworks.add('react-native')
-                    if 'kmm' in desc or 'kotlin multiplatform' in desc:
-                        frameworks.add('kmm')
-    return sorted(frameworks)
+    platform_framework_map = {}
+
+    for platform in platform_domains_map:
+        platform_lower = platform.lower().replace('-', '_')
+        detected = None
+        for fw, indicators in CROSS_PLATFORM_INDICATORS.items():
+            if any(ind in platform_lower for ind in indicators):
+                detected = fw
+                break
+
+        if detected:
+            frameworks.add(detected)
+            platform_framework_map[platform] = detected
+        else:
+            platform_framework_map[platform] = 'native'
+
+    return sorted(frameworks), platform_framework_map
 
 
 def _normalize_domain_name(name):
     return name.lower().replace('-', '_').replace(' ', '_')
 
 
-def _classify_impl_type(domain_name, platform_domains_map, cross_platform_frameworks):
+def _classify_impl_type(domain_name, platform_domains_map, platform_framework_map):
+    """Classify domain implementation type based on which platform it belongs to."""
     normalized = _normalize_domain_name(domain_name)
     has_cross_platform_ref = False
     has_native_ref = False
@@ -79,15 +97,12 @@ def _classify_impl_type(domain_name, platform_domains_map, cross_platform_framew
             if d_name != normalized:
                 continue
             wiki_ref = domain.get('_wiki_ref', '')
-            domain_text = json.dumps(domain).lower()
-            is_framework = any(fw in domain_text for fw in cross_platform_frameworks)
-            if is_framework:
+            fw = platform_framework_map.get(platform, 'native')
+            if fw != 'native':
                 has_cross_platform_ref = True
-                fw = next((fw for fw in cross_platform_frameworks if fw in domain_text), 'unknown')
-                implementations[platform] = {'framework': fw, 'ref': wiki_ref}
             else:
                 has_native_ref = True
-                implementations[platform] = {'framework': 'native', 'ref': wiki_ref}
+            implementations[platform] = {'framework': fw, 'ref': wiki_ref}
 
     if has_cross_platform_ref and not has_native_ref:
         return 'cross-platform', implementations
@@ -97,6 +112,73 @@ def _classify_impl_type(domain_name, platform_domains_map, cross_platform_framew
         return 'mixed', implementations
     else:
         return 'platform-specific', implementations
+
+
+def _build_domain_links(platform_domains_map, platform_framework_map):
+    """Build cross-platform domain links by matching domain names across platforms.
+
+    Uses exact normalized name matching + common mobile semantic families.
+    """
+    SEMANTIC_FAMILIES = {
+        'messaging': ['instant_messaging', 'im_chat', 'group_chat', 'chat'],
+        'live_room': ['live_streaming', 'live_voice_room', 'audio_chatroom', 'audio_room_pk'],
+        'gift': ['gift', 'gift_payment'],
+        'call': ['phone_call', 'av_call_media'],
+        'profile': ['profile_settings', 'account_profile'],
+        'social': ['social_moment', 'feed_social'],
+        'login': ['login_auth'],
+    }
+
+    # Collect all domains per platform with both slug-based and display-name-based keys
+    platform_domain_map = {}  # { platform: { normalized_slug: domain_id } }
+    platform_display_names = {}  # { platform: { domain_id: display_name } }
+    for platform, domains in platform_domains_map.items():
+        platform_domain_map[platform] = {}
+        platform_display_names[platform] = {}
+        for did, domain in domains.items():
+            slug = did.removeprefix('domain:').replace('-', '_').lower()
+            platform_domain_map[platform][slug] = did
+            platform_display_names[platform][did] = domain.get('name', did)
+
+    # Find semantic family matches
+    domain_links = []
+    used_domains = set()  # track (platform, domain_id) pairs already linked
+
+    for family_name, family_members in SEMANTIC_FAMILIES.items():
+        mappings = {}
+        canonical = None
+        for platform, domains in platform_domain_map.items():
+            for slug, did in domains.items():
+                if slug in family_members and (platform, did) not in used_domains:
+                    mappings[platform] = did
+                    if canonical is None:
+                        canonical = platform_display_names.get(platform, {}).get(did, slug)
+                    used_domains.add((platform, did))
+
+        if len(mappings) >= 2:
+            domain_links.append({
+                'canonicalFeature': canonical or family_name,
+                'mappings': mappings,
+            })
+
+    # Also match exact slug names across platforms
+    all_slugs = {}  # { slug: [(platform, domain_id)] }
+    for platform, domains in platform_domain_map.items():
+        for slug, did in domains.items():
+            if (platform, did) not in used_domains:
+                all_slugs.setdefault(slug, []).append((platform, did))
+
+    for slug, entries in all_slugs.items():
+        if len(entries) >= 2:
+            mappings = {platform: did for platform, did in entries}
+            p0, d0 = entries[0]
+            canonical = platform_display_names.get(p0, {}).get(d0, slug)
+            domain_links.append({
+                'canonicalFeature': canonical or slug,
+                'mappings': mappings,
+            })
+
+    return domain_links
 
 
 def build_client_graph(project_root_str: str) -> None:
@@ -130,7 +212,7 @@ def build_client_graph(project_root_str: str) -> None:
     if not platforms:
         raise FileNotFoundError('[build-client-graph] No integrated platforms found')
 
-    cross_platform_frameworks = _detect_cross_platform_frameworks(platform_domains_map)
+    cross_platform_frameworks, platform_framework_map = _detect_platform_frameworks(platform_domains_map)
 
     all_domain_names = set()
     for domains in platform_domains_map.values():
@@ -142,7 +224,7 @@ def build_client_graph(project_root_str: str) -> None:
         if not domain_name:
             continue
         impl_type, implementations = _classify_impl_type(
-            domain_name, platform_domains_map, cross_platform_frameworks
+            domain_name, platform_domains_map, platform_framework_map
         )
         for impl in implementations.values():
             impl.pop('_wiki_ref', None)
@@ -153,10 +235,13 @@ def build_client_graph(project_root_str: str) -> None:
         }
         feature_map.append(entry)
 
+    domain_links = _build_domain_links(platform_domains_map, platform_framework_map)
+
     client_graph = {
         'platforms': platforms,
         'crossPlatformFrameworks': cross_platform_frameworks,
         'featureMap': feature_map,
+        'domainLinks': domain_links,
     }
 
     # Hash is of canonical content (without contentHash), so integrity can be

@@ -123,6 +123,41 @@ describe("WikiDataService", () => {
     });
   });
 
+  describe("getClientGraph", () => {
+    it("returns null when client-graph.json is missing", () => {
+      const svc = new WikiDataService(tmpDir);
+      expect(svc.getClientGraph()).toBeNull();
+    });
+
+    it("loads client-graph.json from project root", () => {
+      writeJson(path.join(tmpDir, ".understand-anything/client-graph.json"), {
+        platforms: ["Amar"],
+        featureMap: [{ domain: "IM", implType: "platform-specific", implementations: { Amar: { framework: "native" } } }],
+      });
+
+      const svc = new WikiDataService(tmpDir);
+      const graph = svc.getClientGraph();
+      expect(graph).not.toBeNull();
+      expect(graph!.platforms).toEqual(["Amar"]);
+      expect(graph!.featureMap).toHaveLength(1);
+    });
+
+    it("loads client-graph.json from facet .understand-anything directory", () => {
+      writeJson(path.join(tmpDir, "mobile/.understand-anything/wiki/meta.json"), {
+        gitCommitHash: "a", generatedAt: "t", version: "1", outputLanguage: "zh",
+      });
+      writeJson(path.join(tmpDir, "mobile/.understand-anything/client-graph.json"), {
+        platforms: ["ddoversea"],
+        featureMap: [{ domain: "Chat", implType: "cross-platform", implementations: { ddoversea: { framework: "flutter" } } }],
+      });
+
+      const svc = new WikiDataService(tmpDir);
+      const graph = svc.getClientGraph("mobile");
+      expect(graph).not.toBeNull();
+      expect(graph!.platforms).toEqual(["ddoversea"]);
+    });
+  });
+
   describe("getServiceWiki", () => {
     it("returns null for unknown service", () => {
       const svc = new WikiDataService(tmpDir);
