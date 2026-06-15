@@ -180,6 +180,37 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 /understand src/frontend
 ```
 
+### Agent-friendly graph CLI
+
+After `/understand` creates `.understand-anything/knowledge-graph.json`, agents and scripts can query the graph without loading the full JSON into context. The installer links `ugraph` for macOS/Linux and creates a Windows command shim; npm-style installs also expose it via the package `bin`.
+
+```bash
+# Project metadata, counts, layers, tags, and graph freshness
+ugraph overview
+
+# Search nodes by name, path, tags, and summary
+ugraph find auth --limit 10
+
+# Show one node and its direct incoming/outgoing relationships
+ugraph node src/auth/login.ts
+
+# Expand a token-efficient subgraph around a node
+ugraph neighbors src/auth/login.ts --depth 2 --limit 30
+
+# Approximate callers/importers/tests affected by a changed file
+ugraph impact src/auth/login.ts --depth 2
+
+# Build compact context for an agent question
+ugraph context "payment flow" --limit 25
+
+# Inspect architecture layers, guided tour, or graph staleness
+ugraph layers
+ugraph tour --nodes
+ugraph stale
+```
+
+`ugraph` returns compact JSON by default for reliable agent parsing. Use `--pretty`, `--format text`, or `--format md` for human-readable output.
+
 ---
 
 ## 🌐 Multi-Platform Installation

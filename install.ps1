@@ -25,6 +25,8 @@ $ErrorActionPreference = 'Stop'
 $RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Egonex-AI/Understand-Anything.git' }
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
+$CliBinDir  = if ($env:UA_BIN_DIR)  { $env:UA_BIN_DIR }  else { Join-Path $HOME '.understand-anything\bin' }
+$CliCmd     = Join-Path $CliBinDir 'ugraph.cmd'
 
 # Platform table — Target = skills directory; Style = "per-skill" | "folder"
 $Platforms = [ordered]@{
@@ -59,6 +61,7 @@ $($Platforms.Keys -join ', ')
 Environment:
   UA_REPO_URL   Override clone URL
   UA_DIR        Override clone destination (default: %USERPROFILE%\.understand-anything\repo)
+  UA_BIN_DIR    Override CLI shim directory (default: %USERPROFILE%\.understand-anything\bin)
 "@
 }
 
@@ -198,6 +201,33 @@ function ConvertTo-FileUri([string]$Path) {
     return 'file:///' + ($Path -replace '\\', '/')
 }
 
+function Link-Cli {
+    $script = Join-Path $RepoDir 'understand-anything-plugin\bin\ugraph.js'
+    if (-not (Test-Path $script)) {
+        Write-Host "  • ugraph CLI not found at $script, skipping"
+        return
+    }
+
+    if (-not (Test-Path $CliBinDir)) { New-Item -ItemType Directory -Path $CliBinDir | Out-Null }
+    $content = "@echo off`r`nnode `"$script`" %*`r`n"
+    Set-Content -LiteralPath $CliCmd -Value $content -NoNewline -Encoding ASCII
+    Write-Host "  ✓ $CliCmd → $script"
+
+    $pathEntries = ($env:PATH -split ';') | Where-Object { $_ }
+    if ($pathEntries -notcontains $CliBinDir) {
+        Write-Host "  Tip: add $CliBinDir to PATH to run ugraph from any shell."
+    }
+}
+
+function Unlink-Cli {
+    if (-not (Test-Path $CliCmd)) { return }
+    $content = Get-Content -LiteralPath $CliCmd -Raw
+    if ($content -match 'understand-anything-plugin[\\/]+bin[\\/]+ugraph\.js') {
+        Remove-Item -LiteralPath $CliCmd -Force
+        Write-Host "  ✓ removed $CliCmd"
+    }
+}
+
 function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
     Clone-Or-Update
@@ -205,6 +235,8 @@ function Cmd-Install([string]$Id) {
     Link-Skills $cfg.Target $cfg.Style
     Write-Host '→ Linking universal plugin root'
     Link-Plugin-Root
+    Write-Host '→ Linking ugraph CLI'
+    Link-Cli
 
     if ($Id -eq 'kiro') {
         Write-Host '→ Creating Kiro agent configuration'
@@ -257,6 +289,7 @@ function Cmd-Uninstall([string]$Id) {
     if (Remove-Reparse $PluginLink) {
         Write-Host "  ✓ removed $PluginLink"
     }
+    Unlink-Cli
     if (Test-Path $RepoDir) {
         Write-Host "`nThe checkout at $RepoDir was kept (other platforms may still use it)."
         Write-Host "To remove it: Remove-Item -Recurse -Force '$RepoDir'"

@@ -15,12 +15,15 @@
 # Environment:
 #   UA_REPO_URL  Override clone URL (default: official GitHub repo)
 #   UA_DIR       Override clone destination (default: $HOME/.understand-anything/repo)
+#   UA_BIN_DIR   Override CLI link directory (default: $HOME/.local/bin)
 
 set -euo pipefail
 
 REPO_URL="${UA_REPO_URL:-https://github.com/Egonex-AI/Understand-Anything.git}"
 REPO_DIR="${UA_DIR:-$HOME/.understand-anything/repo}"
 PLUGIN_LINK="$HOME/.understand-anything-plugin"
+CLI_BIN_DIR="${UA_BIN_DIR:-$HOME/.local/bin}"
+CLI_LINK="$CLI_BIN_DIR/ugraph"
 
 # Platform table — id|skills-target-dir|style
 # style "per-skill": one symlink per skill into the target dir
@@ -178,6 +181,38 @@ link_plugin_root() {
   fi
 }
 
+link_cli() {
+  local target="$REPO_DIR/understand-anything-plugin/bin/ugraph.js"
+  if [[ ! -f "$target" ]]; then
+    printf '  • ugraph CLI not found at %s, skipping\n' "$target"
+    return 0
+  fi
+
+  mkdir -p "$CLI_BIN_DIR"
+  ln -sfn "$target" "$CLI_LINK"
+  printf '  ✓ %s → %s\n' "$CLI_LINK" "$target"
+
+  case ":$PATH:" in
+    *":$CLI_BIN_DIR:"*) ;;
+    *)
+      printf '  Tip: add %s to PATH to run `ugraph` from any shell.\n' "$CLI_BIN_DIR"
+      ;;
+  esac
+}
+
+unlink_cli() {
+  if [[ ! -L "$CLI_LINK" ]]; then
+    return 0
+  fi
+
+  local resolved
+  resolved="$(readlink "$CLI_LINK" 2>/dev/null || true)"
+  if [[ "$resolved" == *"/understand-anything-plugin/bin/ugraph.js" ]]; then
+    rm -f "$CLI_LINK"
+    printf '  ✓ removed %s\n' "$CLI_LINK"
+  fi
+}
+
 cmd_install() {
   local id="$1"
   local row target style
@@ -190,6 +225,8 @@ cmd_install() {
   link_skills "$target" "$style"
   printf -- '→ Linking universal plugin root\n'
   link_plugin_root
+  printf -- '→ Linking ugraph CLI\n'
+  link_cli
 
   if [[ "$id" == "kiro" ]]; then
     printf -- '→ Creating Kiro agent configuration\n'
@@ -248,6 +285,7 @@ cmd_uninstall() {
     rm -f "$PLUGIN_LINK"
     printf '  ✓ removed %s\n' "$PLUGIN_LINK"
   fi
+  unlink_cli
   if [[ -d "$REPO_DIR" ]]; then
     printf '\nThe checkout at %s was kept (other platforms may still use it).\n' "$REPO_DIR"
     printf 'To remove it: rm -rf "%s"\n' "$REPO_DIR"
@@ -279,6 +317,7 @@ $(platform_ids | sed 's/^/  - /')
 Environment:
   UA_REPO_URL  Override clone URL (default: official repo)
   UA_DIR       Override clone destination (default: \$HOME/.understand-anything/repo)
+  UA_BIN_DIR   Override CLI link directory (default: \$HOME/.local/bin)
 USAGE
 }
 
