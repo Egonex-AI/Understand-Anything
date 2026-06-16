@@ -173,6 +173,85 @@ fun three(): String = ""
       expect(result.classes[0].name).toBe("Direction");
       expect(result.classes[0].methods).toContain("opposite");
       expect(result.functions.map((f) => f.name)).toContain("opposite");
+      // A default-public body member is exported (Kotlin default visibility).
+      expect(result.exports.map((e) => e.name)).toContain("opposite");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("surfaces enum constants (enum_entry) as properties", () => {
+      const { tree, parser, root } = parse(`enum class Direction {
+    NORTH, SOUTH;
+    fun opposite(): Direction = NORTH
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      // The enum constants are the canonical members of the enum.
+      expect(result.classes[0].properties).toEqual(
+        expect.arrayContaining(["NORTH", "SOUTH"]),
+      );
+      // Enum constants are public and therefore exported.
+      expect(result.exports.map((e) => e.name)).toEqual(
+        expect.arrayContaining(["NORTH", "SOUTH"]),
+      );
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("collects methods from a companion object inside a class body", () => {
+      const { tree, parser, root } = parse(`class Widget {
+    companion object {
+        fun create(): Widget = Widget()
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      // The companion's function is surfaced on the enclosing class and at
+      // the top level (mirrors the method-into-functions[] convention).
+      expect(result.classes[0].methods).toContain("create");
+      expect(result.functions.map((f) => f.name)).toContain("create");
+      expect(result.exports.map((e) => e.name)).toContain("create");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("collects methods from a companion object inside an enum class body", () => {
+      const { tree, parser, root } = parse(`enum class Direction {
+    NORTH, SOUTH;
+    companion object {
+        fun default(): Direction = NORTH
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toContain("default");
+      expect(result.functions.map((f) => f.name)).toContain("default");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does NOT export a private function declared inside a class body", () => {
+      const { tree, parser, root } = parse(`class Service {
+    fun publicOp(): Int = 1
+    private fun secret(): Int = 2
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      const exportNames = result.exports.map((e) => e.name);
+      expect(exportNames).toContain("publicOp");
+      expect(exportNames).not.toContain("secret");
+      // Both are still methods of the class regardless of visibility.
+      expect(result.classes[0].methods).toEqual(
+        expect.arrayContaining(["publicOp", "secret"]),
+      );
 
       tree.delete();
       parser.delete();
