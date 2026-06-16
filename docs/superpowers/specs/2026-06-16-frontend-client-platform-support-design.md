@@ -1,415 +1,486 @@
-# Frontend & Client Platform Full Support Design
+# Frontend As First-Class Web Facet Design
 
 > Date: 2026-06-16
-> Status: DRAFT — Pending approval
+> Status: APPROVED FOR SPEC REVIEW
 
-## Background
+## Purpose
 
-### Problem Statement
+This design replaces the previous broader "frontend and client platform" draft. The new scope treats `frontend` as a first-class **Web-only** facet, separate from `mobile`.
 
-`/understand` and `/understand-domain` were designed primarily for backend/server-side codebases. While basic language-level support exists for frontend (TypeScript, JavaScript, HTML, CSS) and client (Kotlin, Swift, ObjC, Dart) languages, the **framework-level intelligence** and **domain extraction logic** are severely lacking for frontend (Web Vue React) and client (Android iOS) platforms.
+The system should model these facet categories independently:
 
-**Current support matrix:**
+- `server` / `backend`: backend services that execute authoritative business rules and persist data.
+- `mobile`: Android, iOS, and Flutter applications.
+- `frontend`: Web frontend applications such as React, Vue, Next.js, Nuxt, Svelte, Angular, and Vite-based apps.
 
-| Platform | /understand | /understand-domain |
-|---|---|---|
-| Web Frontend (Vue/React) | ⭐⭐⭐⭐ Good (has addendum) | ⭐⭐ Poor (backend-biased entry detection) |
-| Web Frontend (Nuxt/Svelte) | ⭐⭐ Poor (no addendum) | ⭐⭐ Poor |
-| iOS Client | ⭐⭐⭐ Fair (lang ok, no framework addendum) | ⭐ Very Poor (almost no support) |
-| Android Client | ⭐⭐⭐ Fair (lang ok, no framework addendum) | ⭐ Very Poor (almost no support) |
-| Flutter | ⭐⭐⭐⭐ Good (has addendum) | ⭐⭐ Poor |
-| React Native | ⭐⭐ Poor (no addendum) | ⭐ Very Poor |
+Electron, mini-apps, uni-app, React Native, and desktop clients are out of scope for this design. They can be added later as separate facet types or explicit extensions.
 
-### Root Causes
+## Current Problem
 
-#### /understand gaps:
+The codebase already has partial frontend support:
 
-1. **Missing framework addendums** — No `frameworks/android.md` or `frameworks/ios.md`. The file-analyzer and architecture-analyzer lack guidance on client-specific patterns (Activity lifecycle, ViewController hierarchy, Compose Screens, Navigation Graphs)
-2. **Entry point detection blind spots** — Phase 0 doesn't check for `MainActivity.kt`, `AppDelegate.swift`, `*App.swift` (@main)
-3. **No `navigates_to` edge guidance** — Client apps' core relationship is screen-to-screen navigation, but current addendums don't instruct edge creation for navigation
+- `/understand` can analyze TypeScript, JavaScript, TSX, and JSX, and it has React/Vue/Next framework guidance.
+- `/understand-domain` can classify frontend projects and has a frontend flow strategy.
+- `/understand-wiki` accepts `--repo-type frontend`.
+- `understand-business` can detect frontend facets as client facets in scenario detection.
 
-#### /understand-domain gaps:
+The support is incomplete because frontend is not yet a full independent category:
 
-1. **Entry point patterns in `extract-domain-context.py` are entirely backend-focused** — Only detects HTTP routes, CLI commands, Event listeners, Cron schedules. Misses: Vue Router definitions, React Router Routes, Activity declarations, Screen composables, ViewController classes
-2. **`domain-flow-extractor` only traces `calls` edges** — Frontend/client business flows follow user journeys: Screen → Interaction → State Change → API Call → UI Update. Needs to also trace `routes`, `depends_on`, `subscribes`, `publishes` edges
-3. **`domain-discoverer` splits by API endpoint groups** — Frontend/client should split by feature module / screen group / page group
-4. **`condense_kg_for_domain.py` loses navigation topology** — Frontend's core is "Page + Component + State" triad, navigation relationships must survive condensation
+- Web route/API/store extraction is not deterministic enough.
+- `.vue` and Web framework conventions rely too much on LLM interpretation.
+- `/understand-wiki --repo-type=frontend` does not produce a stable frontend-specific graph artifact.
+- `understand-business` recognizes frontend in scenario detection but downstream association and feature assembly primarily consume mobile data.
+- Existing `client-graph.json` semantics are mobile-centric and should not be reused for Web.
 
----
+## Design Direction
 
-## Architecture
+Use a two-phase rollout.
 
-### Component Impact Map
+### Phase 1: Extraction Precision + Frontend Graph
 
-```mermaid
-graph TD
-    subgraph "/understand changes"
-        FW_ANDROID[frameworks/android.md<br/>NEW]
-        FW_IOS[frameworks/ios.md<br/>NEW]
-        FW_RN[frameworks/react-native.md<br/>NEW]
-        FW_ANGULAR[frameworks/angular.md<br/>NEW]
-        FW_NUXT[frameworks/nuxt.md<br/>NEW]
-        FW_UNIAPP[frameworks/uni-app.md<br/>NEW]
-        SKILL_ENTRY[SKILL.md Phase 0<br/>entry point list MODIFY]
-        SCHEMA[schema-reference.md<br/>navigates_to edge MODIFY]
-    end
+Phase 1 improves Web frontend extraction and introduces a stable `frontend-graph.json` artifact. It does not require full business panorama or dashboard integration.
 
-    subgraph "/understand-domain changes"
-        EDC[extract-domain-context.py<br/>entry point patterns MODIFY]
-        DFE[domain-flow-extractor.md<br/>add client flow rules MODIFY]
-        DD[domain-discoverer.md<br/>add feature-module heuristic MODIFY]
-        CKG[condense_kg_for_domain.py<br/>preserve navigation edges MODIFY]
-    end
+Phase 1 goals:
 
-    FW_ANDROID --> |injects into| FA[file-analyzer]
-    FW_IOS --> |injects into| FA
-    FW_ANDROID --> |injects into| AA[architecture-analyzer]
-    FW_IOS --> |injects into| AA
-    SCHEMA --> |new edge type| FA
-    EDC --> |feeds| DA[domain-analyzer]
-    DFE --> |guides| DFE_AGENT[domain-flow-extractor agent]
+- `/understand` produces a better `knowledge-graph.json` for Web projects.
+- `/understand-domain` produces a better `domain-graph.json` for Web user journeys and feature domains.
+- `/understand-wiki --repo-type=frontend` produces normal wiki output plus `frontend-graph.json`.
+- `frontend-graph.json` becomes the stable frontend facet artifact for later business aggregation.
+
+### Phase 2: Full Business And Dashboard Integration
+
+Phase 2 consumes `frontend-graph.json` in business panorama and dashboard views.
+
+Phase 2 goals:
+
+- `system.json` treats frontend as an independent facet.
+- `check_facets.py` requires `frontend-graph.json` for an available frontend facet.
+- `understand-business` reads frontend features and associates them with server domains.
+- `business-features.json` supports multiple client layers from frontend and mobile.
+- Dashboard and wiki drill-down can navigate from business features to frontend routes/pages and backend domains.
+
+## Command Responsibilities
+
+The three main commands keep the same responsibility boundaries as other project types.
+
+### `/understand`
+
+Output:
+
+```text
+.understand-anything/knowledge-graph.json
 ```
 
----
+Responsibilities:
 
-## Detailed Design
+- Analyze source and non-source files.
+- Detect Web frontend frameworks and conventions.
+- Emit file, function, class, endpoint, config, document, and related nodes.
+- Emit route/API/store/component edges where supported.
 
-### Part A: /understand Enhancements
+`/understand` must not write `frontend-graph.json`.
 
-#### A1. New Framework Addendum: `frameworks/android.md`
+### `/understand-domain`
 
-Covers Jetpack Compose + traditional View System + common architectures (MVVM, MVI, Clean Architecture).
+Output:
 
-**Key sections:**
-- Canonical File Roles: Activity, Fragment, Composable Screen, ViewModel, Repository, UseCase, DAO, Entity, Navigation Graph, AndroidManifest.xml, res/layout/*.xml
-- Edge Patterns: Activity→Fragment (contains), Fragment→ViewModel (depends_on), ViewModel→Repository (depends_on), Compose NavHost→Screen (routes/navigates_to), Activity→Activity (navigates_to via Intent)
-- Architectural Layers: Presentation (Activity/Fragment/Composable) → Domain (UseCase/Interactor) → Data (Repository/DataSource/DAO) → Navigation (NavGraph/Router)
-- Notable Patterns: Hilt/Dagger DI, Coroutines Flow, LiveData/StateFlow, Room Database, Retrofit API interface
-
-#### A2. New Framework Addendum: `frameworks/ios.md`
-
-Covers SwiftUI + UIKit + common architectures (MVVM, Coordinator, VIPER).
-
-**Key sections:**
-- Canonical File Roles: ViewController, SwiftUI View, Coordinator, ViewModel, Service, Repository, Entity, Storyboard/XIB, AppDelegate, SceneDelegate, @main App
-- Edge Patterns: ViewController→ChildVC (contains), View→ViewModel (depends_on), Coordinator→ViewController (navigates_to), NavigationStack→Destination (routes)
-- Architectural Layers: Presentation (View/VC) → Domain (UseCase/Service) → Data (Repository/Network/CoreData) → Navigation (Coordinator/Router)
-- Notable Patterns: Combine publishers, @Published/@State/@Binding, Core Data stack, URLSession/Alamofire, Dependency injection (Swinject)
-
-#### A3. New Framework Addendum: `frameworks/react-native.md`
-
-**Key sections:**
-- Canonical File Roles: Screen component, Navigation stack, Redux store/slice, Native module, Platform-specific (.ios.ts/.android.ts)
-- Edge Patterns: Stack.Screen→Component (routes), Screen→Hook (depends_on), Hook→API (calls)
-- Architectural Layers: Screens → Navigation → State Management → API/Services → Native Modules
-
-#### A4. New Framework Addendum: `frameworks/nuxt.md`
-
-**Key sections:**
-- Canonical File Roles: pages/*.vue (auto-routed), composables/ (auto-imported), server/api/ (Nitro API), middleware/, plugins/, layouts/
-- Edge Patterns: page→composable (depends_on), page→layout (contains), middleware→page (middleware), server/api→service (calls)
-- Architectural Layers: Pages → Composables → Server API → Middleware/Plugins → Config
-
-#### A5. New Framework Addendum: `frameworks/uni-app.md`
-
-Cross-platform mini-program framework (WeChat/Alipay/Baidu/Douyin mini-programs + H5 + App).
-
-**Key sections:**
-- Canonical File Roles: pages/*.vue, components/*.vue, store/, api/, pages.json (route config), manifest.json
-- Edge Patterns: page→component (contains), page→store (depends_on), API calls to backend services
-- Platform-specific: conditional compilation (#ifdef MP-WEIXIN), native plugin bridges
-
-#### A6. Modify SKILL.md Phase 0 — Entry Point Detection
-
-Add to the entry point detection list:
-
-```
-src/index.ts, src/main.ts, src/App.tsx, index.js, main.py, manage.py, app.py,
-# NEW entries:
-app/src/main/java/**/MainActivity.kt,
-app/src/main/java/**/MainActivity.java,
-AppDelegate.swift, *App.swift,
-SceneDelegate.swift,
-App.tsx (React Native),
+```text
+.understand-anything/domain-graph.json
 ```
 
-#### A7. Schema Enhancement — `navigates_to` Edge Type
+Responsibilities:
 
-Add `navigates_to` to the schema as a Behavioral edge:
-- **Semantics**: Screen/Page A can navigate to Screen/Page B
-- **Weight**: 0.7 (same as `imports`)
-- **Source**: Screen/Page/Activity/ViewController/Composable node
-- **Target**: Screen/Page/Activity/ViewController/Composable node
-- **Metadata**: `{ trigger: "button_tap" | "deep_link" | "intent" | "push" | "programmatic" }`
+- Detect frontend platform type.
+- Split frontend code by user-facing feature domain rather than pure technical layer.
+- Extract user journeys from route, page, state, API, render, and interaction edges.
 
-This augments the existing `routes` edge (which is Router→Page) with the user-facing navigation relationship (Page→Page).
+`/understand-domain` must not write `frontend-graph.json`.
 
----
+### `/understand-wiki --repo-type=frontend`
 
-### Part B: /understand-domain Enhancements
+Outputs:
 
-#### B1. Modify `extract-domain-context.py` — New Entry Point Patterns
-
-Add these pattern groups to `ENTRY_POINT_PATTERNS`:
-
-```python
-# ── Frontend/Client entry point patterns ─────────────────────────────────
-
-# Frontend page/route definitions
-("navigation", "Vue Router route", re.compile(
-    r"""path\s*:\s*['"](\\/[^'"]*?)['"]""", re.IGNORECASE)),
-("navigation", "React Router Route", re.compile(
-    r"""<Route\s+[^>]*path\s*=\s*[{'"](\/[^'"{}]+)['"}]""")),
-("navigation", "Nuxt definePageMeta", re.compile(
-    r"""definePageMeta\s*\(\s*\{""")),
-("navigation", "Nuxt/Next page file", re.compile(
-    r"""export\s+default\s+(?:defineComponent|function)\s*\(""")),
-
-# Android screens
-("screen", "Android Activity", re.compile(
-    r"""class\s+(\w+Activity)\s*[:(]""")),
-("screen", "Android Fragment", re.compile(
-    r"""class\s+(\w+Fragment)\s*[:(]""")),
-("screen", "Jetpack Compose Screen", re.compile(
-    r"""@Composable\s+fun\s+(\w+(?:Screen|Page|Route))\s*\(""")),
-
-# iOS screens
-("screen", "iOS ViewController", re.compile(
-    r"""class\s+(\w+ViewController)\s*:\s*(?:UI|NS)""")),
-("screen", "SwiftUI View struct", re.compile(
-    r"""struct\s+(\w+(?:View|Screen|Page))\s*:\s*View""")),
-
-# Cross-platform screens
-("screen", "Flutter Screen/Page Widget", re.compile(
-    r"""class\s+(\w+(?:Screen|Page))\s+extends\s+(?:Stateless|Stateful)Widget""")),
-("screen", "React Native Screen", re.compile(
-    r"""(?:export\s+)?(?:const|function)\s+(\w+Screen)\s*[=(]""")),
+```text
+.understand-anything/wiki/
+.understand-anything/frontend-graph.json
 ```
 
-#### B2. Modify `domain-flow-extractor.md` — Frontend/Client Flow Extraction Rules
+Responsibilities:
 
-Add a new section after "Step Extraction Rules (MANDATORY)":
+- Generate normal wiki files from KG and DG.
+- Generate `frontend-graph.json` as the frontend facet aggregation artifact.
+- Validate that `frontend-graph.json` has meaningful feature content before marking frontend wiki complete.
 
-```markdown
-## Frontend/Client Flow Extraction Rules (when project is frontend or mobile)
+## Frontend Graph Artifact
 
-When the domain's nodes are primarily UI components, screens, or pages (detect by
-checking if >50% of nodes have tags like `ui`, `screen`, `page`, `component`),
-apply these ADDITIONAL rules:
+`frontend-graph.json` is a frontend-only artifact. It must not reuse `client-graph.json`, because `client-graph.json` is mobile-centric and represents cross-platform mobile feature parity.
 
-### User Journey Tracing (replaces pure `calls` tracing for UI domains)
+Path:
 
-1. **TRACE NAVIGATION EDGES**: Find `routes` and `navigates_to` edges from screen nodes.
-   Each navigation target is a step in the user journey flow.
-2. **TRACE STATE DEPENDENCIES**: Find `depends_on` edges from screens to state stores
-   (Vuex/Pinia/Redux/ViewModel). State mutations triggered by user actions are steps.
-3. **TRACE API CONSUMPTION**: Find `consumes_api` or `calls` edges from screens/hooks
-   to API services. Each API call in the user flow is a step.
-4. **ENTRY TYPE for frontend flows**: Use `entryType: "screen"` or `"navigation"`.
-   The `entryPoint` field should be the screen/page name, not an HTTP endpoint.
-
-### Frontend Flow Example
-
-Given a "User Login" flow in a Vue app:
-- Entry: LoginPage.vue (screen)
-- Step 1: "Display login form" → LoginPage.vue renders LoginForm component
-- Step 2: "Validate credentials" → composables/useAuth.ts validates input
-- Step 3: "Call auth API" → api/auth.ts → POST /api/login
-- Step 4: "Store auth token" → stores/auth.ts updates state
-- Step 5: "Navigate to home" → router navigates to HomePage.vue
-
-### Mobile Flow Example
-
-Given a "Create Post" flow in an Android app:
-- Entry: CreatePostActivity (screen)
-- Step 1: "Select media" → MediaPickerFragment handles media selection
-- Step 2: "Apply filters" → FilterViewModel processes image
-- Step 3: "Add caption" → CaptionEditorFragment handles text input
-- Step 4: "Upload to server" → PostRepository.createPost() calls API
-- Step 5: "Navigate to feed" → Navigator returns to FeedActivity
+```text
+<frontend-root>/.understand-anything/frontend-graph.json
 ```
 
-#### B3. Modify `domain-discoverer.md` — Frontend/Client Domain Heuristics
+Schema shape:
 
-Add after Rule 11:
-
-```markdown
-12. **Frontend/client domain splitting heuristic**: When the project is a frontend or
-    mobile app (detected by: majority of modules are in `pages/`, `screens/`, `views/`,
-    `features/`, `components/`, or module names contain "Screen"/"Page"/"View"/"Feature"):
-    - Group by **feature module** (e.g., "Login", "Profile", "Cart", "Feed") rather
-      than by API endpoint group
-    - Each feature module typically contains: screens/pages + related components +
-      feature-specific state + feature-specific API calls
-    - **Shared layers are NOT separate domains**: `components/`, `utils/`, `hooks/`,
-      `services/`, `store/` that serve multiple features are cross-cutting concerns,
-      not independent domains. Assign shared modules to the domain they most closely
-      serve, or mark as `utility` if truly generic.
-    - **Navigation as domain boundary signal**: If two screen groups have NO navigation
-      edges between them (users can't navigate from one to the other without going
-      through a hub), they are likely different domains.
+```json
+{
+  "version": "1.0.0",
+  "facetType": "frontend",
+  "project": {
+    "name": "admin-web",
+    "frameworks": ["React", "Vite"],
+    "languages": ["typescript"],
+    "provenance": {
+      "generationMode": "wiki",
+      "degraded": false,
+      "generatedAt": "2026-06-16T00:00:00.000Z",
+      "gitCommitHash": "c03bfdb"
+    }
+  },
+  "routes": [],
+  "pages": [],
+  "components": [],
+  "stateStores": [],
+  "apiCalls": [],
+  "features": [],
+  "contentHash": "sha256:0123456789abcdef"
+}
 ```
 
-#### B4. Modify `condense_kg_for_domain.py` — Preserve Navigation Topology
+Feature entry shape:
 
-Ensure the condensation preserves:
-1. All `routes` and `navigates_to` edges in `crossModuleEdges`
-2. Screen/Page nodes in `keyNodes` (not just endpoints and services)
-3. Component→Store dependency edges (critical for frontend domain boundaries)
-
----
-
-## Part C: understand-domain SKILL.md Restructuring — Platform-Aware Orchestration
-
-### C1. New Phase 1.5: Platform Detection
-
-Insert between existing Phase 1 (Detect Graph) and Phase 2 (Lightweight Scan):
-
-```markdown
-### Phase 1.5: Platform Type Detection
-
-Detect the project's platform type to select appropriate flow extraction strategy.
-
-1. Read project metadata from KG (`project.frameworks`, `project.languages`) or scan results
-2. Classify into one of: `backend`, `frontend`, `mobile-client`, `fullstack`
-
-**Classification rules (in priority order):**
-
-| Signal | Classification |
-|---|---|
-| frameworks contains Android/iOS/Flutter/React Native/HarmonyOS | `mobile-client` |
-| frameworks contains Vue/React/Next.js/Nuxt/Svelte AND no backend framework | `frontend` |
-| frameworks contains Spring/Express/Django/FastAPI/Gin/Rails | `backend` |
-| frameworks contains both frontend AND backend framework | `fullstack` |
-| >70% files are .kt/.swift/.dart AND path contains Activity/Fragment/ViewController | `mobile-client` |
-| >70% files are .vue/.tsx/.jsx AND path contains pages/views/components | `frontend` |
-| Default | `backend` |
-
-Store as `$PLATFORM_TYPE` for use in Phase 4.
+```json
+{
+  "id": "feature:order-management",
+  "name": "Order Management",
+  "sourceDomain": "domain:order-management",
+  "routes": ["/orders", "/orders/:id"],
+  "pages": ["src/pages/orders/List.tsx"],
+  "components": ["src/features/orders/OrderTable.tsx"],
+  "stateStores": ["src/stores/orderStore.ts"],
+  "apiCalls": [
+    {
+      "method": "GET",
+      "path": "/api/orders",
+      "source": "src/api/orders.ts",
+      "lineRange": [12, 18]
+    }
+  ],
+  "uiRules": [],
+  "interactionRules": [],
+  "stateTransitions": [],
+  "apiSequence": []
+}
 ```
 
-### C2. New Directory: `platforms/` with Three Flow Strategy Files
+## Frontend Business Semantics
 
+Frontend is not a pure page directory. A frontend domain represents a user-facing business capability.
+
+A frontend domain may include:
+
+- Routes and pages where users enter the capability.
+- Feature components that implement the interaction.
+- State stores and context providers that hold user-side state.
+- API clients and hooks that call backend services.
+- UI rules, interaction rules, state transitions, and API call sequences.
+
+Frontend business logic is usually **user-side orchestration and experience logic**, not the final authority for business correctness.
+
+Examples:
+
+- Form required-field checks.
+- Button enable/disable rules.
+- Role-based menu and action visibility.
+- Multi-step wizard ordering.
+- Loading, empty, error, retry, and success states.
+- Draft state and local cache behavior.
+- API request ordering.
+
+Backend services remain the authoritative source for:
+
+- Final validation.
+- Permission enforcement.
+- Data consistency.
+- Persistence.
+- Business rule decisions such as refund eligibility or balance checks.
+
+When frontend and backend appear to enforce the same rule, the frontend instance should be labeled as `clientPrecheck` or `uiRule`, not as the authoritative rule.
+
+## Phase 1 Extraction Enhancements
+
+### Route Extraction
+
+Add or improve deterministic extraction for:
+
+- React Router:
+  - `<Route path="...">`
+  - `createBrowserRouter([...])`
+  - `createRoutesFromElements(...)`
+- Vue Router:
+  - `{ path: "...", component: ... }`
+  - router modules under `router/`
+- Next.js:
+  - `app/**/page.tsx`
+  - `app/**/layout.tsx`
+  - `pages/**/*.tsx`
+- Nuxt:
+  - `pages/**/*.vue`
+  - `definePageMeta(...)`
+- Svelte and Angular:
+  - Recognize common route files where practical, with degraded extraction if framework-specific parsing is incomplete.
+
+### API Call Extraction
+
+Add deterministic or lightweight source scanning for:
+
+- `fetch("/api/...")`
+- `fetch(url, { method: "POST" })`
+- `axios.get/post/put/delete(...)`
+- common wrappers such as `request({ url, method })`
+- GraphQL client calls at a lightweight level, without requiring full schema analysis in Phase 1
+
+The extractor should emit endpoint nodes and `consumes_api` edges when it can identify method and path. If method is unknown, default to `GET` only when the call form strongly implies a read; otherwise mark method as `UNKNOWN` in frontend-graph and avoid inventing a server contract.
+
+### State And Store Extraction
+
+Recognize common state locations and patterns:
+
+- Redux store and slices.
+- Zustand stores.
+- Pinia and Vuex stores.
+- React Context providers.
+- Feature-local hooks or composables that maintain business state.
+
+State artifacts should be linked to pages/features through `depends_on` edges where possible.
+
+### Page And Component Recognition
+
+Recognize:
+
+- `pages/`, `views/`, `routes/`
+- `app/**/page.*`
+- `features/<feature>/...`
+- `components/`
+- framework-specific page and layout conventions
+
+Shared `components`, `utils`, `hooks`, and `composables` should not become standalone business domains unless they represent an actual product capability.
+
+## Phase 1 Domain Enhancements
+
+Frontend domain discovery should group by feature/page group:
+
+- `auth`
+- `checkout`
+- `order-management`
+- `dashboard`
+- `content-management`
+
+Frontend flow extraction should support these step sources:
+
+- `routes`
+- `depends_on`
+- `consumes_api`
+- `calls`
+- `contains`
+
+Flow entry points should usually be route, page, or user interaction, not HTTP endpoint. Valid frontend entry types include:
+
+- `navigation`
+- `screen`
+- `interaction`
+- `api-driven`
+
+Example flow:
+
+```text
+Login route -> render LoginForm -> validate credentials -> call POST /api/login -> store token -> navigate to dashboard
 ```
-skills/understand-domain/platforms/
-├── backend-flow.md    — Server-side: API endpoint → calls chain → DB
-├── frontend-flow.md   — Web frontend: page route → state → API call → render
-└── mobile-flow.md     — Mobile client: screen → ViewModel → Repository → API
+
+## Phase 1 Wiki And Frontend Graph Generation
+
+`/understand-wiki --repo-type=frontend` should:
+
+1. Ensure KG exists.
+2. Ensure DG exists.
+3. Generate wiki pages normally.
+4. Build `frontend-graph.json` from:
+   - KG route/API/store/page/component nodes and edges.
+   - DG domains, flows, and steps.
+   - Targeted lightweight source scanning where KG lacks route/API details.
+5. Validate `frontend-graph.json`.
+6. Mark frontend wiki complete only if wiki and frontend graph pass minimum completeness checks.
+
+Minimum frontend graph completeness:
+
+- `facetType == "frontend"`
+- non-empty `features[]`
+- each feature has at least one of `routes`, `pages`, `apiCalls`, `stateStores`, or `components`
+- project provenance exists
+- `contentHash` exists
+
+If routes or API calls are partially missing, the graph may be saved as degraded. If all feature evidence is missing, the wiki run should fail rather than silently claiming complete frontend support.
+
+## Phase 2 Business Integration
+
+Phase 2 extends the business panorama after the frontend artifact is stable.
+
+### `system.json`
+
+Frontend facet example:
+
+```json
+{
+  "type": "frontend",
+  "name": "Web Frontend",
+  "path": "frontend",
+  "subPaths": ["admin-web", "h5-web"],
+  "services": [
+    {
+      "name": "admin-web",
+      "path": "frontend/admin-web",
+      "platform": "web",
+      "framework": "react",
+      "confidence": "high"
+    }
+  ]
+}
 ```
 
-Each file contains:
-- Entry point identification strategy
-- Edge types to trace
-- Domain splitting heuristic for this platform
-- Worked examples (platform-specific)
-- `entryType` valid values for this platform
+Mobile remains limited to Android, iOS, and Flutter. React Native, Electron, and mini-apps are not folded into this design.
 
-### C3. Modify Phase 4c (Flow Extraction) to be Platform-Aware
+### Facet Availability
 
-```markdown
-#### Phase 4c: Flow Extraction (platform-aware dispatch)
+`check_facets.py` should treat frontend as available only when both files exist:
 
-1. Read the platform-specific flow strategy:
-   - IF $PLATFORM_TYPE == "backend": Read `./platforms/backend-flow.md`
-   - ELIF $PLATFORM_TYPE == "frontend": Read `./platforms/frontend-flow.md`
-   - ELIF $PLATFORM_TYPE == "mobile-client": Read `./platforms/mobile-flow.md`
-   - ELIF $PLATFORM_TYPE == "fullstack": Read both backend and frontend/mobile strategies
-2. Append the platform strategy content to the `domain-flow-extractor` agent prompt
-3. Dispatch agents as before (up to 10 concurrent)
+```text
+<frontend-facet>/.understand-anything/wiki/meta.json
+<frontend-facet>/.understand-anything/frontend-graph.json
 ```
 
-This means `domain-flow-extractor.md` stays as the base agent prompt (generic rules), and platform-specific rules are **injected at dispatch time** — same pattern as `/understand` uses for language/framework addendums.
+If wiki exists but frontend graph is missing, status is `degraded`.
 
----
+### Business Feature Assembly
 
-## Coverage Completeness Audit
+`understand-business` should:
 
-### Covered platforms after full implementation:
+- Load mobile features from mobile-specific artifacts.
+- Load frontend features from `frontend-graph.json`.
+- Associate frontend features to server domains through API paths and LLM-assisted association.
+- Preserve frontend-only features instead of dropping them.
+- Avoid forcing uncertain frontend/mobile merges.
 
-| Platform | /understand | /understand-domain |
-|---|---|---|
-| **Vue** | ⭐⭐⭐⭐⭐ vue.md | ⭐⭐⭐⭐⭐ frontend-flow.md |
-| **React** | ⭐⭐⭐⭐⭐ react.md | ⭐⭐⭐⭐⭐ frontend-flow.md |
-| **Next.js** | ⭐⭐⭐⭐⭐ nextjs.md | ⭐⭐⭐⭐⭐ frontend-flow.md |
-| **Nuxt** | ⭐⭐⭐⭐ nuxt.md (P2) | ⭐⭐⭐⭐⭐ frontend-flow.md |
-| **Svelte** | ⭐⭐⭐⭐ svelte.md (P2) | ⭐⭐⭐⭐⭐ frontend-flow.md |
-| **uni-app/Taro/小程序** | ⭐⭐⭐⭐ uni-app.md (P2) | ⭐⭐⭐⭐⭐ frontend-flow.md |
-| **Android** | ⭐⭐⭐⭐⭐ android.md (P0) | ⭐⭐⭐⭐⭐ mobile-flow.md |
-| **iOS** | ⭐⭐⭐⭐⭐ ios.md (P0) | ⭐⭐⭐⭐⭐ mobile-flow.md |
-| **Flutter** | ⭐⭐⭐⭐⭐ flutter.md | ⭐⭐⭐⭐⭐ mobile-flow.md |
-| **React Native** | ⭐⭐⭐⭐ react-native.md (P1) | ⭐⭐⭐⭐⭐ mobile-flow.md |
-| **HarmonyOS** | ⭐⭐⭐⭐ harmony.md (P1) | ⭐⭐⭐⭐⭐ mobile-flow.md |
-| **Electron/Tauri** | ⭐⭐⭐⭐ electron.md (P2) | ⭐⭐⭐⭐ frontend-flow.md |
+`business-features.json` should evolve from one `clientLayer` to `clientLayers[]`:
 
-### Platforms NOT covered (deliberate exclusion):
-- Angular (per user decision)
-- Kotlin Multiplatform (Kotlin lang support sufficient)
-- Xamarin/.NET MAUI (niche)
-- Qt/QML (niche)
+```json
+{
+  "id": "feature:order-management",
+  "name": "Order Management",
+  "clientLayers": [
+    {
+      "facetType": "frontend",
+      "service": "admin-web",
+      "routes": ["/orders"],
+      "pages": ["src/pages/orders/List.tsx"],
+      "apiCalls": ["GET /api/orders"]
+    },
+    {
+      "facetType": "mobile",
+      "service": "ios-app",
+      "screens": ["OrderListScreen"]
+    }
+  ],
+  "serverLayer": {
+    "primaryDomain": {
+      "name": "Order Management",
+      "service": "order-service"
+    },
+    "supportingDomains": []
+  }
+}
+```
 
----
+Backward compatibility should be preserved by emitting `clientLayer` as a derived field during a transition period. `clientLayer` should point to the first frontend or mobile entry in `clientLayers[]`, while new consumers must read `clientLayers[]`. A later cleanup can remove `clientLayer` after dashboard, query, wiki enrichment, and interaction generation all read the new array form.
 
-## Implementation Plan (Revised)
+### Dashboard And Wiki Drill-Down
 
-### Phase 1 (P0 — Core Support) — Estimated 3 days
+Dashboard and parent wiki should:
 
-| # | Task | File | Type |
-|---|---|---|---|
-| 1 | Create `frameworks/android.md` | skills/understand/frameworks/android.md | NEW |
-| 2 | Create `frameworks/ios.md` | skills/understand/frameworks/ios.md | NEW |
-| 3 | Restructure understand-domain SKILL.md — add Phase 1.5 Platform Detection | skills/understand-domain/SKILL.md | MODIFY |
-| 4 | Create `platforms/backend-flow.md` (extract existing backend logic) | skills/understand-domain/platforms/backend-flow.md | NEW |
-| 5 | Create `platforms/frontend-flow.md` | skills/understand-domain/platforms/frontend-flow.md | NEW |
-| 6 | Create `platforms/mobile-flow.md` | skills/understand-domain/platforms/mobile-flow.md | NEW |
-| 7 | Add entry point patterns to `extract-domain-context.py` | skills/understand-domain/extract-domain-context.py | MODIFY |
-| 8 | Add `navigates_to` to schema-reference.md | skills/understand/docs/schema-reference.md | MODIFY |
-| 9 | Update Phase 0 entry point list in understand SKILL.md | skills/understand/SKILL.md | MODIFY |
+- Show frontend as its own facet.
+- Let users drill from a business feature to frontend route/page/wiki domain.
+- Let users drill from the same feature to server domain wiki.
+- Render frontend routes/pages differently from mobile screens.
 
-### Phase 2 (P1 — Extended Support) — Estimated 2 days
+## Error Handling
 
-| # | Task | File | Type |
-|---|---|---|---|
-| 10 | Create `frameworks/react-native.md` | skills/understand/frameworks/react-native.md | NEW |
-| 11 | Create `frameworks/harmony.md` | skills/understand/frameworks/harmony.md | NEW |
-| 12 | Add frontend/client heuristics to `domain-discoverer.md` | agents/domain-discoverer.md | MODIFY |
-| 13 | Modify `condense_kg_for_domain.py` — preserve navigation topology | skills/understand-domain/condense_kg_for_domain.py | MODIFY |
+### Phase 1
 
-### Phase 3 (P2 — Complete Coverage) — Estimated 2 days
+- Missing route/API/store extraction does not block `knowledge-graph.json`, but should emit warnings.
+- If a frontend project is detected but domains are only shared technical layers such as `components`, `utils`, or `hooks`, mark domain extraction as degraded.
+- If wiki generation succeeds but `frontend-graph.json` has no meaningful features, the frontend wiki run should fail.
+- If only some route or API evidence is missing, save degraded frontend graph with provenance warnings.
 
-| # | Task | File | Type |
-|---|---|---|---|
-| 14 | Create `frameworks/nuxt.md` | skills/understand/frameworks/nuxt.md | NEW |
-| 15 | Create `frameworks/uni-app.md` (includes Taro + WeChat mini-program) | skills/understand/frameworks/uni-app.md | NEW |
-| 16 | Create `frameworks/svelte.md` | skills/understand/frameworks/svelte.md | NEW |
-| 17 | Create `frameworks/electron.md` | skills/understand/frameworks/electron.md | NEW |
+### Phase 2
 
----
+- If a frontend facet lacks `frontend-graph.json`, mark it as degraded and continue with server/mobile.
+- If a frontend feature cannot be associated with a server domain, keep it as a client-only feature.
+- If frontend and mobile features look similar but evidence is weak, do not merge them automatically. Record a candidate relation for later review.
 
-## Backward Compatibility
+## Testing Strategy
 
-All changes are **additive**:
-- New framework addendums are only injected when the framework is detected in Phase 1 scan
-- New entry point patterns in `extract-domain-context.py` don't affect existing backend patterns
-- New rules in `domain-flow-extractor.md` are conditional ("when project is frontend or mobile")
-- New `navigates_to` edge type doesn't break existing graphs (old graphs simply don't have these edges)
-- `domain-discoverer.md` new Rule 12 only activates for frontend/mobile projects
+### Phase 1 Tests
 
-Backend-only projects will see **zero behavioral change**.
+Fixtures should cover:
 
----
+- React Router + axios/fetch + Zustand or Redux.
+- Vue Router + Pinia + request wrapper.
+- Next app router + fetch.
+- Nuxt pages + composables + API wrapper.
 
-## Verification Plan
+Tests should verify:
 
-1. **Unit test**: Run `/understand` on a sample Vue 3 + Pinia project → verify framework detected, layers assigned correctly, `navigates_to` edges created between pages
-2. **Unit test**: Run `/understand` on a sample Android Jetpack Compose project → verify Activities/Composables identified, navigation graph captured
-3. **Unit test**: Run `/understand-domain` on a Vue project → verify pages detected as entry points, domain split by feature module, flows trace user journeys
-4. **Unit test**: Run `/understand-domain` on an Android project → verify screens detected, domain split by feature, flows include navigation steps
-5. **Regression test**: Run `/understand` + `/understand-domain` on existing backend project → verify output unchanged
+- Route extraction.
+- API call extraction.
+- Store recognition.
+- Domain grouping by feature rather than shared technical directories.
+- `frontend-graph.json` schema validation.
+- Degraded status when partial frontend evidence is missing.
 
----
+### Phase 2 Tests
 
-## Open Questions
+Tests should verify:
 
-1. Should `navigates_to` be a new edge type or should we overload the existing `routes` edge for screen→screen navigation?
-2. For uni-app/mini-programs: should we create a separate `miniprogram` node type or reuse `file`?
-3. Should the dashboard render `navigates_to` edges differently (e.g., dashed arrows with a navigation icon)?
+- `scenario_detector.py` treats `server + frontend` as `client_server`.
+- `check_facets.py` uses `frontend-graph.json` for frontend availability.
+- `association_discovery.py` consumes frontend features.
+- `assemble_business_features.py` supports `clientLayers[]`.
+- frontend-only features are preserved.
+- `server + mobile + frontend` does not overwrite or collapse client layers incorrectly.
+- existing mobile `client-graph.json` behavior remains unchanged.
+
+## Non-Goals
+
+This design does not include:
+
+- Electron support.
+- React Native support.
+- uni-app or mini-app support.
+- Full GraphQL schema reasoning.
+- Full dashboard redesign in Phase 1.
+- Treating frontend prechecks as authoritative backend business rules.
+
+## Success Criteria
+
+Phase 1 is successful when:
+
+- Web frontend projects produce useful KG, DG, wiki, and `frontend-graph.json`.
+- `frontend-graph.json` captures user-facing features with routes/pages/components/state/API evidence.
+- frontend domain extraction models user journeys, not just page folders.
+- The artifact is stable enough for Phase 2 business aggregation.
+
+Phase 2 is successful when:
+
+- frontend appears as a first-class facet in `system.json`, business panorama, and dashboard.
+- `business-features.json` can represent frontend and mobile as distinct client layers for the same business feature.
+- frontend business semantics are represented as user-side orchestration and prechecks, while backend remains the authoritative business execution layer.
