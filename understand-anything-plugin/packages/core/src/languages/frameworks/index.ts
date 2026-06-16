@@ -11,6 +11,9 @@ import { springConfig } from "./spring.js";
 import { railsConfig } from "./rails.js";
 import { ginConfig } from "./gin.js";
 import { hiltConfig } from "./hilt.js";
+import { nuxtConfig } from "./nuxt.js";
+import { svelteConfig } from "./svelte.js";
+import { angularConfig } from "./angular.js";
 
 export const builtinFrameworkConfigs: FrameworkConfig[] = [
   djangoConfig,
@@ -24,6 +27,9 @@ export const builtinFrameworkConfigs: FrameworkConfig[] = [
   railsConfig,
   ginConfig,
   hiltConfig,
+  nuxtConfig,
+  svelteConfig,
+  angularConfig,
 ];
 
 export {
@@ -38,4 +44,7 @@ export {
   railsConfig,
   ginConfig,
   hiltConfig,
+  nuxtConfig,
+  svelteConfig,
+  angularConfig,
 };

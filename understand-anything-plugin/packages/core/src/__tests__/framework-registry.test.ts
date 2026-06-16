@@ -70,6 +70,39 @@ describe("FrameworkRegistry", () => {
       expect(registry.detectFrameworks({})).toEqual([]);
     });
 
+    it("detects Nuxt from package.json nuxt dependency", async () => {
+      const { nuxtConfig } = await import("../languages/frameworks/nuxt.js");
+      const registry = new FrameworkRegistry();
+      registry.register(nuxtConfig);
+      const detected = registry.detectFrameworks({
+        "package.json": '{"dependencies": {"nuxt": "^3.11.0"}}',
+      });
+      expect(detected).toHaveLength(1);
+      expect(detected[0].id).toBe("nuxt");
+    });
+
+    it("detects Svelte from package.json svelte dependency", async () => {
+      const { svelteConfig } = await import("../languages/frameworks/svelte.js");
+      const registry = new FrameworkRegistry();
+      registry.register(svelteConfig);
+      const detected = registry.detectFrameworks({
+        "package.json": '{"dependencies": {"@sveltejs/kit": "^2.5.0", "svelte": "^4.0.0"}}',
+      });
+      expect(detected).toHaveLength(1);
+      expect(detected[0].id).toBe("svelte");
+    });
+
+    it("detects Angular from package.json @angular/core dependency", async () => {
+      const { angularConfig } = await import("../languages/frameworks/angular.js");
+      const registry = new FrameworkRegistry();
+      registry.register(angularConfig);
+      const detected = registry.detectFrameworks({
+        "package.json": '{"dependencies": {"@angular/core": "^17.3.0", "@angular/common": "^17.3.0"}}',
+      });
+      expect(detected).toHaveLength(1);
+      expect(detected[0].id).toBe("angular");
+    });
+
     it("does not duplicate detected frameworks", () => {
       const registry = new FrameworkRegistry();
       registry.register(djangoConfig);
@@ -106,9 +139,9 @@ describe("FrameworkRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 11 built-in framework configs", () => {
+    it("registers all 14 built-in framework configs", () => {
       const registry = FrameworkRegistry.createDefault();
-      expect(registry.getAllFrameworks()).toHaveLength(11);
+      expect(registry.getAllFrameworks()).toHaveLength(14);
     });
 
     it("includes frameworks for multiple languages", () => {
