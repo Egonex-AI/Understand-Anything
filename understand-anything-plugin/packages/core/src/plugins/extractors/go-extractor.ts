@@ -269,6 +269,21 @@ export class GoExtractor implements LanguageExtractor {
     // A type_declaration can hold multiple type_spec children when types are
     // grouped, e.g. `type ( Foo struct{...}; Bar struct{...} )`.  Iterate over
     // all of them so every grouped type is captured, not just the first.
+    //
+    // We use the per-spec `type_spec` node (not the outer `type_declaration`)
+    // as the declNode so each grouped type reports its own line range; for a
+    // non-grouped `type Foo struct{...}` the spec and the `type` keyword sit on
+    // the same physical line, so the line range is unchanged.
+    //
+    // Only struct_type / interface_type specs are modeled as `classes`. Other
+    // forms are intentionally not captured (mirroring the pre-fix behavior):
+    //   - named-primitive / defined-type specs (`type Count int`) whose `type`
+    //     field is a type_identifier, qualified_type, etc.
+    //   - type alias specs (`type MyID = string`), which the grammar parses as
+    //     a separate `type_alias` node rather than `type_spec`, so they are not
+    //     even visited by this loop.
+    // Modeling these as graph nodes is a broader type-model question; see the
+    // PR discussion / a follow-up issue if alias/defined-type capture is wanted.
     const typeSpecs = findChildren(node, "type_spec");
     for (const typeSpec of typeSpecs) {
       const nameNode = typeSpec.childForFieldName("name");

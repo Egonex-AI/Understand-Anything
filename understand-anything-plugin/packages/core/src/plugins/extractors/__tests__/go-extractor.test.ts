@@ -622,6 +622,53 @@ func (s Stack[T]) Len() int {
       tree.delete();
       parser.delete();
     });
+
+    it("attaches methods on multi-parameter generic receivers", () => {
+      const { tree, parser, root } = parse(`package main
+
+type Box[K comparable, V any] struct {
+    data map[K]V
+}
+
+func (b *Box[K, V]) Get(k K) V {
+    var zero V
+    return zero
+}
+
+func (b Box[K, V]) Len() int {
+    return 0
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("Box");
+      expect(result.classes[0].methods.sort()).toEqual(["Get", "Len"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("attaches methods on constrained generic receivers", () => {
+      const { tree, parser, root } = parse(`package main
+
+type Result[T comparable] struct {
+    value T
+}
+
+func (r Result[T comparable]) Ok() bool {
+    return true
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("Result");
+      expect(result.classes[0].methods).toContain("Ok");
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Grouped type declarations ----
@@ -642,6 +689,54 @@ type (
       const exportNames = result.exports.map((e) => e.name);
       expect(exportNames).toContain("Foo");
       expect(exportNames).toContain("Bar");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("handles a grouped block mixing struct and interface specs", () => {
+      const { tree, parser, root } = parse(`package main
+
+type (
+    Foo struct { A int }
+    Bar interface { Read() error }
+)
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toEqual(["Foo", "Bar"]);
+
+      const foo = result.classes.find((c) => c.name === "Foo")!;
+      expect(foo.properties).toEqual(["A"]);
+      expect(foo.methods).toEqual([]);
+
+      const bar = result.classes.find((c) => c.name === "Bar")!;
+      expect(bar.methods).toContain("Read");
+      expect(bar.properties).toEqual([]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("handles a grouped block of two interfaces", () => {
+      const { tree, parser, root } = parse(`package main
+
+type (
+    Reader interface { Read() error }
+    Writer interface { Write(p []byte) (int, error) }
+)
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toEqual(["Reader", "Writer"]);
+
+      const reader = result.classes.find((c) => c.name === "Reader")!;
+      expect(reader.methods).toEqual(["Read"]);
+      expect(reader.properties).toEqual([]);
+
+      const writer = result.classes.find((c) => c.name === "Writer")!;
+      expect(writer.methods).toEqual(["Write"]);
+      expect(writer.properties).toEqual([]);
 
       tree.delete();
       parser.delete();
