@@ -776,5 +776,148 @@ void net::Server::start() {}
       tree.delete();
       parser.delete();
     });
+
+    it("combines namespace recursion + qualifier resolution (class inside namespace, out-of-class def)", () => {
+      const { tree, parser, root } = parse(`
+namespace net {
+    class Server {
+    public:
+        void start();
+    };
+}
+
+void net::Server::start() {}
+`);
+      const result = extractor.extractStructure(root);
+
+      // The out-of-class definition resolves to the immediate scope "Server",
+      // so the Server class (declared inside namespace net) gains method "start".
+      const server = result.classes.find((c) => c.name === "Server");
+      expect(server).toBeDefined();
+      expect(server!.methods).toContain("start");
+
+      // No qualified leftover name leaks into functions.
+      const fnNames = result.functions.map((f) => f.name);
+      expect(fnNames).toContain("start");
+      expect(fnNames).not.toContain("Server::start");
+      expect(fnNames).not.toContain("net::Server::start");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("locks the multi-level qualifier walk with a three-segment name (a::b::Server::foo)", () => {
+      const { tree, parser, root } = parse(`
+class Server {
+public:
+    void foo();
+};
+
+void a::b::Server::foo() {}
+`);
+      const result = extractor.extractStructure(root);
+
+      // The leaf identifier is the name; the immediate scope "Server" is the qualifier.
+      const fnNames = result.functions.map((f) => f.name);
+      expect(fnNames).toContain("foo");
+      expect(fnNames).not.toContain("Server::foo");
+      expect(fnNames).not.toContain("b::Server::foo");
+
+      const server = result.classes.find((c) => c.name === "Server");
+      expect(server).toBeDefined();
+      expect(server!.methods).toContain("foo");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures variadic parameter-pack params (variadic_parameter_declaration)", () => {
+      const { tree, parser, root } = parse(
+        `template <typename... Ts> void f(int a, Ts... xs) {}`,
+      );
+      const result = extractor.extractStructure(root);
+
+      const f = result.functions.find((fn) => fn.name === "f");
+      expect(f).toBeDefined();
+      expect(f!.params).toEqual(["a", "xs"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("strips template arguments from a templated qualifier (Box<T>::get matches Box)", () => {
+      const { tree, parser, root } = parse(`
+template <typename T> class Box {
+public:
+    void get();
+};
+
+template <typename T> void Box<T>::get() {}
+`);
+      const result = extractor.extractStructure(root);
+
+      // Box<T>::get must associate with the class registered as "Box", not "Box<T>".
+      const box = result.classes.find((c) => c.name === "Box");
+      expect(box).toBeDefined();
+      expect(box!.methods).toContain("get");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures in-class member templates (template_declaration inside class body)", () => {
+      const { tree, parser, root } = parse(`
+class Foo {
+public:
+    template <class T> void bar(T x);
+    template <class U> U baz(U y) { return y; }
+};
+`);
+      const result = extractor.extractStructure(root);
+
+      const foo = result.classes.find((c) => c.name === "Foo");
+      expect(foo).toBeDefined();
+      // Both the declaration-only and inline member templates are captured.
+      expect(foo!.methods).toContain("bar");
+      expect(foo!.methods).toContain("baz");
+
+      // The inline member template also appears as a function with params.
+      const bazFn = result.functions.find((fn) => fn.name === "baz");
+      expect(bazFn).toBeDefined();
+      expect(bazFn!.params).toEqual(["y"]);
+
+      // Public member templates are exported.
+      const exportNames = result.exports.map((e) => e.name);
+      expect(exportNames).toContain("bar");
+      expect(exportNames).toContain("baz");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures out-of-class member templates (nested template_declaration)", () => {
+      const { tree, parser, root } = parse(`
+template <class T> class Box {
+public:
+    template <class U> void set(U u);
+};
+
+template <class T> template <class U> void Box<T>::set(U u) {}
+`);
+      const result = extractor.extractStructure(root);
+
+      // The nested-template out-of-class definition resolves to the leaf name
+      // "set" and associates with the bare class "Box".
+      const setFn = result.functions.find((fn) => fn.name === "set");
+      expect(setFn).toBeDefined();
+      expect(setFn!.params).toEqual(["u"]);
+
+      const box = result.classes.find((c) => c.name === "Box");
+      expect(box).toBeDefined();
+      expect(box!.methods).toContain("set");
+
+      tree.delete();
+      parser.delete();
+    });
   });
 });
