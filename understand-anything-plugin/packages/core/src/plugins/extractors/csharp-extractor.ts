@@ -59,37 +59,47 @@ function hasModifier(node: TreeSitterNode, modifier: string): boolean {
  *
  * Handles both simple identifiers (`using System;`) and qualified names
  * (`using System.Collections.Generic;`). For aliased usings like
- * `using Alias = Some.Namespace;`, extracts the target namespace.
+ * `using Alias = Some.Namespace;`, extracts the target namespace (the part
+ * after the `=`, not the alias). `global using` forms parse as a
+ * `using_directive` with a leading `global` child, so they flow through the
+ * same single pass below.
  */
 function extractUsingSource(node: TreeSitterNode): string | null {
-  // Check for alias form: `using Alias = Some.Namespace;`
-  const hasEquals = findChild(node, "=") !== null;
+  // A single pass over the children covers every using shape:
+  //   `using System;`                          -> first identifier
+  //   `using System.Collections.Generic;`      -> qualified_name
+  //   `using Alias = System;`                  -> identifier AFTER the `=`
+  //   `using Alias = System.Collections.X;`    -> qualified_name AFTER the `=`
+  // The alias name (before `=`) is intentionally skipped; `source` is always
+  // the target namespace.
+  let target: string | null = null;
 
-  if (hasEquals) {
-    // The target namespace is the qualified_name after the `=`
-    const qualifiedName = findChild(node, "qualified_name");
-    if (qualifiedName) return qualifiedName.text;
-    // Simple-identifier target (`using Alias = System;`): the target is the
-    // identifier AFTER the `=`, not the first identifier (which is the alias).
-    let seenEquals = false;
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.child(i);
-      if (!child) continue;
-      if (child.type === "=") {
-        seenEquals = true;
-        continue;
-      }
-      if (seenEquals && child.type === "identifier") return child.text;
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (!child) continue;
+
+    if (child.type === "=") {
+      // Discard anything seen before the `=` (that was the alias name) and
+      // resume scanning for the real target after it.
+      target = null;
+      continue;
     }
-    return null;
+
+    if (child.type === "qualified_name") {
+      // qualified_name is unambiguous: take it immediately whether or not we
+      // are in an alias directive.
+      return child.text;
+    }
+
+    if (child.type === "identifier" && target === null) {
+      // First identifier (the post-`=` one in the alias case). For a simple
+      // target this is the answer; we keep scanning in case a qualified_name
+      // follows (it would win above).
+      target = child.text;
+    }
   }
 
-  // Simple or qualified using
-  const qualifiedName = findChild(node, "qualified_name");
-  if (qualifiedName) return qualifiedName.text;
-
-  const identifier = findChild(node, "identifier");
-  return identifier ? identifier.text : null;
+  return target;
 }
 
 /**
@@ -236,6 +246,10 @@ export class CSharpExtractor implements LanguageExtractor {
 
       switch (child.type) {
         case "using_directive":
+          // Covers `using X;`, `using X.Y;`, `using A = X;`, and the C# 10
+          // `global using ...` forms — tree-sitter-c-sharp parses the latter
+          // as a `using_directive` with a leading `global` modifier child
+          // rather than a distinct node type.
           this.extractUsing(child, imports);
           break;
 
