@@ -132,6 +132,51 @@ def f(a: int, *args: str, b: int = 0, **kwargs: bool):
       parser.delete();
     });
 
+    it("extracts a typed **kwargs without a preceding typed *args", () => {
+      // Locks the dictionary_splat_pattern arm of the typed_parameter
+      // branch independently of the list_splat arm.
+      const { tree, parser, root } = parse(`
+def g(x: int, **kwargs: bool):
+    pass
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions[0].params).toEqual(["x", "**kwargs"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a typed *args without a preceding typed **kwargs", () => {
+      // Locks the list_splat_pattern arm of the typed_parameter branch
+      // independently of the dict-splat arm.
+      const { tree, parser, root } = parse(`
+def h(*args: int):
+    pass
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions[0].params).toEqual(["*args"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts typed variadics on async functions", () => {
+      const { tree, parser, root } = parse(`
+async def fetch(a: int, *args: str, **kwargs: bool):
+    pass
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("fetch");
+      expect(result.functions[0].params).toEqual(["a", "*args", "**kwargs"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts decorated functions", () => {
       const { tree, parser, root } = parse(`
 @decorator
