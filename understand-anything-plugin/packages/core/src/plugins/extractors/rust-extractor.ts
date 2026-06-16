@@ -127,7 +127,11 @@ export class RustExtractor implements LanguageExtractor {
           break;
 
         case "use_declaration":
-          this.extractUseDeclaration(node, imports);
+          this.extractUseDeclaration(node, imports, exports);
+          break;
+
+        case "extern_crate_declaration":
+          this.extractExternCrate(node, imports, exports);
           break;
       }
     }
@@ -429,9 +433,15 @@ export class RustExtractor implements LanguageExtractor {
   private extractUseDeclaration(
     node: TreeSitterNode,
     imports: StructuralAnalysis["imports"],
+    exports: StructuralAnalysis["exports"],
   ): void {
     const argument = node.childForFieldName("argument");
     if (!argument) return;
+
+    const lineNumber = node.startPosition.row + 1;
+    // `pub use foo::Bar as Baz;` is a public re-export — every binding it
+    // introduces (the alias `Baz`, or each specifier name) is also an export.
+    const isReExport = isPublic(node);
 
     switch (argument.type) {
       case "identifier":
@@ -439,8 +449,11 @@ export class RustExtractor implements LanguageExtractor {
         imports.push({
           source: argument.text,
           specifiers: [argument.text],
-          lineNumber: node.startPosition.row + 1,
+          lineNumber,
         });
+        if (isReExport) {
+          exports.push({ name: argument.text, lineNumber });
+        }
         break;
 
       case "scoped_identifier": {
@@ -449,8 +462,11 @@ export class RustExtractor implements LanguageExtractor {
         imports.push({
           source: path,
           specifiers: [name],
-          lineNumber: node.startPosition.row + 1,
+          lineNumber,
         });
+        if (isReExport && name) {
+          exports.push({ name, lineNumber });
+        }
         break;
       }
 
@@ -462,34 +478,21 @@ export class RustExtractor implements LanguageExtractor {
         const specifiers: string[] = [];
 
         if (listNode) {
-          for (let j = 0; j < listNode.childCount; j++) {
-            const ch = listNode.child(j);
-            if (!ch) continue;
-            if (ch.type === "self" || ch.type === "identifier") {
-              specifiers.push(ch.text);
-            } else if (ch.type === "scoped_identifier") {
-              // Nested scoped identifier inside a use list
-              specifiers.push(ch.text);
-            } else if (ch.type === "use_as_clause") {
-              // Renamed member: `Read as R`
-              const aliasNode = ch.childForFieldName("alias");
-              const pathNode = ch.childForFieldName("path");
-              specifiers.push(
-                aliasNode
-                  ? aliasNode.text
-                  : pathNode
-                    ? pathNode.text
-                    : ch.text,
-              );
-            }
-          }
+          this.collectUseListSpecifiers(listNode, specifiers);
         }
 
         imports.push({
           source,
           specifiers,
-          lineNumber: node.startPosition.row + 1,
+          lineNumber,
         });
+        if (isReExport) {
+          for (const spec of specifiers) {
+            if (spec !== "self" && spec !== "*") {
+              exports.push({ name: spec, lineNumber });
+            }
+          }
+        }
         break;
       }
 
@@ -503,8 +506,10 @@ export class RustExtractor implements LanguageExtractor {
         imports.push({
           source,
           specifiers: ["*"],
-          lineNumber: node.startPosition.row + 1,
+          lineNumber,
         });
+        // A `pub use ...::*;` glob re-export introduces no statically-known
+        // binding names, so there is nothing concrete to add to `exports`.
         break;
       }
 
@@ -518,11 +523,15 @@ export class RustExtractor implements LanguageExtractor {
           pathNode && pathNode.type === "scoped_identifier"
             ? extractScopedPath(pathNode)
             : { path: "", name: pathNode ? pathNode.text : "" };
+        const specifier = alias || name;
         imports.push({
           source: path || name,
-          specifiers: [alias || name],
-          lineNumber: node.startPosition.row + 1,
+          specifiers: [specifier],
+          lineNumber,
         });
+        if (isReExport && specifier) {
+          exports.push({ name: specifier, lineNumber });
+        }
         break;
       }
 
@@ -531,10 +540,88 @@ export class RustExtractor implements LanguageExtractor {
         imports.push({
           source: argument.text,
           specifiers: [argument.text],
-          lineNumber: node.startPosition.row + 1,
+          lineNumber,
         });
         break;
       }
+    }
+  }
+
+  /**
+   * Collect the binding names from a `use_list` node into `specifiers`,
+   * recursing into nested grouped lists.
+   *
+   * tree-sitter-rust parses `use a::{b::{C, D}};` as a `scoped_use_list`
+   * whose `list` is a `use_list` containing a *nested* `scoped_use_list`
+   * (`b::{C, D}`). Without recursion the nested group matches none of the
+   * leaf branches and its members (`C`, `D`) are silently dropped. This
+   * helper walks both `scoped_use_list` and bare `use_list` children so all
+   * leaf specifiers surface regardless of nesting depth.
+   */
+  private collectUseListSpecifiers(
+    listNode: TreeSitterNode,
+    specifiers: string[],
+  ): void {
+    for (let j = 0; j < listNode.childCount; j++) {
+      const ch = listNode.child(j);
+      if (!ch) continue;
+      if (
+        ch.type === "self" ||
+        ch.type === "identifier" ||
+        ch.type === "scoped_identifier"
+      ) {
+        specifiers.push(ch.text);
+      } else if (ch.type === "use_as_clause") {
+        // Renamed member: `Read as R`
+        const aliasNode = ch.childForFieldName("alias");
+        const pathNode = ch.childForFieldName("path");
+        specifiers.push(
+          aliasNode ? aliasNode.text : pathNode ? pathNode.text : ch.text,
+        );
+      } else if (ch.type === "scoped_use_list") {
+        // Nested group: `b::{C, D}` — recurse into its inner `use_list`.
+        const innerList = ch.childForFieldName("list");
+        if (innerList) {
+          this.collectUseListSpecifiers(innerList, specifiers);
+        }
+      } else if (ch.type === "use_list") {
+        // Bare nested list (defensive — recurse directly).
+        this.collectUseListSpecifiers(ch, specifiers);
+      } else if (ch.type === "use_wildcard") {
+        // Glob inside a group: `a::{b::*, C}`.
+        specifiers.push("*");
+      }
+    }
+  }
+
+  /**
+   * Handle `extern crate serde;` and `extern crate serde as s;`.
+   *
+   * Parsed as `extern_crate_declaration` with a `name` field (the crate) and
+   * an optional `alias` field. The crate is recorded as an import; an `as`
+   * alias is the local binding, so it is used as the specifier.
+   */
+  private extractExternCrate(
+    node: TreeSitterNode,
+    imports: StructuralAnalysis["imports"],
+    exports: StructuralAnalysis["exports"],
+  ): void {
+    const nameNode = node.childForFieldName("name");
+    if (!nameNode) return;
+
+    const aliasNode = node.childForFieldName("alias");
+    const lineNumber = node.startPosition.row + 1;
+    const specifier = aliasNode ? aliasNode.text : nameNode.text;
+
+    imports.push({
+      source: nameNode.text,
+      specifiers: [specifier],
+      lineNumber,
+    });
+
+    // `pub extern crate serde as s;` re-exports the binding.
+    if (isPublic(node)) {
+      exports.push({ name: specifier, lineNumber });
     }
   }
 }
