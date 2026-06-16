@@ -650,11 +650,24 @@ export function validateGraph(data: unknown): ValidationResult {
     }
   }
 
+  // Preserve a valid `kind` enum value; an out-of-enum value is dropped with
+  // an auto-corrected issue so a typo / stale extractor value is surfaced
+  // rather than silently narrowed to undefined.
+  const validKind = fixed.kind === "codebase" || fixed.kind === "knowledge"
+    ? (fixed.kind as "codebase" | "knowledge")
+    : undefined;
+  if (fixed.kind !== undefined && validKind === undefined) {
+    issues.push({
+      level: "auto-corrected",
+      category: "out-of-range",
+      message: `"kind" ${JSON.stringify(fixed.kind)} is not one of "codebase" | "knowledge" — dropped`,
+      path: "kind",
+    });
+  }
+
   const graph = {
     version: typeof fixed.version === "string" ? fixed.version : "1.0.0",
-    ...(fixed.kind === "codebase" || fixed.kind === "knowledge"
-      ? { kind: fixed.kind as "codebase" | "knowledge" }
-      : {}),
+    ...(validKind !== undefined ? { kind: validKind } : {}),
     project: projectResult.data,
     nodes: validNodes,
     edges: validEdges,

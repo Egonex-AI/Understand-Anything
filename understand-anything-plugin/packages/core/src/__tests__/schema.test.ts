@@ -66,19 +66,40 @@ describe("schema validation", () => {
     expect(result.issues).toEqual([]);
   });
 
-  it("preserves the kind field for knowledge graphs", () => {
+  it.each([
+    ["codebase", "codebase"],
+    ["knowledge", "knowledge"],
+    ["bogus", undefined],
+    [undefined, undefined],
+  ] as const)("carries kind=%j through validation as %j", (input, expected) => {
     const graph = structuredClone(validGraph);
-    (graph as any).kind = "knowledge";
+    if (input === undefined) {
+      delete (graph as any).kind;
+    } else {
+      (graph as any).kind = input;
+    }
 
     const result = validateGraph(graph);
     expect(result.success).toBe(true);
-    expect(result.data!.kind).toBe("knowledge");
+    expect(result.data!.kind).toBe(expected);
   });
 
-  it("leaves kind undefined when the input omits it", () => {
-    const result = validateGraph(validGraph);
+  it("emits an auto-corrected issue when kind is out of enum", () => {
+    const graph = structuredClone(validGraph);
+    (graph as any).kind = "bogus";
+
+    const result = validateGraph(graph);
     expect(result.success).toBe(true);
     expect(result.data!.kind).toBeUndefined();
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ level: "auto-corrected", category: "out-of-range", path: "kind" })
+    );
+  });
+
+  it("does not emit a kind issue when kind is omitted", () => {
+    const result = validateGraph(validGraph);
+    expect(result.success).toBe(true);
+    expect(result.issues).toEqual([]);
   });
 
   it("rejects graph with missing required fields", () => {
