@@ -321,10 +321,22 @@ end
 `);
       const result = extractor.extractStructure(root);
 
-      expect(result.classes.map((c) => c.name)).toEqual(
-        expect.arrayContaining(["Outer", "Inner"]),
-      );
+      // Order is deterministic: extractClassBody recurses into (and pushes)
+      // the nested `Inner` before the enclosing `Outer` is pushed, so the
+      // flat classes[] is [Inner, Outer], not source order. Assert exactly
+      // so an ordering change (or a regression in either direction) is caught.
+      expect(result.classes.map((c) => c.name)).toEqual(["Inner", "Outer"]);
       expect(result.functions.some((f) => f.name === "foo")).toBe(true);
+
+      // The nested method `foo` belongs to Inner, NOT Outer. Locking this
+      // guards the most likely regression if the class/module branches were
+      // ever folded back into the method-collection path.
+      const inner = result.classes.find((c) => c.name === "Inner");
+      const outer = result.classes.find((c) => c.name === "Outer");
+      expect(inner).toBeDefined();
+      expect(outer).toBeDefined();
+      expect(inner!.methods).toContain("foo");
+      expect(outer!.methods).not.toContain("foo");
 
       tree.delete();
       parser.delete();
