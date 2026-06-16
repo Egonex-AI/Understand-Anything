@@ -189,18 +189,55 @@ export class JavaExtractor implements LanguageExtractor {
   // ---- Private helpers ----
 
   /**
+   * Receiver node types we treat as "simple" — their `.text` is a plain dotted
+   * name (no parentheses, casts, or other expression tokens), so it is safe to
+   * prefix onto the method name to form a qualified callee.
+   *
+   * Anything not in this allowlist (e.g. `method_invocation` from a fluent
+   * chain like `builder().build()`, `object_creation_expression` from
+   * `new Foo().bar()`, or `parenthesized_expression`/`cast_expression` from
+   * `((Foo) x).bar()`) would leak `()`/cast tokens into the callee, so we fall
+   * back to the bare method name for those.
+   */
+  private static readonly SIMPLE_RECEIVER_TYPES = new Set([
+    "identifier",
+    "field_access",
+    "scoped_identifier",
+    "this",
+    "super",
+  ]);
+
+  /**
    * Extract the callee name from a method_invocation node.
    *
    * Handles:
    * - Plain method call: `fetchFromDb(limit)` -> "fetchFromDb"
    * - Qualified call: `System.out.println(msg)` -> "System.out.println"
+   * - Chained/complex receivers: `builder().build()` -> "build",
+   *   `new Foo().bar()` -> "bar", `((Foo) x).bar()` -> "bar"
+   *
+   * For chained or otherwise non-simple receivers we intentionally drop the
+   * receiver and emit only the bare method name. This keeps the callee a clean
+   * identifier (never a string containing `()` or cast tokens). The inner call
+   * of a chain (e.g. `builder()`) is still visited independently by the walker
+   * and emits its own entry, so no call is lost.
+   *
+   * TODO(call-graph disambiguation, see #435): dropping the receiver collapses
+   * distinct fluent terminals (`a.build()` vs `b.build()`) into one bare
+   * `build`. A future receiver-typed callee form (e.g. recursing into the inner
+   * method_invocation to synthesize `builder.build`) would preserve more signal
+   * for downstream consumers; the cascade-shaped Dart extractor will hit the
+   * same problem.
    */
   private extractMethodInvocationName(node: TreeSitterNode): string | null {
     const nameNode = node.childForFieldName("name");
     if (!nameNode) return null;
 
     const objectNode = node.childForFieldName("object");
-    if (objectNode && objectNode.type !== "method_invocation") {
+    if (
+      objectNode &&
+      JavaExtractor.SIMPLE_RECEIVER_TYPES.has(objectNode.type)
+    ) {
       return `${objectNode.text}.${nameNode.text}`;
     }
 
