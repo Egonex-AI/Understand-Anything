@@ -8,7 +8,7 @@ import {
   chmodSync,
   existsSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, devNull } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -29,14 +29,17 @@ const SCRIPT = resolve(
  * $XDG_CONFIG_HOME/git/ignore (or ~/.config/git/ignore) even with no config
  * file, so the knob itself must be overridden. Passing this env to every git
  * invocation makes the fixtures hermetic against any host config.
+ *
+ * `os.devNull` is used instead of a literal '/dev/null' so the null sink is
+ * valid on Windows too (`NUL`), where contributors also run these tests.
  */
 const HERMETIC_GIT_ENV = {
   ...process.env,
-  GIT_CONFIG_GLOBAL: '/dev/null',
-  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: devNull,
+  GIT_CONFIG_SYSTEM: devNull,
   GIT_CONFIG_COUNT: '1',
   GIT_CONFIG_KEY_0: 'core.excludesFile',
-  GIT_CONFIG_VALUE_0: '/dev/null',
+  GIT_CONFIG_VALUE_0: devNull,
 };
 
 /**
