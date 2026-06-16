@@ -12,7 +12,23 @@ export function traverse(
   }
 }
 
-/** Extract the unquoted string value from a string-like node. */
+/**
+ * Extract the raw inner text of a string-like node, with quotes stripped.
+ *
+ * This concatenates the text of all `string_fragment` / `escape_sequence`
+ * children so the full value is preserved across escape sequences (e.g.
+ * `'./a\tb'` yields `./a\tb`, not the truncated `./a`). Escape sequences are
+ * returned verbatim (the literal `\` + `t`), NOT decoded into control
+ * characters — callers must not assume a fully-decoded value.
+ *
+ * The recognized child node types (`string_fragment`, `escape_sequence`) are
+ * those produced by the JS/TS-family grammars. Other grammars name their
+ * content nodes differently (e.g. Python `string_content`, Go/Rust string
+ * literal children), so for those a string node has no matching children and
+ * the function falls back to stripping a single pair of surrounding
+ * `'`, `"`, or `` ` `` quotes from `node.text`. Extending the recognized set
+ * is left to the extractor PRs that actually need it.
+ */
 export function getStringValue(node: TreeSitterNode): string {
   let value = "";
   let found = false;
@@ -24,6 +40,7 @@ export function getStringValue(node: TreeSitterNode): string {
     }
   }
   if (found) return value;
+  // Fallback for grammars without JS-family content nodes: strip surrounding quotes.
   return node.text.replace(/^['"`]|['"`]$/g, "");
 }
 

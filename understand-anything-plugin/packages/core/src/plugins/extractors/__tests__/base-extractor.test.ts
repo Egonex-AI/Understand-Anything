@@ -62,7 +62,10 @@ describe("getStringValue", () => {
     const stringNode = findFirst(root, "string");
     expect(stringNode).not.toBeNull();
 
-    expect(getStringValue(stringNode!)).toContain('a\\"b');
+    // Raw inner text, escape sequence preserved verbatim (backslash + quote),
+    // not decoded. toBe (not toContain) so a regression to the truncated
+    // first-fragment ("a") would fail this assertion.
+    expect(getStringValue(stringNode!)).toBe('a\\"b');
 
     tree.delete();
     parser.delete();
@@ -77,6 +80,20 @@ describe("getStringValue", () => {
 
     tree.delete();
     parser.delete();
+  });
+
+  it("falls back to stripping surrounding quotes for nodes without JS-family content children", () => {
+    // Grammars outside the JS/TS family (e.g. Python `string_content`) do not
+    // produce `string_fragment` / `escape_sequence` children, so the loop finds
+    // nothing and the quote-stripping fallback runs. Exercise that branch with a
+    // synthetic node whose text is the whole quoted literal and which has no
+    // children.
+    const makeNode = (text: string): TreeSitterNode =>
+      ({ type: "string", text, childCount: 0, child: () => null }) as unknown as TreeSitterNode;
+
+    expect(getStringValue(makeNode(`'./x'`))).toBe("./x");
+    expect(getStringValue(makeNode(`"./y"`))).toBe("./y");
+    expect(getStringValue(makeNode("`abc`"))).toBe("abc");
   });
 });
 
