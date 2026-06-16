@@ -70,7 +70,16 @@ export const DEFAULT_IGNORE_PATTERNS: string[] = [
 ];
 
 export interface IgnoreFilter {
-  /** Returns true if the given relative path should be excluded from analysis. */
+  /**
+   * Returns true if the given path should be excluded from analysis.
+   *
+   * Accepts a root-relative path. Inputs are normalized before delegating to
+   * ignore@7 (which throws on anything that isn't a clean `path.relative()`d
+   * string): backslashes are converted to `/`, any leading `./` segments and
+   * duplicate slashes are collapsed, and an empty path (the project root)
+   * returns false. A path that escapes the root (`../...`) is treated as
+   * not-ignored (returns false) rather than throwing.
+   */
   isIgnored(relativePath: string): boolean;
 }
 
@@ -106,8 +115,20 @@ export function createIgnoreFilter(projectRoot: string): IgnoreFilter {
   return {
     isIgnored(relativePath: string): boolean {
       if (!relativePath) return false;
-      const normalized = relativePath.replace(/^\.\//, "");
-      if (!normalized) return false;
+      // ignore@7's ig.ignores() throws on any input that isn't a clean,
+      // root-relative POSIX path, so normalize the shapes path.relative() can
+      // produce before delegating. Production callers always pass
+      // toPosix(relative(root, target)), but normalizing here keeps the
+      // function total against the other shapes too.
+      const normalized = relativePath
+        .replace(/\\/g, "/") // Windows separators -> POSIX
+        .replace(/^(\.\/)+/, "") // collapse one-or-more leading "./"
+        .replace(/\/{2,}/g, "/") // collapse duplicate slash runs
+        .replace(/^\/+/, ""); // drop any leading root slash
+      if (!normalized) return false; // empty path == project root, not ignored
+      // A path that escapes the root can't be under analysis; report not-ignored
+      // instead of letting ig.ignores() throw on the "../" prefix.
+      if (normalized === ".." || normalized.startsWith("../")) return false;
       return ig.ignores(normalized);
     },
   };
