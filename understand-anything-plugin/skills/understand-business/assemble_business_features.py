@@ -20,29 +20,38 @@ import sys
 from pathlib import Path
 
 
-def _build_feature_document(feature_data: dict, association: dict) -> dict:
-    """Build a single feature document combining client and server layers."""
-    name = feature_data.get('name', 'unknown')
-    facet_type = feature_data.get('facetType', 'mobile')
+def _build_feature_document(feature_data, association: dict) -> dict:
+    """Build a single feature document combining client and server layers.
 
-    # Build clientLayers entry for this feature
-    platforms_dict = {}
-    for impl in feature_data.get('implementations', []):
-        platforms_dict[impl.get('platform', '')] = {
-            k: v for k, v in impl.items() if k != 'platform'
-        }
-    if not platforms_dict:
-        for p in feature_data.get('platforms', []):
-            platforms_dict[p] = {}
+    feature_data may be a single dict or a list of dicts (one per facet).
+    When multiple facets produce the same feature name, each becomes a
+    separate entry in clientLayers[].
+    """
+    if isinstance(feature_data, dict):
+        feature_data_list = [feature_data]
+    else:
+        feature_data_list = list(feature_data)
 
-    client_layer_entry = {
-        'facetType': facet_type,
-        'implType': feature_data.get('implType', 'unknown'),
-        'platforms': platforms_dict,
-        'deliveryPlatforms': feature_data.get('deliveryPlatforms', []),
-        'summary': feature_data.get('mergedSummary', ''),
-    }
-    client_layers = [client_layer_entry]
+    name = feature_data_list[0].get('name', 'unknown') if feature_data_list else 'unknown'
+
+    client_layers = []
+    for fd in feature_data_list:
+        facet_type = fd.get('facetType', 'mobile')
+        platforms_dict = {}
+        for impl in fd.get('implementations', []):
+            platforms_dict[impl.get('platform', '')] = {
+                k: v for k, v in impl.items() if k != 'platform'
+            }
+        if not platforms_dict:
+            for p in fd.get('platforms', []):
+                platforms_dict[p] = {}
+        client_layers.append({
+            'facetType': facet_type,
+            'implType': fd.get('implType', 'unknown'),
+            'platforms': platforms_dict,
+            'deliveryPlatforms': fd.get('deliveryPlatforms', []),
+            'summary': fd.get('mergedSummary', ''),
+        })
 
     # Build server layer from association (skip if errored)
     primary = association.get('primaryServer') if not association.get('error') else None
@@ -74,7 +83,7 @@ def _build_feature_document(feature_data: dict, association: dict) -> dict:
         'id': f'feature:{name}',
         'name': name,
         'clientLayers': client_layers,
-        'clientLayer': client_layer_entry,  # backward-compat: first entry in clientLayers
+        'clientLayer': client_layers[0] if client_layers else {},  # backward-compat
         'serverLayer': server_layer,
     }
 
@@ -111,34 +120,36 @@ def _merge_server_associations(associations: list) -> dict:
 
 def assemble_features(associations: list, consolidation: dict) -> dict:
     """Assemble feature-centric documents from associations and consolidation data."""
-    # Build name→feature_data lookup
-    feature_lookup = {}
+    # Build name→[feature_data] lookup; list supports multiple facets per feature name
+    feature_lookup: dict = {}
     for f in consolidation.get('consolidated', []):
-        feature_lookup[f['name']] = f
+        feature_lookup.setdefault(f['name'], []).append(f)
     for f in consolidation.get('standalone', []):
-        feature_lookup[f['name']] = {
+        feature_lookup.setdefault(f['name'], []).append({
             'name': f['name'],
             'implType': f.get('implType', 'native-specific'),
             'platforms': [f.get('platform', '')],
             'deliveryPlatforms': f.get('deliveryPlatforms', []),
             'implementations': [],
             'mergedSummary': '',
-        }
+            'facetType': f.get('facetType', 'mobile'),
+        })
 
     # Build feature documents
     features = []
     with_association = 0
     for assoc in associations:
         feature_name = assoc.get('featureName', '')
-        feature_data = feature_lookup.get(feature_name, {
+        feature_data_list = feature_lookup.get(feature_name) or [{
             'name': feature_name,
             'implType': 'unknown',
             'platforms': [],
             'deliveryPlatforms': [],
             'implementations': [],
             'mergedSummary': '',
-        })
-        doc = _build_feature_document(feature_data, assoc)
+            'facetType': 'unknown',
+        }]
+        doc = _build_feature_document(feature_data_list, assoc)
         features.append(doc)
         if doc['serverLayer']['primaryDomain'] is not None:
             with_association += 1
@@ -221,7 +232,7 @@ def run_assemble_features(project_root_str: str) -> dict:
                     summary_parts.append('Routes: ' + ', '.join(routes[:3]))
                 if api_calls:
                     summary_parts.append('API: ' + ', '.join(
-                        f"{c.get('method')} {c.get('path')}" for c in api_calls[:3]
+                        f"{c.get('method', 'UNKNOWN')} {c.get('path', '')}" for c in api_calls[:3]
                     ))
                 consolidation['consolidated'].append({
                     'name': feat.get('name', ''),

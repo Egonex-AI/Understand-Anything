@@ -147,3 +147,30 @@ class TestClientLayers:
         feat = result["features"][0]
         assert feat["serverLayer"]["primaryDomain"]["name"] == "Checkout"
         assert feat["serverLayer"]["primaryDomain"]["service"] == "order-service"
+
+
+class TestMultiFacetMerge:
+    def test_same_name_mobile_and_frontend_both_appear_in_client_layers(self):
+        """Same-named features from mobile and frontend must not overwrite each other."""
+        assoc = [_association("Order Management")]
+        consol = {
+            "consolidated": [_mobile_feature(), _frontend_feature()],
+            "standalone": [],
+        }
+        result = assemble_features(assoc, consol)
+        assert len(result["features"]) == 1
+        feat = result["features"][0]
+        facet_types = {layer["facetType"] for layer in feat["clientLayers"]}
+        assert "mobile" in facet_types
+        assert "frontend" in facet_types
+
+    def test_backward_compat_client_layer_is_first_entry(self):
+        """clientLayer (singular) must equal clientLayers[0] even when multiple layers exist."""
+        assoc = [_association("Order Management")]
+        consol = {
+            "consolidated": [_mobile_feature(), _frontend_feature()],
+            "standalone": [],
+        }
+        result = assemble_features(assoc, consol)
+        feat = result["features"][0]
+        assert feat["clientLayer"] == feat["clientLayers"][0]
