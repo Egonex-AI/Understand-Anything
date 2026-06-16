@@ -166,6 +166,10 @@ describe("generateStarterIgnoreFile", () => {
       // header and the next "# ---" section header).
       const lines = content.split("\n");
       const headerIdx = lines.findIndex((l) => l.includes("From .gitignore"));
+      // Guard: if the section were fully deduped, findIndex returns -1 and the
+      // slice below would silently scan from the top of the file (masking a
+      // regression). Assert the section is actually present before slicing.
+      expect(headerIdx).toBeGreaterThanOrEqual(0);
       const nextSectionIdx = lines.findIndex((l, i) => i > headerIdx && l.startsWith("# ---"));
       const sectionLines = lines.slice(headerIdx + 1, nextSectionIdx === -1 ? undefined : nextSectionIdx);
       const patterns = sectionLines
@@ -175,6 +179,28 @@ describe("generateStarterIgnoreFile", () => {
       expect(patterns).not.toContain("/node_modules"); // fails today: '# /node_modules' is present
       expect(patterns).not.toContain("/dist"); // fails today: '# /dist' is present
       expect(patterns).toContain(".env"); // still suggested
+    });
+
+    it("treats **/ and ./ anchor variants as covered by defaults", () => {
+      writeFileSync(
+        join(testDir, ".gitignore"),
+        "**/node_modules\n**/build/\n./dist/\n.env\n",
+      );
+      const content = generateStarterIgnoreFile(testDir);
+      const lines = content.split("\n");
+      const headerIdx = lines.findIndex((l) => l.includes("From .gitignore"));
+      expect(headerIdx).toBeGreaterThanOrEqual(0);
+      const nextSectionIdx = lines.findIndex((l, i) => i > headerIdx && l.startsWith("# ---"));
+      const sectionLines = lines.slice(headerIdx + 1, nextSectionIdx === -1 ? undefined : nextSectionIdx);
+      const patterns = sectionLines
+        .filter((l) => l.startsWith("# ") && !l.startsWith("# ---"))
+        .map((l) => l.slice(2));
+      // **/node_modules, **/build/, and ./dist/ are anchor variants of defaults.
+      expect(patterns).not.toContain("**/node_modules");
+      expect(patterns).not.toContain("**/build/");
+      expect(patterns).not.toContain("./dist/");
+      // A non-default pattern still survives.
+      expect(patterns).toContain(".env");
     });
 
     it("does not suggest .gitignore negation (!) patterns", () => {
