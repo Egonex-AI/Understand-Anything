@@ -95,5 +95,55 @@ describe("embedding-search", () => {
       engine.addEmbedding("n1", [1, 0, 0, 0]);
       expect(engine.hasEmbeddings()).toBe(true);
     });
+
+    it("tolerates a mis-sized stored embedding without throwing", () => {
+      // n2 simulates a stale/corrupt index entry: it was persisted by a
+      // different model and has the wrong dimension relative to the query.
+      const mixedEmbeddings: Record<string, number[]> = {
+        n1: [1, 0, 0, 0],
+        n2: [0, 1, 0], // wrong length (3 vs 4)
+        n3: [0.9, 0, 0.1, 0],
+      };
+      const engine = new SemanticSearchEngine(nodes, mixedEmbeddings);
+      const queryEmbedding = [1, 0, 0, 0];
+
+      expect(() => engine.search(queryEmbedding)).not.toThrow();
+    });
+
+    it("ranks a mis-sized stored embedding last at the default threshold", () => {
+      const mixedEmbeddings: Record<string, number[]> = {
+        n1: [1, 0, 0, 0], // identical to query -> similarity 1, score 0 (best)
+        n2: [0, 1, 0], // wrong length -> similarity 0, score 1 (worst)
+        n3: [0.9, 0, 0.1, 0], // similar -> high similarity, low score
+      };
+      const engine = new SemanticSearchEngine(nodes, mixedEmbeddings);
+
+      const results = engine.search([1, 0, 0, 0]);
+      const ids = results.map((r) => r.nodeId);
+
+      // Correctly-sized neighbours come back in ascending-score (descending
+      // similarity) order; the mismatched node is included but ranked last
+      // because similarity 0 satisfies `0 >= 0` and scores `1 - 0 = 1`.
+      expect(ids).toEqual(["n1", "n3", "n2"]);
+      expect(results[results.length - 1].nodeId).toBe("n2");
+      expect(results[results.length - 1].score).toBe(1);
+    });
+
+    it("drops a mis-sized stored embedding under a positive threshold", () => {
+      const mixedEmbeddings: Record<string, number[]> = {
+        n1: [1, 0, 0, 0],
+        n2: [0, 1, 0], // wrong length -> similarity 0, filtered by threshold
+        n3: [0.9, 0, 0.1, 0],
+      };
+      const engine = new SemanticSearchEngine(nodes, mixedEmbeddings);
+
+      const results = engine.search([1, 0, 0, 0], { threshold: 0.5 });
+      const ids = results.map((r) => r.nodeId);
+
+      // similarity 0 fails `0 >= 0.5`, so the mismatched node is excluded while
+      // the correctly-sized neighbours remain in score order.
+      expect(ids).not.toContain("n2");
+      expect(ids).toEqual(["n1", "n3"]);
+    });
   });
 });

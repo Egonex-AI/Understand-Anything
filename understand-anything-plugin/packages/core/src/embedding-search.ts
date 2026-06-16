@@ -9,9 +9,20 @@ export interface SemanticSearchOptions {
 
 /**
  * Compute cosine similarity between two vectors.
- * Returns 0 if either vector has zero magnitude.
+ * Returns 0 if either vector has zero magnitude or if the two vectors have
+ * different lengths.
  */
 export function cosineSimilarity(a: number[], b: number[]): number {
+  // A length mismatch means the two vectors came from different embedding
+  // models/dimensions — i.e. a stale or corrupt index, not a meaningful data
+  // point. We swallow it as 0 (treated as "completely dissimilar") so callers
+  // never see NaN or an overstated similarity. This is intentionally silent
+  // here because cosineSimilarity is a pure helper invoked once per node per
+  // query in search()'s hot loop and has no state to dedupe a warning.
+  // TODO(follow-up): surface mismatches at the engine level (record the
+  // expected dimension and warn-once / count skipped stored embeddings) so a
+  // user re-running search after a model upgrade gets a signal instead of
+  // quietly degraded recall.
   if (a.length !== b.length) return 0;
 
   let dot = 0;
@@ -69,6 +80,11 @@ export class SemanticSearchEngine {
       const embedding = this.embeddings.get(node.id);
       if (!embedding) continue;
 
+      // If a stored embedding's length differs from queryEmbedding (e.g. a
+      // persisted index from a prior model/dimension loaded alongside a fresh
+      // query), cosineSimilarity returns 0, so the node is treated as fully
+      // dissimilar rather than throwing or scoring spuriously high. See the
+      // TODO in cosineSimilarity about surfacing these mismatches engine-side.
       const similarity = cosineSimilarity(queryEmbedding, embedding);
       if (similarity >= threshold) {
         scored.push({ nodeId: node.id, score: 1 - similarity });
