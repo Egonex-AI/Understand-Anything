@@ -861,7 +861,7 @@ ${setup.languageDirective ? `Language directive: ${setup.languageDirective}` : '
 ${setup.repoType === 'mobile'
       ? `\`python3 "${setup.skillDir}/build-client-graph.py" "${setup.projectRoot}"\``
       : setup.repoType === 'frontend'
-        ? `\`python3 "${setup.skillDir}/build-client-graph.py" "${setup.projectRoot}" --frontend\``
+        ? `\`python3 "${setup.skillDir}/build-frontend-graph.py" "${setup.projectRoot}"\``
         : `\`python3 "${setup.skillDir}/build-system-graph.py" "${setup.projectRoot}"\``}
 (On failure: log warning, continue.)
 
