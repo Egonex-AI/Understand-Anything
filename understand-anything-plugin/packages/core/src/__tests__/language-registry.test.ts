@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { LanguageRegistry } from "../languages/language-registry.js";
 import { StrictLanguageConfigSchema } from "../languages/types.js";
 import { typescriptConfig } from "../languages/configs/typescript.js";
+import { javascriptConfig } from "../languages/configs/javascript.js";
 import { pythonConfig } from "../languages/configs/python.js";
 
 describe("LanguageRegistry", () => {
@@ -100,6 +101,13 @@ describe("LanguageRegistry", () => {
     it("recognizes both .test.tsx and .spec.tsx test files", () => {
       expect(typescriptConfig.filePatterns.tests).toContain("*.test.tsx");
       expect(typescriptConfig.filePatterns.tests).toContain("*.spec.tsx");
+    });
+  });
+
+  describe("javascript config test patterns", () => {
+    it("recognizes .jsx test files for parity with the .tsx patterns", () => {
+      expect(javascriptConfig.filePatterns.tests).toContain("*.test.jsx");
+      expect(javascriptConfig.filePatterns.tests).toContain("*.spec.jsx");
     });
   });
 
