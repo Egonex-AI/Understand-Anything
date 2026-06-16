@@ -1,0 +1,9 @@
+{
+  "cSpell.enabled": false,
+  "css.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+  "markdownlint.config": {
+    "default": false
+  },
+  "scss.lint.unknownAtRules": "ignore"
+}

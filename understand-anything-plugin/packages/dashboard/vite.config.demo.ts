@@ -19,6 +19,7 @@ export default defineConfig({
   },
 
   build: {
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -27,6 +28,8 @@ export default defineConfig({
             return "react-vendor";
           }
           if (id.includes("node_modules/@xyflow/")) return "xyflow";
+          if (id.includes("node_modules/elkjs/")) return "elk";
+          if (id.includes("node_modules/graphology")) return "graphology";
           if (
             id.includes("node_modules/@dagrejs/") ||
             id.includes("node_modules/d3-force/")

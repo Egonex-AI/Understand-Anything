@@ -8,10 +8,11 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:with-demo": "pnpm --filter @understand-anything/core build && astro build && pnpm --dir ../understand-anything-plugin/packages/dashboard exec tsc -b && pnpm --dir ../understand-anything-plugin/packages/dashboard exec vite build --config vite.config.demo.ts --outDir ../../../homepage/dist/demo --emptyOutDir true",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^6.1.6"
+    "astro": "^6.4.7"
   }
 }

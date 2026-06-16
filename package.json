@@ -42,6 +42,15 @@
     "vitest": "^3.1.0"
   },
   "pnpm": {
+    "overrides": {
+      "devalue": "5.8.1",
+      "esbuild": "0.28.1",
+      "js-yaml": "4.2.0",
+      "picomatch": "4.0.4",
+      "postcss": "8.5.10",
+      "smol-toml": "1.6.1",
+      "vite": "7.3.5"
+    },
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
