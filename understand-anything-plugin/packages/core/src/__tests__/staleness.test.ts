@@ -82,6 +82,26 @@ describe("getChangedFiles", () => {
     );
   });
 
+  it("tolerates paths containing literal newlines (the -z motivation)", () => {
+    // A path with an embedded newline is exactly what split("\n") would have
+    // corrupted; -z + split("\0") must keep it intact as a single token.
+    mockedExecFileSync.mockReturnValue("weird\nname.txt\0other.txt\0");
+
+    const result = getChangedFiles("/project", "abc123");
+
+    expect(result).toEqual(["weird\nname.txt", "other.txt"]);
+  });
+
+  it("preserves leading and trailing whitespace in path tokens", () => {
+    // git -z emits raw path bytes; tokens must not be trimmed, otherwise
+    // legitimate filenames with surrounding spaces/tabs are corrupted.
+    mockedExecFileSync.mockReturnValue("  leading.txt\0trailing.txt \0\ttabbed.txt\0");
+
+    const result = getChangedFiles("/project", "abc123");
+
+    expect(result).toEqual(["  leading.txt", "trailing.txt ", "\ttabbed.txt"]);
+  });
+
   it("returns empty array when no changes", () => {
     mockedExecFileSync.mockReturnValue("");
 
