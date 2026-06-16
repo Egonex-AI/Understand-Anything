@@ -95,5 +95,68 @@ describe("TypeScriptExtractor", () => {
       tree.delete();
       parser.delete();
     });
+
+    it("extracts abstract method signatures alongside concrete methods", () => {
+      // Abstract members parse as `abstract_method_signature`, not
+      // `method_definition`, so a pure-abstract contract would otherwise
+      // yield empty/partial `methods`.
+      const { tree, parser, root } = parse(
+        `abstract class Service { abstract run(): void; helper(): void {} }`,
+      );
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("Service");
+      expect(result.classes[0].methods).toEqual(["run", "helper"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a purely abstract class contract", () => {
+      const { tree, parser, root } = parse(
+        `abstract class Repo { find(id: string): void; save(): void; }`,
+      );
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("Repo");
+      expect(result.classes[0].methods).toEqual(["find", "save"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a decorated abstract class and its methods", () => {
+      // The decorator parses as an inner child of the
+      // `abstract_class_declaration`, so the existing dispatch already
+      // handles it. This locks that behaviour against regressions.
+      const { tree, parser, root } = parse(
+        `@Injectable() abstract class X { foo(): void {} }`,
+      );
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("X");
+      expect(result.classes[0].methods).toEqual(["foo"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a decorated, exported abstract class", () => {
+      const { tree, parser, root } = parse(
+        `@Injectable() export abstract class Y { foo(): void {} }`,
+      );
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].name).toBe("Y");
+      expect(result.classes[0].methods).toEqual(["foo"]);
+      expect(result.exports.some((e) => e.name === "Y")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
   });
 });

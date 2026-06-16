@@ -285,7 +285,11 @@ export class TypeScriptExtractor implements LanguageExtractor {
         const member = classBody.child(j);
         if (!member) continue;
 
-        if (member.type === "method_definition") {
+        if (
+          member.type === "method_definition" ||
+          member.type === "abstract_method_signature" ||
+          member.type === "method_signature"
+        ) {
           const methodName = member.children.find(
             (c) => c.type === "property_identifier",
           );
