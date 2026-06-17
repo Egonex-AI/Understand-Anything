@@ -511,13 +511,23 @@ def build_frontend_graph(service_root_str: str) -> dict:
             f"No web repo with knowledge-graph.json + domain-graph.json found under {root}"
         )
 
+    names = [r["name"] for r in per_repo]
+    if len(names) != len(set(names)):
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        raise ValueError(
+            f"[build-frontend-graph] Duplicate repo name(s) after discovery: {dupes} — "
+            f"web sub-repos must have distinct directory names"
+        )
+
     # Union scalar inventories across repos (stay as sorted string lists).
     routes = _union([r["routes"] for r in per_repo])
     pages = _union([r["pages"] for r in per_repo])
     components = _union([r["components"] for r in per_repo])
     stores = _union([r["stores"] for r in per_repo])
 
-    # Union top-level apiCalls with per-repo provenance (dedup per (repo, method, path)).
+    # Union top-level apiCalls with per-repo provenance, deduped per (repo, method, path).
+    # This intentionally differs from feature-level _union_api_calls (which dedups per
+    # (method, path) and carries no repo), because the top-level inventory keeps provenance.
     all_api_calls: list[dict] = []
     seen_api: set[tuple[str, str, str]] = set()
     for r in per_repo:
@@ -544,6 +554,7 @@ def build_frontend_graph(service_root_str: str) -> dict:
     degraded_in = any(
         r["project"].get("provenance", {}).get("degraded", False) for r in per_repo
     )
+    # No single commit hash covers a multi-repo aggregate; use the first repo's as representative.
     git_hash = per_repo[0]["project"].get("gitCommitHash", "")
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")

@@ -83,8 +83,9 @@ class TestBuildFrontendGraph:
         data = json.loads(
             (minimal_project / ".understand-anything" / "frontend-graph.json").read_text()
         )
-        for key in ("version", "facetType", "project", "routes", "pages",
-                    "components", "stateStores", "apiCalls", "features", "contentHash"):
+        for key in ("version", "facetType", "project", "repos", "routes", "pages",
+                    "components", "stateStores", "apiCalls", "features", "domainLinks",
+                    "contentHash"):
             assert key in data, f"Missing top-level key: {key}"
 
     def test_facet_type_is_frontend(self, minimal_project):
@@ -645,3 +646,40 @@ class TestMultiRepoAggregate:
         build_frontend_graph(str(tmp_path))
         data = _read_graph(tmp_path)
         assert data["repos"] == ["web-app", "admin"]  # declared order, not sorted
+
+    def test_rerun_is_deterministic(self, tmp_path):
+        _make_repo(tmp_path, "web-app",
+                   kg=_kg_with_page("web-app", "src/pages/orders/List.tsx"),
+                   dg=_dg_with_domain("domain:order", "Orders"))
+        _make_repo(tmp_path, "admin",
+                   kg=_kg_with_page("admin", "src/pages/permissions/Index.tsx"),
+                   dg=_dg_with_domain("domain:permission", "Permission"))
+        build_frontend_graph(str(tmp_path))
+        first = _read_graph(tmp_path)
+        build_frontend_graph(str(tmp_path))
+        second = _read_graph(tmp_path)
+        for key in ("repos", "routes", "pages", "components", "stateStores",
+                    "apiCalls", "features", "domainLinks"):
+            assert first[key] == second[key], f"non-deterministic field: {key}"
+
+    def test_all_repos_skipped_raises_file_not_found(self, tmp_path):
+        # discovered (has DG) but missing KG -> skipped; no repo survives
+        _make_repo(tmp_path, "admin", dg=_dg_with_domain("domain:order", "Orders"))
+        with pytest.raises(FileNotFoundError, match="knowledge-graph.json"):
+            build_frontend_graph(str(tmp_path))
+
+    def test_duplicate_repo_names_raise(self, tmp_path):
+        # Two nested subPaths whose leaf dir name collides ("web") -> loud error, not silent corruption.
+        _make_repo(tmp_path / "apps", "web",
+                   kg=_kg_with_page("web", "src/pages/orders/List.tsx"),
+                   dg=_dg_with_domain("domain:order", "Orders"))
+        _make_repo(tmp_path / "pkgs", "web",
+                   kg=_kg_with_page("web", "src/pages/orders/List.tsx"),
+                   dg=_dg_with_domain("domain:order", "Orders"))
+        sys_ua = tmp_path / ".understand-anything"
+        sys_ua.mkdir()
+        (sys_ua / "system.json").write_text(json.dumps({
+            "facets": [{"type": "frontend", "path": "", "subPaths": ["apps/web/", "pkgs/web/"]}]
+        }))
+        with pytest.raises(ValueError, match="Duplicate repo name"):
+            build_frontend_graph(str(tmp_path))
