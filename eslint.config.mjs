@@ -14,6 +14,7 @@ export default tseslint.config(
       '**/.claude-plugin/**',
       '**/.cursor-plugin/**',
       '**/.copilot-plugin/**',
+      '**/.qoder-plugin/**',
       '**/.astro/**',
       '.private/**',
     ],

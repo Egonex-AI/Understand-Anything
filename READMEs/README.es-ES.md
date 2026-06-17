@@ -181,7 +181,7 @@ Understand-Anything funciona en múltiples plataformas de codificación con IA.
 /plugin install understand-anything
 ```
 
-### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / Qoder)
 
 **macOS / Linux:**
 ```bash
@@ -197,7 +197,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 El instalador clona el repositorio en `~/.understand-anything/repo` y crea los enlaces simbólicos correspondientes para la plataforma elegida. Reinicia tu CLI/IDE al terminar.
 
-- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `qoder`
 - Actualizar más adelante: `./install.sh --update`
 - Desinstalar: `./install.sh --uninstall <platform>`
 
@@ -231,6 +231,16 @@ Tras la instalación:
 
 Para habilidades personales (disponibles en todos los proyectos), ejecuta el `install.sh` de arriba con la plataforma `kiro`.
 
+### Qoder
+
+Qoder detecta automáticamente el plugin a través de `.qoder-plugin/plugin.json` cuando se clona este repositorio. No requiere instalación manual: simplemente clona y abre en Qoder.
+
+Para habilidades personales (disponibles en todos los proyectos), ejecuta el `install.sh` de arriba con la plataforma `qoder`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s qoder
+```
+
 ### Compatibilidad de Plataformas
 
 | Plataforma | Estado | Método de Instalación |
@@ -251,6 +261,7 @@ Para habilidades personales (disponibles en todos los proyectos), ejecuta el `in
 | KIMI CLI | ✅ Soportado | `install.sh kimi` |
 | Nanobot | ✅ Soportado | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Soportado | `install.sh kiro` |
+| Qoder | ✅ Soportado | Detección automática / `install.sh qoder` |
 
 ---
 

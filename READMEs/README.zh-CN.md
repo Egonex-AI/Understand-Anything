@@ -2,7 +2,7 @@
 <p align="center">
   <strong>将任意代码库、知识库或文档转化为可探索、可搜索、可对话的交互式知识图谱</strong>
   <br />
-  <em>支持 Claude Code、Codex、Cursor、Copilot、Gemini CLI 等多平台。</em>
+  <em>支持 Claude Code、Codex、Cursor、Copilot、Gemini CLI、Qoder 等多平台。</em>
 </p>
 
 <p align="center">
@@ -181,7 +181,7 @@ Understand-Anything 可在多个 AI 编码平台上运行。
 /plugin install understand-anything
 ```
 
-### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro）
+### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / Qoder）
 
 **macOS / Linux：**
 ```bash
@@ -197,7 +197,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 安装脚本会将仓库克隆到 `~/.understand-anything/repo`，并为所选平台创建相应的符号链接。安装完成后请重启 CLI 或 IDE。
 
-- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
+- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`、`qoder`
 - 后续更新：`./install.sh --update`
 - 卸载：`./install.sh --uninstall <platform>`
 
@@ -231,6 +231,16 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 若需要在所有项目中使用（个人技能），运行上面的 `install.sh` 并选择 `kiro` 平台即可。
 
+### Qoder
+
+克隆此仓库后，Qoder 会自动通过 `.qoder-plugin/plugin.json` 文件发现插件。无需手动安装 — 只需克隆并在 Qoder 中打开即可。
+
+若需要在所有项目中使用（个人技能），运行上面的 `install.sh` 并选择 `qoder` 平台：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s qoder
+```
+
 ### 多平台兼容
 
 | 平台 | 状态 | 安装方式 |
@@ -251,6 +261,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | KIMI CLI | ✅ 支持 | `install.sh kimi` |
 | Nanobot | ✅ 支持 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 支持 | `install.sh kiro` |
+| Qoder | ✅ 支持 | 自动发现 / `install.sh qoder` |
 
 ---
 
