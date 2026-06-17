@@ -425,6 +425,60 @@ type reader interface {
       tree.delete();
       parser.delete();
     });
+
+    it("exports defined types and type aliases (not just structs/interfaces)", () => {
+      const { tree, parser, root } = parse(`package main
+
+type Count int
+type Celsius float64
+type ID = string
+
+type count int
+type id = string
+`);
+      const result = extractor.extractStructure(root);
+
+      const exportNames = result.exports.map((e) => e.name);
+      // Exported defined types and aliases are surfaced...
+      expect(exportNames).toContain("Count");
+      expect(exportNames).toContain("Celsius");
+      expect(exportNames).toContain("ID");
+      // ...lowercase (unexported) ones are not.
+      expect(exportNames).not.toContain("count");
+      expect(exportNames).not.toContain("id");
+      // They are not modeled as classes (no fields/methods).
+      expect(result.classes.map((c) => c.name)).not.toContain("Count");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures every kind in a grouped type block (struct, interface, defined, alias)", () => {
+      const { tree, parser, root } = parse(`package main
+
+type (
+    Foo struct{ x int }
+    Bar interface{ M() }
+    Gid = string
+    N   int
+)
+`);
+      const result = extractor.extractStructure(root);
+
+      const exportNames = result.exports.map((e) => e.name);
+      expect(exportNames).toEqual(
+        expect.arrayContaining(["Foo", "Bar", "Gid", "N"]),
+      );
+      // Struct/interface are modeled as classes; defined-type/alias are not.
+      expect(result.classes.map((c) => c.name)).toEqual(
+        expect.arrayContaining(["Foo", "Bar"]),
+      );
+      expect(result.classes.map((c) => c.name)).not.toContain("Gid");
+      expect(result.classes.map((c) => c.name)).not.toContain("N");
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Call Graph ----

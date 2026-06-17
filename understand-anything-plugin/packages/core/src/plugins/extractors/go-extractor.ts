@@ -270,20 +270,17 @@ export class GoExtractor implements LanguageExtractor {
     // grouped, e.g. `type ( Foo struct{...}; Bar struct{...} )`.  Iterate over
     // all of them so every grouped type is captured, not just the first.
     //
-    // We use the per-spec `type_spec` node (not the outer `type_declaration`)
-    // as the declNode so each grouped type reports its own line range; for a
+    // We use the per-spec node (not the outer `type_declaration`) as the
+    // declNode so each grouped type reports its own line range; for a
     // non-grouped `type Foo struct{...}` the spec and the `type` keyword sit on
     // the same physical line, so the line range is unchanged.
     //
-    // Only struct_type / interface_type specs are modeled as `classes`. Other
-    // forms are intentionally not captured (mirroring the pre-fix behavior):
-    //   - named-primitive / defined-type specs (`type Count int`) whose `type`
-    //     field is a type_identifier, qualified_type, etc.
-    //   - type alias specs (`type MyID = string`), which the grammar parses as
-    //     a separate `type_alias` node rather than `type_spec`, so they are not
-    //     even visited by this loop.
-    // Modeling these as graph nodes is a broader type-model question; see the
-    // PR discussion / a follow-up issue if alias/defined-type capture is wanted.
+    // struct_type / interface_type specs are modeled as `classes` (with their
+    // fields/methods). Defined types (`type Count int`) and type aliases
+    // (`type MyID = string`, parsed as a separate `type_alias` node) have no
+    // fields or methods to model, but they are still top-level package
+    // declarations: when exported they are surfaced in `exports` so public
+    // types aren't silently dropped from the structural view.
     const typeSpecs = findChildren(node, "type_spec");
     for (const typeSpec of typeSpecs) {
       const nameNode = typeSpec.childForFieldName("name");
@@ -294,6 +291,24 @@ export class GoExtractor implements LanguageExtractor {
         this.extractStruct(typeSpec, nameNode, typeNode, classes, exports);
       } else if (typeNode.type === "interface_type") {
         this.extractInterface(typeSpec, nameNode, typeNode, classes, exports);
+      } else if (isExported(nameNode.text)) {
+        // Defined type, e.g. `type Count int` / `type Celsius float64`.
+        exports.push({
+          name: nameNode.text,
+          lineNumber: typeSpec.startPosition.row + 1,
+        });
+      }
+    }
+
+    // Type aliases (`type MyID = string`) parse as `type_alias`, a sibling of
+    // `type_spec` under `type_declaration`, so they are not visited above.
+    for (const alias of findChildren(node, "type_alias")) {
+      const aliasName = alias.childForFieldName("name");
+      if (aliasName && isExported(aliasName.text)) {
+        exports.push({
+          name: aliasName.text,
+          lineNumber: alias.startPosition.row + 1,
+        });
       }
     }
   }
