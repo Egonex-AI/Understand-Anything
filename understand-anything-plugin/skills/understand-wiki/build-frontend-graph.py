@@ -322,6 +322,59 @@ def _validate(graph: dict) -> tuple[bool, bool, list[str]]:
     return True, bool(warnings), warnings
 
 
+def _frontend_subpaths(root: Path) -> list[str]:
+    """Return subPaths declared for the frontend facet in a discoverable system.json.
+
+    Checks root/.understand-anything/system.json then root.parent/... — the
+    aggregate is invoked with the facet dir (e.g. web/), whose system.json lives
+    at the project root (root.parent).
+    """
+    for base in (root, root.parent):
+        sys_path = base / ".understand-anything" / "system.json"
+        if not sys_path.exists():
+            continue
+        try:
+            cfg = json.loads(sys_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return []
+        for facet in cfg.get("facets", []):
+            if facet.get("type") == "frontend":
+                return facet.get("subPaths", []) or []
+        return []
+    return []
+
+
+def _discover_repos(root: Path) -> list[tuple[str, Path]]:
+    """Resolve the web repos this aggregate covers, as (name, root) pairs.
+
+    1. Single-repo: root itself has a domain-graph.json -> [(root.name, root)].
+    2. Explicit: a frontend facet in system.json lists subPaths -> use those in
+       declared order, keeping only ones that actually have a domain-graph.json.
+    3. Scan: otherwise, immediate subdirs that have a domain-graph.json, by name.
+
+    Discovery keys on domain-graph.json, so arbitrary subdirs (docs/, scripts/)
+    are simply not repos and are skipped without warning.
+    """
+    if (root / ".understand-anything" / "domain-graph.json").exists():
+        return [(root.name, root)]
+
+    sub_paths = _frontend_subpaths(root)
+    if sub_paths:
+        repos: list[tuple[str, Path]] = []
+        for sp in sub_paths:
+            d = root / sp.rstrip("/")
+            if (d / ".understand-anything" / "domain-graph.json").exists():
+                repos.append((d.name, d))
+        if repos:
+            return repos
+
+    repos = []
+    for d in sorted(root.iterdir(), key=lambda p: p.name):
+        if d.is_dir() and (d / ".understand-anything" / "domain-graph.json").exists():
+            repos.append((d.name, d))
+    return repos
+
+
 def build_frontend_graph(service_root_str: str) -> dict:
     service_root = Path(service_root_str).resolve()
     ua_dir = service_root / ".understand-anything"

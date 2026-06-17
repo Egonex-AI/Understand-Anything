@@ -18,6 +18,8 @@ _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 build_frontend_graph = _mod.build_frontend_graph
 _validate = _mod._validate
+_discover_repos = _mod._discover_repos
+_frontend_subpaths = _mod._frontend_subpaths
 
 
 def _minimal_kg(name="admin-web", extra_nodes=None):
@@ -311,3 +313,72 @@ class TestValidate:
         assert valid
         assert degraded
         assert any("degraded" in w for w in warnings)
+
+
+def _make_repo(parent, name, *, kg=None, dg=None):
+    """Create parent/name/.understand-anything/{knowledge-graph,domain-graph}.json."""
+    ua = parent / name / ".understand-anything"
+    ua.mkdir(parents=True)
+    if kg is not None:
+        (ua / "knowledge-graph.json").write_text(json.dumps(kg))
+    if dg is not None:
+        (ua / "domain-graph.json").write_text(json.dumps(dg))
+    return parent / name
+
+
+class TestDiscoverRepos:
+    def test_single_repo_when_root_has_domain_graph(self, tmp_path):
+        ua = tmp_path / ".understand-anything"
+        ua.mkdir()
+        (ua / "domain-graph.json").write_text(json.dumps(_minimal_dg()))
+        repos = _discover_repos(tmp_path)
+        assert repos == [(tmp_path.name, tmp_path)]
+
+    def test_scan_subdirs_sorted_by_name(self, tmp_path):
+        _make_repo(tmp_path, "web-app", dg=_minimal_dg())
+        _make_repo(tmp_path, "admin", dg=_minimal_dg())
+        (tmp_path / "docs").mkdir()  # non-repo subdir is ignored, no error
+        repos = _discover_repos(tmp_path)
+        assert [name for name, _ in repos] == ["admin", "web-app"]
+
+    def test_subpaths_override_scan_order(self, tmp_path):
+        _make_repo(tmp_path, "web-app", dg=_minimal_dg())
+        _make_repo(tmp_path, "admin", dg=_minimal_dg())
+        sys_ua = tmp_path / ".understand-anything"
+        sys_ua.mkdir()
+        (sys_ua / "system.json").write_text(json.dumps({
+            "facets": [{"type": "frontend", "path": "", "subPaths": ["web-app/", "admin/"]}]
+        }))
+        repos = _discover_repos(tmp_path)
+        assert [name for name, _ in repos] == ["web-app", "admin"]  # declared order, not sorted
+
+    def test_subdir_without_domain_graph_is_not_a_repo(self, tmp_path):
+        _make_repo(tmp_path, "web-app", dg=_minimal_dg())
+        _make_repo(tmp_path, "scripts", kg=_minimal_kg())  # KG only, no DG
+        repos = _discover_repos(tmp_path)
+        assert [name for name, _ in repos] == ["web-app"]
+
+
+class TestFrontendSubpaths:
+    def test_reads_subpaths_from_root_system_json(self, tmp_path):
+        ua = tmp_path / ".understand-anything"
+        ua.mkdir()
+        (ua / "system.json").write_text(json.dumps({
+            "facets": [{"type": "frontend", "path": "web/", "subPaths": ["a/", "b/"]}]
+        }))
+        assert _frontend_subpaths(tmp_path) == ["a/", "b/"]
+
+    def test_reads_subpaths_from_parent_system_json(self, tmp_path):
+        # Aggregate is invoked with the facet dir (web/); system.json lives at the project root.
+        project = tmp_path
+        web = project / "web"
+        web.mkdir()
+        ua = project / ".understand-anything"
+        ua.mkdir()
+        (ua / "system.json").write_text(json.dumps({
+            "facets": [{"type": "frontend", "path": "web/", "subPaths": ["admin/"]}]
+        }))
+        assert _frontend_subpaths(web) == ["admin/"]
+
+    def test_no_system_json_returns_empty(self, tmp_path):
+        assert _frontend_subpaths(tmp_path) == []
