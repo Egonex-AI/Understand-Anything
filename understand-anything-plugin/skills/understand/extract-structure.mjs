@@ -20,6 +20,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { buildResult as buildResultShared } from './extract-structure-result.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // skills/understand/ -> plugin root is two dirs up
@@ -120,7 +121,7 @@ async function main() {
     }
 
     // Build result object
-    const result = buildResult(file, totalLines, nonEmptyLines, analysis, callGraph, batchImportData);
+    const result = buildResultShared(file, totalLines, nonEmptyLines, analysis, callGraph, batchImportData);
     results.push(result);
   }
 

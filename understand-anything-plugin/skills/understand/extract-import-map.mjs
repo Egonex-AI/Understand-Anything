@@ -1504,6 +1504,9 @@ async function main() {
   let registry = null;
   let treeSitterReady = false;
   try {
+    if (process.env.UA_EXTRACT_IMPORT_MAP_FORCE_TREE_SITTER_THROW === '1') {
+      throw new Error('forced throw via UA_EXTRACT_IMPORT_MAP_FORCE_TREE_SITTER_THROW');
+    }
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
     const tsPlugin = new TreeSitterPlugin(tsConfigs);
     await tsPlugin.init();

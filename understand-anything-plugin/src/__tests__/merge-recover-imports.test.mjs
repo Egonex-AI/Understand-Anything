@@ -8,12 +8,13 @@ import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MERGE_SCRIPT = resolve(__dirname, "../../skills/understand/merge-batch-graphs.py");
+const PYTHON = process.platform === "win32" ? "python" : "python3";
 
 let projectRoot;
 let intermediateDir;
 
 function runMerge() {
-  const result = spawnSync("python3", [MERGE_SCRIPT, projectRoot], {
+  const result = spawnSync(PYTHON, [MERGE_SCRIPT, projectRoot], {
     encoding: "utf-8",
   });
   if (result.status !== 0) {
@@ -163,7 +164,7 @@ describe("merge-batch-graphs.py imports recovery", () => {
 
     const { assembled, stderr } = runMerge();
     expect(assembled.edges.filter((e) => e.type === "imports")).toHaveLength(1);
-    expect(stderr).toContain("importMap recovery skipped — scan-result.json not found");
+    expect(stderr).toMatch(/importMap recovery skipped .* scan-result\.json not found/);
   });
 
   it("never produces self-import edges", () => {

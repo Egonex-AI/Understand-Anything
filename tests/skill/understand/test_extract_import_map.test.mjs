@@ -30,14 +30,14 @@ function setupTree(files) {
  * `extraNodeArgs` is prepended to the node argv before the script path, so
  * tests can pass `--import` loader hooks to force specific failure modes.
  */
-function runScript(projectRoot, input, extraNodeArgs = []) {
+function runScript(projectRoot, input, extraNodeArgs = [], extraEnv = {}) {
   const inputPath = join(projectRoot, 'ua-eim-input.json');
   const outputPath = join(projectRoot, 'ua-eim-output.json');
   writeFileSync(inputPath, JSON.stringify(input), 'utf-8');
   const result = spawnSync(
     'node',
     [...extraNodeArgs, SCRIPT, inputPath, outputPath],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', env: { ...process.env, ...extraEnv } },
   );
   let output = null;
   try {
@@ -1692,27 +1692,6 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
       'src/lib.ts': `export const x = 1;\n`,
     });
 
-    // Write the loader hook + register module to the temp project root.
-    const hookPath = join(projectRoot, 'ua-eim-fail-hook.mjs');
-    const loaderPath = join(projectRoot, 'ua-eim-fail-loader.mjs');
-    writeFileSync(
-      hookPath,
-      `export async function resolve(specifier, ctx, nextResolve) {\n` +
-      `  if (specifier === 'web-tree-sitter') {\n` +
-      `    throw new Error('synthetic: web-tree-sitter unavailable in test');\n` +
-      `  }\n` +
-      `  return nextResolve(specifier, ctx);\n` +
-      `}\n`,
-      'utf-8',
-    );
-    writeFileSync(
-      loaderPath,
-      `import { register } from 'node:module';\n` +
-      `import { pathToFileURL } from 'node:url';\n` +
-      `register(pathToFileURL(${JSON.stringify(hookPath)}).href);\n`,
-      'utf-8',
-    );
-
     const result = runScript(
       projectRoot,
       {
@@ -1722,7 +1701,8 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
           { path: 'src/lib.ts', language: 'typescript', fileCategory: 'code' },
         ],
       },
-      ['--import', loaderPath],
+      [],
+      { UA_EXTRACT_IMPORT_MAP_FORCE_TREE_SITTER_THROW: '1' },
     );
 
     expect(result.status).toBe(0);

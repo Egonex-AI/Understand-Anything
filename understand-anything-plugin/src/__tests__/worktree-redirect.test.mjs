@@ -11,12 +11,17 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+function normalizePathForAssert(path) {
+  return path.replaceAll("\\", "/");
+}
+
 const RESOLVE_SNIPPET = `
+ua_pwd_p() { pwd -W 2>/dev/null || pwd -P; }
 COMMON_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-common-dir 2>/dev/null)
 GIT_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-dir 2>/dev/null)
 if [ -n "$COMMON_DIR" ] && [ -n "$GIT_DIR" ]; then
-  COMMON_ABS=$(cd "$PROJECT_ROOT" && cd "$COMMON_DIR" 2>/dev/null && pwd -P)
-  GIT_ABS=$(cd "$PROJECT_ROOT" && cd "$GIT_DIR" 2>/dev/null && pwd -P)
+  COMMON_ABS=$(cd "$PROJECT_ROOT" && cd "$COMMON_DIR" 2>/dev/null && ua_pwd_p)
+  GIT_ABS=$(cd "$PROJECT_ROOT" && cd "$GIT_DIR" 2>/dev/null && ua_pwd_p)
   if [ -n "$COMMON_ABS" ] && [ "$COMMON_ABS" != "$GIT_ABS" ]; then
     MAIN_ROOT=$(dirname "$COMMON_ABS")
     if [ -d "$MAIN_ROOT" ] && [ "\${UNDERSTAND_NO_WORKTREE_REDIRECT:-0}" != "1" ]; then
@@ -64,19 +69,19 @@ afterAll(() => {
 
 describe("worktree-redirect snippet (issue #133)", () => {
   it("leaves PROJECT_ROOT alone in a normal checkout", () => {
-    expect(runResolve(mainRepo)).toBe(mainRepo);
+    expect(normalizePathForAssert(runResolve(mainRepo))).toBe(normalizePathForAssert(mainRepo));
   });
 
   it("redirects PROJECT_ROOT to the main repo when started in a worktree", () => {
-    expect(runResolve(worktree)).toBe(mainRepo);
+    expect(normalizePathForAssert(runResolve(worktree))).toBe(normalizePathForAssert(mainRepo));
   });
 
   it("redirects from a subdirectory inside a worktree", () => {
-    expect(runResolve(subdir)).toBe(mainRepo);
+    expect(normalizePathForAssert(runResolve(subdir))).toBe(normalizePathForAssert(mainRepo));
   });
 
   it("respects UNDERSTAND_NO_WORKTREE_REDIRECT=1", () => {
-    expect(runResolve(worktree, { UNDERSTAND_NO_WORKTREE_REDIRECT: "1" })).toBe(worktree);
+    expect(normalizePathForAssert(runResolve(worktree, { UNDERSTAND_NO_WORKTREE_REDIRECT: "1" }))).toBe(normalizePathForAssert(worktree));
   });
 
   it("leaves PROJECT_ROOT alone when not inside a git repo", () => {
@@ -84,6 +89,6 @@ describe("worktree-redirect snippet (issue #133)", () => {
     // inside a parent git repo (e.g. when /tmp is symlinked into one).
     const nonGit = join(tmpRoot, "no-git");
     mkdirSync(nonGit, { recursive: true });
-    expect(runResolve(nonGit)).toBe(nonGit);
+    expect(normalizePathForAssert(runResolve(nonGit))).toBe(normalizePathForAssert(nonGit));
   });
 });

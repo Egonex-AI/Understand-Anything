@@ -11,6 +11,7 @@ import { defineConfig } from 'vitest/config';
 // files are excluded here to avoid double-counting.
 export default defineConfig({
   test: {
+    testTimeout: process.platform === 'win32' ? 60000 : 5000,
     include: [
       'tests/**/*.test.{js,mjs,ts}',
       'understand-anything-plugin/src/**/*.test.{js,mjs,ts}',
