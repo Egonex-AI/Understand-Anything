@@ -178,7 +178,12 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 
 # Scope to a subdirectory (for huge monorepos)
 /understand src/frontend
+
+# Quick overview mode — ~65-70% fewer tokens, file-level only
+/understand --caveman
 ```
+
+**Caveman mode (`--caveman`):** A reduced-token alternative for quick overviews or very large codebases. Skips function/class extraction, import resolution, and the LLM architecture and tour agents in favor of deterministic directory-pattern heuristics. You lose function-level detail, import edges, and curated tour narration; you keep the file-level graph, non-code edges (configures/documents/deploys/etc.), and a usable layered tour. Incompatible with `--review`; layer names and tour titles are English-only regardless of `--language`.
 
 ---
 

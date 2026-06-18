@@ -475,6 +475,21 @@ Use these hints for common edge patterns:
 - NEVER create self-referencing edges (where source equals target).
 - Trust the script's structural extraction. Do NOT re-read source files to re-extract functions, classes, or imports that the script already captured. Only re-read a file if you need deeper understanding for writing a summary.
 
+## Caveman Mode
+
+When the dispatch prompt includes `**Caveman mode: ON**`, apply these overrides to reduce token consumption:
+
+1. **Skip function and class nodes entirely.** Do NOT create `function:` or `class:` nodes. Do NOT create `contains` edges from files to functions/classes. Only create file-level nodes (one per file in the batch).
+2. **Skip import edges entirely.** Ignore `batchImportData`. Do not create any `imports` edges. Do not create `calls`, `inherits`, `implements`, or `exports` edges.
+3. **Shorter summaries.** Write exactly 1 sentence per file node (not 1-2). Focus on the file's primary purpose.
+4. **Skip `languageNotes`.** Do not include the `languageNotes` field on any node.
+5. **Non-code edges still apply.** For non-code files (config, docs, infra, data), still create cross-file edges (`configures`, `documents`, `deploys`, `migrates`, `triggers`, `defines_schema`, `serves`, `provisions`, `routes`, `depends_on`, `related`) as normal — these are cheap and valuable for the graph.
+6. **Non-code sub-nodes still apply.** If the structural extraction script produces `services`, `endpoints`, `resources`, `steps`, or `definitions` arrays for non-code files, still emit sub-nodes for significant entries as described in Phase 1 Step 3.
+
+All other rules (node types, ID conventions, required fields, output format) remain unchanged.
+
+---
+
 ## Writing Results — single or multi-part
 
 ### Output File Naming — STRICT
