@@ -1,7 +1,7 @@
 ---
 name: understand-knowledge
 description: Analyze a Karpathy-pattern LLM wiki knowledge base and generate an interactive knowledge graph with entity extraction, implicit relationships, and topic clustering.
-argument-hint: [wiki-directory]
+argument-hint: ["[wiki-directory] [--max-subagents <n>]"]
 ---
 
 # /understand-knowledge
@@ -20,6 +20,14 @@ The **Karpathy LLM wiki pattern** (see https://gist.github.com/karpathy/442a6bf5
 Detection signals: has `index.md` + multiple `.md` files with wikilinks. May have `raw/` directory and schema file.
 
 ## Instructions
+
+### Concurrency Option
+
+- `$ARGUMENTS` may contain `--max-subagents <n>`
+- Parse `<n>` as integer, clamp to `1..3`
+- Default to `3` when omitted or invalid
+- Store as `$MAX_SUBAGENTS`
+- Use `1` for fully serial batch execution on constrained local models
 
 ### Phase 1: DETECT
 
@@ -65,7 +73,7 @@ Dispatch `article-analyzer` subagents to extract implicit knowledge:
    
    The agent will write `analysis-batch-{N}.json` to the intermediate directory.
 
-4. Run up to 3 batches concurrently. Wait for all batches to complete.
+4. Run up to `$MAX_SUBAGENTS` batches concurrently (default `3`). If `$MAX_SUBAGENTS=1`, execute strictly sequentially. Wait for all batches to complete.
 
 5. If any batch fails, log a warning but continue — the scan-manifest provides a solid base graph even without LLM analysis.
 

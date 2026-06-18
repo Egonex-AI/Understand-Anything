@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>]"]
+argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>|--max-subagents <n>|--stop-after <phase>|--resume-from <phase>|--reuse-intermediate]"]
 ---
 
 # /understand
@@ -15,8 +15,25 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--auto-update` — Enable automatic graph updates on commit (writes `autoUpdate: true` to `.understand-anything/config.json`)
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
+  - `--max-subagents <n>` — Cap concurrent subagent dispatches for batch analysis. Use `1` for fully serial execution (best for local/smaller LLMs). Allowed range: `1..5`. Default: `5`.
+  - `--stop-after <phase>` — Run until a specific phase and stop while preserving intermediates for a later resume.
+  - `--resume-from <phase>` — Resume from a specific phase using existing intermediates.
+  - `--reuse-intermediate` — Explicitly trust existing files in `.understand-anything/intermediate/` when resuming.
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
+
+### Phase names for split-pass execution
+
+Use these exact values with `--stop-after` and `--resume-from`:
+
+- `scan` (Phase 1)
+- `batch` (Phase 1.5)
+- `analyze` (Phase 2)
+- `assemble` (Phase 3)
+- `architecture` (Phase 4)
+- `tour` (Phase 5)
+- `review` (Phase 6)
+- `save` (Phase 7)
 
 ---
 
@@ -42,6 +59,37 @@ Throughout execution, report progress to the user at each phase transition and d
 ## Phase 0 — Pre-flight
 
 Determine whether to run a full analysis or incremental update.
+
+**Split-pass controls (evaluate first):**
+
+0. Parse optional mode flags from `$ARGUMENTS`:
+   - `--stop-after <phase>`
+   - `--resume-from <phase>`
+   - `--reuse-intermediate`
+   - Allowed phase values: `scan`, `batch`, `analyze`, `assemble`, `architecture`, `tour`, `review`, `save`.
+   - If phase value is invalid, report error and STOP.
+   - If both `--stop-after` and `--resume-from` are present and `resume-from` is later than `stop-after`, report error and STOP.
+
+0.1 Compute booleans:
+   - `$IS_RESUME` = whether `--resume-from` is present
+   - `$STOP_PHASE` = value of `--stop-after` or empty
+   - `$RESUME_PHASE` = value of `--resume-from` or empty
+   - `$REUSE_INTERMEDIATE` = whether `--reuse-intermediate` is present
+
+0.2 If `$IS_RESUME=true`, validate required intermediate artifacts before continuing:
+   - `resume-from batch` requires: `scan-result.json`
+   - `resume-from analyze` requires: `batches.json`
+   - `resume-from assemble` requires: at least one `batch-*.json`
+   - `resume-from architecture` requires: `assembled-graph.json`
+   - `resume-from tour` requires: `assembled-graph.json` and `layers.json`
+   - `resume-from review` requires: `assembled-graph.json`, `layers.json`, `tour.json`
+   - `resume-from save` requires: `assembled-graph.json`, `layers.json`, `tour.json`, `review.json`
+
+   All paths above are under `$PROJECT_ROOT/.understand-anything/intermediate/`.
+   If missing files are found, report exactly which files are missing and tell the user which earlier phase to rerun, then STOP.
+
+0.3 If `$IS_RESUME=true` and `$REUSE_INTERMEDIATE` is NOT set, warn once:
+   > Resuming without `--reuse-intermediate`; existing intermediate files must still be present and valid.
 
 1. **Resolve `PROJECT_ROOT`:**
    - Parse `$ARGUMENTS` for a non-flag token (any argument that does not start with `--`). If found, treat it as the target directory path.
@@ -138,6 +186,17 @@ Determine whether to run a full analysis or incremental update.
     - If `--no-auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": false}` to `$PROJECT_ROOT/.understand-anything/config.json`
     - These flags only set the config — analysis proceeds normally regardless.
 
+ 3.55. **Concurrency configuration (`--max-subagents`)**:
+    - Parse `$ARGUMENTS` for `--max-subagents <n>`.
+    - If provided, parse `<n>` as an integer. If parsing fails, default to `5` and warn the user.
+    - Clamp to range `1..5`:
+      - `<1` → use `1`
+      - `>5` → use `5`
+    - Store as `$MAX_SUBAGENTS` for all batch-dispatch phases.
+    - If not provided, set `$MAX_SUBAGENTS=5`.
+    - Report the effective setting once during pre-flight, e.g.:
+      - `[understand] Batch concurrency: $MAX_SUBAGENTS subagent(s)`
+
  3.6. **Language configuration:**
     - Parse `$ARGUMENTS` for `--language <lang>` flag. If found, extract the language code.
     - **Language code normalization:** Map friendly names to ISO codes:
@@ -197,6 +256,8 @@ Determine whether to run a full analysis or incremental update.
 
 ## Phase 0.5 — Ignore Configuration
 
+Skip this phase when resuming from `scan` or later (`batch`, `analyze`, `assemble`, `architecture`, `tour`, `review`, `save`).
+
 Set up and verify the `.understandignore` file before scanning.
 
 1. Check if `$PROJECT_ROOT/.understand-anything/.understandignore` exists.
@@ -215,6 +276,10 @@ Set up and verify the `.understandignore` file before scanning.
 ---
 
 ## Phase 1 — SCAN (Full analysis only)
+
+Skip this phase when:
+- resuming from `batch` or later, OR
+- `--stop-after` is before `scan`.
 
 Report to the user: `[Phase 1/7] Scanning project files...`
 
@@ -257,9 +322,13 @@ Store the file list as `$FILE_LIST` with `fileCategory` metadata for use in Phas
 If the scan result includes `filteredByIgnore > 0`, report:
 > Excluded {filteredByIgnore} files via `.understandignore`.
 
+If `--stop-after scan` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 1.5 — BATCH
+
+Skip this phase when resuming from `analyze` or later.
 
 Report: `[Phase 1.5/7] Computing semantic batches...`
 
@@ -274,17 +343,21 @@ Capture stderr. Append any line starting with `Warning:` to `$PHASE_WARNINGS` fo
 
 If the script exits non-zero, the failure is hard — relay the full stderr to the user as a Phase 1.5 failure. Do not attempt to recover; the script's internal fallback (count-based) already handles recoverable issues. A non-zero exit means a fundamental problem (missing input file, malformed JSON, etc.).
 
+If `--stop-after batch` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 2 — ANALYZE
+
+Skip this phase when resuming from `assemble` or later.
 
 ### Full analysis path
 
 Load `.understand-anything/intermediate/batches.json` (produced by Phase 1.5). Iterate the `batches[]` array.
 
-Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
+Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to $MAX_SUBAGENTS concurrent)...`
 
-For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
+For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **$MAX_SUBAGENTS subagents concurrently**. If `$MAX_SUBAGENTS=1`, run batches strictly sequentially. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -368,9 +441,13 @@ After batches complete:
    python <SKILL_DIR>/merge-batch-graphs.py $PROJECT_ROOT
    ```
 
+If `--stop-after analyze` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 3 — ASSEMBLE REVIEW
+
+Skip this phase when resuming from `architecture` or later.
 
 Report to the user: `[Phase 3/7] Reviewing assembled graph...`
 
@@ -395,9 +472,13 @@ Pass these parameters in the dispatch prompt:
 
 After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermediate/assemble-review.json` and add any notes to `$PHASE_WARNINGS`.
 
+If `--stop-after assemble` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 4 — ARCHITECTURE
+
+Skip this phase when resuming from `tour` or later.
 
 Report to the user: `[Phase 4/7] Identifying architectural layers...`
 
@@ -478,9 +559,13 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 >
 > Maintain the same layer names and IDs where possible. Only add/remove layers if the file structure has materially changed.
 
+If `--stop-after architecture` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 5 — TOUR
+
+Skip this phase when resuming from `review` or `save`.
 
 Report to the user: `[Phase 5/7] Building guided tour...`
 
@@ -551,9 +636,13 @@ Each element of the final `tour` array MUST have this shape:
 
 Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `languageLesson` when present.
 
+If `--stop-after tour` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 6 — REVIEW
+
+Skip this phase when resuming from `save`.
 
 Report to the user: `[Phase 6/7] Validating knowledge graph...`
 
@@ -713,6 +802,8 @@ Pass these parameters in the dispatch prompt:
 
 6. **If `issues` array is empty:** Proceed to Phase 7.
 
+If `--stop-after review` is set: report that phase boundary was reached, keep intermediate files, and STOP.
+
 ---
 
 ## Phase 7 — SAVE
@@ -769,6 +860,8 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
    fi
    mv "$PROJECT_ROOT/.understand-anything/tmp" "$TRASH/" 2>/dev/null || true
    ```
+
+   **Split-pass exception:** if `--stop-after` was used in this run, do not clean intermediates. For normal runs (or resumes that reach save), keep the existing cleanup behavior.
 
 5. Report a summary to the user containing:
    - Project name and description

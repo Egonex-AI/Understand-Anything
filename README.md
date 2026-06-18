@@ -125,6 +125,50 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 
 A multi-agent pipeline scans your project, extracts every file, function, class, and dependency, then builds a knowledge graph saved to `.understand-anything/knowledge-graph.json`.
 
+**Constrained local model?** Limit parallel subagents during analysis:
+
+```bash
+# Fully serial execution (best for small local LLMs)
+/understand --max-subagents 1
+
+# Default is 5, allowed range is 1..5
+```
+
+**Multi-pass workflow (switch models between runs):**
+
+```bash
+# Pass A (e.g. smaller/local model): stop after file analysis
+/understand --max-subagents 1 --stop-after analyze
+
+# Pass B (e.g. stronger model in a new session): resume later phases
+/understand --resume-from assemble --reuse-intermediate
+```
+
+You can also combine `--resume-from` and `--stop-after` in one command to run a phase window.
+
+```bash
+# Run only assemble -> architecture -> tour -> review
+/understand --resume-from assemble --stop-after review --reuse-intermediate
+```
+
+Valid phase names for `--stop-after` and `--resume-from`:
+
+- `scan` — project scan
+- `batch` — semantic batch computation
+- `analyze` — file-analyzer batch processing
+- `assemble` — assembled-graph review
+- `architecture` — layer detection
+- `tour` — guided tour generation
+- `review` — graph validation
+- `save` — final write + metadata
+
+Example:
+
+```bash
+/understand --stop-after batch
+/understand --resume-from analyze --reuse-intermediate
+```
+
 **Localized output:** Use `--language` to generate content in your preferred language:
 
 ```bash

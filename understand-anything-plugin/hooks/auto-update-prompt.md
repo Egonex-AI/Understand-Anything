@@ -10,6 +10,12 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
 1. Set `PROJECT_ROOT` to the current working directory.
 
+1.1. Parse optional concurrency override from `$ARGUMENTS`:
+   - If `--max-subagents <n>` is present, parse `<n>` as integer.
+   - Clamp to range `1..5`.
+   - If missing or invalid, default to `3` for auto-update.
+   - Store as `$MAX_SUBAGENTS`.
+
 2. Check that `$PROJECT_ROOT/.understand-anything/knowledge-graph.json` exists.
    - If not: report "No existing knowledge graph found. Run `/understand` first to create one." and **STOP**.
 
@@ -156,6 +162,7 @@ Only re-analyze files with structural changes. This is the **only** phase that c
 1. Read the existing knowledge graph from `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`.
 
 2. Batch the files from `filesToReanalyze` (from Phase 1). Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
+   Dispatch up to `$MAX_SUBAGENTS` batch subagents concurrently. If `$MAX_SUBAGENTS=1`, run batches strictly sequentially.
 
 3. For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Append:
 
