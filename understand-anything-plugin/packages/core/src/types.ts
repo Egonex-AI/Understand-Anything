@@ -114,9 +114,16 @@ export interface AnalysisMeta {
 }
 
 // Project config (for auto-update opt-in and language preference)
+export interface OllamaConfig {
+  baseUrl: string;
+  model: string;
+  concurrency: number;
+}
+
 export interface ProjectConfig {
   autoUpdate: boolean;
   outputLanguage?: string;
+  ollama?: OllamaConfig;
 }
 
 // Non-code structural sub-interfaces
