@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Lum1104%2FUnderstand-Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+  <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="#-inicio-rápido"><img src="https://img.shields.io/badge/Inicio_Rápido-blue" alt="Quick Start" /></a>
-  <a href="https://github.com/Lum1104/Understand-Anything/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-yellow" alt="License: MIT" /></a>
+  <a href="https://github.com/Egonex-AI/Understand-Anything/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-yellow" alt="License: MIT" /></a>
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-8A2BE2" alt="Claude Code" /></a>
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
@@ -31,9 +31,9 @@
 </p>
 
 <p align="center">
-  <strong>💬 <a href="https://discord.gg/pydat66RY">Únete a la comunidad de Discord &rarr;</a></strong>
+  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
   <br />
-  <em>Pregunta, comparte lo que construyes y recibe ayuda de la comunidad.</em>
+  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
 </p>
 
 ---
@@ -103,9 +103,11 @@ Apunta `/understand-knowledge` a un [wiki LLM con patrón Karpathy](https://gist
 ### 1. Instala el plugin
 
 ```bash
-/plugin marketplace add Lum1104/Understand-Anything
+/plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
 ```
+
+> **¿Usas un modelo local?** Para configuraciones de privacidad o empresariales, apunta tu plataforma a un proveedor de modelos local como [Ollama](https://docs.ollama.com/integrations) — sigue su guía de integración para cambiar el proveedor de modelo.
 
 ### 2. Analiza tu código
 
@@ -114,6 +116,8 @@ Apunta `/understand-knowledge` a un [wiki LLM con patrón Karpathy](https://gist
 ```
 
 Un pipeline multi-agente escanea tu proyecto, extrae cada archivo, función, clase y dependencia, y construye un grafo de conocimiento guardado en `.understand-anything/knowledge-graph.json`.
+
+> **Aviso sobre el consumo de tokens:** El primer `/understand` analiza todo tu código y puede consumir una cantidad significativa de tokens en proyectos grandes. Recomendamos ejecutarlo con un plan / suscripción de tokens, o usar un modelo local (ver arriba) para la inicialización. Las ejecuciones posteriores son incrementales por defecto — solo se reanalizan los archivos modificados — por lo que usan muchos menos tokens.
 
 **Salida localizada:** Usa `--language` para generar contenido en tu idioma preferido:
 
@@ -177,27 +181,27 @@ Understand-Anything funciona en múltiples plataformas de codificación con IA.
 ### Claude Code (Nativo)
 
 ```bash
-/plugin marketplace add Lum1104/Understand-Anything
+/plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
 ```
 
-### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI)
+### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
 # o pasa la plataforma directamente para saltar el prompt:
-curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
 ```
 
 **Windows (PowerShell):**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
 ```
 
 El instalador clona el repositorio en `~/.understand-anything/repo` y crea los enlaces simbólicos correspondientes para la plataforma elegida. Reinicia tu CLI/IDE al terminar.
 
-- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`
+- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
 - Actualizar más adelante: `./install.sh --update`
 - Desinstalar: `./install.sh --uninstall <platform>`
 
@@ -205,7 +209,7 @@ El instalador clona el repositorio en `~/.understand-anything/repo` y crea los e
 
 Cursor detecta automáticamente el plugin a través de `.cursor-plugin/plugin.json` cuando se clona este repositorio. No requiere instalación manual: simplemente clona y abre en Cursor.
 
-Si la detección automática no lo reconoce, instálalo manualmente: abre **Cursor Settings → Plugins**, pega `https://github.com/Lum1104/Understand-Anything` en el campo de búsqueda y añádelo desde allí.
+Si la detección automática no lo reconoce, instálalo manualmente: abre **Cursor Settings → Plugins**, pega `https://github.com/Egonex-AI/Understand-Anything` en el campo de búsqueda y añádelo desde allí.
 
 ### VS Code + GitHub Copilot
 
@@ -216,8 +220,20 @@ Para habilidades personales (disponibles en todos los proyectos), ejecuta el `in
 ### Copilot CLI
 
 ```bash
-copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
+copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 ```
+
+### Kiro CLI / IDE
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
+```
+
+Tras la instalación:
+- **Kiro CLI**: `kiro-cli chat --agent understand "Analiza este proyecto"`
+- **Kiro IDE**: Las habilidades se enlazan simbólicamente en `~/.kiro/skills/` y el agente `understand` se escribe en `~/.kiro/agents/understand.json`, de modo que ambos quedan disponibles tras reiniciar el IDE.
+
+Para habilidades personales (disponibles en todos los proyectos), ejecuta el `install.sh` de arriba con la plataforma `kiro`.
 
 ### Compatibilidad de Plataformas
 
@@ -237,6 +253,8 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ Soportado | `install.sh hermes` |
 | Cline | ✅ Soportado | `install.sh cline` |
 | KIMI CLI | ✅ Soportado | `install.sh kimi` |
+| Nanobot | ✅ Soportado | `install.sh nanobot` |
+| Kiro CLI / IDE | ✅ Soportado | `install.sh kiro` |
 
 ---
 
@@ -244,7 +262,7 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 
 El grafo es solo JSON — **confírmalo una vez y tus compañeros se saltan el pipeline**. Ideal para onboarding, revisiones de PR y flujos docs-as-code.
 
-> **Ejemplo:** [GoogleCloudPlatform/microservices-demo (fork)](https://github.com/Lum1104/microservices-demo) — referencia políglota (Go / Java / Python / Node) con el grafo ya confirmado.
+> **Ejemplo:** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) — referencia políglota (Go / Java / Python / Node) con el grafo ya confirmado.
 
 **Qué confirmar:** todo lo que hay en `.understand-anything/` *excepto* `intermediate/` y `diff-overlay.json` (archivos temporales locales).
 
@@ -327,11 +345,11 @@ Para cambios importantes, abre primero un issue para que podamos discutir el enf
 
 ## Historial de Stars
 
-<a href="https://www.star-history.com/?repos=Lum1104%2FUnderstand-Anything&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=Egonex-AI%2FUnderstand-Anything&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=Egonex-AI/Understand-Anything&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=Egonex-AI/Understand-Anything&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=Egonex-AI/Understand-Anything&type=date&legend=top-left" />
  </picture>
 </a>
 
@@ -340,5 +358,5 @@ Para cambios importantes, abre primero un issue para que podamos discutir el enf
 </p>
 
 <p align="center">
-  Licencia MIT &copy; <a href="https://github.com/Lum1104">Lum1104</a>
+  MIT License &copy; Yuxiang Lin and Infinite Universe, Inc.
 </p>

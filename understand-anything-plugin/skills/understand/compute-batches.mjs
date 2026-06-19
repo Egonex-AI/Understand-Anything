@@ -13,9 +13,18 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+
+/**
+ * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
+ * to open every descriptor at once (would hit `EMFILE`) while still keeping
+ * libuv's worker-thread pool saturated. Empirically chosen to keep memory
+ * around tens of MB even when the average file is ~10 KB.
+ */
+const IO_PARALLELISM = 64;
 
 const __filename = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(__filename), '../..');
@@ -57,31 +66,55 @@ async function extractExports(projectRoot, codeFiles) {
   }
 
   const exportsByPath = new Map();
-  for (const file of codeFiles) {
-    const abs = join(projectRoot, file.path);
-    let content;
-    try {
-      content = readFileSync(abs, 'utf-8');
-    } catch (err) {
-      process.stderr.write(
-        `Warning: compute-batches: exports extraction failed for ${file.path} ` +
-        `(read error: ${err.message}) — symbols=[] in neighborMap — ` +
-        `cross-batch edges to this file limited to file-level\n`,
-      );
-      exportsByPath.set(file.path, []);
-      continue;
-    }
-    try {
-      const analysis = registry.analyzeFile(file.path, content);
-      const names = (analysis?.exports || []).map(e => e.name).filter(Boolean);
-      exportsByPath.set(file.path, names);
-    } catch (err) {
-      process.stderr.write(
-        `Warning: compute-batches: exports extraction failed for ${file.path} ` +
-        `(analyze error: ${err.message}) — symbols=[] in neighborMap — ` +
-        `cross-batch edges to this file limited to file-level\n`,
-      );
-      exportsByPath.set(file.path, []);
+
+  // I/O is parallelised in bounded chunks (libuv worker threads handle the
+  // disk reads concurrently) while the actual tree-sitter parse stays on
+  // the main thread, since web-tree-sitter is single-threaded WASM. For a
+  // 15k-file iOS repo (#226), the sequential `readFileSync` loop dominated;
+  // letting reads pipeline drops wall time roughly proportional to the
+  // share of the loop spent waiting on disk.
+  for (let start = 0; start < codeFiles.length; start += IO_PARALLELISM) {
+    const slice = codeFiles.slice(start, start + IO_PARALLELISM);
+
+    // Read every file in the slice concurrently. Errors per file are
+    // captured in-place so a single bad file does not abort the chunk.
+    const reads = await Promise.all(
+      slice.map(async (file) => {
+        const abs = join(projectRoot, file.path);
+        try {
+          const content = await readFile(abs, 'utf-8');
+          return { file, content, readError: null };
+        } catch (err) {
+          return { file, content: null, readError: err };
+        }
+      }),
+    );
+
+    // Serialise the CPU-bound tree-sitter work and the stderr warning emits
+    // so log order remains identical to the previous sequential loop. This
+    // also keeps existing fixture-comparison tests stable.
+    for (const { file, content, readError } of reads) {
+      if (readError) {
+        process.stderr.write(
+          `Warning: compute-batches: exports extraction failed for ${file.path} ` +
+          `(read error: ${readError.message}) — symbols=[] in neighborMap — ` +
+          `cross-batch edges to this file limited to file-level\n`,
+        );
+        exportsByPath.set(file.path, []);
+        continue;
+      }
+      try {
+        const analysis = registry.analyzeFile(file.path, content);
+        const names = (analysis?.exports || []).map(e => e.name).filter(Boolean);
+        exportsByPath.set(file.path, names);
+      } catch (err) {
+        process.stderr.write(
+          `Warning: compute-batches: exports extraction failed for ${file.path} ` +
+          `(analyze error: ${err.message}) — symbols=[] in neighborMap — ` +
+          `cross-batch edges to this file limited to file-level\n`,
+        );
+        exportsByPath.set(file.path, []);
+      }
     }
   }
   return exportsByPath;

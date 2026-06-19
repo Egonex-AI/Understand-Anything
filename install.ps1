@@ -23,7 +23,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Lum1104/Understand-Anything.git' }
+$RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Egonex-AI/Understand-Anything.git' }
 $RepoRef    = if ($env:UA_REPO_REF) { $env:UA_REPO_REF } else { '' }
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
@@ -42,6 +42,8 @@ $Platforms = [ordered]@{
     cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
     kimi        = @{ Target = (Join-Path $HOME '.kimi\skills');               Style = 'folder' }
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
+    nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
+    kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -394,6 +396,11 @@ function Link-Plugin-Root {
     }
 }
 
+function ConvertTo-FileUri([string]$Path) {
+    # Produce a forward-slashed file URI (Windows: file:///C:/path/...).
+    return 'file:///' + ($Path -replace '\\', '/')
+}
+
 function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
     $target = Resolve-TargetDir $Id $cfg.Target
@@ -416,6 +423,32 @@ function Cmd-Install([string]$Id) {
     Write-Host '→ Linking universal plugin root'
     Link-Plugin-Root
 
+    if ($Id -eq 'kiro') {
+        Write-Host '→ Creating Kiro agent configuration'
+        $agentsDir = Join-Path $HOME '.kiro\agents'
+        if (-not (Test-Path $agentsDir)) { New-Item -ItemType Directory -Path $agentsDir | Out-Null }
+        $pluginRoot = Join-Path $RepoDir 'understand-anything-plugin'
+
+        # Build the "resources" list dynamically from the agent definitions in
+        # the repo so it never drifts as agents are added or removed.
+        $resources = @(
+            Get-ChildItem -Path (Join-Path $pluginRoot 'agents') -Filter '*.md' -File |
+                Sort-Object Name |
+                ForEach-Object { ConvertTo-FileUri $_.FullName }
+        )
+        $agent = [ordered]@{
+            name        = 'understand'
+            description = 'Analyze codebase into interactive knowledge graph — Understand Anything'
+            prompt      = ConvertTo-FileUri (Join-Path $pluginRoot 'skills\understand\SKILL.md')
+            tools       = @('read', 'write', 'shell', 'grep', 'glob', 'code', 'subagent')
+            resources   = $resources
+        }
+        $agentJson = Join-Path $agentsDir 'understand.json'
+        # WriteAllText emits UTF-8 without a BOM on every PowerShell version.
+        [System.IO.File]::WriteAllText($agentJson, ($agent | ConvertTo-Json -Depth 5))
+        Write-Host "  ✓ $agentJson"
+    }
+
     Write-Host "`n✓ Installed Understand-Anything for $Id"
     if ($Id -eq 'forgecode') {
         Write-Host '  Restart ForgeCode to pick up commands and agents.'
@@ -425,6 +458,9 @@ function Cmd-Install([string]$Id) {
     if ($Id -eq 'vscode') {
         Write-Host "`n  Tip: VS Code can also auto-discover the plugin by opening this repo"
         Write-Host '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.'
+    }
+    if ($Id -eq 'kiro') {
+        Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
     }
 }
 
@@ -446,6 +482,15 @@ function Cmd-Uninstall([string]$Id) {
         Uninstall-ForgeCodeAgents
     }
 
+    Write-Host "→ Removing skill links for $Id"
+    Unlink-Skills $cfg.Target $cfg.Style
+    if ($Id -eq 'kiro') {
+        $agentJson = Join-Path $HOME '.kiro\agents\understand.json'
+        if (Test-Path $agentJson) {
+            Remove-Item -LiteralPath $agentJson -Force
+            Write-Host "  ✓ removed $agentJson"
+        }
+    }
     if (Remove-Reparse $PluginLink) {
         Write-Host "  ✓ removed $PluginLink"
     }
