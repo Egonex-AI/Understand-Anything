@@ -91,6 +91,22 @@ describe("fetchAndValidateGraph", () => {
     expect(result.status).toBe("validation-error");
   });
 
+  it("labels a 200 body that fails to parse as a parse-error, not a network error", async () => {
+    // A 200 whose body is not valid JSON is a body-parse failure, distinct
+    // from a transport/network failure — so it gets its own status.
+    const fetchImpl = mockFetch({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: () => Promise.reject(new SyntaxError("Unexpected token < in JSON")),
+    });
+
+    const result = await fetchAndValidateGraph("/knowledge-graph.json", fetchImpl);
+
+    expect(result.status).toBe("parse-error");
+    expect(result.status === "parse-error" && result.error).toContain("Unexpected token");
+  });
+
   it("loads a valid knowledge graph on a 200 response", async () => {
     const fetchImpl = mockFetch({
       ok: true,

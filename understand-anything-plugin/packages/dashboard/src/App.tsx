@@ -147,10 +147,15 @@ function Dashboard({ accessToken }: { accessToken: string }) {
               console.error(`[graph] dropped: ${issue.message}`);
             }
           }
-        } else if (result.status === "http-error" || result.status === "network-error") {
-          // Guard on res.ok (issue #288): surface a clear HTTP/network error
-          // instead of letting a 404 body fall through to graph validation,
-          // which produced a misleading "Missing or invalid project metadata".
+        } else if (
+          result.status === "http-error" ||
+          result.status === "network-error" ||
+          result.status === "parse-error"
+        ) {
+          // Guard on res.ok (issue #288): surface a clear HTTP/network/parse
+          // error instead of letting a 404 body fall through to graph
+          // validation, which produced a misleading "Missing or invalid
+          // project metadata".
           console.error("Failed to load knowledge graph:", result.error);
           setLoadError(`Failed to load knowledge graph: ${result.error}`);
         } else {

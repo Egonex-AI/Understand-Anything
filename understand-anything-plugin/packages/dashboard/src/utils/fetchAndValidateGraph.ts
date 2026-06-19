@@ -16,6 +16,7 @@ export type FetchGraphResult =
   | { status: "loaded"; graph: Graph; issues: GraphIssue[]; isKnowledge: boolean }
   | { status: "http-error"; error: string }
   | { status: "validation-error"; error: string }
+  | { status: "parse-error"; error: string }
   | { status: "network-error"; error: string };
 
 /**
@@ -50,8 +51,10 @@ export async function fetchAndValidateGraph(
   try {
     data = await res.json();
   } catch (err) {
+    // A parse failure on a 2xx body is a body-parse error, not a transport
+    // (network) failure — label it distinctly so the UI can message it precisely.
     return {
-      status: "network-error",
+      status: "parse-error",
       error: err instanceof Error ? err.message : String(err),
     };
   }
