@@ -10,6 +10,9 @@ Run the Understand Anything analysis pipeline against a local Ollama server. The
 
 ## Prerequisites
 
+> **Note for Claude Code and Codex users:** Ollama also publishes [native integrations for Claude Code](https://docs.ollama.com/integrations/claude-code) and Codex that let you override the upstream model from inside the host platform. Those integrations are the lightest path on those two hosts. Use `/understand-ollama` instead if (a) you are on any other supported host (Cursor, Copilot, OpenCode, Kiro, Gemini CLI, etc.), (b) you want a guarantee that no prompt ever leaves the host machine, or (c) you are running in an air-gapped or vendor-restricted environment where managed platforms may still forward traffic.
+
+
 1. **Install Ollama.** macOS / Linux:
    ```bash
    curl -fsSL https://ollama.com/install.sh | sh
