@@ -41,6 +41,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    codebuddy   = @{ Target = (Join-Path $HOME '.codebuddy\skills');          Style = 'per-skill' }
 }
 
 function Show-Usage {

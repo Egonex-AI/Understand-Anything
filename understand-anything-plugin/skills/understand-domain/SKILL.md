@@ -51,6 +51,8 @@ SKILL_REAL=$(realpath ~/.agents/skills/understand-domain 2>/dev/null || readlink
 SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-domain 2>/dev/null || readlink -f ~/.copilot/skills/understand-domain 2>/dev/null || echo "")
 COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+CODEBUDDY_SKILL_REAL=$(realpath ~/.codebuddy/skills/understand-domain 2>/dev/null || readlink -f ~/.codebuddy/skills/understand-domain 2>/dev/null || echo "")
+CODEBUDDY_SELF_RELATIVE=$([ -n "$CODEBUDDY_SKILL_REAL" ] && cd "$CODEBUDDY_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 
 PLUGIN_ROOT=""
 for candidate in \
@@ -58,6 +60,7 @@ for candidate in \
   "$HOME/.understand-anything-plugin" \
   "$SELF_RELATIVE" \
   "$COPILOT_SELF_RELATIVE" \
+  "$CODEBUDDY_SELF_RELATIVE" \
   "$HOME/.codex/understand-anything/understand-anything-plugin" \
   "$HOME/.opencode/understand-anything/understand-anything-plugin" \
   "$HOME/.pi/understand-anything/understand-anything-plugin" \
@@ -75,6 +78,7 @@ if [ -z "$PLUGIN_ROOT" ]; then
   echo "  - $HOME/.understand-anything-plugin"
   echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-domain>}"
   echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-domain>}"
+  echo "  - ${CODEBUDDY_SELF_RELATIVE:-<unresolved path derived from ~/.codebuddy/skills/understand-domain>}"
   echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
   echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
   echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"

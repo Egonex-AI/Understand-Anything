@@ -42,6 +42,7 @@ kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+codebuddy|$HOME/.codebuddy/skills|per-skill
 EOF
 }
 
