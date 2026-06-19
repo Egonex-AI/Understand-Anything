@@ -148,6 +148,30 @@ function readSourceFile(url: URL) {
     return rejectFileRequest("File is not in the knowledge graph", 404);
   }
 
+  // Resolve symlinks and re-confirm the real path stays inside the project.
+  // The textual checks above only see the requested (in-root) path; a symlink
+  // committed in an indexed repo (e.g. src/config.txt -> ~/.ssh/id_rsa) is
+  // textually in-root and present in the graph, so without this guard the
+  // statSync/readFileSync below would follow it and disclose a file outside
+  // the project root.
+  let realFile: string;
+  let realRoot: string;
+  try {
+    realFile = fs.realpathSync(absoluteFile);
+    realRoot = fs.realpathSync(projectRoot);
+  } catch {
+    return rejectFileRequest("File not found", 404);
+  }
+  const realRelative = path.relative(realRoot, realFile);
+  if (
+    !realRelative ||
+    realRelative === ".." ||
+    realRelative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(realRelative)
+  ) {
+    return rejectFileRequest("Path must stay inside the project");
+  }
+
   let stat: fs.Stats;
   try {
     stat = fs.statSync(absoluteFile);

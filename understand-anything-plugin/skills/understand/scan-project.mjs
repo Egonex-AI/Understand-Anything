@@ -53,6 +53,7 @@ import { dirname, resolve, join, basename, extname, relative, sep } from 'node:p
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   existsSync,
+  lstatSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -699,10 +700,13 @@ async function main() {
     // Stat first — git ls-files could include paths that vanished between
     // listing and processing; the walker shouldn't but defensive anyway.
     try {
-      const st = statSync(absPath);
-      if (!st.isFile()) {
-        // Symlinks-to-dir, special files, etc. — skip silently. Not a
-        // warning condition because git wouldn't have tracked it as a file.
+      // lstat (not stat) so symlinks are NOT followed: a symlink committed in
+      // an indexed repo could point outside the project root (e.g.
+      // src/config.txt -> ~/.ssh/id_rsa) and would otherwise be emitted as a
+      // normal file node and later served by the dashboard. Skip it (the
+      // recursive-walk fallback already skips symlinks).
+      const st = lstatSync(absPath);
+      if (st.isSymbolicLink() || !st.isFile()) {
         continue;
       }
     } catch (err) {
