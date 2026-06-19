@@ -180,6 +180,22 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 /understand src/frontend
 ```
 
+### 5. Run fully locally with Ollama
+
+Prefer to keep every byte on your machine? Use a local Ollama server instead of a cloud LLM:
+
+```bash
+# One-time setup
+curl -fsSL https://ollama.com/install.sh | sh   # install Ollama
+ollama serve &                                   # start the server
+ollama pull qwen2.5-coder:7b                    # pull a 7B code model
+
+# Then run
+/understand-ollama
+```
+
+The local pipeline produces the same `.understand-anything/knowledge-graph.json` schema and the same dashboard. Add `--ollama` to the existing `/understand` command to keep one entry point. See `understand-anything-plugin/skills/understand-ollama/SKILL.md` for details.
+
 ---
 
 ## 🌐 Multi-Platform Installation
@@ -250,7 +266,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Platform | Status | Install Method |
 |----------|--------|----------------|
 | Claude Code | ✅ Native | Plugin marketplace |
-| Cursor | ✅ Supported | Auto-discovery |
+| Ollama (local) | ✅ Supported | `/understand-ollama` (no host plugin needed) |
 | VS Code + GitHub Copilot | ✅ Supported | Auto-discovery |
 | Copilot CLI | ✅ Supported | Plugin install |
 | Codex | ✅ Supported | `install.sh codex` |

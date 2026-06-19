@@ -1,6 +1,6 @@
 {
   "name": "@understand-anything/skill",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
