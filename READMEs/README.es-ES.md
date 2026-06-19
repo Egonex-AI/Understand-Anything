@@ -107,6 +107,8 @@ Apunta `/understand-knowledge` a un [wiki LLM con patrón Karpathy](https://gist
 /plugin install understand-anything
 ```
 
+> **¿Usas un modelo local?** Para configuraciones de privacidad o empresariales, apunta tu plataforma a un proveedor de modelos local como [Ollama](https://docs.ollama.com/integrations) — sigue su guía de integración para cambiar el proveedor de modelo.
+
 ### 2. Analiza tu código
 
 ```bash
@@ -114,6 +116,8 @@ Apunta `/understand-knowledge` a un [wiki LLM con patrón Karpathy](https://gist
 ```
 
 Un pipeline multi-agente escanea tu proyecto, extrae cada archivo, función, clase y dependencia, y construye un grafo de conocimiento guardado en `.understand-anything/knowledge-graph.json`.
+
+> **Aviso sobre el consumo de tokens:** El primer `/understand` analiza todo tu código y puede consumir una cantidad significativa de tokens en proyectos grandes. Recomendamos ejecutarlo con un plan / suscripción de tokens, o usar un modelo local (ver arriba) para la inicialización. Las ejecuciones posteriores son incrementales por defecto — solo se reanalizan los archivos modificados — por lo que usan muchos menos tokens.
 
 **Salida localizada:** Usa `--language` para generar contenido en tu idioma preferido:
 

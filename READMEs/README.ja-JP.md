@@ -108,6 +108,8 @@ Understand Anything は [Claude Code Plugin](https://code.claude.com/docs/en/plu
 /plugin install understand-anything
 ```
 
+> **ローカルモデルを使う場合:** プライバシーやエンタープライズ用途では、[Ollama](https://docs.ollama.com/integrations) などのローカルモデルプロバイダーにプラットフォームを向けてください。統合ガイドに従ってモデルプロバイダーを変更できます。
+
 ### 2. コードベースを分析
 
 ```bash
@@ -115,6 +117,8 @@ Understand Anything は [Claude Code Plugin](https://code.claude.com/docs/en/plu
 ```
 
 マルチエージェントパイプラインがプロジェクトをスキャンし、すべてのファイル・関数・クラス・依存関係を抽出して、`.understand-anything/knowledge-graph.json` にナレッジグラフを保存します。
+
+> **トークン使用量にご注意:** 初回の `/understand` はコードベース全体を分析するため、大規模プロジェクトではかなりのトークンを消費することがあります。トークンプラン / サブスクリプションでの実行、または初期化にはローカルモデル（上記参照）の使用をおすすめします。以降の実行はデフォルトで増分処理され、変更されたファイルのみ再分析するため、消費トークンは大幅に少なくなります。
 
 **ローカライズされた出力：** `--language` を使用して、希望の言語でコンテンツを生成：
 

@@ -117,6 +117,8 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 /plugin install understand-anything
 ```
 
+> **Using a local model?** For privacy or enterprise setups, point your platform at a local model provider such as [Ollama](https://docs.ollama.com/integrations) — follow their integration guide to change the model provider.
+
 ### 2. Analyze your codebase
 
 ```bash
@@ -124,6 +126,8 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 ```
 
 A multi-agent pipeline scans your project, extracts every file, function, class, and dependency, then builds a knowledge graph saved to `.understand-anything/knowledge-graph.json`.
+
+> **Heads up on token usage:** The initial `/understand` analyzes your whole codebase and can consume a significant number of tokens on large projects. We recommend running it on a token plan / subscription, or using a local model (see above) for initialization. Subsequent runs are incremental by default — only changed files are re-analyzed — so they use far fewer tokens.
 
 **Localized output:** Use `--language` to generate content in your preferred language:
 

@@ -107,6 +107,8 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 /plugin install understand-anything
 ```
 
+> **使用本地模型？** 基於隱私或企業需求，可以將你的平台指向本地模型提供方，例如 [Ollama](https://docs.ollama.com/integrations) —— 依照其整合指南變更模型提供方。
+
 ### 2. 分析你的程式碼庫
 
 ```bash
@@ -114,6 +116,8 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 ```
 
 多智能體（multi-agent）架構會：掃描你的專案，提取函式 / 類別 / 相依關係，建構知識圖譜並儲存至 `.understand-anything/knowledge-graph.json`。
+
+> **關於 Token 消耗的提醒：** 首次執行 `/understand` 會分析整個程式碼庫，在大型專案上可能消耗大量 token。建議在有 token 方案 / 訂閱的情況下執行，或在初始化時使用本地模型（見上文）。後續執行預設為增量式——只重新分析變更過的檔案——因此消耗的 token 大幅減少。
 
 **在地化輸出：** 使用 `--language` 參數產生中文內容：
 

@@ -107,6 +107,8 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 /plugin install understand-anything
 ```
 
+> **로컬 모델을 사용하시나요?** 개인정보 보호나 엔터프라이즈 환경에서는 [Ollama](https://docs.ollama.com/integrations) 같은 로컬 모델 제공자를 사용하도록 플랫폼을 설정하세요 — 통합 가이드를 따라 모델 제공자를 변경할 수 있습니다.
+
 ### 2. 코드베이스 분석
 
 ```bash
@@ -114,6 +116,8 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 ```
 
 멀티 에이전트 파이프라인이 프로젝트를 스캔하고, 모든 파일, 함수, 클래스, 의존성을 추출한 뒤, `.understand-anything/knowledge-graph.json`에 지식 그래프를 저장합니다.
+
+> **토큰 사용량 안내:** 최초 `/understand`는 전체 코드베이스를 분석하므로 대규모 프로젝트에서는 상당한 토큰을 소비할 수 있습니다. 토큰 요금제 / 구독으로 실행하거나, 초기화에는 로컬 모델(위 참조)을 사용하는 것을 권장합니다. 이후 실행은 기본적으로 증분 방식이라 변경된 파일만 다시 분석하므로 훨씬 적은 토큰을 사용합니다.
 
 **로컬라이즈된 출력:** `--language`를 사용하여 원하는 언어로 내용을 생성:
 
