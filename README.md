@@ -182,7 +182,9 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 
 ### 5. Run fully locally with Ollama
 
-Prefer to keep every byte on your machine? Use a local Ollama server instead of a cloud LLM:
+Prefer to keep every byte on your machine? Use a local Ollama server. Ollama ships [native integrations](https://docs.ollama.com/integrations) for several hosts in the list above — Claude Code, Codex App, Codex CLI, Copilot CLI, Cline CLI, OpenCode, VS Code (incl. Copilot), JetBrains, Zed, Roo Code — and you should use the native integration when one exists.
+
+For hosts with no native Ollama integration (Cursor, Gemini CLI, OpenClaw, Hermes, Goose, Kiro CLI / IDE, Antigravity, Pi Agent, Vibe CLI, Trae, Nanobot, Droid, Pool, …), or when you want a guarantee that no prompt ever leaves the host machine, use `/understand-ollama`:
 
 ```bash
 # One-time setup
@@ -192,9 +194,11 @@ ollama pull qwen2.5-coder:7b                    # pull a 7B code model
 
 # Then run
 /understand-ollama
+# or
+/understand --ollama
 ```
 
-The local pipeline produces the same `.understand-anything/knowledge-graph.json` schema and the same dashboard. Add `--ollama` to the existing `/understand` command to keep one entry point. See `understand-anything-plugin/skills/understand-ollama/SKILL.md` for details.
+The local pipeline produces the same `.understand-anything/knowledge-graph.json` schema and the same dashboard. See `understand-anything-plugin/skills/understand-ollama/SKILL.md` for details on which path is right for your host.
 
 ---
 

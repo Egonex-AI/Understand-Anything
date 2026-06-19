@@ -10,7 +10,12 @@ Run the Understand Anything analysis pipeline against a local Ollama server. The
 
 ## Prerequisites
 
-> **Note for Claude Code and Codex users:** Ollama also publishes [native integrations for Claude Code](https://docs.ollama.com/integrations/claude-code) and Codex that let you override the upstream model from inside the host platform. Those integrations are the lightest path on those two hosts. Use `/understand-ollama` instead if (a) you are on any other supported host (Cursor, Copilot, OpenCode, Kiro, Gemini CLI, etc.), (b) you want a guarantee that no prompt ever leaves the host machine, or (c) you are running in an air-gapped or vendor-restricted environment where managed platforms may still forward traffic.
+> **Choosing between this skill and Ollama's native integrations.** Ollama publishes [native integrations](https://docs.ollama.com/integrations) for many coding agents and IDEs — Claude Code, Codex App, Codex CLI, Copilot CLI, Cline CLI, OpenCode, VS Code (incl. Copilot), JetBrains, Zed, Roo Code, and others. If your host is on that list, the native integration is the lightest path: `ollama pull <model>` and set the model inside the host.
+>
+> `/understand-ollama` is the right pick in three concrete cases:
+> 1. **Your host has no native Ollama integration.** This includes Cursor, Gemini CLI, OpenClaw, Hermes, Goose, Kiro CLI / IDE, Antigravity, Pi Agent, Vibe CLI, Trae, Nanobot, Droid, Pool, and others. The plugin supports these hosts via auto-discovery or `install.sh`, but they have no Ollama hook of their own.
+> 2. **You want a guarantee that no prompt ever leaves the host machine.** Native integrations still send prompts through the host process; on managed / corporate deployments they may forward to a vendor gateway regardless of the user-chosen model. `/understand-ollama` runs the entire pipeline as a local Node script against a local HTTP server — no vendor process touches any prompt.
+> 3. **You want one command that behaves the same across hosts.** `/understand-ollama` is a single Node script with a stable CLI and stable output schema; the host platform doesn't matter.
 
 
 1. **Install Ollama.** macOS / Linux:
