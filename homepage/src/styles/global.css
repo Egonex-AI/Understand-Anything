@@ -1,39 +1,41 @@
-/* Font declarations — self-hosted, no external CDN dependency */
-@font-face {
-  font-family: 'DM Serif Display';
-  src: url('/fonts/DMSerifDisplay-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+/* --- New Feature: Premium Scroll Progress & Custom Scrollbar --- */
+
+/* Horizontal scroll progress indicator at the top of the viewport */
+.scroll-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--gradient);
+  transform-origin: left;
+  scale: 0 1; /* Bind this to scroll-timeline or a quick JS scroll listener */
+  z-index: 10000;
 }
 
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+/* Custom scrollbar track */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
+::-webkit-scrollbar-track {
+  background: var(--bg);
+  border-left: 1px solid var(--border);
 }
 
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
+/* Custom scrollbar thumb with a subtle hover glow */
+::-webkit-scrollbar-thumb {
+  background: var(--surface);
+  border: 2px solid var(--bg);
+  border-radius: 5px;
+  transition: background 0.3s ease;
 }
 
-/* Design tokens */
-:root {
-  --bg: #0a0a0a;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
   --surface: #141414;
   --border: #1a1a1a;
   --accent: #d4a574;
