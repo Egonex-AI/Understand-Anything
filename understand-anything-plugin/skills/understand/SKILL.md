@@ -577,6 +577,8 @@ Assemble the full KnowledgeGraph JSON object:
 }
 ```
 
+**Populate `project` from earlier phases — all six fields are required.** Take `name`, `description`, `languages`, and `frameworks` from the Phase 1 `scan-result.json` (its keys are literally `name` and `description`, not `projectName`/`projectDescription`), `gitCommitHash` from Phase 0, and set `analyzedAt` to the current ISO 8601 timestamp. The dashboard rejects the graph on load with *"Missing or invalid project metadata"* if any field is missing or empty, so do not leave any as an unresolved placeholder.
+
 1. Before writing the assembled graph, validate that:
    - `layers` is an array of objects with these required fields: `id`, `name`, `description`, `nodeIds`
    - `tour` is an array of objects with these required fields: `order`, `title`, `description`, `nodeIds`
@@ -594,82 +596,19 @@ Assemble the full KnowledgeGraph JSON object:
 
 #### Default path (no `--review`): inline deterministic validation
 
-Write the following Node.js script to `$PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs`:
-
-```javascript
-#!/usr/bin/env node
-const fs = require('fs');
-const graphPath = process.argv[2];
-const outputPath = process.argv[3];
-try {
-  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
-  const issues = [], warnings = [];
-  if (!Array.isArray(graph.nodes)) { issues.push('graph.nodes is missing or not an array'); graph.nodes = []; }
-  if (!Array.isArray(graph.edges)) { issues.push('graph.edges is missing or not an array'); graph.edges = []; }
-  const nodeIds = new Set();
-  const seen = new Map();
-  graph.nodes.forEach((n, i) => {
-    if (!n.id) { issues.push(`Node[${i}] missing id`); return; }
-    if (!n.type) issues.push(`Node[${i}] '${n.id}' missing type`);
-    if (!n.name) issues.push(`Node[${i}] '${n.id}' missing name`);
-    if (!n.summary) issues.push(`Node[${i}] '${n.id}' missing summary`);
-    if (!n.tags || !n.tags.length) issues.push(`Node[${i}] '${n.id}' missing tags`);
-    if (seen.has(n.id)) issues.push(`Duplicate node ID '${n.id}' at indices ${seen.get(n.id)} and ${i}`);
-    else seen.set(n.id, i);
-    nodeIds.add(n.id);
-  });
-  graph.edges.forEach((e, i) => {
-    if (!nodeIds.has(e.source)) issues.push(`Edge[${i}] source '${e.source}' not found`);
-    if (!nodeIds.has(e.target)) issues.push(`Edge[${i}] target '${e.target}' not found`);
-  });
-  const fileLevelTypes = new Set(['file', 'config', 'document', 'service', 'pipeline', 'table', 'schema', 'resource', 'endpoint']);
-  const fileNodes = graph.nodes.filter(n => fileLevelTypes.has(n.type)).map(n => n.id);
-  const assigned = new Map();
-  if (!Array.isArray(graph.layers)) { if (graph.layers) warnings.push('graph.layers is not an array'); graph.layers = []; }
-  if (!Array.isArray(graph.tour)) { if (graph.tour) warnings.push('graph.tour is not an array'); graph.tour = []; }
-  graph.layers.forEach(layer => {
-    (layer.nodeIds || []).forEach(id => {
-      if (!nodeIds.has(id)) issues.push(`Layer '${layer.id}' refs missing node '${id}'`);
-      if (assigned.has(id)) issues.push(`Node '${id}' appears in multiple layers`);
-      assigned.set(id, layer.id);
-    });
-  });
-  fileNodes.forEach(id => {
-    if (!assigned.has(id)) issues.push(`File node '${id}' not in any layer`);
-  });
-  graph.tour.forEach((step, i) => {
-    (step.nodeIds || []).forEach(id => {
-      if (!nodeIds.has(id)) issues.push(`Tour step[${i}] refs missing node '${id}'`);
-    });
-  });
-  const withEdges = new Set([
-    ...graph.edges.map(e => e.source),
-    ...graph.edges.map(e => e.target)
-  ]);
-  graph.nodes.forEach(n => {
-    if (!withEdges.has(n.id)) warnings.push(`Node '${n.id}' has no edges (orphan)`);
-  });
-  const stats = {
-    totalNodes: graph.nodes.length,
-    totalEdges: graph.edges.length,
-    totalLayers: graph.layers.length,
-    tourSteps: graph.tour.length,
-    nodeTypes: graph.nodes.reduce((a, n) => { a[n.type] = (a[n.type]||0)+1; return a; }, {}),
-    edgeTypes: graph.edges.reduce((a, e) => { a[e.type] = (a[e.type]||0)+1; return a; }, {})
-  };
-  fs.writeFileSync(outputPath, JSON.stringify({ issues, warnings, stats }, null, 2));
-  process.exit(0);
-} catch (err) { process.stderr.write(err.message + '\n'); process.exit(1); }
-```
-
-Execute it:
+Run the bundled validator script (located next to this SKILL.md file — use the skill directory path, not the project root):
 ```bash
-node $PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs \
+node <SKILL_DIR>/validate-graph.mjs \
   "$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json" \
   "$PROJECT_ROOT/.understand-anything/intermediate/review.json"
 ```
 
-If the script exits non-zero, read stderr, fix the script, and retry once.
+It reads the assembled graph and writes a `{ issues, warnings, stats }` report to `review.json`:
+- **`issues`** (blocking): missing/duplicate node fields, dangling edge endpoints, file nodes not in any layer, nodes in multiple layers, tour/layer refs to missing nodes, **and missing/invalid `graph.project` metadata** (the six required fields — `name`, `description`, `languages`, `frameworks`, `analyzedAt`, `gitCommitHash` — validated against the same rules the dashboard enforces via `ProjectMetaSchema`, so a graph that would be rejected on dashboard load with *"Missing or invalid project metadata"* is now caught at build time).
+- **`warnings`** (advisory): orphan nodes (no edges), non-array `layers`/`tour`.
+- **`stats`**: node/edge/layer/tour counts and type breakdowns.
+
+If the script exits non-zero, read stderr, fix the input, and retry once.
 
 ---
 
@@ -707,6 +646,7 @@ Pass these parameters in the dispatch prompt:
    - Apply automated fixes where possible:
      - Remove edges with dangling references
      - Fill missing required fields with sensible defaults (e.g., empty `tags` -> `["untagged"]`, empty `summary` -> `"No summary available"`)
+     - Repopulate any missing `graph.project` field from earlier phases (`name`/`description`/`languages`/`frameworks` from Phase 1 `scan-result.json`, `gitCommitHash` from Phase 0, `analyzedAt` from the current timestamp) — do not leave project metadata invalid, or the dashboard will refuse to load the graph
      - Remove nodes with invalid types
    - Re-run the final graph validation after automated fixes
    - If critical issues remain after one fix attempt, save the graph anyway but include the warnings in the final report and mark dashboard auto-launch as skipped
