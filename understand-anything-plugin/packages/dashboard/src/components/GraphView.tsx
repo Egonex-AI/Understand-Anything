@@ -1478,6 +1478,14 @@ function GraphViewInner() {
   useEffect(() => {
     if (navigationLevel !== "layer-detail" || !activeLayerId) return;
     if (!containerIds || containerIds.length === 0 || !containers) return;
+    // Bail while a new-layer ELK layout is in flight: containers/containerIds
+    // come from the same `topo` topology state as `nodes`, so on a direct
+    // layer→layer jump they still hold the PREVIOUS layer until setTopology
+    // lands. Marking the layer auto-expanded here (and expanding stale ids)
+    // would make the guard below skip it once fresh topology arrives, so the
+    // new layer's small containers never expand. Same guard the fitView effect
+    // uses; newLayoutRef clears when ELK completes, re-triggering this effect.
+    if (newLayoutRef?.current) return;
     if (autoExpandedLayersRef.current.has(activeLayerId)) return;
     autoExpandedLayersRef.current.add(activeLayerId);
 
