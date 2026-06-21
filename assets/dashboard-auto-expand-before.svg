@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380">
+  <defs>
+    <style>
+      .title { font: bold 13px sans-serif; fill: #888; }
+      .label { font: 11px monospace; fill: #666; }
+      .node-label { font: 10px sans-serif; fill: #ccc; }
+      .container-label { font: bold 11px sans-serif; fill: rgba(212,165,116,0.5); }
+      .badge { font: 9px monospace; fill: #a39787; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="600" height="380" fill="#0a0a0a" rx="12"/>
+
+  <!-- Title -->
+  <text x="16" y="28" class="title">BEFORE — Layer opened, containers collapsed (nearly invisible at zoom 0.15)</text>
+
+  <!-- Zoom indicator -->
+  <rect x="490" y="12" width="94" height="22" fill="#1a1a1a" rx="4"/>
+  <text x="537" y="27" text-anchor="middle" font="10px monospace" fill="#666">zoom: 0.15×</text>
+
+  <!-- Graph canvas area -->
+  <rect x="12" y="42" width="576" height="326" fill="#111" rx="8"/>
+
+  <!-- Collapsed container 1 — barely visible, dark box -->
+  <rect x="50" y="70" width="120" height="80" fill="rgba(212,165,116,0.015)" rx="8"
+        stroke="rgba(212,165,116,0.25)" stroke-width="1"/>
+  <text x="110" y="95" text-anchor="middle" class="container-label" opacity="0.4">components/</text>
+  <text x="110" y="112" text-anchor="middle" class="badge">12</text>
+  <!-- Question mark showing confusion -->
+  <text x="110" y="136" text-anchor="middle" font="20px sans-serif" fill="rgba(255,100,100,0.6)">?</text>
+
+  <!-- Collapsed container 2 -->
+  <rect x="220" y="55" width="110" height="90" fill="rgba(212,165,116,0.015)" rx="8"
+        stroke="rgba(212,165,116,0.25)" stroke-width="1"/>
+  <text x="275" y="82" text-anchor="middle" class="container-label" opacity="0.4">hooks/</text>
+  <text x="275" y="98" text-anchor="middle" class="badge">7</text>
+  <text x="275" y="128" text-anchor="middle" font="20px sans-serif" fill="rgba(255,100,100,0.6)">?</text>
+
+  <!-- Collapsed container 3 — large -->
+  <rect x="380" y="65" width="150" height="100" fill="rgba(212,165,116,0.015)" rx="8"
+        stroke="rgba(212,165,116,0.25)" stroke-width="1"/>
+  <text x="455" y="90" text-anchor="middle" class="container-label" opacity="0.4">services/</text>
+  <text x="455" y="107" text-anchor="middle" class="badge">24</text>
+  <text x="455" y="137" text-anchor="middle" font="20px sans-serif" fill="rgba(255,100,100,0.6)">?</text>
+
+  <!-- Collapsed container 4 -->
+  <rect x="60" y="200" width="100" height="75" fill="rgba(212,165,116,0.015)" rx="8"
+        stroke="rgba(212,165,116,0.25)" stroke-width="1"/>
+  <text x="110" y="222" text-anchor="middle" class="container-label" opacity="0.4">utils/</text>
+  <text x="110" y="238" text-anchor="middle" class="badge">5</text>
+  <text x="110" y="262" text-anchor="middle" font="20px sans-serif" fill="rgba(255,100,100,0.6)">?</text>
+
+  <!-- Collapsed container 5 -->
+  <rect x="215" y="195" width="120" height="85" fill="rgba(212,165,116,0.015)" rx="8"
+        stroke="rgba(212,165,116,0.25)" stroke-width="1"/>
+  <text x="275" y="218" text-anchor="middle" class="container-label" opacity="0.4">store/</text>
+  <text x="275" y="234" text-anchor="middle" class="badge">8</text>
+  <text x="275" y="262" text-anchor="middle" font="20px sans-serif" fill="rgba(255,100,100,0.6)">?</text>
+
+  <!-- Annotation box -->
+  <rect x="30" y="310" width="540" height="48" fill="#1a1510" rx="6" stroke="#c97070" stroke-width="1"/>
+  <text x="50" y="330" font="11px sans-serif" fill="#c97070">⚠  All file nodes hidden inside collapsed containers.</text>
+  <text x="50" y="348" font="11px sans-serif" fill="#888">User must click each container manually, or zoom to 1.0× to trigger auto-expand.</text>
+</svg>

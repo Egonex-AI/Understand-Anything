@@ -663,8 +663,25 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   const [topology, setTopology] = useState<LayerDetailTopology>(EMPTY_TOPOLOGY);
   const [layoutStatus, setLayoutStatus] = useState<"computing" | "ready">("ready");
 
+  // Synchronous flag: true while a new-layer ELK layout is in flight.
+  // Read by the nodes-watch fitView effect in GraphViewInner to prevent a
+  // premature fitView firing on the previous layer's stale nodes before the
+  // new layout arrives. A ref (not state) so it's visible to effects in the
+  // same flush without causing an extra render.
+  const newLayoutRef = useRef(false);
+  const prevBuiltRef = useRef<unknown>(null);
+
   useEffect(() => {
+    // Mark "new layout in flight" only when `built` itself changes (new layer
+    // or structural filter change), NOT when only stage1Tick changes (which is
+    // a same-layer container-size refinement after Stage 2 expansion).
+    if (built !== prevBuiltRef.current && built) {
+      newLayoutRef.current = true;
+    }
+    prevBuiltRef.current = built;
+
     if (!built) {
+      newLayoutRef.current = false;
       setTopology(EMPTY_TOPOLOGY);
       setLayoutStatus("ready");
       return;
@@ -748,6 +765,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           ...(portalNodes as unknown as Node[]),
         ];
         const positionedNodes = mergeElkPositions(allBaseNodes, positioned);
+        newLayoutRef.current = false;
         setTopology({
           nodes: positionedNodes,
           edges: aggEdges,
@@ -763,6 +781,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       })
       .catch((err) => {
         if (cancelled) return;
+        newLayoutRef.current = false;
         console.error("[layer-detail Stage 1 ELK] layout failed:", err);
         setLayoutStatus("ready");
       });
@@ -898,7 +917,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     bumpStage1Tick,
   ]);
 
-  return { ...topology, layoutStatus };
+  return { ...topology, layoutStatus, newLayoutRef };
 }
 
 /**
@@ -1289,8 +1308,10 @@ function useLayerDetailGraph() {
     nodes,
     edges,
     nodeToContainer: topo.nodeToContainer,
+    containers: topo.containers,
     containerIds,
     layoutStatus: topo.layoutStatus,
+    newLayoutRef: topo.newLayoutRef,
   };
 }
 
@@ -1311,6 +1332,7 @@ function GraphViewInner() {
   const pendingFocusContainer = useDashboardStore((s) => s.pendingFocusContainer);
   const setPendingFocusContainer = useDashboardStore((s) => s.setPendingFocusContainer);
   const tourFitPending = useDashboardStore((s) => s.tourFitPending);
+  const stage1Tick = useDashboardStore((s) => s.stage1Tick);
   const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
@@ -1320,10 +1342,12 @@ function GraphViewInner() {
     nodes: initialNodes,
     edges: initialEdges,
     nodeToContainer,
+    containers,
     containerIds,
     layoutStatus,
+    newLayoutRef,
   } = navigationLevel === "overview"
-    ? { ...overviewGraph, nodeToContainer: undefined, containerIds: undefined }
+    ? { ...overviewGraph, nodeToContainer: undefined, containers: undefined, containerIds: undefined, newLayoutRef: undefined }
     : detailGraph;
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -1351,13 +1375,20 @@ function GraphViewInner() {
   useEffect(() => {
     if (!pendingFitRef.current) return;
     if (nodes.length === 0) return;
+    // Bail if a new-layer ELK layout is still in flight. The nodes we see are
+    // stale (previous layer) — fitting them would leave the new layer's nodes
+    // off-screen. newLayoutRef.current is set synchronously in the ELK Stage 1
+    // effect (which fires before this effect in the same flush) and cleared
+    // when ELK completes. When ELK completes, setTopology triggers a re-render
+    // → nodes changes → this effect re-runs with newLayoutRef.current = false.
+    if (newLayoutRef?.current) return;
     pendingFitRef.current = false;
     // One frame so React Flow has positioned the nodes before fit.
     const raf = requestAnimationFrame(() => {
-      fitView({ duration: 400, padding: 0.2 });
+      fitView({ duration: 400, padding: 0.15, minZoom: 0.12 });
     });
     return () => cancelAnimationFrame(raf);
-  }, [nodes, fitView]);
+  }, [nodes, fitView, newLayoutRef]);
 
   // Lock viewport onto a container the user just manually expanded so it
   // appears to expand in place rather than getting yanked off-screen by
@@ -1434,6 +1465,45 @@ function GraphViewInner() {
 
     tourBorrowedContainersRef.current = stillBorrowed;
   }, [tourHighlightedNodeIds, nodeToContainer, expandContainer, collapseContainer]);
+
+  // Initial auto-expand: on first visit to a layer, expand only "small"
+  // containers (≤ AUTO_EXPAND_MAX_CHILDREN files). Large containers stay
+  // collapsed to avoid cascading ELK layouts and visual overwhelm.
+  // Per-layer Set ensures we don't re-expand on return visits, respecting
+  // any containers the user manually collapsed.
+  const AUTO_EXPAND_MAX_CHILDREN = 10;
+  const autoExpandedLayersRef = useRef<Set<string>>(new Set());
+  const pendingExpandFitRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (navigationLevel !== "layer-detail" || !activeLayerId) return;
+    if (!containerIds || containerIds.length === 0 || !containers) return;
+    if (autoExpandedLayersRef.current.has(activeLayerId)) return;
+    autoExpandedLayersRef.current.add(activeLayerId);
+
+    const store = useDashboardStore.getState();
+    const toExpand = containerIds.filter((cid) => {
+      if (store.expandedContainers.has(cid)) return false;
+      const c = containers.find((cc) => cc.id === cid);
+      return (c?.nodeIds.length ?? Infinity) <= AUTO_EXPAND_MAX_CHILDREN;
+    });
+    if (toExpand.length === 0) return;
+
+    pendingExpandFitRef.current = store.stage1Tick;
+    for (const cid of toExpand) expandContainer(cid);
+  }, [navigationLevel, activeLayerId, containerIds, containers, expandContainer]);
+
+  // Re-fit after the expansion-triggered Stage 1 re-layout settles.
+  useEffect(() => {
+    if (pendingExpandFitRef.current === null) return;
+    if (layoutStatus !== "ready") return;
+    if (stage1Tick === pendingExpandFitRef.current) return;
+    pendingExpandFitRef.current = null;
+    const raf = requestAnimationFrame(() => {
+      fitView({ duration: 300, padding: 0.15, minZoom: 0.08 });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [stage1Tick, layoutStatus, fitView]);
 
   // Zoom: debounced auto-expand when the user has zoomed in past 1.0.
   // Hysteresis: zoom < 0.6 = no auto-expand AND no auto-collapse (v1, the
