@@ -18,6 +18,8 @@ Output:
     <project-root>/.understand-anything/intermediate/assembled-graph.json
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
