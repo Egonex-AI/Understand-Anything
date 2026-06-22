@@ -10,7 +10,10 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Instructions
 
-1. Determine the project directory:
+1. Determine the project directory and bind it to a shell variable:
+   ```bash
+   PROJECT_DIR="${ARGUMENTS:-$(pwd)}"
+   ```
    - If `$ARGUMENTS` contains a path, use that as the project directory
    - Otherwise, use the current working directory
 
@@ -68,18 +71,19 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    fi
    ```
 
-4. Install dependencies and build if needed:
+4. Install dependencies and build if needed (uses `PLUGIN_ROOT` resolved above):
    ```bash
-   cd <dashboard-dir> && pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+   cd "$PLUGIN_ROOT/packages/dashboard" && pnpm install --frozen-lockfile 2>/dev/null || pnpm install
    ```
    Then ensure the core package is built (the dashboard depends on it):
    ```bash
-   cd <plugin-root> && pnpm --filter @understand-anything/core build
+   cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
    ```
 
-5. Start the Vite dev server pointing at the project's knowledge graph:
+5. Start the Vite dev server pointing at the project's knowledge graph
+   (uses `PROJECT_DIR` from Step 1 and `PLUGIN_ROOT` from Step 3):
    ```bash
-   cd <dashboard-dir> && GRAPH_DIR=<project-dir> npx vite --host 127.0.0.1
+   cd "$PLUGIN_ROOT/packages/dashboard" && GRAPH_DIR="$PROJECT_DIR" npx vite --host 127.0.0.1
    ```
    Run this in the background so the user can continue working.
 
@@ -89,10 +93,12 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    ```
    Extract the full URL including the `?token=` parameter. The token is required to access the knowledge graph data — without it the dashboard will show an "Access Token Required" gate.
 
-7. Report to the user, including the full tokenized URL:
+7. Report to the user, including the full tokenized URL (substitute
+   `$PROJECT_DIR` from Step 1 and the actual `<PORT>` / `<TOKEN>` from
+   the Vite output):
    ```
    Dashboard started at http://127.0.0.1:<PORT>?token=<TOKEN>
-   Viewing: <project-dir>/.understand-anything/knowledge-graph.json
+   Viewing: $PROJECT_DIR/.understand-anything/knowledge-graph.json
 
    The dashboard is running in the background. Press Ctrl+C in the terminal to stop it.
    ```
