@@ -105,6 +105,7 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 ```bash
 /plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 ### 2. 分析你的程式碼庫

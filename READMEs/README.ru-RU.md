@@ -106,6 +106,7 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 ```bash
 /plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 ### 2. Проанализируйте кодовую базу

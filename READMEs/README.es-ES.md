@@ -105,6 +105,7 @@ Apunta `/understand-knowledge` a un [wiki LLM con patrón Karpathy](https://gist
 ```bash
 /plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 ### 2. Analiza tu código
