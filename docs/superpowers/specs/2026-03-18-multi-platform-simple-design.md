@@ -82,7 +82,7 @@ Each platform gets an `INSTALL.md` that the AI agent can fetch and follow:
 
 User tells the agent one line:
 ```
-Fetch and follow instructions from https://raw.githubusercontent.com/Lum1104/Understand-Anything/refs/heads/main/understand-anything-plugin/.codex/INSTALL.md
+Fetch and follow instructions from https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/refs/heads/main/understand-anything-plugin/.codex/INSTALL.md
 ```
 
 The agent executes the clone + symlink/config automatically.

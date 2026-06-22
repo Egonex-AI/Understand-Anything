@@ -4,13 +4,13 @@
   "type": "module",
   "description": "An open-source tool combining LLM intelligence + static analysis to produce interactive dashboards for understanding codebases.",
   "license": "MIT",
-  "homepage": "https://github.com/Lum1104/Understand-Anything#readme",
+  "homepage": "https://github.com/Egonex-AI/Understand-Anything#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Lum1104/Understand-Anything.git"
+    "url": "git+https://github.com/Egonex-AI/Understand-Anything.git"
   },
   "bugs": {
-    "url": "https://github.com/Lum1104/Understand-Anything/issues"
+    "url": "https://github.com/Egonex-AI/Understand-Anything/issues"
   },
   "keywords": [
     "claude-code",

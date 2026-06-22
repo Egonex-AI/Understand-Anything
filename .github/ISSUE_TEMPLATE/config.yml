@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: README & docs
-    url: https://github.com/Lum1104/Understand-Anything#readme
+    url: https://github.com/Egonex-AI/Understand-Anything#readme
     about: Most usage questions are answered in the project README.
   - name: Discussions
-    url: https://github.com/Lum1104/Understand-Anything/discussions
+    url: https://github.com/Egonex-AI/Understand-Anything/discussions
     about: For open-ended discussion, design proposals, or sharing how you use the tool.

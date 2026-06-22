@@ -11,6 +11,7 @@ import { swiftConfig } from "./swift.js";
 import { kotlinConfig } from "./kotlin.js";
 import { cConfig } from "./c.js";
 import { cppConfig } from "./cpp.js";
+import { dartConfig } from "./dart.js";
 import { csharpConfig } from "./csharp.js";
 import { luaConfig } from "./lua.js";
 // Non-code language configs
@@ -56,6 +57,7 @@ export const builtinLanguageConfigs: LanguageConfig[] = [
   luaConfig,
   cConfig,
   cppConfig,
+  dartConfig,
   csharpConfig,
   // Non-code languages
   markdownConfig,
@@ -101,6 +103,7 @@ export {
   luaConfig,
   cConfig,
   cppConfig,
+  dartConfig,
   csharpConfig,
   // Non-code languages
   markdownConfig,

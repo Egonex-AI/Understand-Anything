@@ -342,6 +342,150 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.status).toBe(0);
     expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
   });
+
+  // ── #294: NodeNext / ESM TypeScript `.js → .ts` rewrite ────────────────
+  //
+  // Under `moduleResolution: NodeNext`, TypeScript does NOT rewrite import
+  // specifiers during compilation — what you write in the .ts source is
+  // emitted verbatim. Because Node's ESM loader requires explicit file
+  // extensions at runtime, the TS source must already spell the import with
+  // the `.js` extension that will only be correct AFTER compilation:
+  //
+  //   import { x } from './config.js';   // on disk: config.ts
+  //
+  // Before the fix, every such import resolved to null, leaving ESM-TS
+  // projects with a near-edgeless knowledge graph.
+
+  it('resolves NodeNext .js → .ts relative imports (the main #294 case)', () => {
+    projectRoot = setupTree({
+      'src/index.ts': `import { resolveBackend } from './llm-backend-selector.js';\nimport { loadConfig } from './config.js';\n`,
+      'src/llm-backend-selector.ts': `export function resolveBackend() {}\n`,
+      'src/config.ts': `export function loadConfig() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/llm-backend-selector.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/config.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual([
+      'src/config.ts',
+      'src/llm-backend-selector.ts',
+    ]);
+  });
+
+  it('resolves NodeNext .jsx → .tsx and .mjs → .mts rewrites', () => {
+    projectRoot = setupTree({
+      'src/index.ts': `import Comp from './Comp.jsx';\nimport { fn } from './worker.mjs';\n`,
+      'src/Comp.tsx': `export default function Comp() {}\n`,
+      'src/worker.mts': `export function fn() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/Comp.tsx', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/worker.mts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual([
+      'src/Comp.tsx',
+      'src/worker.mts',
+    ]);
+  });
+
+  it('resolves to the .js when both .ts and .js exist on disk', () => {
+    // Rare but possible during a partial migration: both `config.ts` and
+    // `config.js` exist. An `import './config.js'` is an exact-disk match
+    // and should resolve to that exact file — the NodeNext rewrite only
+    // kicks in when the .js *doesn't* exist on disk. We assert this to
+    // pin the disambiguation and avoid future regressions where the rewrite
+    // accidentally prefers `.ts` over an existing `.js`.
+    projectRoot = setupTree({
+      'src/index.ts': `import { x } from './config.js';\n`,
+      'src/config.ts': `export const x = 1;\n`,
+      'src/config.js': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/config.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/config.js', language: 'javascript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/config.js']);
+  });
+
+  it('still resolves traditional .js → .js imports unchanged', () => {
+    // The rewrite must not break the case where `.js` IS the real file on
+    // disk (pure JavaScript projects, untyped libraries).
+    projectRoot = setupTree({
+      'src/index.js': `import { x } from './util.js';\n`,
+      'src/util.js': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.js', language: 'javascript', fileCategory: 'code' },
+        { path: 'src/util.js', language: 'javascript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.js']).toEqual(['src/util.js']);
+  });
+
+  it('leaves the historical "no extension" probe behaviour intact', () => {
+    // An import like `./utils` (no extension) must still go through the
+    // append-extensions loop and resolve to `./utils.ts` — the new rewrite
+    // path is only triggered when the import already ends with a compiled
+    // extension.
+    projectRoot = setupTree({
+      'src/index.ts': `import { foo } from './utils';\n`,
+      'src/utils.ts': `export function foo() {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/utils.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/utils.ts']);
+  });
+
+  it('returns null (no resolution) for a .js import whose .ts source is missing', () => {
+    // The rewrite must NOT silently invent a target when neither the .js nor
+    // the .ts file exists. The old behaviour would also return null for this
+    // case — we're verifying the rewrite path doesn't regress it.
+    projectRoot = setupTree({
+      'src/index.ts': `import './completely-missing.js';\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [{ path: 'src/index.ts', language: 'typescript', fileCategory: 'code' }],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual([]);
+  });
 });
 
 describe('extract-import-map.mjs — Python resolver', () => {
@@ -1595,5 +1739,57 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
     expect(result.output.stats.filesScanned).toBe(2);
     expect(result.output.stats.filesWithImports).toBe(0);
     expect(result.output.stats.totalEdges).toBe(0);
+  });
+});
+
+describe('extract-import-map.mjs — deterministic stderr ordering across loaders', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  // Regression for the parallel-loader stderr-order bug surfaced in
+  // PR #346 review: tsconfig / go.mod / composer.json loaders now run
+  // concurrently, but warnings must still emit in the pre-PR canonical
+  // order (tsconfig → go → php). If the loaders streamed warnings
+  // mid-flight, I/O timing could reorder them — the assertions below
+  // catch that regression.
+  it('emits warnings in canonical order (tsconfig, go, php) regardless of I/O timing', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': '{ "compilerOptions": { "baseUrl": ".", ', // unterminated
+      'composer.json': '{ "autoload": { "psr-4": { "App\\\\": "src/" }, ', // unterminated
+      'src/index.ts': `import { foo } from './foo';\n`,
+      'src/foo.ts': `export const foo = 1;\n`,
+      'src/Http/Controller.php':
+        `<?php\nnamespace App\\Http;\n\nuse App\\Models\\User;\n\nclass Controller { }\n`,
+      'src/Models/User.php':
+        `<?php\nnamespace App\\Models;\nclass User { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'composer.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/foo.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/Http/Controller.php', language: 'php', fileCategory: 'code' },
+        { path: 'src/Models/User.php', language: 'php', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    const tsLineIdx = result.stderr.indexOf('tsconfig.json at');
+    const composerLineIdx = result.stderr.indexOf('composer.json at');
+    expect(tsLineIdx).toBeGreaterThanOrEqual(0);
+    expect(composerLineIdx).toBeGreaterThanOrEqual(0);
+    // Canonical order: tsconfig warnings precede composer warnings.
+    // Pre-PR-346 this fell out of sequential loader passes; post-fix it
+    // falls out of buffering + ordered drain in buildResolutionContext.
+    expect(tsLineIdx).toBeLessThan(composerLineIdx);
   });
 });

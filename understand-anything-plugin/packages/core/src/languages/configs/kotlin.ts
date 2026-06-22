@@ -4,6 +4,10 @@ export const kotlinConfig = {
   id: "kotlin",
   displayName: "Kotlin",
   extensions: [".kt", ".kts"],
+  treeSitter: {
+    wasmPackage: "@tree-sitter-grammars/tree-sitter-kotlin",
+    wasmFile: "tree-sitter-kotlin.wasm",
+  },
   concepts: [
     "coroutines",
     "data classes",

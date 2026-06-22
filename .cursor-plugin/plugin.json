@@ -2,12 +2,12 @@
   "name": "understand-anything",
   "displayName": "Understand Anything",
   "description": "AI-powered codebase understanding — analyze, visualize, and explain any project",
-  "version": "2.7.6",
+  "version": "2.8.1",
   "author": {
-    "name": "Lum1104"
+    "name": "Egonex"
   },
-  "homepage": "https://github.com/Lum1104/Understand-Anything",
-  "repository": "https://github.com/Lum1104/Understand-Anything",
+  "homepage": "https://github.com/Egonex-AI/Understand-Anything",
+  "repository": "https://github.com/Egonex-AI/Understand-Anything",
   "license": "MIT",
   "keywords": ["codebase-analysis", "knowledge-graph", "architecture", "onboarding", "dashboard"],
   "skills": "./understand-anything-plugin/skills/",

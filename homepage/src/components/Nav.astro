@@ -1,5 +1,5 @@
 ---
-const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 ---
 
 <nav class="nav" id="nav">
@@ -49,6 +49,7 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
   }
 
   .nav-logo {
@@ -56,6 +57,7 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
     font-size: 1.25rem;
     color: var(--text);
     text-decoration: none;
+    min-width: 0;
   }
 
   .nav-logo:hover {
@@ -103,5 +105,17 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
   @media (max-width: 480px) {
     .nav { padding: 0.75rem 1rem; }
     .nav-github span { display: none; }
+  }
+
+  @media (max-width: 540px) {
+    .nav { padding: 0.75rem 1rem; }
+    .nav-logo { font-size: 1.05rem; }
+    .nav-links { gap: 0.85rem; }
+    .nav-github span { display: none; }
+    .nav-cta {
+      padding: 0.48rem 0.85rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
   }
 </style>
