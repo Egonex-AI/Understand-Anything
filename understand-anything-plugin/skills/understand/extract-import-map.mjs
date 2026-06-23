@@ -356,17 +356,20 @@ async function buildResolutionContext(projectRoot, files) {
   // flaky. Drain the buffers in canonical order *after* Promise.all, so
   // a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
-  const [tsResult, goResult, phpResult] = await Promise.all([
+  const [tsResult, goResult, phpResult, yii2Result] = await Promise.all([
     loadTsConfigs(projectRoot, files),
     loadGoModules(projectRoot, files),
     loadPhpAutoloads(projectRoot, files),
+    loadYii2Aliases(projectRoot, files),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
   for (const w of phpResult.warnings) process.stderr.write(w);
+  for (const w of yii2Result.warnings) process.stderr.write(w);
   const tsConfigs = tsResult.configs;
   const goModules = goResult.modules;
   const phpAutoloads = phpResult.autoloads;
+  const yii2PrefixMap = yii2Result.yii2PrefixMap;
 
   // Index .go files by their parent directory so the Go resolver can
   // expand a package-level import to all member .go files in O(1).
@@ -398,6 +401,7 @@ async function buildResolutionContext(projectRoot, files) {
     kotlinIndex,
     csIndex,
     phpAutoloads,
+    yii2PrefixMap,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
     _warnedNoRustCrateRoot: new Set(),
@@ -1160,6 +1164,175 @@ async function loadPhpAutoloads(projectRoot, files) {
   return { autoloads: out, warnings };
 }
 
+// ---------------------------------------------------------------------------
+// Yii2 alias loader (fallback for projects without composer.json autoload)
+//
+// Yii2 Advanced projects configure PSR-4 autoloading via `Yii::setAlias()`
+// calls in `<app>/config/bootstrap.php`, NOT via composer.json's
+// autoload.psr-4 section. Without this fallback, every PHP `use` statement
+// in a Yii2 project resolves to nothing — the composer autoload map is
+// empty, so resolvePhpImport returns [] for all of them.
+//
+// We parse every `bootstrap.php` for `Yii::setAlias('@name', <path-expr>)`
+// calls and derive a global namespace-prefix → directory map:
+//   @common -> "common"  means  "common\" prefix -> "common/" directory
+// So `common\models\Booking` resolves to `common/models/Booking.php`.
+//
+// Yii2 aliases are global once registered (they live in Yii::$aliases), so
+// unlike composer.json (which is per-package), we merge all bootstrap.php
+// aliases into a single flat map. The path expression is resolved
+// heuristically — `dirname(__DIR__)` and `dirname(dirname(__DIR__)) . '/x'`
+// cover the standard Yii2 advanced template pattern.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a single bootstrap.php source string and return
+ * Map<aliasName, dirPath> where dirPath is project-relative POSIX.
+ *
+ * The path expression in `Yii::setAlias('@name', <expr>)` is typically
+ * `dirname(__DIR__)` or `dirname(dirname(__DIR__)) . '/subdir'`. We resolve
+ * these heuristically by counting dirname() nesting depth:
+ *   depth 1 -> parent of the bootstrap file's directory
+ *   depth 2 -> grandparent (project root, "")
+ *   depth 3 -> great-grandparent (outside project — skip)
+ *
+ * For `common/config/bootstrap.php`:
+ *   __DIR__ = common/config  (the file's own directory)
+ *   dirname(__DIR__) = common          (parent)
+ *   dirname(dirname(__DIR__)) = ""     (grandparent = project root)
+ *
+ * Exotic path expressions (function calls, variables, concatenations beyond
+ * a simple string suffix) are silently skipped — they're rare in standard
+//  * Yii2 templates and adding a PHP expression evaluator would be overkill.
+ */
+function parseYii2Aliases(bootstrapSrc, bootstrapRelPath) {
+  const aliases = new Map();
+  const bootstrapDir = bootstrapRelPath.includes('/')
+    ? bootstrapRelPath.slice(0, bootstrapRelPath.lastIndexOf('/'))
+    : '';
+
+  // Match: Yii::setAlias('@name', <expr>);
+  // The expr can span multiple lines but in practice is single-line.
+  const aliasRe = /Yii::setAlias\s*\(\s*['"]@([a-zA-Z0-9_]+)['"]\s*,\s*([^)]+)\s*\)/g;
+  let match;
+  while ((match = aliasRe.exec(bootstrapSrc)) !== null) {
+    const aliasName = match[1];
+    const expr = match[2].trim();
+
+    // Count dirname() nesting depth
+    let dirDepth = 0;
+    const dirnameRe = /dirname\s*\(\s*/g;
+    while (dirnameRe.exec(expr) !== null) dirDepth++;
+
+    // Extract string-literal suffix like '/frontend'
+    const suffix = expr
+      .replace(/dirname\s*\(\s*/g, '')
+      .replace(/__DIR__\s*\)/g, '')
+      .trim();
+    const suffixMatch = suffix.match(/['"]\/([a-zA-Z0-9_\-]+)['"]/);
+    const suffixDir = suffixMatch ? suffixMatch[1] : '';
+
+    // Resolve depth to a project-relative directory.
+    // __DIR__ = bootstrapDir (the file's own directory).
+    const parts = bootstrapDir ? bootstrapDir.split('/').filter(Boolean) : [];
+    let resolvedDir;
+    if (dirDepth === 1) {
+      resolvedDir = parts.slice(0, -1).join('/'); // parent of bootstrapDir
+    } else if (dirDepth === 2) {
+      resolvedDir = ''; // grandparent = project root
+    } else {
+      // depth 3+ (outside project) or depth 0 (not a dirname expr) — skip
+      continue;
+    }
+
+    if (suffixDir) {
+      resolvedDir = resolvedDir ? `${resolvedDir}/${suffixDir}` : suffixDir;
+    }
+
+    aliases.set(aliasName, resolvedDir);
+  }
+  return aliases;
+}
+
+/**
+ * Load every `bootstrap.php` discovered in the input file list and parse
+ * each for `Yii::setAlias()` calls. Returns a single merged
+ * Map<prefix, dir> (prefix = aliasName + '\\', dir = project-relative POSIX).
+ *
+ * Unlike composer.json PSR-4 (which is per-package), Yii2 aliases are global
+ * once registered, so we merge all bootstrap.php files into one flat map.
+ * This also means we don't need the per-importer walk-up that the composer
+ * resolver uses — the same map applies to every PHP file.
+ *
+ * Also adds conventional prefixes for standard Yii2 advanced dirs
+ * (common, backend, frontend, console, api) when those dirs contain PHP
+ * files but aren't explicitly aliased — defensive for single-app setups
+ * that skip aliases.
+ *
+ * On read/parse failure for a specific bootstrap.php, emits a Warning:
+ * and skips it. The rest of the project's Yii2 imports keep resolving.
+ */
+async function loadYii2Aliases(projectRoot, files) {
+  const aliases = new Map(); // aliasName -> dirPath
+  const warnings = [];
+  const candidates = [];
+  for (const f of files) {
+    const p = toPosix(f.path);
+    // Match any bootstrap.php, but only those under a config/ dir (Yii2
+    // convention). This avoids matching unrelated files named bootstrap.php.
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (base !== 'bootstrap.php') continue;
+    if (!p.includes('/config/bootstrap.php') && p !== 'config/bootstrap.php') continue;
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    candidates.push({ key: p, absPath });
+  }
+  const reads = await readFilesParallel(candidates);
+  for (const { key: p, raw, err } of reads) {
+    if (err) {
+      warnings.push(
+        `Warning: extract-import-map: bootstrap.php at ${join(projectRoot, p)} failed ` +
+        `to read (${err.message}) — Yii2 aliases from this file will not ` +
+        `be applied — PHP imports may not resolve\n`,
+      );
+      continue;
+    }
+    const fileAliases = parseYii2Aliases(raw, p);
+    for (const [name, dir] of fileAliases) {
+      aliases.set(name, dir);
+    }
+  }
+
+  // Build the prefix map: aliasName -> prefix (name + '\\') and dir.
+  const prefixMap = new Map();
+  for (const [aliasName, dir] of aliases) {
+    prefixMap.set(aliasName + '\\', dir);
+  }
+
+  // Defensive: add conventional prefixes for standard Yii2 dirs that
+  // contain PHP files but aren't explicitly aliased. This catches single-app
+  // setups that skip bootstrap.php aliases.
+  const fileSet = new Set(files.map(f => toPosix(f.path)));
+  const conventional = ['common', 'backend', 'frontend', 'console', 'api'];
+  for (const name of conventional) {
+    const prefix = name + '\\';
+    if (prefixMap.has(prefix)) continue;
+    // Check if any file starts with this dir
+    let hasPhpFiles = false;
+    for (const f of fileSet) {
+      if (f.startsWith(name + '/') && f.endsWith('.php')) {
+        hasPhpFiles = true;
+        break;
+      }
+    }
+    if (hasPhpFiles) {
+      prefixMap.set(prefix, name);
+    }
+  }
+
+  return { yii2PrefixMap: prefixMap, warnings };
+}
+
 /**
  * Resolve a PHP `use` FQN against the autoload map of the importer's
  * nearest enclosing composer.json. Returns array (0 or 1 match — the first
@@ -1176,43 +1349,71 @@ export function resolvePhpImport(rawImport, file, ctx) {
   const fqn = rawImport.startsWith('\\') ? rawImport.slice(1) : rawImport;
   if (!fqn) return [];
 
+  // --- Primary: Composer PSR-4 autoload map ---
   const importerDir = dirOf(toPosix(file.path));
   const composerDir = findNearestConfigDir(importerDir, ctx.phpAutoloads);
-  if (composerDir === undefined) return [];
-  const autoload = ctx.phpAutoloads.get(composerDir);
-  if (!autoload || autoload.size === 0) return [];
-
-  // Longest-prefix match across this composer.json's autoload entries.
-  // Walk the map and pick the entry with the longest matching prefix, so
-  // `Foo\Bar` does not match a prefix `F\` if `Foo\` is also present.
-  // Use `null` as the sentinel rather than 0-length so the empty PSR-4
-  // fallback prefix (`""` → `src/`) can win when nothing more specific
-  // matches; otherwise `prefix.length > bestPrefix.length` would always
-  // be `0 > 0 = false` for the empty prefix.
-  let bestPrefix = null;
-  let bestDirs = null;
-  for (const [prefix, dirs] of autoload) {
-    if (fqn.startsWith(prefix) && (bestPrefix === null || prefix.length > bestPrefix.length)) {
-      bestPrefix = prefix;
-      bestDirs = dirs;
+  if (composerDir !== undefined) {
+    const autoload = ctx.phpAutoloads.get(composerDir);
+    if (autoload && autoload.size > 0) {
+      // Longest-prefix match across this composer.json's autoload entries.
+      // Walk the map and pick the entry with the longest matching prefix, so
+      // `Foo\Bar` does not match a prefix `F\` if `Foo\` is also present.
+      // Use `null` as the sentinel rather than 0-length so the empty PSR-4
+      // fallback prefix (`""` → `src/`) can win when nothing more specific
+      // matches; otherwise `prefix.length > bestPrefix.length` would always
+      // be `0 > 0 = false` for the empty prefix.
+      let bestPrefix = null;
+      let bestDirs = null;
+      for (const [prefix, dirs] of autoload) {
+        if (fqn.startsWith(prefix) && (bestPrefix === null || prefix.length > bestPrefix.length)) {
+          bestPrefix = prefix;
+          bestDirs = dirs;
+        }
+      }
+      if (bestDirs !== null) {
+        // Drop the prefix (it covers the directory), translate `\` to `/`.
+        const relative = fqn.slice(bestPrefix.length).replace(/\\/g, '/');
+        if (relative) {
+          for (const dir of bestDirs) {
+            // Anchor at the composer.json's own directory — PSR-4 paths are
+            // composer-relative, not project-relative.
+            const dirUnderComposer = dir
+              ? (composerDir ? `${composerDir}/${dir}` : dir)
+              : composerDir;
+            const candidate = dirUnderComposer
+              ? `${dirUnderComposer}/${relative}.php`
+              : `${relative}.php`;
+            if (ctx.fileSet.has(candidate)) return [candidate];
+          }
+        }
+      }
     }
   }
-  if (bestDirs === null) return [];
 
-  // Drop the prefix (it covers the directory), translate `\` to `/`.
-  const relative = fqn.slice(bestPrefix.length).replace(/\\/g, '/');
-  if (!relative) return [];
-  for (const dir of bestDirs) {
-    // Anchor at the composer.json's own directory — PSR-4 paths are
-    // composer-relative, not project-relative.
-    const dirUnderComposer = dir
-      ? (composerDir ? `${composerDir}/${dir}` : dir)
-      : composerDir;
-    const candidate = dirUnderComposer
-      ? `${dirUnderComposer}/${relative}.php`
-      : `${relative}.php`;
-    if (ctx.fileSet.has(candidate)) return [candidate];
+  // --- Fallback: Yii2 alias map (bootstrap.php Yii::setAlias) ---
+  // Yii2 Advanced projects configure PSR-4 via Yii::setAlias() in
+  // bootstrap.php, not composer.json autoload. The yii2PrefixMap is a flat
+  // global map (prefix -> dir) merged from all bootstrap.php files.
+  if (ctx.yii2PrefixMap && ctx.yii2PrefixMap.size > 0) {
+    let bestPrefix = null;
+    let bestDir = null;
+    for (const [prefix, dir] of ctx.yii2PrefixMap) {
+      if (fqn.startsWith(prefix) && (bestPrefix === null || prefix.length > bestPrefix.length)) {
+        bestPrefix = prefix;
+        bestDir = dir;
+      }
+    }
+    if (bestDir !== null) {
+      const relative = fqn.slice(bestPrefix.length).replace(/\\/g, '/');
+      if (relative) {
+        const candidate = bestDir
+          ? `${bestDir}/${relative}.php`
+          : `${relative}.php`;
+        if (ctx.fileSet.has(candidate)) return [candidate];
+      }
+    }
   }
+
   return [];
 }
 
