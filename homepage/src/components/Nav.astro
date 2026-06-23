@@ -1,0 +1,133 @@
+---
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
+---
+
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">EgonexAI</a>
+    <div class="nav-links">
+      <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="nav-github">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+      <a href="#install" class="nav-cta">Get Started</a>
+    </div>
+  </div>
+</nav>
+
+<script>
+  const nav = document.getElementById('nav');
+  if (nav) {
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 50);
+    });
+  }
+</script>
+
+<style>
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 1rem 2rem;
+    transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+  }
+
+  .nav.scrolled {
+    background-color: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav.scrolled .nav-logo {
+    color: var(--text);
+  }
+
+  .nav.scrolled .nav-github {
+    color: var(--text-muted);
+  }
+
+  .nav.scrolled .nav-github:hover {
+    color: var(--text);
+  }
+
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .nav-logo {
+    font-family: var(--font-heading);
+    font-size: 1.25rem;
+    color: var(--text);
+    text-decoration: none;
+    min-width: 0;
+  }
+
+  .nav-logo:hover {
+    text-decoration: none;
+    color: var(--accent);
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav-github {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .nav-github:hover {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .nav-cta {
+    background: var(--accent);
+    color: #ffffff;
+    padding: 0.5rem 1.25rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: box-shadow 0.3s ease;
+  }
+
+  .nav-cta:hover {
+    text-decoration: none;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  @media (max-width: 480px) {
+    .nav { padding: 0.75rem 1rem; }
+    .nav-github span { display: none; }
+  }
+
+  @media (max-width: 540px) {
+    .nav { padding: 0.75rem 1rem; }
+    .nav-logo { font-size: 1.05rem; }
+    .nav-links { gap: 0.85rem; }
+    .nav-github span { display: none; }
+    .nav-cta {
+      padding: 0.48rem 0.85rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+  }
+</style>

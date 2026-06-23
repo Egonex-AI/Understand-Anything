@@ -1,0 +1,233 @@
+{
+  "name": "fixture-merge-respects-non-mergeable",
+  "description": "Regression guard for mergeSmallBatches: a small non-mergeable batch (Dockerfile cluster, marked mergeable=false by buildNonCodeBatches Group A) must NOT be pooled into the misc bucket alongside isolated code singletons, even though its size (1) is well below MIN_BATCH_SIZE=3. Pooling Dockerfiles into misc would destroy the semantic atom — an LLM analyzing the misc batch loses the per-service infra context.",
+  "languages": [
+    "typescript",
+    "dockerfile"
+  ],
+  "frameworks": [],
+  "files": [
+    {
+      "path": "src/leaf000.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf001.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf002.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf003.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf004.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf005.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf006.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf007.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf008.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf009.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf010.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf011.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf012.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf013.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf014.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf015.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf016.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf017.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf018.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf019.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf020.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf021.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf022.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf023.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf024.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf025.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf026.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf027.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf028.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/leaf029.ts",
+      "language": "typescript",
+      "sizeLines": 10,
+      "fileCategory": "code"
+    },
+    {
+      "path": "services/api/Dockerfile",
+      "language": "dockerfile",
+      "sizeLines": 18,
+      "fileCategory": "infra"
+    }
+  ],
+  "totalFiles": 31,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "moderate",
+  "importMap": {
+    "src/leaf000.ts": [],
+    "src/leaf001.ts": [],
+    "src/leaf002.ts": [],
+    "src/leaf003.ts": [],
+    "src/leaf004.ts": [],
+    "src/leaf005.ts": [],
+    "src/leaf006.ts": [],
+    "src/leaf007.ts": [],
+    "src/leaf008.ts": [],
+    "src/leaf009.ts": [],
+    "src/leaf010.ts": [],
+    "src/leaf011.ts": [],
+    "src/leaf012.ts": [],
+    "src/leaf013.ts": [],
+    "src/leaf014.ts": [],
+    "src/leaf015.ts": [],
+    "src/leaf016.ts": [],
+    "src/leaf017.ts": [],
+    "src/leaf018.ts": [],
+    "src/leaf019.ts": [],
+    "src/leaf020.ts": [],
+    "src/leaf021.ts": [],
+    "src/leaf022.ts": [],
+    "src/leaf023.ts": [],
+    "src/leaf024.ts": [],
+    "src/leaf025.ts": [],
+    "src/leaf026.ts": [],
+    "src/leaf027.ts": [],
+    "src/leaf028.ts": [],
+    "src/leaf029.ts": [],
+    "services/api/Dockerfile": []
+  }
+}

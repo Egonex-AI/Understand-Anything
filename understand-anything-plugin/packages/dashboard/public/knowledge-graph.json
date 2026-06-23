@@ -1,0 +1,3088 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "understand-anything",
+    "languages": [
+      "typescript",
+      "css"
+    ],
+    "frameworks": [
+      "React",
+      "Vite",
+      "TailwindCSS",
+      "Zustand",
+      "React Flow",
+      "Monaco Editor",
+      "Vitest",
+      "Zod",
+      "Fuse.js",
+      "Dagre",
+      "tree-sitter",
+      "Anthropic SDK"
+    ],
+    "description": "An open-source tool combining LLM intelligence with static analysis to produce interactive dashboards for understanding codebases.",
+    "analyzedAt": "2026-03-14T16:15:02.617Z",
+    "gitCommitHash": "58cfb20ac8f3f98cd7dede428d147dbe9cdc94b2"
+  },
+  "nodes": [
+    {
+      "id": "file:packages/core/src/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "packages/core/src/types.ts",
+      "summary": "Defines all core TypeScript interfaces and types for the knowledge graph system, including GraphNode, GraphEdge, KnowledgeGraph, Layer, TourStep, ProjectMeta, AnalysisMeta, and the AnalyzerPlugin interface contract.",
+      "tags": [
+        "data-model",
+        "types",
+        "interfaces",
+        "knowledge-graph",
+        "plugin-api"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/schema.ts",
+      "type": "file",
+      "name": "schema.ts",
+      "filePath": "packages/core/src/schema.ts",
+      "summary": "Provides Zod runtime schema validation for all KnowledgeGraph data structures, mirroring the TypeScript type definitions in types.ts and exposing a validateGraph function.",
+      "tags": [
+        "validation",
+        "zod",
+        "schema",
+        "runtime-safety",
+        "knowledge-graph"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/core/src/index.ts",
+      "summary": "Barrel entry point for the core package that re-exports all public APIs including types, persistence, schema validation, tree-sitter plugin, graph builder, LLM analyzer, search engines, staleness detection, layer detection, tour generation, language lessons, plugin registry, and plugin discovery.",
+      "tags": [
+        "entry-point",
+        "barrel",
+        "exports",
+        "api-surface"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/core/src/search.ts",
+      "type": "file",
+      "name": "search.ts",
+      "filePath": "packages/core/src/search.ts",
+      "summary": "Implements fuzzy search over graph nodes using Fuse.js with weighted fields, extended OR-query tokenization, and optional type filtering.",
+      "tags": [
+        "search",
+        "fuzzy-search",
+        "fuse.js",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/staleness.ts",
+      "type": "file",
+      "name": "staleness.ts",
+      "filePath": "packages/core/src/staleness.ts",
+      "summary": "Detects whether the persisted knowledge graph is stale relative to the current git HEAD by diffing commit hashes, and provides incremental graph merging.",
+      "tags": [
+        "staleness",
+        "git",
+        "incremental-update",
+        "graph-merge"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/embedding-search.ts",
+      "type": "file",
+      "name": "embedding-search.ts",
+      "filePath": "packages/core/src/embedding-search.ts",
+      "summary": "Implements vector-embedding-based semantic search over graph nodes using cosine similarity, with score inversion to match Fuse.js convention.",
+      "tags": [
+        "semantic-search",
+        "embeddings",
+        "cosine-similarity",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/schema.ts:validateGraph",
+      "type": "function",
+      "name": "validateGraph",
+      "filePath": "packages/core/src/schema.ts",
+      "lineRange": [
+        72,
+        85
+      ],
+      "summary": "Validates an unknown value against the KnowledgeGraphSchema using Zod's safeParse, returning a structured ValidationResult.",
+      "tags": [
+        "validation",
+        "zod",
+        "error-handling"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "class:packages/core/src/search.ts:SearchEngine",
+      "type": "class",
+      "name": "SearchEngine",
+      "filePath": "packages/core/src/search.ts",
+      "lineRange": [
+        27,
+        65
+      ],
+      "summary": "Wraps Fuse.js to provide fuzzy search over GraphNode arrays with weighted field scoring, OR-tokenized queries, type filtering, and live index rebuilding.",
+      "tags": [
+        "fuzzy-search",
+        "fuse.js",
+        "search-engine",
+        "utility"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/core/src/embedding-search.ts:SemanticSearchEngine",
+      "type": "class",
+      "name": "SemanticSearchEngine",
+      "filePath": "packages/core/src/embedding-search.ts",
+      "lineRange": [
+        37,
+        83
+      ],
+      "summary": "Vector search engine using pre-computed embeddings and cosine similarity with optional type and threshold filters.",
+      "tags": [
+        "semantic-search",
+        "embeddings",
+        "vector-search"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/embedding-search.ts:cosineSimilarity",
+      "type": "function",
+      "name": "cosineSimilarity",
+      "filePath": "packages/core/src/embedding-search.ts",
+      "lineRange": [
+        14,
+        30
+      ],
+      "summary": "Computes the cosine similarity between two numeric vectors in a single pass.",
+      "tags": [
+        "math",
+        "cosine-similarity",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/staleness.ts:getChangedFiles",
+      "type": "function",
+      "name": "getChangedFiles",
+      "filePath": "packages/core/src/staleness.ts",
+      "lineRange": [
+        13,
+        29
+      ],
+      "summary": "Shells out to git diff to retrieve the list of files changed between a given commit hash and HEAD.",
+      "tags": [
+        "git",
+        "file-diff",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/staleness.ts:isStale",
+      "type": "function",
+      "name": "isStale",
+      "filePath": "packages/core/src/staleness.ts",
+      "lineRange": [
+        34,
+        43
+      ],
+      "summary": "Determines if the knowledge graph is stale by checking whether any files changed since the last analyzed commit hash.",
+      "tags": [
+        "staleness",
+        "git",
+        "utility"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/staleness.ts:mergeGraphUpdate",
+      "type": "function",
+      "name": "mergeGraphUpdate",
+      "filePath": "packages/core/src/staleness.ts",
+      "lineRange": [
+        54,
+        90
+      ],
+      "summary": "Incrementally updates an existing KnowledgeGraph by removing nodes and edges associated with changed files and appending newly analyzed nodes.",
+      "tags": [
+        "graph-merge",
+        "incremental-update",
+        "staleness"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/analyzer/graph-builder.ts",
+      "type": "file",
+      "name": "graph-builder.ts",
+      "filePath": "packages/core/src/analyzer/graph-builder.ts",
+      "summary": "Defines the GraphBuilder class that incrementally accumulates file, function, and class nodes plus edges before assembling a final KnowledgeGraph.",
+      "tags": [
+        "graph",
+        "builder",
+        "static-analysis",
+        "data-model"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/core/src/analyzer/graph-builder.ts:GraphBuilder",
+      "type": "class",
+      "name": "GraphBuilder",
+      "filePath": "packages/core/src/analyzer/graph-builder.ts",
+      "lineRange": [
+        63,
+        207
+      ],
+      "summary": "Stateful builder that collects nodes and edges incrementally via addFile, addFileWithAnalysis, addImportEdge, addCallEdge, then emits a KnowledgeGraph via build().",
+      "tags": [
+        "builder-pattern",
+        "graph",
+        "accumulator"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/graph-builder.ts:detectLanguage",
+      "type": "function",
+      "name": "detectLanguage",
+      "filePath": "packages/core/src/analyzer/graph-builder.ts",
+      "lineRange": [
+        56,
+        61
+      ],
+      "summary": "Derives a language identifier string from a file path by matching its extension.",
+      "tags": [
+        "utility",
+        "language-detection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "type": "file",
+      "name": "llm-analyzer.ts",
+      "filePath": "packages/core/src/analyzer/llm-analyzer.ts",
+      "summary": "Provides prompt-builder functions and response-parser functions for LLM-based file analysis and project-level summary.",
+      "tags": [
+        "llm",
+        "prompt-template",
+        "parser",
+        "analysis"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/llm-analyzer.ts:buildFileAnalysisPrompt",
+      "type": "function",
+      "name": "buildFileAnalysisPrompt",
+      "filePath": "packages/core/src/analyzer/llm-analyzer.ts",
+      "lineRange": [
+        19,
+        43
+      ],
+      "summary": "Constructs an LLM prompt for analyzing a single source file.",
+      "tags": [
+        "prompt-builder",
+        "llm",
+        "file-analysis"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/llm-analyzer.ts:buildProjectSummaryPrompt",
+      "type": "function",
+      "name": "buildProjectSummaryPrompt",
+      "filePath": "packages/core/src/analyzer/llm-analyzer.ts",
+      "lineRange": [
+        48,
+        76
+      ],
+      "summary": "Constructs an LLM prompt for generating a project-level summary.",
+      "tags": [
+        "prompt-builder",
+        "llm",
+        "project-summary"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/llm-analyzer.ts:parseFileAnalysisResponse",
+      "type": "function",
+      "name": "parseFileAnalysisResponse",
+      "filePath": "packages/core/src/analyzer/llm-analyzer.ts",
+      "lineRange": [
+        102,
+        143
+      ],
+      "summary": "Parses an LLM JSON response for file analysis into a typed LLMFileAnalysis object.",
+      "tags": [
+        "parser",
+        "llm",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/llm-analyzer.ts:parseProjectSummaryResponse",
+      "type": "function",
+      "name": "parseProjectSummaryResponse",
+      "filePath": "packages/core/src/analyzer/llm-analyzer.ts",
+      "lineRange": [
+        148,
+        186
+      ],
+      "summary": "Parses an LLM JSON response for project summary.",
+      "tags": [
+        "parser",
+        "llm",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/analyzer/layer-detector.ts",
+      "type": "file",
+      "name": "layer-detector.ts",
+      "filePath": "packages/core/src/analyzer/layer-detector.ts",
+      "summary": "Implements heuristic and LLM-driven architectural layer detection.",
+      "tags": [
+        "layer-detection",
+        "architecture",
+        "llm",
+        "heuristic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/layer-detector.ts:detectLayers",
+      "type": "function",
+      "name": "detectLayers",
+      "filePath": "packages/core/src/analyzer/layer-detector.ts",
+      "lineRange": [
+        95,
+        134
+      ],
+      "summary": "Heuristically assigns file nodes to named architectural layers by matching directory paths.",
+      "tags": [
+        "heuristic",
+        "layer-detection",
+        "graph"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/layer-detector.ts:buildLayerDetectionPrompt",
+      "type": "function",
+      "name": "buildLayerDetectionPrompt",
+      "filePath": "packages/core/src/analyzer/layer-detector.ts",
+      "lineRange": [
+        140,
+        160
+      ],
+      "summary": "Builds an LLM prompt for identifying architectural layers.",
+      "tags": [
+        "prompt-builder",
+        "llm",
+        "layer-detection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/layer-detector.ts:parseLayerDetectionResponse",
+      "type": "function",
+      "name": "parseLayerDetectionResponse",
+      "filePath": "packages/core/src/analyzer/layer-detector.ts",
+      "lineRange": [
+        167,
+        210
+      ],
+      "summary": "Parses and validates an LLM JSON response for layer detection.",
+      "tags": [
+        "parser",
+        "llm",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/layer-detector.ts:applyLLMLayers",
+      "type": "function",
+      "name": "applyLLMLayers",
+      "filePath": "packages/core/src/analyzer/layer-detector.ts",
+      "lineRange": [
+        217,
+        274
+      ],
+      "summary": "Applies LLM-provided layer definitions to a KnowledgeGraph by prefix-matching file paths.",
+      "tags": [
+        "layer-assignment",
+        "llm",
+        "graph"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/analyzer/language-lesson.ts",
+      "type": "file",
+      "name": "language-lesson.ts",
+      "filePath": "packages/core/src/analyzer/language-lesson.ts",
+      "summary": "Detects language-specific programming concepts and generates LLM prompts for beginner-friendly language lessons.",
+      "tags": [
+        "language-lesson",
+        "llm",
+        "prompt-template",
+        "education"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/language-lesson.ts:detectLanguageConcepts",
+      "type": "function",
+      "name": "detectLanguageConcepts",
+      "filePath": "packages/core/src/analyzer/language-lesson.ts",
+      "lineRange": [
+        42,
+        64
+      ],
+      "summary": "Scans a graph node for keywords matching 12 pre-defined concept patterns.",
+      "tags": [
+        "concept-detection",
+        "keyword-matching",
+        "graph"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/language-lesson.ts:buildLanguageLessonPrompt",
+      "type": "function",
+      "name": "buildLanguageLessonPrompt",
+      "filePath": "packages/core/src/analyzer/language-lesson.ts",
+      "lineRange": [
+        75,
+        119
+      ],
+      "summary": "Constructs an LLM prompt for generating a language lesson for a graph node.",
+      "tags": [
+        "prompt-builder",
+        "llm",
+        "education"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/language-lesson.ts:parseLanguageLessonResponse",
+      "type": "function",
+      "name": "parseLanguageLessonResponse",
+      "filePath": "packages/core/src/analyzer/language-lesson.ts",
+      "lineRange": [
+        142,
+        174
+      ],
+      "summary": "Parses an LLM JSON response for a language lesson.",
+      "tags": [
+        "parser",
+        "llm",
+        "education"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/core/src/analyzer/tour-generator.ts",
+      "type": "file",
+      "name": "tour-generator.ts",
+      "filePath": "packages/core/src/analyzer/tour-generator.ts",
+      "summary": "Generates guided codebase tours via LLM prompts and heuristically using Kahn's topological sort algorithm.",
+      "tags": [
+        "tour-generation",
+        "topological-sort",
+        "llm",
+        "graph",
+        "education"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/tour-generator.ts:buildTourGenerationPrompt",
+      "type": "function",
+      "name": "buildTourGenerationPrompt",
+      "filePath": "packages/core/src/analyzer/tour-generator.ts",
+      "lineRange": [
+        7,
+        62
+      ],
+      "summary": "Builds an LLM prompt for generating a guided tour with ordered steps.",
+      "tags": [
+        "prompt-builder",
+        "llm",
+        "tour"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/tour-generator.ts:parseTourGenerationResponse",
+      "type": "function",
+      "name": "parseTourGenerationResponse",
+      "filePath": "packages/core/src/analyzer/tour-generator.ts",
+      "lineRange": [
+        70,
+        120
+      ],
+      "summary": "Parses an LLM JSON response for tour generation.",
+      "tags": [
+        "parser",
+        "llm",
+        "tour"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/analyzer/tour-generator.ts:generateHeuristicTour",
+      "type": "function",
+      "name": "generateHeuristicTour",
+      "filePath": "packages/core/src/analyzer/tour-generator.ts",
+      "lineRange": [
+        135,
+        293
+      ],
+      "summary": "Generates a guided tour using Kahn's topological sort on the graph, grouping by architectural layer.",
+      "tags": [
+        "topological-sort",
+        "heuristic",
+        "tour",
+        "graph"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "type": "file",
+      "name": "tree-sitter-plugin.ts",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "summary": "Implements the TreeSitterPlugin class, a full static-analysis plugin for TypeScript and JavaScript using web-tree-sitter WASM.",
+      "tags": [
+        "plugin",
+        "static-analysis",
+        "tree-sitter",
+        "ast",
+        "parser"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "type": "class",
+      "name": "TreeSitterPlugin",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        158,
+        652
+      ],
+      "summary": "Core analyzer plugin implementing AnalyzerPlugin interface; initializes WASM grammars and exposes analyzeFile, resolveImports, and extractCallGraph.",
+      "tags": [
+        "plugin",
+        "analyzer",
+        "class",
+        "tree-sitter",
+        "implements"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/core/src/plugins/tree-sitter-plugin.ts:languageKeyFromPath",
+      "type": "function",
+      "name": "languageKeyFromPath",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        17,
+        32
+      ],
+      "summary": "Maps a file path's extension to a tree-sitter language key string.",
+      "tags": [
+        "utility",
+        "language-detection"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/plugins/tree-sitter-plugin.ts:traverse",
+      "type": "function",
+      "name": "traverse",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        37,
+        46
+      ],
+      "summary": "Recursively traverses an AST node tree, invoking a visitor callback on every node.",
+      "tags": [
+        "utility",
+        "ast",
+        "traversal"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/plugins/tree-sitter-plugin.ts:getStringValue",
+      "type": "function",
+      "name": "getStringValue",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        51,
+        61
+      ],
+      "summary": "Extracts the unquoted string content from a tree-sitter string literal AST node.",
+      "tags": [
+        "utility",
+        "ast",
+        "extraction"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractParams",
+      "type": "function",
+      "name": "extractParams",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        66,
+        105
+      ],
+      "summary": "Extracts parameter name strings from a formal_parameters AST node.",
+      "tags": [
+        "utility",
+        "ast",
+        "extraction",
+        "parameters"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractReturnType",
+      "type": "function",
+      "name": "extractReturnType",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        110,
+        119
+      ],
+      "summary": "Extracts the return type annotation string from a function-like AST node.",
+      "tags": [
+        "utility",
+        "ast",
+        "extraction",
+        "types"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractImportSpecifiers",
+      "type": "function",
+      "name": "extractImportSpecifiers",
+      "filePath": "packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        124,
+        156
+      ],
+      "summary": "Extracts import specifier names from an import_clause AST node.",
+      "tags": [
+        "utility",
+        "ast",
+        "extraction",
+        "imports"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/plugins/registry.ts",
+      "type": "file",
+      "name": "registry.ts",
+      "filePath": "packages/core/src/plugins/registry.ts",
+      "summary": "Defines the PluginRegistry class that maps language identifiers to registered AnalyzerPlugin instances.",
+      "tags": [
+        "registry",
+        "plugin",
+        "dispatcher",
+        "language-map"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/core/src/plugins/registry.ts:PluginRegistry",
+      "type": "class",
+      "name": "PluginRegistry",
+      "filePath": "packages/core/src/plugins/registry.ts",
+      "lineRange": [
+        25,
+        79
+      ],
+      "summary": "Registry managing AnalyzerPlugin instances, dispatching analysis calls by file extension or language.",
+      "tags": [
+        "registry",
+        "class",
+        "plugin-management"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/core/src/plugins/discovery.ts",
+      "type": "file",
+      "name": "discovery.ts",
+      "filePath": "packages/core/src/plugins/discovery.ts",
+      "summary": "Defines plugin configuration types and utility functions to parse and serialize plugin configuration JSON.",
+      "tags": [
+        "plugin",
+        "configuration",
+        "discovery",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/plugins/discovery.ts:parsePluginConfig",
+      "type": "function",
+      "name": "parsePluginConfig",
+      "filePath": "packages/core/src/plugins/discovery.ts",
+      "lineRange": [
+        26,
+        57
+      ],
+      "summary": "Parses a JSON string into a validated PluginConfig object with fallback.",
+      "tags": [
+        "configuration",
+        "parsing",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/plugins/discovery.ts:serializePluginConfig",
+      "type": "function",
+      "name": "serializePluginConfig",
+      "filePath": "packages/core/src/plugins/discovery.ts",
+      "lineRange": [
+        62,
+        64
+      ],
+      "summary": "Serializes a PluginConfig object to pretty-printed JSON.",
+      "tags": [
+        "configuration",
+        "serialization"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/core/src/persistence/index.ts",
+      "type": "file",
+      "name": "persistence/index.ts",
+      "filePath": "packages/core/src/persistence/index.ts",
+      "summary": "Provides the persistence layer for saving and loading KnowledgeGraph and AnalysisMeta JSON files.",
+      "tags": [
+        "persistence",
+        "file-io",
+        "knowledge-graph",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/persistence/index.ts:saveGraph",
+      "type": "function",
+      "name": "saveGraph",
+      "filePath": "packages/core/src/persistence/index.ts",
+      "lineRange": [
+        18,
+        21
+      ],
+      "summary": "Writes a KnowledgeGraph as JSON to .understand-anything/knowledge-graph.json.",
+      "tags": [
+        "persistence",
+        "write",
+        "knowledge-graph"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/persistence/index.ts:loadGraph",
+      "type": "function",
+      "name": "loadGraph",
+      "filePath": "packages/core/src/persistence/index.ts",
+      "lineRange": [
+        23,
+        43
+      ],
+      "summary": "Reads and parses knowledge-graph.json with optional Zod validation.",
+      "tags": [
+        "persistence",
+        "read",
+        "knowledge-graph",
+        "validation"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/core/src/persistence/index.ts:saveMeta",
+      "type": "function",
+      "name": "saveMeta",
+      "filePath": "packages/core/src/persistence/index.ts",
+      "lineRange": [
+        45,
+        48
+      ],
+      "summary": "Writes AnalysisMeta to .understand-anything/meta.json.",
+      "tags": [
+        "persistence",
+        "write",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/core/src/persistence/index.ts:loadMeta",
+      "type": "function",
+      "name": "loadMeta",
+      "filePath": "packages/core/src/persistence/index.ts",
+      "lineRange": [
+        50,
+        54
+      ],
+      "summary": "Reads and parses meta.json, returning null if not found.",
+      "tags": [
+        "persistence",
+        "read",
+        "metadata"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/dashboard/src/App.tsx",
+      "type": "file",
+      "name": "App.tsx",
+      "filePath": "packages/dashboard/src/App.tsx",
+      "summary": "Root React component orchestrating the dashboard layout with persona-adaptive panel arrangements.",
+      "tags": [
+        "entry-point",
+        "layout",
+        "react",
+        "persona-adaptive",
+        "dashboard"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/dashboard/src/App.tsx:App",
+      "type": "function",
+      "name": "App",
+      "filePath": "packages/dashboard/src/App.tsx",
+      "lineRange": [
+        13,
+        167
+      ],
+      "summary": "Main app component that fetches the knowledge graph on mount and renders a persona-adaptive multi-panel layout.",
+      "tags": [
+        "react-component",
+        "layout",
+        "persona-adaptive"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/dashboard/src/main.tsx",
+      "type": "file",
+      "name": "main.tsx",
+      "filePath": "packages/dashboard/src/main.tsx",
+      "summary": "Application entry point that mounts the React root into the DOM under StrictMode.",
+      "tags": [
+        "entry-point",
+        "bootstrap",
+        "react"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/dashboard/src/store.ts",
+      "type": "file",
+      "name": "store.ts",
+      "filePath": "packages/dashboard/src/store.ts",
+      "summary": "Zustand store defining complete dashboard state including graph data, search, chat messages, node explanations, persona selection, and tour management.",
+      "tags": [
+        "state-management",
+        "zustand",
+        "chat",
+        "search",
+        "tour"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/dashboard/src/store.ts:buildSystemPrompt",
+      "type": "function",
+      "name": "buildSystemPrompt",
+      "filePath": "packages/dashboard/src/store.ts",
+      "lineRange": [
+        59,
+        128
+      ],
+      "summary": "Constructs a multi-section system prompt for the Claude API with full graph context.",
+      "tags": [
+        "llm",
+        "prompt-engineering",
+        "context-builder"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/dashboard/src/store.ts:getSortedTour",
+      "type": "function",
+      "name": "getSortedTour",
+      "filePath": "packages/dashboard/src/store.ts",
+      "lineRange": [
+        130,
+        132
+      ],
+      "summary": "Returns tour steps sorted by order for sequential navigation.",
+      "tags": [
+        "utility",
+        "tour"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "type": "function",
+      "name": "useDashboardStore",
+      "filePath": "packages/dashboard/src/store.ts",
+      "lineRange": [
+        134,
+        378
+      ],
+      "summary": "Zustand store hook exposing all dashboard state and actions: graph loading, node selection, search, chat, explanation, layer toggling, persona switching, and tour navigation.",
+      "tags": [
+        "state-management",
+        "zustand",
+        "hook",
+        "api-handler"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/dashboard/src/utils/layout.ts",
+      "type": "file",
+      "name": "layout.ts",
+      "filePath": "packages/dashboard/src/utils/layout.ts",
+      "summary": "Utility applying Dagre hierarchical graph layout to React Flow nodes and edges.",
+      "tags": [
+        "utility",
+        "layout",
+        "dagre",
+        "graph"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/utils/layout.ts:applyDagreLayout",
+      "type": "function",
+      "name": "applyDagreLayout",
+      "filePath": "packages/dashboard/src/utils/layout.ts",
+      "lineRange": [
+        7,
+        45
+      ],
+      "summary": "Runs Dagre layout on React Flow nodes and edges, returning computed positions.",
+      "tags": [
+        "utility",
+        "layout",
+        "dagre"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/GraphView.tsx",
+      "type": "file",
+      "name": "GraphView.tsx",
+      "filePath": "packages/dashboard/src/components/GraphView.tsx",
+      "summary": "React Flow-based interactive graph visualization with Dagre layout, persona-based filtering, layer grouping, and tour highlighting.",
+      "tags": [
+        "visualization",
+        "react-flow",
+        "graph",
+        "layer-grouping",
+        "persona-adaptive"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/GraphView.tsx:GraphView",
+      "type": "function",
+      "name": "GraphView",
+      "filePath": "packages/dashboard/src/components/GraphView.tsx",
+      "lineRange": [
+        23,
+        243
+      ],
+      "summary": "Renders the React Flow canvas with knowledge graph data, handling persona filtering, Dagre layout, layer groups, and node selection.",
+      "tags": [
+        "react-component",
+        "graph",
+        "visualization"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/ChatPanel.tsx",
+      "type": "file",
+      "name": "ChatPanel.tsx",
+      "filePath": "packages/dashboard/src/components/ChatPanel.tsx",
+      "summary": "Chat interface panel managing API key input, message rendering with react-markdown, auto-scroll, and user input.",
+      "tags": [
+        "chat",
+        "ui-component",
+        "react",
+        "markdown",
+        "api-key"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/ChatPanel.tsx:ChatPanel",
+      "type": "function",
+      "name": "ChatPanel",
+      "filePath": "packages/dashboard/src/components/ChatPanel.tsx",
+      "lineRange": [
+        5,
+        253
+      ],
+      "summary": "Chat panel component handling API key setup, markdown message display, loading state, and keyboard shortcuts.",
+      "tags": [
+        "react-component",
+        "chat",
+        "ui-component"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/CodeViewer.tsx",
+      "type": "file",
+      "name": "CodeViewer.tsx",
+      "filePath": "packages/dashboard/src/components/CodeViewer.tsx",
+      "summary": "Monaco Editor-based code viewer displaying metadata and placeholder source code for selected graph nodes.",
+      "tags": [
+        "component",
+        "monaco-editor",
+        "code-viewer",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/CodeViewer.tsx:getLanguage",
+      "type": "function",
+      "name": "getLanguage",
+      "filePath": "packages/dashboard/src/components/CodeViewer.tsx",
+      "lineRange": [
+        31,
+        35
+      ],
+      "summary": "Maps a file path's extension to a Monaco Editor language identifier.",
+      "tags": [
+        "utility",
+        "language-detection",
+        "monaco"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/CodeViewer.tsx:CodeViewer",
+      "type": "function",
+      "name": "CodeViewer",
+      "filePath": "packages/dashboard/src/components/CodeViewer.tsx",
+      "lineRange": [
+        37,
+        114
+      ],
+      "summary": "React component rendering a read-only Monaco Editor panel for the selected graph node.",
+      "tags": [
+        "component",
+        "react",
+        "ui",
+        "code-viewer"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/CustomNode.tsx",
+      "type": "file",
+      "name": "CustomNode.tsx",
+      "filePath": "packages/dashboard/src/components/CustomNode.tsx",
+      "summary": "Custom React Flow node component with type-based colors, complexity badges, and highlight rings.",
+      "tags": [
+        "component",
+        "react-flow",
+        "graph",
+        "ui",
+        "visualization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "class:packages/dashboard/src/components/CustomNode.tsx:CustomNodeData",
+      "type": "class",
+      "name": "CustomNodeData",
+      "filePath": "packages/dashboard/src/components/CustomNode.tsx",
+      "lineRange": [
+        39,
+        48
+      ],
+      "summary": "TypeScript interface defining the data shape for a custom React Flow node.",
+      "tags": [
+        "interface",
+        "data-model",
+        "react-flow"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/CustomNode.tsx:CustomNode",
+      "type": "function",
+      "name": "CustomNode",
+      "filePath": "packages/dashboard/src/components/CustomNode.tsx",
+      "lineRange": [
+        52,
+        116
+      ],
+      "summary": "Custom React Flow node rendering type, complexity, name, summary, and dynamic highlight styles.",
+      "tags": [
+        "component",
+        "react-flow",
+        "ui",
+        "graph"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "type": "file",
+      "name": "LayerLegend.tsx",
+      "filePath": "packages/dashboard/src/components/LayerLegend.tsx",
+      "summary": "Layer color constants, color-getter utilities, and a LayerLegend UI component.",
+      "tags": [
+        "component",
+        "layer-visualization",
+        "ui",
+        "legend"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerColor",
+      "type": "function",
+      "name": "getLayerColor",
+      "filePath": "packages/dashboard/src/components/LayerLegend.tsx",
+      "lineRange": [
+        27,
+        29
+      ],
+      "summary": "Returns the background RGBA color for a layer index.",
+      "tags": [
+        "utility",
+        "color",
+        "layer"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerBorderColor",
+      "type": "function",
+      "name": "getLayerBorderColor",
+      "filePath": "packages/dashboard/src/components/LayerLegend.tsx",
+      "lineRange": [
+        31,
+        33
+      ],
+      "summary": "Returns the border RGBA color for a layer index.",
+      "tags": [
+        "utility",
+        "color",
+        "layer"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/LayerLegend.tsx:LayerLegend",
+      "type": "function",
+      "name": "LayerLegend",
+      "filePath": "packages/dashboard/src/components/LayerLegend.tsx",
+      "lineRange": [
+        35,
+        86
+      ],
+      "summary": "Toggle button for layer grouping and inline legend of layer names with color indicators.",
+      "tags": [
+        "component",
+        "ui",
+        "layer-visualization"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/LearnPanel.tsx",
+      "type": "file",
+      "name": "LearnPanel.tsx",
+      "filePath": "packages/dashboard/src/components/LearnPanel.tsx",
+      "summary": "Guided learning/tour panel managing three states (no tour, ready, active) with step navigation and markdown.",
+      "tags": [
+        "component",
+        "tour",
+        "learning",
+        "ui",
+        "markdown"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/LearnPanel.tsx:LearnPanel",
+      "type": "function",
+      "name": "LearnPanel",
+      "filePath": "packages/dashboard/src/components/LearnPanel.tsx",
+      "lineRange": [
+        5,
+        228
+      ],
+      "summary": "Guided tour UI with state-machine rendering for empty, idle, and active phases including progress bar.",
+      "tags": [
+        "component",
+        "tour",
+        "ui",
+        "learning"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/NodeInfo.tsx",
+      "type": "file",
+      "name": "NodeInfo.tsx",
+      "filePath": "packages/dashboard/src/components/NodeInfo.tsx",
+      "summary": "Detail panel for selected graph node displaying type, complexity, summary, AI explain, tags, and connections.",
+      "tags": [
+        "component",
+        "node-detail",
+        "ui",
+        "markdown"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/NodeInfo.tsx:NodeInfo",
+      "type": "function",
+      "name": "NodeInfo",
+      "filePath": "packages/dashboard/src/components/NodeInfo.tsx",
+      "lineRange": [
+        19,
+        196
+      ],
+      "summary": "Comprehensive node metadata panel with LLM explanation trigger, tags, and connections list.",
+      "tags": [
+        "component",
+        "node-detail",
+        "ui"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/PersonaSelector.tsx",
+      "type": "file",
+      "name": "PersonaSelector.tsx",
+      "filePath": "packages/dashboard/src/components/PersonaSelector.tsx",
+      "summary": "Compact toggle button group for switching between three dashboard personas.",
+      "tags": [
+        "component",
+        "persona",
+        "ui",
+        "settings"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/PersonaSelector.tsx:PersonaSelector",
+      "type": "function",
+      "name": "PersonaSelector",
+      "filePath": "packages/dashboard/src/components/PersonaSelector.tsx",
+      "lineRange": [
+        22,
+        44
+      ],
+      "summary": "Segmented button group for persona selection with active highlighting.",
+      "tags": [
+        "component",
+        "persona",
+        "ui"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/dashboard/src/components/SearchBar.tsx",
+      "type": "file",
+      "name": "SearchBar.tsx",
+      "filePath": "packages/dashboard/src/components/SearchBar.tsx",
+      "summary": "Search bar with fuzzy/semantic mode toggle, live dropdown results, and keyboard dismissal.",
+      "tags": [
+        "component",
+        "search",
+        "ui",
+        "fuzzy",
+        "semantic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/dashboard/src/components/SearchBar.tsx:SearchBar",
+      "type": "function",
+      "name": "SearchBar",
+      "filePath": "packages/dashboard/src/components/SearchBar.tsx",
+      "lineRange": [
+        12,
+        177
+      ],
+      "summary": "Search input with mode toggle, live top-5 results dropdown, and escape/outside-click handling.",
+      "tags": [
+        "component",
+        "search",
+        "ui"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/skill/src/index.ts",
+      "type": "file",
+      "name": "index.ts",
+      "filePath": "packages/skill/src/index.ts",
+      "summary": "Barrel entry point for the skill package, re-exporting all public functions and types.",
+      "tags": [
+        "entry-point",
+        "barrel",
+        "exports",
+        "skill"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:packages/skill/src/context-builder.ts",
+      "type": "file",
+      "name": "context-builder.ts",
+      "filePath": "packages/skill/src/context-builder.ts",
+      "summary": "Builds ChatContext from a KnowledgeGraph by fuzzy-searching and expanding 1-hop via graph edges.",
+      "tags": [
+        "chat",
+        "context",
+        "graph-traversal",
+        "llm",
+        "search"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/context-builder.ts:buildChatContext",
+      "type": "function",
+      "name": "buildChatContext",
+      "filePath": "packages/skill/src/context-builder.ts",
+      "lineRange": [
+        25,
+        80
+      ],
+      "summary": "Searches the KnowledgeGraph for matching nodes, expands 1 hop, returns structured ChatContext.",
+      "tags": [
+        "chat",
+        "graph-traversal",
+        "search",
+        "context-builder"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/context-builder.ts:formatContextForPrompt",
+      "type": "function",
+      "name": "formatContextForPrompt",
+      "filePath": "packages/skill/src/context-builder.ts",
+      "lineRange": [
+        85,
+        147
+      ],
+      "summary": "Converts ChatContext into markdown suitable for LLM prompt injection.",
+      "tags": [
+        "formatting",
+        "markdown",
+        "llm",
+        "prompt"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/skill/src/diff-analyzer.ts",
+      "type": "file",
+      "name": "diff-analyzer.ts",
+      "filePath": "packages/skill/src/diff-analyzer.ts",
+      "summary": "Maps git-changed files to graph nodes and identifies downstream ripple effects with risk assessment.",
+      "tags": [
+        "diff",
+        "impact-analysis",
+        "risk",
+        "graph-traversal",
+        "llm"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/diff-analyzer.ts:buildDiffContext",
+      "type": "function",
+      "name": "buildDiffContext",
+      "filePath": "packages/skill/src/diff-analyzer.ts",
+      "lineRange": [
+        22,
+        88
+      ],
+      "summary": "Maps changed file paths to graph nodes and expands to find all impacted nodes, edges, and layers.",
+      "tags": [
+        "diff",
+        "graph-traversal",
+        "impact-analysis",
+        "context-builder"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/diff-analyzer.ts:formatDiffAnalysis",
+      "type": "function",
+      "name": "formatDiffAnalysis",
+      "filePath": "packages/skill/src/diff-analyzer.ts",
+      "lineRange": [
+        93,
+        198
+      ],
+      "summary": "Renders DiffContext as structured markdown with risk assessment.",
+      "tags": [
+        "formatting",
+        "markdown",
+        "diff",
+        "risk-assessment"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/skill/src/explain-builder.ts",
+      "type": "file",
+      "name": "explain-builder.ts",
+      "filePath": "packages/skill/src/explain-builder.ts",
+      "summary": "Builds ExplainContext for a file or function path with neighbors and layer info.",
+      "tags": [
+        "explain",
+        "context-builder",
+        "graph-traversal",
+        "llm",
+        "prompt"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/explain-builder.ts:buildExplainContext",
+      "type": "function",
+      "name": "buildExplainContext",
+      "filePath": "packages/skill/src/explain-builder.ts",
+      "lineRange": [
+        22,
+        103
+      ],
+      "summary": "Resolves a file/function string to a graph node with children and 1-hop neighbors.",
+      "tags": [
+        "explain",
+        "graph-traversal",
+        "context-builder",
+        "node-resolution"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/explain-builder.ts:formatExplainPrompt",
+      "type": "function",
+      "name": "formatExplainPrompt",
+      "filePath": "packages/skill/src/explain-builder.ts",
+      "lineRange": [
+        108,
+        196
+      ],
+      "summary": "Converts ExplainContext into a structured LLM explanation prompt.",
+      "tags": [
+        "formatting",
+        "markdown",
+        "llm",
+        "prompt",
+        "explain"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/skill/src/onboard-builder.ts",
+      "type": "file",
+      "name": "onboard-builder.ts",
+      "filePath": "packages/skill/src/onboard-builder.ts",
+      "summary": "Generates a standalone markdown onboarding guide from a KnowledgeGraph.",
+      "tags": [
+        "onboarding",
+        "documentation",
+        "markdown",
+        "knowledge-graph"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:packages/skill/src/onboard-builder.ts:buildOnboardingGuide",
+      "type": "function",
+      "name": "buildOnboardingGuide",
+      "filePath": "packages/skill/src/onboard-builder.ts",
+      "lineRange": [
+        7,
+        124
+      ],
+      "summary": "Renders a complete onboarding markdown document from a KnowledgeGraph.",
+      "tags": [
+        "onboarding",
+        "documentation",
+        "markdown",
+        "tour"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:packages/skill/src/understand-chat.ts",
+      "type": "file",
+      "name": "understand-chat.ts",
+      "filePath": "packages/skill/src/understand-chat.ts",
+      "summary": "Thin skill handler composing buildChatContext and formatContextForPrompt into buildChatPrompt.",
+      "tags": [
+        "chat",
+        "skill",
+        "llm",
+        "prompt"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:packages/skill/src/understand-chat.ts:buildChatPrompt",
+      "type": "function",
+      "name": "buildChatPrompt",
+      "filePath": "packages/skill/src/understand-chat.ts",
+      "lineRange": [
+        8,
+        29
+      ],
+      "summary": "Builds a complete LLM chat prompt by composing graph context with a system instruction.",
+      "tags": [
+        "chat",
+        "prompt",
+        "llm",
+        "composition"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/search.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/staleness.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/embedding-search.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/persistence/index.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/analyzer/graph-builder.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/analyzer/layer-detector.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/analyzer/tour-generator.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/analyzer/language-lesson.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/plugins/registry.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/index.ts",
+      "target": "file:packages/core/src/plugins/discovery.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/schema.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/core/src/search.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/staleness.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/embedding-search.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/embedding-search.ts",
+      "target": "file:packages/core/src/search.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/schema.ts",
+      "target": "function:packages/core/src/schema.ts:validateGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/search.ts",
+      "target": "class:packages/core/src/search.ts:SearchEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/embedding-search.ts",
+      "target": "class:packages/core/src/embedding-search.ts:SemanticSearchEngine",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/embedding-search.ts",
+      "target": "function:packages/core/src/embedding-search.ts:cosineSimilarity",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/staleness.ts",
+      "target": "function:packages/core/src/staleness.ts:getChangedFiles",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/staleness.ts",
+      "target": "function:packages/core/src/staleness.ts:isStale",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/staleness.ts",
+      "target": "function:packages/core/src/staleness.ts:mergeGraphUpdate",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "function:packages/core/src/staleness.ts:isStale",
+      "target": "function:packages/core/src/staleness.ts:getChangedFiles",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/embedding-search.ts:SemanticSearchEngine",
+      "target": "function:packages/core/src/embedding-search.ts:cosineSimilarity",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/embedding-search.ts:SemanticSearchEngine",
+      "target": "class:packages/core/src/search.ts:SearchEngine",
+      "type": "similar_to",
+      "direction": "bidirectional",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/core/src/schema.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "validates",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "class:packages/core/src/analyzer/graph-builder.ts:GraphBuilder",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "function:packages/core/src/analyzer/graph-builder.ts:detectLanguage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "class:packages/core/src/analyzer/graph-builder.ts:GraphBuilder",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:buildFileAnalysisPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:buildProjectSummaryPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:parseFileAnalysisResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:parseProjectSummaryResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:buildFileAnalysisPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:buildProjectSummaryPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:parseFileAnalysisResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "target": "function:packages/core/src/analyzer/llm-analyzer.ts:parseProjectSummaryResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:detectLayers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:buildLayerDetectionPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:parseLayerDetectionResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:applyLLMLayers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:detectLayers",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:buildLayerDetectionPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:parseLayerDetectionResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/layer-detector.ts",
+      "target": "function:packages/core/src/analyzer/layer-detector.ts:applyLLMLayers",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:detectLanguageConcepts",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:buildLanguageLessonPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:parseLanguageLessonResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:detectLanguageConcepts",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:buildLanguageLessonPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/language-lesson.ts",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:parseLanguageLessonResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/core/src/analyzer/language-lesson.ts:buildLanguageLessonPrompt",
+      "target": "function:packages/core/src/analyzer/language-lesson.ts:detectLanguageConcepts",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "function:packages/core/src/analyzer/tour-generator.ts:buildTourGenerationPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "function:packages/core/src/analyzer/tour-generator.ts:parseTourGenerationResponse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "function:packages/core/src/analyzer/tour-generator.ts:generateHeuristicTour",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "function:packages/core/src/analyzer/tour-generator.ts:buildTourGenerationPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "function:packages/core/src/analyzer/tour-generator.ts:parseTourGenerationResponse",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/tour-generator.ts",
+      "target": "function:packages/core/src/analyzer/tour-generator.ts:generateHeuristicTour",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "file:packages/core/src/analyzer/llm-analyzer.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "file:packages/core/src/analyzer/layer-detector.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/core/src/analyzer/graph-builder.ts",
+      "target": "file:packages/core/src/analyzer/tour-generator.ts",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:languageKeyFromPath",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:traverse",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:getStringValue",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractParams",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractReturnType",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractImportSpecifiers",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+      "target": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:languageKeyFromPath",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractParams",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractReturnType",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:extractImportSpecifiers",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "target": "function:packages/core/src/plugins/tree-sitter-plugin.ts:getStringValue",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/plugins/registry.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/plugins/registry.ts",
+      "target": "class:packages/core/src/plugins/registry.ts:PluginRegistry",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/registry.ts",
+      "target": "class:packages/core/src/plugins/registry.ts:PluginRegistry",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/plugins/discovery.ts",
+      "target": "function:packages/core/src/plugins/discovery.ts:parsePluginConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/discovery.ts",
+      "target": "function:packages/core/src/plugins/discovery.ts:serializePluginConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/plugins/discovery.ts",
+      "target": "function:packages/core/src/plugins/discovery.ts:parsePluginConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/plugins/discovery.ts",
+      "target": "function:packages/core/src/plugins/discovery.ts:serializePluginConfig",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "file:packages/core/src/types.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "file:packages/core/src/schema.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:saveGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:loadGraph",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:saveMeta",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:loadMeta",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:saveGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:loadGraph",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:saveMeta",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/core/src/persistence/index.ts",
+      "target": "function:packages/core/src/persistence/index.ts:loadMeta",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/core/src/persistence/index.ts:loadGraph",
+      "target": "function:packages/core/src/schema.ts:validateGraph",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "class:packages/core/src/plugins/registry.ts:PluginRegistry",
+      "target": "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "file:packages/dashboard/src/main.tsx",
+      "target": "file:packages/dashboard/src/App.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/App.tsx",
+      "target": "function:packages/dashboard/src/App.tsx:App",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/App.tsx",
+      "target": "function:packages/dashboard/src/App.tsx:App",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/App.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/App.tsx",
+      "target": "file:packages/dashboard/src/components/GraphView.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/App.tsx",
+      "target": "file:packages/dashboard/src/components/ChatPanel.tsx",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/store.ts",
+      "target": "function:packages/dashboard/src/store.ts:buildSystemPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/store.ts",
+      "target": "function:packages/dashboard/src/store.ts:getSortedTour",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/store.ts",
+      "target": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/store.ts",
+      "target": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "target": "function:packages/dashboard/src/store.ts:buildSystemPrompt",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "target": "function:packages/dashboard/src/store.ts:getSortedTour",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/utils/layout.ts",
+      "target": "function:packages/dashboard/src/utils/layout.ts:applyDagreLayout",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/utils/layout.ts",
+      "target": "function:packages/dashboard/src/utils/layout.ts:applyDagreLayout",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/GraphView.tsx",
+      "target": "function:packages/dashboard/src/components/GraphView.tsx:GraphView",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/GraphView.tsx",
+      "target": "function:packages/dashboard/src/components/GraphView.tsx:GraphView",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/GraphView.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/GraphView.tsx",
+      "target": "file:packages/dashboard/src/utils/layout.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:packages/dashboard/src/components/GraphView.tsx:GraphView",
+      "target": "function:packages/dashboard/src/utils/layout.ts:applyDagreLayout",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/dashboard/src/components/GraphView.tsx:GraphView",
+      "target": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/ChatPanel.tsx",
+      "target": "function:packages/dashboard/src/components/ChatPanel.tsx:ChatPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/ChatPanel.tsx",
+      "target": "function:packages/dashboard/src/components/ChatPanel.tsx:ChatPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/ChatPanel.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:packages/dashboard/src/components/ChatPanel.tsx:ChatPanel",
+      "target": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/dashboard/src/App.tsx:App",
+      "target": "function:packages/dashboard/src/store.ts:useDashboardStore",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CodeViewer.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CodeViewer.tsx",
+      "target": "function:packages/dashboard/src/components/CodeViewer.tsx:getLanguage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CodeViewer.tsx",
+      "target": "function:packages/dashboard/src/components/CodeViewer.tsx:CodeViewer",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CodeViewer.tsx",
+      "target": "function:packages/dashboard/src/components/CodeViewer.tsx:CodeViewer",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/dashboard/src/components/CodeViewer.tsx:CodeViewer",
+      "target": "function:packages/dashboard/src/components/CodeViewer.tsx:getLanguage",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CustomNode.tsx",
+      "target": "class:packages/dashboard/src/components/CustomNode.tsx:CustomNodeData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CustomNode.tsx",
+      "target": "function:packages/dashboard/src/components/CustomNode.tsx:CustomNode",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CustomNode.tsx",
+      "target": "function:packages/dashboard/src/components/CustomNode.tsx:CustomNode",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/CustomNode.tsx",
+      "target": "class:packages/dashboard/src/components/CustomNode.tsx:CustomNodeData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerBorderColor",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:LayerLegend",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerColor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerBorderColor",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LayerLegend.tsx",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:LayerLegend",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/dashboard/src/components/LayerLegend.tsx:LayerLegend",
+      "target": "function:packages/dashboard/src/components/LayerLegend.tsx:getLayerBorderColor",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LearnPanel.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LearnPanel.tsx",
+      "target": "function:packages/dashboard/src/components/LearnPanel.tsx:LearnPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/LearnPanel.tsx",
+      "target": "function:packages/dashboard/src/components/LearnPanel.tsx:LearnPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/NodeInfo.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/NodeInfo.tsx",
+      "target": "function:packages/dashboard/src/components/NodeInfo.tsx:NodeInfo",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/NodeInfo.tsx",
+      "target": "function:packages/dashboard/src/components/NodeInfo.tsx:NodeInfo",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/PersonaSelector.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/PersonaSelector.tsx",
+      "target": "function:packages/dashboard/src/components/PersonaSelector.tsx:PersonaSelector",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/PersonaSelector.tsx",
+      "target": "function:packages/dashboard/src/components/PersonaSelector.tsx:PersonaSelector",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/dashboard/src/components/SearchBar.tsx",
+      "target": "file:packages/dashboard/src/store.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/dashboard/src/components/SearchBar.tsx",
+      "target": "function:packages/dashboard/src/components/SearchBar.tsx:SearchBar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/dashboard/src/components/SearchBar.tsx",
+      "target": "function:packages/dashboard/src/components/SearchBar.tsx:SearchBar",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/index.ts",
+      "target": "file:packages/skill/src/context-builder.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/skill/src/index.ts",
+      "target": "file:packages/skill/src/understand-chat.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/skill/src/index.ts",
+      "target": "file:packages/skill/src/diff-analyzer.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/skill/src/index.ts",
+      "target": "file:packages/skill/src/explain-builder.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/skill/src/index.ts",
+      "target": "file:packages/skill/src/onboard-builder.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:packages/skill/src/context-builder.ts",
+      "target": "function:packages/skill/src/context-builder.ts:buildChatContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/context-builder.ts",
+      "target": "function:packages/skill/src/context-builder.ts:formatContextForPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/diff-analyzer.ts",
+      "target": "function:packages/skill/src/diff-analyzer.ts:buildDiffContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/diff-analyzer.ts",
+      "target": "function:packages/skill/src/diff-analyzer.ts:formatDiffAnalysis",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/explain-builder.ts",
+      "target": "function:packages/skill/src/explain-builder.ts:buildExplainContext",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/explain-builder.ts",
+      "target": "function:packages/skill/src/explain-builder.ts:formatExplainPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/onboard-builder.ts",
+      "target": "function:packages/skill/src/onboard-builder.ts:buildOnboardingGuide",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/understand-chat.ts",
+      "target": "function:packages/skill/src/understand-chat.ts:buildChatPrompt",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:packages/skill/src/understand-chat.ts",
+      "target": "file:packages/skill/src/context-builder.ts",
+      "type": "imports",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "function:packages/skill/src/understand-chat.ts:buildChatPrompt",
+      "target": "function:packages/skill/src/context-builder.ts:buildChatContext",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/skill/src/understand-chat.ts:buildChatPrompt",
+      "target": "function:packages/skill/src/context-builder.ts:formatContextForPrompt",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/context-builder.ts",
+      "target": "function:packages/skill/src/context-builder.ts:formatContextForPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/context-builder.ts",
+      "target": "function:packages/skill/src/context-builder.ts:buildChatContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/diff-analyzer.ts",
+      "target": "function:packages/skill/src/diff-analyzer.ts:buildDiffContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/diff-analyzer.ts",
+      "target": "function:packages/skill/src/diff-analyzer.ts:formatDiffAnalysis",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/explain-builder.ts",
+      "target": "function:packages/skill/src/explain-builder.ts:buildExplainContext",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/explain-builder.ts",
+      "target": "function:packages/skill/src/explain-builder.ts:formatExplainPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/onboard-builder.ts",
+      "target": "function:packages/skill/src/onboard-builder.ts:buildOnboardingGuide",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:packages/skill/src/understand-chat.ts",
+      "target": "function:packages/skill/src/understand-chat.ts:buildChatPrompt",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:packages/skill/src/context-builder.ts:buildChatContext",
+      "target": "function:packages/skill/src/context-builder.ts:formatContextForPrompt",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:packages/skill/src/diff-analyzer.ts:buildDiffContext",
+      "target": "function:packages/skill/src/diff-analyzer.ts:formatDiffAnalysis",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "function:packages/skill/src/explain-builder.ts:buildExplainContext",
+      "target": "function:packages/skill/src/explain-builder.ts:formatExplainPrompt",
+      "type": "related",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:types",
+      "name": "Types & Schema Layer",
+      "description": "Core TypeScript type definitions and runtime schema validation that form the shared data contract across all packages",
+      "nodeIds": [
+        "file:packages/core/src/types.ts",
+        "file:packages/core/src/schema.ts"
+      ]
+    },
+    {
+      "id": "layer:analysis-engine",
+      "name": "Analysis Engine Layer",
+      "description": "Static analysis, graph construction, LLM-driven enrichment, layer detection, tour generation, and language lesson extraction",
+      "nodeIds": [
+        "file:packages/core/src/analyzer/graph-builder.ts",
+        "file:packages/core/src/analyzer/llm-analyzer.ts",
+        "file:packages/core/src/analyzer/layer-detector.ts",
+        "file:packages/core/src/analyzer/language-lesson.ts",
+        "file:packages/core/src/analyzer/tour-generator.ts"
+      ]
+    },
+    {
+      "id": "layer:plugin",
+      "name": "Plugin & Persistence Layer",
+      "description": "Extensible plugin system for language-specific static analysis, plugin registry and discovery, and knowledge graph persistence",
+      "nodeIds": [
+        "file:packages/core/src/plugins/tree-sitter-plugin.ts",
+        "file:packages/core/src/plugins/registry.ts",
+        "file:packages/core/src/plugins/discovery.ts",
+        "file:packages/core/src/persistence/index.ts"
+      ]
+    },
+    {
+      "id": "layer:search",
+      "name": "Search & Core Services Layer",
+      "description": "Cross-cutting core services including fuzzy search, semantic search, staleness detection, and barrel entry point",
+      "nodeIds": [
+        "file:packages/core/src/search.ts",
+        "file:packages/core/src/embedding-search.ts",
+        "file:packages/core/src/staleness.ts",
+        "file:packages/core/src/index.ts"
+      ]
+    },
+    {
+      "id": "layer:skill",
+      "name": "Skill (CLI Command) Layer",
+      "description": "Claude Code skill handlers implementing the /understand-* commands",
+      "nodeIds": [
+        "file:packages/skill/src/context-builder.ts",
+        "file:packages/skill/src/understand-chat.ts",
+        "file:packages/skill/src/diff-analyzer.ts",
+        "file:packages/skill/src/explain-builder.ts",
+        "file:packages/skill/src/onboard-builder.ts",
+        "file:packages/skill/src/index.ts"
+      ]
+    },
+    {
+      "id": "layer:state",
+      "name": "State Management Layer",
+      "description": "Zustand store holding all dashboard application state plus the dagre layout utility",
+      "nodeIds": [
+        "file:packages/dashboard/src/store.ts",
+        "file:packages/dashboard/src/utils/layout.ts"
+      ]
+    },
+    {
+      "id": "layer:ui",
+      "name": "UI & Presentation Layer",
+      "description": "React dashboard components and application entry points",
+      "nodeIds": [
+        "file:packages/dashboard/src/App.tsx",
+        "file:packages/dashboard/src/main.tsx",
+        "file:packages/dashboard/src/components/GraphView.tsx",
+        "file:packages/dashboard/src/components/ChatPanel.tsx",
+        "file:packages/dashboard/src/components/CodeViewer.tsx",
+        "file:packages/dashboard/src/components/CustomNode.tsx",
+        "file:packages/dashboard/src/components/LayerLegend.tsx",
+        "file:packages/dashboard/src/components/LearnPanel.tsx",
+        "file:packages/dashboard/src/components/NodeInfo.tsx",
+        "file:packages/dashboard/src/components/PersonaSelector.tsx",
+        "file:packages/dashboard/src/components/SearchBar.tsx"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Overview: The Dashboard Entry Point",
+      "description": "Start with packages/dashboard/src/App.tsx, the root React component that bootstraps the entire interactive dashboard. On mount it fetches a pre-built knowledge-graph.json file and hands it to the Zustand store. From here you can see the three persona-adaptive layouts and how every major panel is composed together.",
+      "nodeIds": [
+        "function:packages/dashboard/src/App.tsx:App"
+      ],
+      "languageLesson": "TypeScript conditional JSX with ternary chains is a clean pattern for persona-adaptive rendering without introducing a separate routing library."
+    },
+    {
+      "order": 2,
+      "title": "The Domain Model: Core Types",
+      "description": "Every part of the system speaks the same language defined in packages/core/src/types.ts. GraphNode, GraphEdge, Layer, TourStep, KnowledgeGraph, and AnalyzerPlugin are the vocabulary of the entire project. The 18 EdgeType variants across five categories capture a rich set of code relationships.",
+      "nodeIds": [
+        "file:packages/core/src/types.ts"
+      ],
+      "languageLesson": "TypeScript discriminated union types enable exhaustive switch checks and IDE autocomplete across the entire codebase with zero runtime cost."
+    },
+    {
+      "order": 3,
+      "title": "Runtime Validation: Zod Schema",
+      "description": "packages/core/src/schema.ts mirrors every type from types.ts using Zod, adding runtime validation at the boundary where JSON is loaded from disk. The persistence layer imports schema.ts directly, so any malformed graph is rejected before it can corrupt dashboard state.",
+      "nodeIds": [
+        "file:packages/core/src/schema.ts"
+      ],
+      "languageLesson": "Zod v4 schema definitions provide runtime safety. Using z.infer<typeof schema> derives the TypeScript type from the schema itself, keeping the two in sync."
+    },
+    {
+      "order": 4,
+      "title": "Building the Graph: GraphBuilder",
+      "description": "packages/core/src/analyzer/graph-builder.ts is the stateful assembly point for the knowledge graph. It accepts addFile, addFileWithAnalysis, addImportEdge, and addCallEdge calls, accumulating nodes and edges, then emits the final KnowledgeGraph via build().",
+      "nodeIds": [
+        "class:packages/core/src/analyzer/graph-builder.ts:GraphBuilder"
+      ],
+      "languageLesson": "The Builder pattern in TypeScript is preferable to constructor overloads when an object requires many optional, ordered setup steps."
+    },
+    {
+      "order": 5,
+      "title": "Static Analysis: The Plugin System",
+      "description": "The plugin system separates how to parse a language from the rest of the pipeline. PluginRegistry routes by extension to the right AnalyzerPlugin. TreeSitterPlugin uses web-tree-sitter WASM to parse TS/JS into ASTs and extract functions, classes, imports, and call graphs.",
+      "nodeIds": [
+        "class:packages/core/src/plugins/registry.ts:PluginRegistry",
+        "class:packages/core/src/plugins/tree-sitter-plugin.ts:TreeSitterPlugin",
+        "file:packages/core/src/plugins/discovery.ts"
+      ],
+      "languageLesson": "The AnalyzerPlugin interface is structural — any object with matching method signatures satisfies it, enabling community plugins without base class inheritance."
+    },
+    {
+      "order": 6,
+      "title": "LLM-Augmented Analysis",
+      "description": "Static analysis gives structure; LLM analysis gives meaning. llm-analyzer.ts builds prompts requesting JSON summaries per file. layer-detector.ts applies filename heuristics then optionally asks the LLM to group nodes into architectural layers.",
+      "nodeIds": [
+        "file:packages/core/src/analyzer/llm-analyzer.ts",
+        "file:packages/core/src/analyzer/layer-detector.ts"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Tour Generation: Teaching a Codebase",
+      "description": "tour-generator.ts generates guided tours using Kahn's topological sort algorithm for dependency-respecting traversal order, grouping results by architectural layer. The TourStep data structure in types.ts is exactly what drives this tour.",
+      "nodeIds": [
+        "file:packages/core/src/analyzer/tour-generator.ts"
+      ],
+      "languageLesson": "Kahn's algorithm processes a DAG by repeatedly removing zero in-degree nodes. In TypeScript this is elegantly expressed with a Map and queue array."
+    },
+    {
+      "order": 8,
+      "title": "Search: Fuzzy and Semantic Modes",
+      "description": "SearchEngine wraps Fuse.js for weighted fuzzy matching. SemanticSearchEngine uses cosine similarity over embeddings. Both return results in the same shape (lower score = better match), so the dashboard can toggle between modes seamlessly.",
+      "nodeIds": [
+        "file:packages/core/src/search.ts",
+        "file:packages/core/src/embedding-search.ts"
+      ],
+      "languageLesson": "Both engines adopt score = 0 (perfect) to 1 (no match). SemanticSearchEngine translates cosine similarity via score = 1 - similarity."
+    },
+    {
+      "order": 9,
+      "title": "Infrastructure: Persistence and Staleness",
+      "description": "persistence/index.ts handles saving/loading KnowledgeGraph JSON with Zod validation. staleness.ts uses git diff to detect outdated graphs and mergeGraphUpdate performs surgical incremental updates.",
+      "nodeIds": [
+        "file:packages/core/src/persistence/index.ts",
+        "file:packages/core/src/staleness.ts"
+      ]
+    },
+    {
+      "order": 10,
+      "title": "Dashboard State: The Zustand Store",
+      "description": "store.ts is the single source of truth for everything the dashboard displays. It holds the graph, search state, chat history, tour state, and persona. buildSystemPrompt assembles rich LLM context for the ChatPanel.",
+      "nodeIds": [
+        "function:packages/dashboard/src/store.ts:useDashboardStore"
+      ],
+      "languageLesson": "Zustand's create pattern is a TypeScript-idiomatic alternative to Redux. Selectors subscribe only to changed slices."
+    },
+    {
+      "order": 11,
+      "title": "Visual Graph: React Flow with Dagre Layout",
+      "description": "GraphView.tsx renders the knowledge graph as an interactive node-link diagram using React Flow. applyDagreLayout computes hierarchical positions, and tour-highlighted nodes receive distinct visual styles.",
+      "nodeIds": [
+        "function:packages/dashboard/src/components/GraphView.tsx:GraphView"
+      ]
+    },
+    {
+      "order": 12,
+      "title": "Skill Commands: AI-Powered Developer Tools",
+      "description": "The skill package exposes four Claude Code slash commands. context-builder.ts does fuzzy search + 1-hop expansion. diff-analyzer.ts traces ripple effects from git diffs. explain-builder.ts resolves nodes for explanation. onboard-builder.ts generates markdown onboarding guides.",
+      "nodeIds": [
+        "function:packages/skill/src/context-builder.ts:buildChatContext",
+        "function:packages/skill/src/diff-analyzer.ts:buildDiffContext",
+        "function:packages/skill/src/explain-builder.ts:buildExplainContext",
+        "function:packages/skill/src/onboard-builder.ts:buildOnboardingGuide"
+      ]
+    }
+  ]
+}

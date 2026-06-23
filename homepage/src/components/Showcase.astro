@@ -1,0 +1,209 @@
+---
+const base = import.meta.env.BASE_URL;   /* "/" after custom domain migration */
+const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
+---
+
+<!-- Live Demo -->
+<section class="showcase showcase--demo">
+  <span class="showcase-label showcase-label--accent reveal">Live Demo</span>
+  <h2 class="showcase-heading reveal">
+    See what your code is <span class="grad">really</span> doing
+  </h2>
+  <p class="showcase-desc showcase-desc--wide reveal">
+    Explore every file, function, and dependency &mdash; or switch to <span class="grad">business
+    knowledge</span> mode and watch your code transform into authentication flows,
+    payment pipelines, and user lifecycles. Not just a map.
+    <strong>The story behind your codebase, fully interactive.</strong>
+  </p>
+  <div class="showcase-frame showcase-frame--featured reveal reveal-delay-1">
+    <div class="showcase-titlebar">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+      <span class="showcase-titlebar-text">Interactive Dashboard</span>
+    </div>
+    <div class="showcase-iframe-wrap">
+      <iframe
+        src={demoUrl}
+        title="Understand Anything — live demo"
+        class="showcase-iframe"
+        loading="lazy"
+      ></iframe>
+    </div>
+  </div>
+  <div class="showcase-features reveal reveal-delay-2">
+    <span class="showcase-pill">Hierarchical drill-down</span>
+    <span class="showcase-pill">Fuzzy search</span>
+    <span class="showcase-pill">Filter by type</span>
+    <span class="showcase-pill">26+ file types</span>
+    <span class="showcase-pill showcase-pill--accent">Domain mapping</span>
+    <span class="showcase-pill showcase-pill--accent">Business flows</span>
+    <span class="showcase-pill showcase-pill--accent">Process steps</span>
+    <span class="showcase-pill showcase-pill--accent">AI-generated tours</span>
+  </div>
+</section>
+
+<style>
+  .showcase {
+    padding: 6rem 2rem 4rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .showcase--demo {
+    padding: 8rem 2rem 6rem;
+    max-width: 1400px;
+  }
+
+  /* Section label */
+  .showcase-label {
+    display: inline-block;
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    padding: 0.3rem 1rem;
+    border-radius: 100px;
+    margin-bottom: 1.5rem;
+  }
+
+  .showcase-label--accent {
+    color: var(--accent);
+    border-color: rgba(88, 43, 232, 0.2);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px) saturate(1.12);
+  }
+
+  /* Heading */
+  .showcase-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(1.75rem, 4.5vw, 3rem);
+    color: var(--text);
+    font-weight: 780;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+  }
+
+  /* Description */
+  .showcase-desc {
+    font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 3rem;
+    line-height: 1.8;
+  }
+
+  .showcase-desc--wide {
+    max-width: 700px;
+  }
+
+  .showcase-desc strong {
+    color: var(--text);
+  }
+
+  /* macOS frame */
+  .showcase-frame {
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .showcase-frame--featured {
+    border-color: rgba(255, 255, 255, 0.9);
+    box-shadow:
+      0 34px 90px rgba(88, 43, 232, 0.16),
+      0 14px 34px rgba(15, 16, 32, 0.1);
+  }
+
+  .showcase-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: rgba(16, 19, 29, 0.86);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .showcase-titlebar-text {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    color: var(--text-muted-on-dark);
+    margin-right: 30px; /* offset for dots */
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #ffbd2e; }
+  .dot.green { background: #28c840; }
+
+  .showcase-media {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  /* Iframe embed */
+  .showcase-iframe-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #0a0a0a;
+  }
+
+  .showcase-iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  /* Feature pills below frame */
+  .showcase-features {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .showcase-pill {
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 0.4rem 1rem;
+    border: 1px solid rgba(88, 43, 232, 0.14);
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(12px);
+  }
+
+  .showcase-pill--accent {
+    color: var(--accent);
+    border-color: rgba(88, 43, 232, 0.2);
+    background: rgba(88, 43, 232, 0.07);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .showcase { padding: 4rem 1rem 2rem; }
+    .showcase--demo { padding: 4rem 1rem 4rem; }
+    .showcase-features { gap: 0.5rem; }
+    .showcase-pill { font-size: 0.7rem; padding: 0.25rem 0.65rem; }
+    .showcase-iframe-wrap { aspect-ratio: 4 / 3; }
+  }
+</style>

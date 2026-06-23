@@ -1,0 +1,88 @@
+---
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
+---
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span class="footer-logo">Understand Anything</span>
+    <div class="footer-links">
+      <a href={githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <a href="/demo/">Live Demo</a>
+      <span class="footer-sep">&middot;</span>
+      <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">MIT License</a>
+    </div>
+    <p class="footer-note">An open-source project from Egonex. Originally created by Lum1104.</p>
+    <p class="footer-note">&copy; 2026 Infinite Universe, Inc.</p>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    padding: 4rem 2rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .footer-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.25rem;
+  }
+
+  .footer-logo {
+    font-family: var(--font-heading);
+    font-size: 1.15rem;
+    color: var(--text);
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .footer-links {
+    margin-bottom: 1rem;
+  }
+
+  .footer-links a {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover {
+    color: var(--accent);
+  }
+
+  .footer-sep {
+    color: var(--border);
+    margin: 0 0.6rem;
+  }
+
+  .footer-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0.25rem 0;
+  }
+
+  .footer-note a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .footer-note a:hover {
+    text-decoration: underline;
+  }
+
+  @media (max-width: 480px) {
+    .footer { padding: 3rem 1.25rem; }
+    .footer-sep { display: none; }
+    .footer-links { gap: 0.25rem 1rem; }
+  }
+</style>

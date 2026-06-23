@@ -1,0 +1,68 @@
+name: Deploy Homepage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'homepage/**'
+      - 'understand-anything-plugin/packages/dashboard/**'
+      - 'understand-anything-plugin/packages/core/**'
+      - '.github/workflows/deploy-homepage.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build homepage
+        working-directory: homepage
+        run: pnpm build
+
+      - name: Build core
+        run: pnpm --filter @understand-anything/core build
+
+      - name: Build demo dashboard
+        run: pnpm --filter @understand-anything/dashboard build:demo
+        env:
+          VITE_GRAPH_URL: ${{ vars.DEMO_GRAPH_URL }}
+          VITE_DOMAIN_GRAPH_URL: ${{ vars.DEMO_DOMAIN_GRAPH_URL }}
+          VITE_META_URL: ${{ vars.DEMO_META_URL }}
+
+      - name: Merge demo into homepage output
+        run: cp -r understand-anything-plugin/packages/dashboard/dist homepage/dist/demo
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: homepage/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

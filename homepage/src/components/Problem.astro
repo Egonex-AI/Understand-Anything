@@ -1,0 +1,232 @@
+<section class="problem">
+  <h2 class="problem-heading reveal">
+    Most code graphs show you <span class="grad">structure</span>.<br />
+    Files, functions, edges. A map with no legend.
+  </h2>
+  <p class="problem-promise reveal">
+    We show you <span class="grad">meaning</span> &mdash;
+    how your code maps to real business domains, processes, and flows.
+  </p>
+
+  <div class="problem-compare reveal reveal-delay-1">
+    <div class="problem-card problem-card--them">
+      <div class="problem-card-label">Typical code graph</div>
+      <div class="problem-card-visual">
+        <svg viewBox="0 0 320 200" class="hairball" aria-label="A tangled, unreadable graph of dots and lines">
+          <!-- scattered nodes -->
+          <circle cx="60" cy="40" r="6" /><circle cx="140" cy="25" r="8" />
+          <circle cx="220" cy="50" r="5" /><circle cx="280" cy="30" r="7" />
+          <circle cx="40" cy="100" r="7" /><circle cx="100" cy="80" r="5" />
+          <circle cx="170" cy="95" r="9" /><circle cx="250" cy="90" r="6" />
+          <circle cx="300" cy="110" r="5" /><circle cx="80" cy="150" r="6" />
+          <circle cx="150" cy="160" r="7" /><circle cx="210" cy="145" r="5" />
+          <circle cx="270" cy="165" r="8" /><circle cx="120" cy="120" r="4" />
+          <circle cx="190" cy="130" r="6" /><circle cx="50" cy="180" r="5" />
+          <circle cx="160" cy="185" r="4" /><circle cx="240" cy="180" r="6" />
+          <!-- tangled edges -->
+          <line x1="60" y1="40" x2="140" y2="25" /><line x1="140" y1="25" x2="220" y2="50" />
+          <line x1="220" y1="50" x2="280" y2="30" /><line x1="40" y1="100" x2="170" y2="95" />
+          <line x1="100" y1="80" x2="250" y2="90" /><line x1="170" y1="95" x2="300" y2="110" />
+          <line x1="60" y1="40" x2="100" y2="80" /><line x1="140" y1="25" x2="170" y2="95" />
+          <line x1="80" y1="150" x2="150" y2="160" /><line x1="150" y1="160" x2="270" y2="165" />
+          <line x1="120" y1="120" x2="190" y2="130" /><line x1="190" y1="130" x2="210" y2="145" />
+          <line x1="40" y1="100" x2="80" y2="150" /><line x1="250" y1="90" x2="270" y2="165" />
+          <line x1="100" y1="80" x2="120" y2="120" /><line x1="170" y1="95" x2="150" y2="160" />
+          <line x1="280" y1="30" x2="300" y2="110" /><line x1="210" y1="145" x2="240" y2="180" />
+          <line x1="50" y1="180" x2="160" y2="185" /><line x1="160" y1="185" x2="240" y2="180" />
+          <line x1="60" y1="40" x2="250" y2="90" /><line x1="40" y1="100" x2="210" y2="145" />
+          <line x1="120" y1="120" x2="270" y2="165" /><line x1="80" y1="150" x2="190" y2="130" />
+        </svg>
+      </div>
+      <p class="problem-card-caption">23 nodes. 34 edges. Now what?</p>
+    </div>
+
+    <div class="problem-card problem-card--us">
+      <div class="problem-card-label">Understand Anything</div>
+      <div class="problem-card-visual">
+        <div class="domain-preview">
+          <div class="domain-group">
+            <span class="domain-badge">Authentication</span>
+            <span class="domain-item">login()</span>
+            <span class="domain-item">verify_token()</span>
+            <span class="domain-item">session management</span>
+          </div>
+          <div class="domain-group">
+            <span class="domain-badge">User Lifecycle</span>
+            <span class="domain-item">create_user()</span>
+            <span class="domain-item">get_profile()</span>
+            <span class="domain-item">permissions</span>
+          </div>
+          <div class="domain-group">
+            <span class="domain-badge">Data Layer</span>
+            <span class="domain-item">db_connect()</span>
+            <span class="domain-item">migrations</span>
+            <span class="domain-item">models</span>
+          </div>
+        </div>
+      </div>
+      <p class="problem-card-caption">Auth flow. Session management. Now you understand.</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .problem {
+    padding: 7rem 2rem 9rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    text-align: center;
+    position: relative;
+  }
+
+  .problem-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    color: var(--text-soft);
+    font-weight: 760;
+    line-height: 1.4;
+    margin-bottom: 1.5rem;
+  }
+
+  .problem-promise {
+    font-family: var(--font-heading);
+    font-size: clamp(1.3rem, 3.5vw, 2.2rem);
+    color: var(--text);
+    font-weight: 760;
+    line-height: 1.4;
+    max-width: 700px;
+    margin: 0 auto 4rem;
+  }
+
+  .grad-warm {
+    background: linear-gradient(135deg, var(--grad-mid), var(--grad-warm));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .problem-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    text-align: left;
+  }
+
+  .problem-card {
+    border-radius: 22px;
+    padding: 2rem;
+    border: 1px solid rgba(232, 225, 255, 0.85);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px) saturate(1.12);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  }
+
+  .problem-card--them {
+    background: rgba(255, 255, 255, 0.56);
+  }
+
+  .problem-card--us {
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(88, 43, 232, 0.2);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .problem-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .problem-card-label {
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1.5rem;
+  }
+
+  .problem-card--us .problem-card-label {
+    color: var(--accent);
+  }
+
+  .problem-card-visual {
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(88, 43, 232, 0.08), transparent 12rem),
+      rgba(248, 248, 253, 0.52);
+    border-radius: 16px;
+  }
+
+  /* Hairball SVG */
+  .hairball {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+  }
+
+  .hairball circle {
+    fill: var(--text-muted);
+    opacity: 0.45;
+  }
+
+  .hairball line {
+    stroke: var(--text-muted);
+    stroke-width: 0.8;
+    opacity: 0.22;
+  }
+
+  /* Domain preview */
+  .domain-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  .domain-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .domain-badge {
+    background: linear-gradient(135deg, rgba(88, 43, 232, 0.1), rgba(139, 92, 246, 0.12));
+    border: 1px solid rgba(88, 43, 232, 0.18);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+  }
+
+  .domain-item {
+    font-family: var(--font-code);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding: 0.3rem 0.6rem;
+    background: rgba(88, 43, 232, 0.045);
+    border-radius: 4px;
+  }
+
+  .problem-card-caption {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .problem-card--us .problem-card-caption {
+    color: var(--text);
+  }
+
+  @media (max-width: 768px) {
+    .problem { padding: 4rem 1rem 6rem; }
+    .problem-compare {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+  }
+</style>

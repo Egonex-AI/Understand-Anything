@@ -1,0 +1,147 @@
+---
+const youTubeId = 'VmIUXVlt7_I';
+const youTubeUrl = `https://www.youtube.com/watch?v=${youTubeId}`;
+const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7`;
+---
+
+<section class="community-video">
+  <span class="community-video-label reveal">Community</span>
+  <h2 class="community-video-heading reveal">
+    A walkthrough from the
+    <span class="grad">community</span>
+  </h2>
+  <p class="community-video-desc reveal">
+    A community-made video tour by
+    <a class="community-video-credit" href={youTubeUrl} target="_blank" rel="noopener noreferrer">Better Stack</a>.
+  </p>
+  <div class="community-video-frame reveal reveal-delay-1">
+    <div class="community-video-titlebar">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+      <span class="community-video-titlebar-text">YouTube · Better Stack</span>
+    </div>
+    <div class="community-video-iframe-wrap">
+      <iframe
+        src={embedUrl}
+        title="Community video by Better Stack — Understand Anything walkthrough"
+        class="community-video-iframe"
+        loading="lazy"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allowfullscreen
+      ></iframe>
+    </div>
+  </div>
+</section>
+
+<style>
+  .community-video {
+    padding: 6rem 2rem 4rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .community-video-label {
+    display: inline-block;
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(88, 43, 232, 0.2);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px) saturate(1.12);
+    padding: 0.3rem 1rem;
+    border-radius: 100px;
+    margin-bottom: 1.5rem;
+  }
+
+  .community-video-heading {
+    font-family: var(--font-heading);
+    font-size: clamp(1.75rem, 4.5vw, 3rem);
+    color: var(--text);
+    font-weight: 780;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .community-video-desc {
+    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+    color: var(--text-muted);
+    max-width: 640px;
+    margin: 0 auto 2.5rem;
+    line-height: 1.7;
+  }
+
+  .community-video-credit {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(88, 43, 232, 0.32);
+    transition: border-color 0.2s ease;
+  }
+
+  .community-video-credit:hover {
+    border-bottom-color: var(--accent);
+  }
+
+  .community-video-frame {
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+      0 34px 90px rgba(88, 43, 232, 0.14),
+      0 14px 34px rgba(15, 16, 32, 0.1);
+  }
+
+  .community-video-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: rgba(16, 19, 29, 0.86);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .community-video-titlebar-text {
+    flex: 1;
+    text-align: center;
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    color: var(--text-muted-on-dark);
+    margin-right: 30px;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #ffbd2e; }
+  .dot.green { background: #28c840; }
+
+  .community-video-iframe-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #0a0a0a;
+  }
+
+  .community-video-iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  @media (max-width: 768px) {
+    .community-video { padding: 4rem 1rem 3rem; }
+  }
+</style>

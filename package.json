@@ -1,0 +1,61 @@
+{
+  "name": "understand-anything",
+  "private": true,
+  "type": "module",
+  "description": "An open-source tool combining LLM intelligence + static analysis to produce interactive dashboards for understanding codebases.",
+  "license": "MIT",
+  "homepage": "https://github.com/Egonex-AI/Understand-Anything#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Egonex-AI/Understand-Anything.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Egonex-AI/Understand-Anything/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "codebase-analysis",
+    "knowledge-graph",
+    "tree-sitter",
+    "llm",
+    "static-analysis",
+    "developer-tools",
+    "code-understanding",
+    "code-onboarding",
+    "claude-plugin"
+  ],
+  "main": ".opencode/plugins/understand-anything.js",
+  "packageManager": "pnpm@10.6.2+sha512.47870716bea1572b53df34ad8647b42962bc790ce2bf4562ba0f643237d7302a3d6a8ecef9e4bdfc01d23af1969aa90485d4cebb0b9638fa5ef1daef656f6c1b",
+  "scripts": {
+    "prepare": "pnpm --filter @understand-anything/core build",
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "dev:dashboard": "pnpm --filter @understand-anything/dashboard dev",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^17.6.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "tree-sitter-c",
+      "tree-sitter-c-sharp",
+      "tree-sitter-cpp",
+      "tree-sitter-go",
+      "tree-sitter-java",
+      "tree-sitter-javascript",
+      "tree-sitter-php",
+      "tree-sitter-python",
+      "tree-sitter-ruby",
+      "tree-sitter-rust",
+      "tree-sitter-typescript"
+    ]
+  }
+}

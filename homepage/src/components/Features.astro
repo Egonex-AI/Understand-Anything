@@ -1,0 +1,113 @@
+---
+const features = [
+  {
+    icon: '◈',
+    title: 'Interactive Knowledge Graph',
+    description: 'Explorable graph with hierarchical drill-down, smart layout, and community clustering.',
+  },
+  {
+    icon: '⬡',
+    title: 'Beyond Code Analysis',
+    description: 'Dockerfiles, Terraform, SQL, Markdown, and 26+ file types in one unified graph.',
+  },
+  {
+    icon: '⊘',
+    title: 'Smart Filtering & Search',
+    description: 'Filter by type, complexity, or layer. Fuzzy and semantic search to find anything.',
+  },
+  {
+    icon: '⎙',
+    title: 'Export & Share',
+    description: 'High-quality PNG, SVG, or filtered JSON for docs, presentations, or analysis.',
+  },
+  {
+    icon: '⟿',
+    title: 'Dependency Path Finder',
+    description: 'Shortest path between any two components. See how your system connects.',
+  },
+  {
+    icon: '⟐',
+    title: 'Guided Tours & Onboarding',
+    description: 'AI-generated walkthroughs that teach the codebase step by step.',
+  },
+];
+---
+
+<section class="features">
+  <div class="features-grid">
+    {features.map((f, i) => (
+      <div class={`feature-card reveal reveal-delay-${(i % 2) + 1}`}>
+        <span class="feature-icon grad">{f.icon}</span>
+        <div class="feature-body">
+          <h3 class="feature-title">{f.title}</h3>
+          <p class="feature-desc">{f.description}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .features {
+    padding: 4rem 2rem 8rem;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(232, 225, 255, 0.85);
+    border-radius: 22px;
+    padding: 2rem;
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px) saturate(1.12);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+  }
+
+  .feature-card:hover {
+    border-color: rgba(88, 43, 232, 0.24);
+    box-shadow: 0 22px 54px rgba(88, 43, 232, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    transform: translateY(-3px);
+  }
+
+  .feature-icon {
+    font-size: 2rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .feature-body {
+    min-width: 0;
+  }
+
+  .feature-title {
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    color: var(--text);
+    font-weight: 760;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-desc {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 768px) {
+    .features { padding: 2rem 1rem 6rem; }
+    .features-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+  }
+</style>

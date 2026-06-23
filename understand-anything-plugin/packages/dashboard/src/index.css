@@ -1,0 +1,265 @@
+@import "tailwindcss";
+@source "./**/*.{ts,tsx,js,jsx,html}";
+@source "../index.html";
+
+@theme {
+  /* Base */
+  --color-root: #0a0a0a;
+  --color-surface: #111111;
+  --color-elevated: #1a1a1a;
+  --color-panel: #141414;
+
+  /* Accent */
+  --color-accent: #d4a574;
+  --color-accent-dim: #c9a96e;
+  --color-accent-bright: #e8c49a;
+
+  /* Text */
+  --color-text-primary: #f5f0eb;
+  --color-text-secondary: #a39787;
+  --color-text-muted: #6b5f53;
+
+  /* Borders */
+  --color-border-subtle: rgba(212, 165, 116, 0.12);
+  --color-border-medium: rgba(212, 165, 116, 0.25);
+
+  /* Node types */
+  --color-node-file: #4a7c9b;
+  --color-node-function: #5a9e6f;
+  --color-node-class: #8b6fb0;
+  --color-node-module: #c9a06c;
+  --color-node-concept: #b07a8a;
+  --color-node-config: #5eead4;
+  --color-node-document: #7dd3fc;
+  --color-node-service: #a78bfa;
+  --color-node-table: #6ee7b7;
+  --color-node-endpoint: #fdba74;
+  --color-node-pipeline: #fda4af;
+  --color-node-schema: #fcd34d;
+  --color-node-resource: #a5b4fc;
+
+  /* Knowledge node types */
+  --color-node-article: #d4a574;
+  --color-node-entity: #7ba4c9;
+  --color-node-topic: #c9b06c;
+  --color-node-claim: #6fb07a;
+  --color-node-source: #8a8a8a;
+
+  /* Diff */
+  --color-diff-changed: #e05252;
+  --color-diff-affected: #d4a030;
+  --color-diff-changed-dim: rgba(224, 82, 82, 0.25);
+  --color-diff-affected-dim: rgba(212, 160, 48, 0.25);
+
+  /* Glass */
+  --glass-bg: rgba(20, 20, 20, 0.8);
+  --glass-bg-heavy: rgba(20, 20, 20, 0.95);
+  --glass-border: rgba(212, 165, 116, 0.1);
+  --glass-border-heavy: rgba(212, 165, 116, 0.15);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(212, 165, 116, 0.2);
+  --scrollbar-thumb-hover: rgba(212, 165, 116, 0.35);
+
+  /* Glow */
+  --glow-accent: rgba(212, 165, 116, 0.15);
+  --glow-accent-strong: rgba(212, 165, 116, 0.4);
+  --glow-accent-pulse: rgba(212, 165, 116, 0.6);
+
+  /* Edges */
+  --color-edge: rgba(212, 165, 116, 0.3);
+  --color-edge-dim: rgba(212, 165, 116, 0.08);
+  --color-edge-dot: rgba(212, 165, 116, 0.15);
+
+  /* Accent overlays */
+  --color-accent-overlay-bg: rgba(212, 165, 116, 0.05);
+  --color-accent-overlay-border: rgba(212, 165, 116, 0.25);
+
+  /* Kbd */
+  --kbd-bg: rgba(212, 165, 116, 0.1);
+
+  /* Typography */
+  --font-serif: 'DM Serif Display', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-heading: var(--font-serif);
+}
+
+.font-heading { font-family: var(--font-heading); }
+
+/* Base styles */
+html {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-root);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle noise texture overlay */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Glass utility */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-heavy {
+  background: var(--glass-bg-heavy);
+  border: 1px solid var(--glass-border-heavy);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Keyboard shortcut key styling */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--kbd-bg);
+  border: 1px solid var(--color-border-medium);
+  border-radius: 0.25rem;
+  box-shadow: 0 1px 0 var(--scrollbar-thumb);
+}
+
+/* Animation keyframes */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes accentPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--glow-accent-strong);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--glow-accent-pulse);
+  }
+}
+
+/* Animation utilities */
+.animate-fade-slide-in {
+  animation: fadeSlideIn 0.3s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+.animate-accent-pulse {
+  animation: accentPulse 2s ease-in-out infinite;
+}
+
+/* Node selection glow */
+.node-glow {
+  box-shadow: 0 0 20px var(--glow-accent);
+}
+
+/* Diff overlay glow effects */
+.diff-changed-glow {
+  box-shadow: 0 0 16px rgba(224, 82, 82, 0.25);
+}
+
+.diff-affected-glow {
+  box-shadow: 0 0 12px rgba(212, 160, 48, 0.2);
+}
+
+/* Diff fade for unrelated nodes */
+.diff-faded {
+  opacity: 0.25;
+  filter: saturate(0.3);
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Custom scrollbar for dark luxury theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Override React Flow dark theme */
+.react-flow__background {
+  background-color: var(--color-root) !important;
+}
+
+/* Light theme overrides */
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+[data-theme="light"] .diff-faded {
+  opacity: 0.35;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .warning-banner {
+  background: rgba(180, 130, 30, 0.1);
+  border-color: rgba(180, 130, 30, 0.3);
+  color: #92600a;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}

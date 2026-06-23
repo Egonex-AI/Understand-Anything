@@ -1,0 +1,31 @@
+{
+  "name": "fixture-3-cliques",
+  "description": "Three disjoint import cliques for Louvain testing",
+  "languages": ["typescript"],
+  "frameworks": [],
+  "files": [
+    {"path": "src/auth/login.ts", "language": "typescript", "sizeLines": 50, "fileCategory": "code"},
+    {"path": "src/auth/session.ts", "language": "typescript", "sizeLines": 40, "fileCategory": "code"},
+    {"path": "src/auth/tokens.ts", "language": "typescript", "sizeLines": 60, "fileCategory": "code"},
+    {"path": "src/api/handlers.ts", "language": "typescript", "sizeLines": 80, "fileCategory": "code"},
+    {"path": "src/api/middleware.ts", "language": "typescript", "sizeLines": 30, "fileCategory": "code"},
+    {"path": "src/api/routes.ts", "language": "typescript", "sizeLines": 45, "fileCategory": "code"},
+    {"path": "src/db/users.ts", "language": "typescript", "sizeLines": 70, "fileCategory": "code"},
+    {"path": "src/db/queries.ts", "language": "typescript", "sizeLines": 55, "fileCategory": "code"},
+    {"path": "src/db/migrations.ts", "language": "typescript", "sizeLines": 35, "fileCategory": "code"}
+  ],
+  "totalFiles": 9,
+  "filteredByIgnore": 0,
+  "estimatedComplexity": "small",
+  "importMap": {
+    "src/auth/login.ts": ["src/auth/session.ts", "src/auth/tokens.ts"],
+    "src/auth/session.ts": ["src/auth/tokens.ts"],
+    "src/auth/tokens.ts": [],
+    "src/api/handlers.ts": ["src/api/middleware.ts", "src/api/routes.ts"],
+    "src/api/middleware.ts": ["src/api/routes.ts", "src/auth/session.ts"],
+    "src/api/routes.ts": [],
+    "src/db/users.ts": ["src/db/queries.ts", "src/db/migrations.ts"],
+    "src/db/queries.ts": ["src/db/migrations.ts"],
+    "src/db/migrations.ts": []
+  }
+}

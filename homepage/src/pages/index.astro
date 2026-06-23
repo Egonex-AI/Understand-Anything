@@ -1,0 +1,38 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Nav from '../components/Nav.astro';
+import Hero from '../components/Hero.astro';
+import Problem from '../components/Problem.astro';
+import Showcase from '../components/Showcase.astro';
+import CommunityVideo from '../components/CommunityVideo.astro';
+import Features from '../components/Features.astro';
+import Install from '../components/Install.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Layout title="Understand Anything — Graphs that teach the codebase">
+  <Nav />
+  <Hero />
+  <Problem />
+  <Showcase />
+  <CommunityVideo />
+  <Features />
+  <Install />
+  <Footer />
+</Layout>
+
+<script>
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.15 }
+  );
+
+  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+</script>

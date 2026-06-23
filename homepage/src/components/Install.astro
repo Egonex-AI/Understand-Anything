@@ -1,0 +1,148 @@
+<section class="install" id="install">
+  <div class="install-inner reveal">
+    <h2 class="install-title">Get started in <span class="grad">30 seconds</span>.</h2>
+    <div class="install-code">
+      <div class="install-code-header">
+        <span class="install-code-dot"></span>
+        <span class="install-code-label">Claude Code</span>
+        <button class="install-copy" id="copy-btn" type="button" aria-label="Copy to clipboard">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span class="install-copy-label">Copy</span>
+        </button>
+      </div>
+      <pre id="install-snippet"><code><span class="cmd">/plugin marketplace add</span> Egonex-AI/Understand-Anything
+<span class="cmd">/plugin install</span> understand-anything
+<span class="cmd">/understand</span></code></pre>
+    </div>
+    <p class="install-note">Works with <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>OpenCode</strong>, <strong>Gemini CLI</strong>, and more.</p>
+  </div>
+</section>
+
+<script>
+  const btn = document.getElementById('copy-btn');
+  const snippet = document.getElementById('install-snippet');
+  if (btn && snippet) {
+    btn.addEventListener('click', async () => {
+      const text = snippet.textContent || '';
+      await navigator.clipboard.writeText(text.trim());
+      const label = btn.querySelector('.install-copy-label');
+      if (label) {
+        label.textContent = 'Copied!';
+        setTimeout(() => { label.textContent = 'Copy'; }, 2000);
+      }
+    });
+  }
+</script>
+
+<style>
+  .install {
+    padding: 8rem 2rem;
+    text-align: center;
+  }
+
+  .install-inner {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .install-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    color: var(--text);
+    font-weight: 780;
+    margin-bottom: 2.5rem;
+  }
+
+  .install-code {
+    background: var(--surface-dark);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    overflow: hidden;
+    text-align: left;
+    margin-bottom: 1.5rem;
+    box-shadow:
+      0 34px 90px rgba(88, 43, 232, 0.14),
+      0 14px 34px rgba(15, 16, 32, 0.12);
+  }
+
+  .install-code-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .install-code-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-3);
+  }
+
+  .install-code-label {
+    font-size: 0.8rem;
+    color: var(--text-muted-on-dark);
+    font-family: var(--font-code);
+    flex: 1;
+  }
+
+  .install-copy {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.35rem 0.65rem;
+    color: var(--text-muted-on-dark);
+    font-family: var(--font-code);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .install-copy:hover {
+    color: var(--accent);
+    border-color: rgba(139, 92, 246, 0.42);
+  }
+
+  pre {
+    padding: 1.25rem 1.5rem;
+    margin: 0;
+    overflow-x: auto;
+  }
+
+  code {
+    font-family: var(--font-code);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: var(--text-on-dark);
+  }
+
+  .cmd {
+    color: var(--accent);
+  }
+
+  .install-note {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  .install-note strong {
+    color: var(--text);
+  }
+
+  @media (max-width: 480px) {
+    .install { padding: 4.5rem 1.25rem; }
+    .install-title { margin-bottom: 1.75rem; }
+    pre { padding: 1rem 1.1rem; }
+    code { font-size: 0.82rem; line-height: 1.7; }
+    .install-code-header { padding: 0.65rem 0.85rem; }
+    .install-code-label { font-size: 0.72rem; }
+    .install-note { font-size: 0.82rem; line-height: 1.55; }
+  }
+</style>

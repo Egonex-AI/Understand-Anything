@@ -1,0 +1,15 @@
+{
+  "name": "understand-anything",
+  "metadata": {
+    "description": "LLM-powered codebase analysis producing interactive knowledge graphs, guided tours, and deep-dive explanations"
+  },
+  "owner": {
+    "name": "Egonex"
+  },
+  "plugins": [
+    {
+      "name": "understand-anything",
+      "source": "./understand-anything-plugin"
+    }
+  ]
+}
