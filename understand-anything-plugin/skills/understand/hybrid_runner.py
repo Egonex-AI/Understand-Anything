@@ -103,6 +103,12 @@ def call_ollama(prompt: str, timeout: int = HYBRID_TIMEOUT) -> str:
         raise RuntimeError(f"Ollama HTTP {e.code}: {body}") from e
     except TimeoutError:
         raise RuntimeError(f"Ollama request timed out after {timeout}s") from None
+    except urllib.error.URLError as e:
+        # Connection refused (Ollama not running), DNS failures, and many
+        # socket-level timeouts surface here, NOT as HTTPError/TimeoutError.
+        # Convert so run_analyze's `except RuntimeError` writes the empty-batch
+        # fallback instead of crashing the whole hybrid run.
+        raise RuntimeError(f"Ollama unreachable at {OLLAMA_HOST}: {e.reason}") from e
 
 
 def build_gemma_prompt(system: str, user: str) -> str:
@@ -163,9 +169,12 @@ def fix_nodes(nodes: list[dict]) -> list[dict]:
         # Fix: config files that got 'file:' prefix instead of 'config:'
         # If node has fileCategory config but uses file: prefix, normalise
         # (We can infer from tags or name — if tags include 'config' or 'configuration')
+        # Write `type` back unconditionally: a missing key must be populated, not
+        # just an invalid value fixed. `node.get("type", "file")` alone would pass
+        # the validity check while leaving node["type"] unset, dropping the node at
+        # schema validation downstream.
         n_type = node.get("type", "file")
-        if n_type not in VALID_NODE_TYPES:
-            node["type"] = "file"  # fallback
+        node["type"] = n_type if n_type in VALID_NODE_TYPES else "file"
 
         # Fix invalid complexity
         complexity = node.get("complexity", "moderate")
