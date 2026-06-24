@@ -24,7 +24,6 @@ export class GraphQLParser implements AnalyzerPlugin {
 
   private extractDefinitions(content: string): DefinitionInfo[] {
     const definitions: DefinitionInfo[] = [];
-    const lines = content.split("\n");
 
     // Match type, input, enum, interface, union, scalar definitions
     const typeRegex = /^(type|input|enum|interface|union|scalar)\s+(\w+)/gm;

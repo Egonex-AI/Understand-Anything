@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_IGNORE_PATTERNS } from "./ignore-filter.js";
 
@@ -12,23 +12,65 @@ const HEADER = `# .understandignore — patterns for files/dirs to exclude from 
 #
 `;
 
-const DETECTABLE_DIRS = [
-  { dir: "__tests__", pattern: "__tests__/" },
-  { dir: "test", pattern: "test/" },
-  { dir: "tests", pattern: "tests/" },
-  { dir: "fixtures", pattern: "fixtures/" },
-  { dir: "testdata", pattern: "testdata/" },
-  { dir: "docs", pattern: "docs/" },
-  { dir: "examples", pattern: "examples/" },
-  { dir: "scripts", pattern: "scripts/" },
-  { dir: "migrations", pattern: "migrations/" },
-  { dir: ".storybook", pattern: ".storybook/" },
+// Directory names matched case-insensitively against the on-disk entry name.
+// Mixes ecosystem conventions: __tests__ (JS), test/tests (multi), testdata
+// (Go), .storybook (JS), and PascalCase variants (UnitTests/IntegrationTests)
+// commonly seen in C#/.NET projects.
+const EXACT_DIR_NAMES = [
+  "__tests__",
+  "test",
+  "tests",
+  "fixtures",
+  "testdata",
+  "docs",
+  "examples",
+  "scripts",
+  "migrations",
+  ".storybook",
+  "unittests",
+  "integrationtests",
 ];
 
-const GENERIC_SUGGESTIONS = [
-  "*.test.*",
-  "*.spec.*",
-  "*.snap",
+// Directory-name suffixes matched case-insensitively via String.endsWith.
+// Primarily intended for C# / .NET project-suffix conventions like Foo.Tests,
+// Foo.UnitTests, Foo.IntegrationTests, but note the match is unanchored —
+// e.g. a hypothetical `.storybook.tests` would also match. Suggestions stay
+// commented-out so the user reviews before activating.
+const SUFFIX_DIR_GLOBS = [
+  ".tests",
+  ".unittests",
+  ".integrationtests",
+];
+
+// Test file patterns grouped by language. Emitted as commented suggestions
+// with a sub-header per group.
+const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
+  {
+    label: "JS / TS",
+    patterns: ["*.test.*", "*.spec.*", "*.snap"],
+  },
+  {
+    label: "C# / .NET",
+    patterns: [
+      "**/*Tests.cs",
+      "**/*Test.cs",
+      "**/*Fixture.cs",
+      "**/*.Tests.csproj",
+    ],
+  },
+  {
+    label: "Java / Kotlin",
+    patterns: [
+      "**/src/test/**",
+      "**/*Test.java",
+      "**/*IT.java",
+      "**/*Spec.kt",
+    ],
+  },
+  {
+    label: "Go",
+    patterns: ["**/*_test.go"],
+  },
 ];
 
 /**
@@ -54,6 +96,33 @@ function isCoveredByDefaults(pattern: string): boolean {
 }
 
 /**
+ * Detects directories under projectRoot that match either an exact name
+ * (case-insensitive) in EXACT_DIR_NAMES or end with one of SUFFIX_DIR_GLOBS.
+ * Returns patterns using the directory's actual on-disk casing.
+ */
+function detectDirectories(projectRoot: string): string[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(projectRoot, { withFileTypes: true, encoding: "utf-8" });
+  } catch {
+    return [];
+  }
+  const matches: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const lower = entry.name.toLowerCase();
+    if (EXACT_DIR_NAMES.includes(lower)) {
+      matches.push(`${entry.name}/`);
+      continue;
+    }
+    if (SUFFIX_DIR_GLOBS.some((suffix) => lower.endsWith(suffix))) {
+      matches.push(`${entry.name}/`);
+    }
+  }
+  return matches;
+}
+
+/**
  * Generates a starter .understandignore file content by scanning the project
  * for common directories and reading .gitignore patterns.
  * All suggestions are commented out — this is a one-time generation.
@@ -75,14 +144,8 @@ export function generateStarterIgnoreFile(projectRoot: string): string {
     sections.push("");
   }
 
-  // Section 2: detected directories
-  const detected: string[] = [];
-  for (const { dir, pattern } of DETECTABLE_DIRS) {
-    if (existsSync(join(projectRoot, dir))) {
-      detected.push(pattern);
-    }
-  }
-
+  // Section 2: detected directories (case-insensitive + suffix-glob)
+  const detected = detectDirectories(projectRoot);
   if (detected.length > 0) {
     sections.push("# --- Detected directories (uncomment to exclude) ---\n");
     for (const pattern of detected) {
@@ -91,10 +154,13 @@ export function generateStarterIgnoreFile(projectRoot: string): string {
     sections.push("");
   }
 
-  // Section 3: generic test patterns
+  // Section 3: test file patterns, grouped by language
   sections.push("# --- Test file patterns (uncomment to exclude) ---\n");
-  for (const pattern of GENERIC_SUGGESTIONS) {
-    sections.push(`# ${pattern}`);
+  for (const group of TEST_PATTERN_GROUPS) {
+    sections.push(`# ${group.label}`);
+    for (const pattern of group.patterns) {
+      sections.push(`# ${pattern}`);
+    }
   }
   sections.push("");
 

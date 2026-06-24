@@ -23,7 +23,7 @@ export function classifyUpdate(
   totalFilesInGraph: number,
   allKnownFiles: string[] = [],
 ): UpdateDecision {
-  const { newFiles, deletedFiles, structurallyChangedFiles, cosmeticOnlyFiles, unchangedFiles } = analysis;
+  const { newFiles, deletedFiles, structurallyChangedFiles, cosmeticOnlyFiles } = analysis;
   const structuralCount = structurallyChangedFiles.length + newFiles.length + deletedFiles.length;
 
   // No structural changes at all — skip

@@ -12,5 +12,8 @@ __pycache__/
 .worktrees/
 homepage/public/demo/
 .private/
-__pycache__/
+.venv/
+venv/
 *.pyc
+*.pyo
+Thumbs.db

@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   validateGraph,
-  normalizeGraph,
   sanitizeGraph,
   autoFixGraph,
   NODE_TYPE_ALIASES,

@@ -4,7 +4,6 @@ description: |
   Analyzes batches of source files to produce knowledge graph nodes and edges.
   Extracts file structure, functions, classes, and relationships using a two-phase
   approach: structural extraction script followed by LLM semantic analysis.
-model: inherit
 ---
 
 # File Analyzer
@@ -51,6 +50,18 @@ cat > $PROJECT_ROOT/.understand-anything/tmp/ua-file-analyzer-input-<batchIndex>
 }
 ENDJSON
 ```
+
+### Cross-batch context (neighborMap)
+
+Your dispatch prompt includes a `neighborMap` — for each file in your batch, it lists project-internal neighbors in OTHER batches (files that import yours or that you import), with their exported symbols.
+
+Use neighborMap as a confidence boost for cross-batch edges (`calls`, `related`, `inherits`, `implements` to nodes outside your batch):
+
+- If your source clearly references a symbol that appears in some `neighbor.symbols`, emit the edge to `function:<neighbor.path>:<symbol>` or `class:<neighbor.path>:<symbol>` with confidence.
+- If your source references a cross-batch symbol that is NOT in neighborMap (the project-scanner may not have extracted it), you may still emit the edge if you saw it explicitly in the imported file's surface — but prefer matching neighborMap symbols when available.
+- Imports continue to use `batchImportData` (fully resolved), not neighborMap.
+
+The merge script's dangling-edge dropper is the safety net for genuinely unresolvable targets.
 
 ### Step 2 — Execute the bundled extraction script
 
@@ -464,12 +475,46 @@ Use these hints for common edge patterns:
 - NEVER create self-referencing edges (where source equals target).
 - Trust the script's structural extraction. Do NOT re-read source files to re-extract functions, classes, or imports that the script already captured. Only re-read a file if you need deeper understanding for writing a summary.
 
-## Writing Results
+## Writing Results — single or multi-part
 
-After producing the JSON:
+### Output File Naming — STRICT
 
-1. Write the JSON to: `<project-root>/.understand-anything/intermediate/batch-<batchIndex>.json`
-2. The project root and batch index will be provided in your prompt.
-3. Respond with ONLY a brief text summary: number of nodes created (by type), number of edges created, and any files that were skipped.
+**For EVERY batch in your input, write a separate output file using ONLY one of these two filename patterns:**
 
-Do NOT include the full JSON in your text response.
+- `batch-<batchIndex>.json` — single-part output for batch `<batchIndex>`
+- `batch-<batchIndex>-part-<k>.json` — multi-part output when `nodes > 60` or `edges > 120` (per Step B below)
+
+`<batchIndex>` is the **ORIGINAL integer batch index** from the input `batches.json`. Even if your dispatch prompt fused multiple batches into one call (e.g., for token efficiency — input may be labeled `fused-8-13` or contain `batches: [{batchIndex: 8}, {batchIndex: 9}, ...]`), you MUST split your output back into per-batch files using each original `batchIndex`.
+
+**NEVER use these patterns:** `batch-fused-*`, `batch-merged-*`, `batch-N-M-*` (range like `batch-8-13.json`), `batches-*`, or any other variant. The downstream merge script (`merge-batch-graphs.py`) requires the regex `batch-(\d+)(?:-part-(\d+))?\.json` — anything else is **silently dropped from the final graph**, losing every node and edge in that file with no error.
+
+**Example.** If your input contained 6 batches (indices 8 through 13), you write EXACTLY 6 output files: `batch-8.json`, `batch-9.json`, `batch-10.json`, `batch-11.json`, `batch-12.json`, `batch-13.json`. Not one combined `batch-fused-8-13.json`. Not one `batch-8-13.json`. Six files, one per original `batchIndex`. Run Steps A–F below independently for each batch's nodes/edges.
+
+**Step A — Compute totals.**
+```
+nodeCount = nodes.length
+edgeCount = edges.length
+```
+
+**Step B — Decide split.**
+- If `nodeCount ≤ 60` AND `edgeCount ≤ 120`: write ONE file to `.understand-anything/intermediate/batch-<batchIndex>.json`. Done. Skip to Step F.
+- Otherwise: `parts = ceil(max(nodeCount / 60, edgeCount / 120))`.
+
+**Step C — Partition.**
+Sort files in your batch alphabetically by path. Chunk them sequentially into `parts` groups of size `ceil(N / parts)`. For each part:
+- All nodes whose `filePath` is in this part's files (for non-file nodes like `module`/`concept`, use the file they belong to).
+- All edges whose `source` is in this part's nodes (target may be anywhere — same part, different part of same batch, different batch).
+
+**Step D — Write each part.**
+Write part `k` (1-indexed) to `.understand-anything/intermediate/batch-<batchIndex>-part-<k>.json`. Each part is a valid GraphFragment: `{ "nodes": [...], "edges": [...] }`.
+
+**Step E — Self-validate.**
+For each file written, verify:
+- Valid JSON.
+- `nodes` array exists and is well-formed.
+- For every edge: `source` and `target` both appear as either (a) a node `id` in this part's nodes, OR (b) a `file:<path>` reference where `<path>` is in `neighborMap` or `batchImportData`, OR (c) a `function:<path>:<symbol>` / `class:<path>:<symbol>` reference where `<symbol>` is in some `neighbor.symbols`.
+
+If validation fails on a part, do NOT silently rebuild. Respond with an explicit error stating which part failed, which edge(s) failed validation, and why. The dispatching session can then retry.
+
+**Step F — Respond.**
+Respond with ONLY a brief text summary: parts written (1 or more), total nodes/edges across all parts, any files skipped. Do NOT include JSON content in the response.

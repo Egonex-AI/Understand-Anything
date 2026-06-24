@@ -11,11 +11,13 @@ Analyze the current code changes against the knowledge graph at `.understand-any
 
 The knowledge graph JSON has this structure:
 - `project` — {name, description, languages, frameworks, analyzedAt, gitCommitHash}
-- `nodes[]` — each has {id, type, name, filePath, summary, tags[], complexity, languageNotes?}
-  - Node types: file, function, class, module, concept
-  - IDs: `file:path`, `function:path:name`, `class:path:name`
+- `nodes[]` — each has {id, type, name, filePath?, summary, tags[], complexity, languageNotes?}
+  - Code node types: file, function, class, module, concept
+  - Non-code node types: config, document, service, table, endpoint, pipeline, schema, resource
+  - Domain/knowledge node types: domain, flow, step, article, entity, topic, claim, source
+  - IDs use the node type as prefix, e.g. `file:path`, `function:path:name`, `config:path`, `article:path`
 - `edges[]` — each has {source, target, type, direction, weight}
-  - Key types: imports, contains, calls, depends_on
+  - Key types: imports, contains, calls, depends_on, configures, documents, deploys, triggers, contains_flow, flow_step, related, cites
 - `layers[]` — each has {id, name, description, nodeIds[]}
 - `tour[]` — each has {order, title, description, nodeIds[]}
 
@@ -39,7 +41,7 @@ The knowledge graph JSON has this structure:
 
 4. **Find nodes for changed files** — for each changed file path, use Grep to search the knowledge graph for:
    - Nodes with matching `"filePath"` values (e.g., `grep "changed/file/path"`)
-   - This finds file nodes AND function/class nodes defined in those files
+   - This finds file-level nodes (including non-code types) AND function/class nodes defined in those files
    - Note the `id` values of all matched nodes
 
 5. **Find connected edges (1-hop)** — for each matched node ID, Grep for that ID in the edges to find:

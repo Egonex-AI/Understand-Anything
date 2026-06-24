@@ -15,7 +15,6 @@ const require = createRequire(import.meta.url);
 
 type TreeSitterParser = import("web-tree-sitter").Parser;
 type TreeSitterLanguage = import("web-tree-sitter").Language;
-type TreeSitterNode = import("web-tree-sitter").Node;
 
 /**
  * Config-driven tree-sitter plugin.

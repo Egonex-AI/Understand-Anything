@@ -4,7 +4,7 @@
     "description": "LLM-powered codebase analysis producing interactive knowledge graphs, guided tours, and deep-dive explanations"
   },
   "owner": {
-    "name": "Lum1104"
+    "name": "Egonex"
   },
   "plugins": [
     {

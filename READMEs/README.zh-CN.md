@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Lum1104%2FUnderstand-Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+  <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
 <p align="center">
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="#-快速开始"><img src="https://img.shields.io/badge/快速开始-blue" alt="Quick Start" /></a>
-  <a href="https://github.com/Lum1104/Understand-Anything/blob/main/LICENSE"><img src="https://img.shields.io/badge/许可证-MIT-yellow" alt="License: MIT" /></a>
+  <a href="https://github.com/Egonex-AI/Understand-Anything/blob/main/LICENSE"><img src="https://img.shields.io/badge/许可证-MIT-yellow" alt="License: MIT" /></a>
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-8A2BE2" alt="Claude Code" /></a>
   <a href="#codex"><img src="https://img.shields.io/badge/Codex-000000" alt="Codex" /></a>
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
@@ -31,9 +31,9 @@
 </p>
 
 <p align="center">
-  <strong>💬 <a href="https://discord.gg/pydat66RY">加入 Discord 社区 &rarr;</a></strong>
+  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
   <br />
-  <em>来提问、分享你的项目、和社区一起讨论。</em>
+  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
 </p>
 
 ---
@@ -103,9 +103,11 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 ### 1. 安装插件
 
 ```bash
-/plugin marketplace add Lum1104/Understand-Anything
+/plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
 ```
+
+> **使用本地模型？** 出于隐私或企业需求，可以将你的平台指向本地模型提供方，例如 [Ollama](https://docs.ollama.com/integrations) —— 按照其集成指南更改模型提供方。
 
 ### 2. 分析你的代码库
 
@@ -114,6 +116,8 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 ```
 
 多智能体（multi-agent）架构会：扫描你的项目，提取函数 / 类 / 依赖，构建知识图谱保存至`.understand-anything/knowledge-graph.json`.
+
+> **关于 Token 消耗的提醒：** 首次运行 `/understand` 会分析整个代码库，在大型项目上可能消耗大量 token。建议在有 token 套餐 / 订阅的情况下运行，或在初始化时使用本地模型（见上文）。后续运行默认是增量式的——只重新分析变更过的文件——因此消耗的 token 大幅减少。
 
 **本地化输出：** 使用 `--language` 参数生成中文内容：
 
@@ -157,6 +161,15 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 
 # 分析 Karpathy 模式的 LLM Wiki 知识库
 /understand-knowledge ~/path/to/wiki
+
+# 直接重跑即可 —— 默认增量更新，只分析变更的文件
+/understand
+
+# 安装 post-commit 钩子，每次提交自动增量更新
+/understand --auto-update
+
+# 大型 monorepo？把分析范围限定到某个子目录
+/understand src/frontend
 ```
 
 ---
@@ -168,33 +181,35 @@ Understand-Anything 可在多个 AI 编码平台上运行。
 ### Claude Code（原生）
 
 ```bash
-/plugin marketplace add Lum1104/Understand-Anything
+/plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
 ```
 
-### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI）
+### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro）
 
 **macOS / Linux：**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
 # 也可以直接传入平台名跳过交互提示：
-curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
 ```
 
 **Windows（PowerShell）：**
 ```powershell
-iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
 ```
 
 安装脚本会将仓库克隆到 `~/.understand-anything/repo`，并为所选平台创建相应的符号链接。安装完成后请重启 CLI 或 IDE。
 
-- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`
+- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
 - 后续更新：`./install.sh --update`
 - 卸载：`./install.sh --uninstall <platform>`
 
 ### Cursor
 
 克隆此仓库后，Cursor 会自动通过 `.cursor-plugin/plugin.json`文件发现插件。无需手动安装 — 只需克隆并在 Cursor 中打开即可。
+
+若自动发现未生效，可手动安装：打开 **Cursor Settings → Plugins**，在搜索框中粘贴 `https://github.com/Egonex-AI/Understand-Anything` 并添加。
 
 ### VS Code + GitHub Copilot
 
@@ -205,8 +220,20 @@ iwr -useb https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/ins
 ### Copilot CLI
 
 ```bash
-copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
+copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 ```
+
+### Kiro CLI / IDE
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
+```
+
+安装完成后：
+- **Kiro CLI**：`kiro-cli chat --agent understand "分析这个项目"`
+- **Kiro IDE**：技能会被符号链接到 `~/.kiro/skills/`，`understand` agent 会被写入 `~/.kiro/agents/understand.json`，重启 IDE 后两者均可使用。
+
+若需要在所有项目中使用（个人技能），运行上面的 `install.sh` 并选择 `kiro` 平台即可。
 
 ### 多平台兼容
 
@@ -226,6 +253,8 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 | Hermes | ✅ 支持 | `install.sh hermes` |
 | Cline | ✅ 支持 | `install.sh cline` |
 | KIMI CLI | ✅ 支持 | `install.sh kimi` |
+| Nanobot | ✅ 支持 | `install.sh nanobot` |
+| Kiro CLI / IDE | ✅ 支持 | `install.sh kiro` |
 
 ---
 
@@ -233,7 +262,7 @@ copilot plugin install Lum1104/Understand-Anything:understand-anything-plugin
 
 图谱就是一份 JSON 文件——**提交一次，团队成员就可以跳过整条流水线**。适合新人上手、PR 评审和 docs-as-code 工作流。
 
-> **示例：** [GoogleCloudPlatform/microservices-demo（fork）](https://github.com/Lum1104/microservices-demo) —— 包含已提交图谱的 Go / Java / Python / Node 多语言参考项目。
+> **示例：** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) —— 包含已提交图谱的 Go / Java / Python / Node 多语言参考项目。
 
 **需要提交的内容：** `.understand-anything/` 下的全部文件，*除了* `intermediate/` 和 `diff-overlay.json`（这些是本地临时文件）。
 
@@ -255,6 +284,15 @@ git add .gitattributes .understand-anything/
 ---
 
 ## 🔧 技术原理
+
+### Tree-sitter + LLM 混合分析
+
+把确定性的事情交给静态分析，把需要语义理解的事情交给 LLM：
+
+- **Tree-sitter（确定性）** —— 将源码解析为具体语法树，提取结构性事实：导入、导出、函数 / 类定义、调用点、继承关系。在 scan 阶段预先解析为 `importMap` 并传给 file-analyzer，避免它们再从源码推导一次 import。同样的输入永远得到同样的输出，并作为增量更新的指纹基础。
+- **LLM（语义）** —— 读取解析后的结构以及原始源码，生成解析器做不了的事：plain-English 摘要、标签、架构层归属、业务领域映射、引导路径、语言概念标注。
+
+正因为这个分工，图谱在结构层面是可复现的（同样的代码总是产生同样的边），同时在语义层面又能捕捉意图（一个文件是「为了什么」存在，而不仅仅是它 import 了什么）。
 
 ### 多智能体架构
 
@@ -307,11 +345,11 @@ git add .gitattributes .understand-anything/
 
 ## Star 历史记录
 
-<a href="https://www.star-history.com/?repos=Lum1104%2FUnderstand-Anything&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=Egonex-AI%2FUnderstand-Anything&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=Lum1104/Understand-Anything&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=Egonex-AI/Understand-Anything&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=Egonex-AI/Understand-Anything&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=Egonex-AI/Understand-Anything&type=date&legend=top-left" />
  </picture>
 </a>
 
@@ -320,5 +358,5 @@ git add .gitattributes .understand-anything/
 </p>
 
 <p align="center">
-  MIT 许可证 &copy; <a href="https://github.com/Lum1104">Lum1104</a>
+  MIT License &copy; Yuxiang Lin and Infinite Universe, Inc.
 </p>

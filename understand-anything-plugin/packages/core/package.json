@@ -37,6 +37,8 @@
     "vitest": "^3.1.0"
   },
   "dependencies": {
+    "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
+    "@understand-anything/tree-sitter-dart-wasm": "workspace:*",
     "fuse.js": "^7.1.0",
     "ignore": "^7.0.5",
     "tree-sitter-c-sharp": "^0.23.1",

@@ -199,7 +199,7 @@ function injectTier3Node(node) {
   }
 }
 
-function injectTier3Edge(edge, validNodeIds) {
+function injectTier3Edge(edge, _validNodeIds) {
   const r = Math.random();
   if (r < 0.4) {
     edge.target = "nonexistent-node-999999";

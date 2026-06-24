@@ -82,7 +82,7 @@ async function main() {
     let content;
     try {
       content = readFileSync(absolutePath, 'utf-8');
-    } catch (err) {
+    } catch {
       filesSkipped.push(file.path);
       continue;
     }

@@ -3,7 +3,6 @@ import {
   parsePluginConfig,
   serializePluginConfig,
   type PluginConfig,
-  type PluginEntry,
   DEFAULT_PLUGIN_CONFIG,
 } from "../plugins/discovery.js";
 

@@ -466,7 +466,7 @@ export function normalizeGraph(data: unknown): unknown {
   const result = { ...d };
 
   if (Array.isArray(d.nodes)) {
-    result.nodes = (d.nodes as any[]).map((node) => {
+    result.nodes = (d.nodes as Array<Record<string, unknown>>).map((node) => {
       if (
         typeof node === "object" &&
         node !== null &&
@@ -480,7 +480,7 @@ export function normalizeGraph(data: unknown): unknown {
   }
 
   if (Array.isArray(d.edges)) {
-    result.edges = (d.edges as any[]).map((edge) => {
+    result.edges = (d.edges as Array<Record<string, unknown>>).map((edge) => {
       if (
         typeof edge === "object" &&
         edge !== null &&

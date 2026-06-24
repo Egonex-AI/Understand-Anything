@@ -7,10 +7,10 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
 <section class="showcase showcase--demo">
   <span class="showcase-label showcase-label--accent reveal">Live Demo</span>
   <h2 class="showcase-heading reveal">
-    See what your code is <span style="display:inline;background:linear-gradient(135deg,#b8865c,#d4a574);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">really</span> doing
+    See what your code is <span class="grad">really</span> doing
   </h2>
   <p class="showcase-desc showcase-desc--wide reveal">
-    Explore every file, function, and dependency &mdash; or switch to <span style="display:inline;background:linear-gradient(135deg,#b8865c,#d4a574);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">business
+    Explore every file, function, and dependency &mdash; or switch to <span class="grad">business
     knowledge</span> mode and watch your code transform into authentication flows,
     payment pipelines, and user lifecycles. Not just a map.
     <strong>The story behind your codebase, fully interactive.</strong>
@@ -71,8 +71,11 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
   }
 
   .showcase-label--accent {
-    color: #d4a574;
-    border-color: rgba(212, 165, 116, 0.3);
+    color: var(--accent);
+    border-color: rgba(88, 43, 232, 0.2);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px) saturate(1.12);
   }
 
   /* Heading */
@@ -80,6 +83,7 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
     font-family: var(--font-heading);
     font-size: clamp(1.75rem, 4.5vw, 3rem);
     color: var(--text);
+    font-weight: 780;
     margin-bottom: 1.5rem;
     line-height: 1.2;
   }
@@ -106,15 +110,15 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
     border-radius: 12px;
     overflow: hidden;
     background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    box-shadow: var(--shadow-soft);
   }
 
   .showcase-frame--featured {
-    border-color: rgba(212, 165, 116, 0.2);
+    border-color: rgba(255, 255, 255, 0.9);
     box-shadow:
-      0 0 60px rgba(212, 165, 116, 0.1),
-      0 30px 60px rgba(0, 0, 0, 0.5);
+      0 34px 90px rgba(88, 43, 232, 0.16),
+      0 14px 34px rgba(15, 16, 32, 0.1);
   }
 
   .showcase-titlebar {
@@ -122,8 +126,8 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
     align-items: center;
     gap: 6px;
     padding: 10px 14px;
-    background: rgba(20, 20, 20, 0.8);
-    border-bottom: 1px solid var(--border);
+    background: rgba(16, 19, 29, 0.86);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   }
 
   .showcase-titlebar-text {
@@ -131,7 +135,7 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
     text-align: center;
     font-family: var(--font-code);
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--text-muted-on-dark);
     margin-right: 30px; /* offset for dots */
   }
 
@@ -180,17 +184,18 @@ const demoUrl = `${base.endsWith('/') ? base : base + '/'}demo/index.html`;
   .showcase-pill {
     font-family: var(--font-code);
     font-size: 0.8rem;
-    color: #8a8578;
+    color: var(--text-muted);
     padding: 0.4rem 1rem;
-    border: 1px solid rgba(138, 133, 120, 0.25);
+    border: 1px solid rgba(88, 43, 232, 0.14);
     border-radius: 100px;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(12px);
   }
 
   .showcase-pill--accent {
-    color: #d4a574;
-    border-color: rgba(212, 165, 116, 0.3);
-    background: rgba(212, 165, 116, 0.06);
+    color: var(--accent);
+    border-color: rgba(88, 43, 232, 0.2);
+    background: rgba(88, 43, 232, 0.07);
   }
 
   /* Responsive */

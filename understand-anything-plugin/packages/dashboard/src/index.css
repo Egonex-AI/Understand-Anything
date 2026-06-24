@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "./**/*.{ts,tsx,js,jsx,html}";
+@source "../index.html";
 
 @theme {
   /* Base */

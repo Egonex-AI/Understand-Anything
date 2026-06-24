@@ -1,10 +1,10 @@
 <section class="problem">
   <h2 class="problem-heading reveal">
-    Most code graphs show you <span style="display:inline;background:linear-gradient(135deg,#c9867a,#b8865c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">structure</span>.<br />
+    Most code graphs show you <span class="grad">structure</span>.<br />
     Files, functions, edges. A map with no legend.
   </h2>
   <p class="problem-promise reveal">
-    We show you <span style="display:inline;background:linear-gradient(135deg,#b8865c,#d4a574);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">meaning</span> &mdash;
+    We show you <span class="grad">meaning</span> &mdash;
     how your code maps to real business domains, processes, and flows.
   </p>
 
@@ -72,16 +72,18 @@
 
 <style>
   .problem {
-    padding: 8rem 2rem 10rem;
+    padding: 7rem 2rem 9rem;
     max-width: 1100px;
     margin: 0 auto;
     text-align: center;
+    position: relative;
   }
 
   .problem-heading {
     font-family: var(--font-heading);
     font-size: clamp(1.5rem, 4vw, 2.5rem);
-    color: var(--text-muted);
+    color: var(--text-soft);
+    font-weight: 760;
     line-height: 1.4;
     margin-bottom: 1.5rem;
   }
@@ -90,6 +92,7 @@
     font-family: var(--font-heading);
     font-size: clamp(1.3rem, 3.5vw, 2.2rem);
     color: var(--text);
+    font-weight: 760;
     line-height: 1.4;
     max-width: 700px;
     margin: 0 auto 4rem;
@@ -110,21 +113,26 @@
   }
 
   .problem-card {
-    border-radius: 16px;
+    border-radius: 22px;
     padding: 2rem;
-    border: 1px solid var(--border);
-    transition: border-color 0.3s ease;
+    border: 1px solid rgba(232, 225, 255, 0.85);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px) saturate(1.12);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   }
 
   .problem-card--them {
-    background: var(--surface);
-    opacity: 0.7;
+    background: rgba(255, 255, 255, 0.56);
   }
 
   .problem-card--us {
-    background: var(--surface);
-    border-color: rgba(212, 165, 116, 0.2);
-    box-shadow: 0 0 40px var(--accent-glow);
+    background: rgba(255, 255, 255, 0.82);
+    border-color: rgba(88, 43, 232, 0.2);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .problem-card:hover {
+    transform: translateY(-3px);
   }
 
   .problem-card-label {
@@ -146,6 +154,10 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 1.5rem;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(88, 43, 232, 0.08), transparent 12rem),
+      rgba(248, 248, 253, 0.52);
+    border-radius: 16px;
   }
 
   /* Hairball SVG */
@@ -157,13 +169,13 @@
 
   .hairball circle {
     fill: var(--text-muted);
-    opacity: 0.5;
+    opacity: 0.45;
   }
 
   .hairball line {
     stroke: var(--text-muted);
     stroke-width: 0.8;
-    opacity: 0.25;
+    opacity: 0.22;
   }
 
   /* Domain preview */
@@ -182,8 +194,8 @@
   }
 
   .domain-badge {
-    background: linear-gradient(135deg, rgba(201, 134, 122, 0.15), rgba(212, 165, 116, 0.15));
-    border: 1px solid rgba(212, 165, 116, 0.3);
+    background: linear-gradient(135deg, rgba(88, 43, 232, 0.1), rgba(139, 92, 246, 0.12));
+    border: 1px solid rgba(88, 43, 232, 0.18);
     color: var(--text);
     font-weight: 600;
     font-size: 0.85rem;
@@ -196,7 +208,7 @@
     font-size: 0.8rem;
     color: var(--text-muted);
     padding: 0.3rem 0.6rem;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(88, 43, 232, 0.045);
     border-radius: 4px;
   }
 

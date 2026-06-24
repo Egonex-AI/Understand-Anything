@@ -64,16 +64,19 @@ const features = [
     display: flex;
     align-items: flex-start;
     gap: 1.25rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(232, 225, 255, 0.85);
+    border-radius: 22px;
     padding: 2rem;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px) saturate(1.12);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
   }
 
   .feature-card:hover {
-    border-color: rgba(212, 165, 116, 0.25);
-    box-shadow: 0 0 24px var(--accent-glow);
+    border-color: rgba(88, 43, 232, 0.24);
+    box-shadow: 0 22px 54px rgba(88, 43, 232, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    transform: translateY(-3px);
   }
 
   .feature-icon {
@@ -90,6 +93,7 @@ const features = [
     font-family: var(--font-heading);
     font-size: 1.2rem;
     color: var(--text);
+    font-weight: 760;
     margin-bottom: 0.5rem;
   }
 

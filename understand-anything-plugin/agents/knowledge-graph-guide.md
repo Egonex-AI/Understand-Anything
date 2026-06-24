@@ -5,7 +5,6 @@ description: |
   with an Understand-Anything knowledge graph. Guides users through graph
   structure, node/edge relationships, layer architecture, tours, and
   dashboard usage.
-model: inherit
 ---
 
 You are an expert on Understand-Anything knowledge graphs. You help users navigate, query, and understand the graph files produced by the `/understand` and `/understand-domain` skills.

@@ -95,6 +95,106 @@ describe("generateStarterIgnoreFile", () => {
     expect(content).not.toContain("# fixtures/");
   });
 
+  describe("multi-language test directory detection", () => {
+    it("suggests PascalCase Tests/ via case-insensitive match", () => {
+      mkdirSync(join(testDir, "Tests"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      // On-disk casing is preserved in the suggestion.
+      expect(content).toContain("# Tests/");
+    });
+
+    it("suggests UnitTests/ via case-insensitive match", () => {
+      mkdirSync(join(testDir, "UnitTests"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# UnitTests/");
+    });
+
+    it("suggests IntegrationTests/ via case-insensitive match", () => {
+      mkdirSync(join(testDir, "IntegrationTests"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# IntegrationTests/");
+    });
+
+    it("suggests C# project-suffix .Tests/ directories", () => {
+      mkdirSync(join(testDir, "MyApp.Tests"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# MyApp.Tests/");
+    });
+
+    it("suggests C# project-suffix .UnitTests/ directories", () => {
+      mkdirSync(join(testDir, "MyApp.UnitTests"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# MyApp.UnitTests/");
+    });
+
+    it("suggests C# project-suffix .IntegrationTests/ directories", () => {
+      mkdirSync(join(testDir, "MyApp.IntegrationTests"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# MyApp.IntegrationTests/");
+    });
+
+    it("ignores files that happen to share a detected name", () => {
+      writeFileSync(join(testDir, "tests"), "not a directory");
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).not.toContain("# tests/");
+    });
+  });
+
+  describe("language-grouped test file patterns", () => {
+    it("includes C# / .NET test file patterns", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# C# / .NET");
+      expect(content).toContain("# **/*Tests.cs");
+      expect(content).toContain("# **/*Test.cs");
+      expect(content).toContain("# **/*Fixture.cs");
+      expect(content).toContain("# **/*.Tests.csproj");
+    });
+
+    it("includes Java / Kotlin test file patterns", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# Java / Kotlin");
+      expect(content).toContain("# **/*Test.java");
+      expect(content).toContain("# **/*IT.java");
+      expect(content).toContain("# **/*Spec.kt");
+      expect(content).toContain("# **/src/test/**");
+    });
+
+    it("includes Go test file patterns", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# Go");
+      expect(content).toContain("# **/*_test.go");
+    });
+
+    it("groups patterns under the JS / TS sub-header", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# JS / TS");
+    });
+
+    it("emits language groups in stable order: JS, C#, Java, Go", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      const jsIdx = content.indexOf("# JS / TS");
+      const csIdx = content.indexOf("# C# / .NET");
+      const javaIdx = content.indexOf("# Java / Kotlin");
+      const goIdx = content.indexOf("# Go");
+      expect(jsIdx).toBeGreaterThan(-1);
+      expect(csIdx).toBeGreaterThan(jsIdx);
+      expect(javaIdx).toBeGreaterThan(csIdx);
+      expect(goIdx).toBeGreaterThan(javaIdx);
+    });
+
+    it("keeps all suggestions commented even with no detected dirs and no .gitignore", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      const uncommented = content.split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+      expect(uncommented).toHaveLength(0);
+    });
+
+    it("ignores a file whose name would match a suffix-glob", () => {
+      writeFileSync(join(testDir, "MyApp.Tests"), "not a directory");
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).not.toContain("# MyApp.Tests/");
+    });
+  });
+
   describe(".gitignore integration", () => {
     it("includes .gitignore patterns not covered by defaults", () => {
       writeFileSync(join(testDir, ".gitignore"), ".env\nsecrets/\n*.pyc\n");

@@ -1,10 +1,10 @@
 ---
-const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 ---
 
 <nav class="nav" id="nav">
   <div class="nav-inner">
-    <a href="/" class="nav-logo">Understand Anything</a>
+    <a href="/" class="nav-logo">EgonexAI</a>
     <div class="nav-links">
       <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="nav-github">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
@@ -38,9 +38,21 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
   }
 
   .nav.scrolled {
-    background-color: rgba(10, 10, 10, 0.85);
+    background-color: rgba(255, 255, 255, 0.82);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
+  }
+
+  .nav.scrolled .nav-logo {
+    color: var(--text);
+  }
+
+  .nav.scrolled .nav-github {
+    color: var(--text-muted);
+  }
+
+  .nav.scrolled .nav-github:hover {
+    color: var(--text);
   }
 
   .nav-inner {
@@ -49,6 +61,7 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
   }
 
   .nav-logo {
@@ -56,6 +69,7 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
     font-size: 1.25rem;
     color: var(--text);
     text-decoration: none;
+    min-width: 0;
   }
 
   .nav-logo:hover {
@@ -86,7 +100,7 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
 
   .nav-cta {
     background: var(--accent);
-    color: var(--bg);
+    color: #ffffff;
     padding: 0.5rem 1.25rem;
     border-radius: 6px;
     font-weight: 600;
@@ -103,5 +117,17 @@ const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
   @media (max-width: 480px) {
     .nav { padding: 0.75rem 1rem; }
     .nav-github span { display: none; }
+  }
+
+  @media (max-width: 540px) {
+    .nav { padding: 0.75rem 1rem; }
+    .nav-logo { font-size: 1.05rem; }
+    .nav-links { gap: 0.85rem; }
+    .nav-github span { display: none; }
+    .nav-cta {
+      padding: 0.48rem 0.85rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
   }
 </style>

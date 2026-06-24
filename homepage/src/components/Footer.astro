@@ -1,7 +1,5 @@
 ---
-const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
-const discordUrl = 'https://discord.gg/pydat66RY';
-const contactEmail = 'lum@understand-anything.com';
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 ---
 
 <footer class="footer">
@@ -10,15 +8,12 @@ const contactEmail = 'lum@understand-anything.com';
     <div class="footer-links">
       <a href={githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>
       <span class="footer-sep">&middot;</span>
-      <a href={discordUrl} target="_blank" rel="noopener noreferrer">Discord</a>
-      <span class="footer-sep">&middot;</span>
       <a href="/demo/">Live Demo</a>
-      <span class="footer-sep">&middot;</span>
-      <a href={`mailto:${contactEmail}`}>Contact</a>
       <span class="footer-sep">&middot;</span>
       <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">MIT License</a>
     </div>
-    <p class="footer-note">Graphs that teach. Built for AI coding assistants.</p>
+    <p class="footer-note">An open-source project from Egonex. Originally created by Lum1104.</p>
+    <p class="footer-note">&copy; 2026 Infinite Universe, Inc.</p>
   </div>
 </footer>
 
@@ -73,6 +68,16 @@ const contactEmail = 'lum@understand-anything.com';
   .footer-note {
     font-size: 0.8rem;
     color: var(--text-muted);
+    margin: 0.25rem 0;
+  }
+
+  .footer-note a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .footer-note a:hover {
+    text-decoration: underline;
   }
 
   @media (max-width: 480px) {

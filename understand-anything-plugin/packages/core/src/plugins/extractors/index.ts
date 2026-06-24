@@ -9,6 +9,8 @@ export { RubyExtractor } from "./ruby-extractor.js";
 export { PhpExtractor } from "./php-extractor.js";
 export { CppExtractor } from "./cpp-extractor.js";
 export { CSharpExtractor } from "./csharp-extractor.js";
+export { DartExtractor } from "./dart-extractor.js";
+export { KotlinExtractor } from "./kotlin-extractor.js";
 
 import type { LanguageExtractor } from "./types.js";
 import { TypeScriptExtractor } from "./typescript-extractor.js";
@@ -20,6 +22,8 @@ import { RubyExtractor } from "./ruby-extractor.js";
 import { PhpExtractor } from "./php-extractor.js";
 import { CppExtractor } from "./cpp-extractor.js";
 import { CSharpExtractor } from "./csharp-extractor.js";
+import { DartExtractor } from "./dart-extractor.js";
+import { KotlinExtractor } from "./kotlin-extractor.js";
 
 export const builtinExtractors: LanguageExtractor[] = [
   new TypeScriptExtractor(),
@@ -31,4 +35,6 @@ export const builtinExtractors: LanguageExtractor[] = [
   new PhpExtractor(),
   new CppExtractor(),
   new CSharpExtractor(),
+  new DartExtractor(),
+  new KotlinExtractor(),
 ];

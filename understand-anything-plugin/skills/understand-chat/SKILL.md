@@ -12,11 +12,13 @@ Answer questions about this codebase using the knowledge graph at `.understand-a
 
 The knowledge graph JSON has this structure:
 - `project` — {name, description, languages, frameworks, analyzedAt, gitCommitHash}
-- `nodes[]` — each has {id, type, name, filePath, summary, tags[], complexity, languageNotes?}
-  - Node types: file, function, class, module, concept
-  - IDs: `file:path`, `function:path:name`, `class:path:name`
+- `nodes[]` — each has {id, type, name, filePath?, summary, tags[], complexity, languageNotes?}
+  - Code node types: file, function, class, module, concept
+  - Non-code node types: config, document, service, table, endpoint, pipeline, schema, resource
+  - Domain/knowledge node types: domain, flow, step, article, entity, topic, claim, source
+  - IDs use the node type as prefix, e.g. `file:path`, `function:path:name`, `config:path`, `article:path`
 - `edges[]` — each has {source, target, type, direction, weight}
-  - Key types: imports, contains, calls, depends_on
+  - Key types: imports, contains, calls, depends_on, configures, documents, deploys, triggers, contains_flow, flow_step, related, cites
 - `layers[]` — each has {id, name, description, nodeIds[]}
 - `tour[]` — each has {order, title, description, nodeIds[]}
 

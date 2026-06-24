@@ -22,7 +22,6 @@ export class SQLParser implements AnalyzerPlugin {
 
   private extractDefinitions(content: string): DefinitionInfo[] {
     const definitions: DefinitionInfo[] = [];
-    const lines = content.split("\n");
 
     // Match CREATE TABLE statements
     const tableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:`|")?(\w+)(?:`|")?/gi;

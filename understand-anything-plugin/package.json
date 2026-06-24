@@ -1,15 +1,17 @@
 {
   "name": "@understand-anything/skill",
-  "version": "2.7.4",
+  "version": "2.8.1",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run"
+    "test": "node -e \"console.log('skill tests live at <repo-root>/tests/skill — run via root \\`pnpm test\\`')\""
   },
   "dependencies": {
-    "@understand-anything/core": "workspace:*"
+    "@understand-anything/core": "workspace:*",
+    "graphology": "~0.26.0",
+    "graphology-communities-louvain": "^2.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
