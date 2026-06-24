@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 41 built-in language configs", () => {
+    it("registers all 42 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(41);
+      expect(all.length).toBe(42);
     });
 
     it("maps all expected extensions", () => {
