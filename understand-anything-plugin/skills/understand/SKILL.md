@@ -218,7 +218,7 @@ Set up and verify the `.understandignore` file before scanning.
 
 Report to the user: `[Phase 1/7] Scanning project files...`
 
-Dispatch a subagent using the `project-scanner` agent definition (at `agents/project-scanner.md`). Append the following additional context:
+Dispatch a subagent with `subagent_type: understand-anything:project-scanner`. If the host cannot dispatch registered plugin agents by type, load the fallback prompt from `$PLUGIN_ROOT/agents/project-scanner.md`. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -284,7 +284,7 @@ Load `.understand-anything/intermediate/batches.json` (produced by Phase 1.5). I
 
 Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
 
-For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
+For each batch, dispatch a subagent with `subagent_type: understand-anything:file-analyzer`. If the host cannot dispatch registered plugin agents by type, load the fallback prompt from `$PLUGIN_ROOT/agents/file-analyzer.md`. Run up to **5 subagents concurrently**. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -374,7 +374,7 @@ After batches complete:
 
 Report to the user: `[Phase 3/7] Reviewing assembled graph...`
 
-Dispatch a subagent using the `assemble-reviewer` agent definition (at `agents/assemble-reviewer.md`).
+Dispatch a subagent with `subagent_type: understand-anything:assemble-reviewer`. If the host cannot dispatch registered plugin agents by type, load the fallback prompt from `$PLUGIN_ROOT/agents/assemble-reviewer.md`.
 
 Pass these parameters in the dispatch prompt:
 
@@ -402,7 +402,7 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 Report to the user: `[Phase 4/7] Identifying architectural layers...`
 
 **Build the combined prompt template:**
- 1. Use the `architecture-analyzer` agent definition (at `agents/architecture-analyzer.md`).
+ 1. Use `subagent_type: understand-anything:architecture-analyzer`. If the host cannot dispatch registered plugin agents by type, load the fallback prompt from `$PLUGIN_ROOT/agents/architecture-analyzer.md`.
  2. **Language context injection:** For each language detected in Phase 1 (e.g., `python`, `markdown`, `dockerfile`, `yaml`, `sql`, `terraform`, `graphql`, `protobuf`, `shell`, `html`, `css`), read the file at `./languages/<language-id>.md` (e.g., `./languages/python.md`, `./languages/dockerfile.md`) and append its content after the base template under a `## Language Context` header. If the file does not exist for a detected language, skip it silently and continue. These files are in the `languages/` subdirectory next to this SKILL.md file. **Include non-code language snippets** — they provide edge patterns and summary styles for non-code files.
  3. **Framework addendum injection:** For each framework detected in Phase 1 (e.g., `Django`), read the file at `./frameworks/<framework-id-lowercase>.md` (e.g., `./frameworks/django.md`) and append its full content after the language context. If the file does not exist for a detected framework, skip it silently and continue. These files are in the `frameworks/` subdirectory next to this SKILL.md file.
  4. **Output locale injection:** If `$OUTPUT_LANGUAGE` is NOT `en` (English), read the locale guidance file at `./locales/<language-code>.md` (e.g., `./locales/zh.md`, `./locales/ja.md`, `./locales/ko.md`) and append its content after the framework addendums under a `## Output Language Guidelines` header. This provides language-specific guidance for tag naming conventions, summary style, and layer name translations. If the locale file does not exist for the specified language, skip silently — the `$LANGUAGE_DIRECTIVE` still applies. These files are in the `locales/` subdirectory next to this SKILL.md file.
@@ -484,7 +484,7 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 
 Report to the user: `[Phase 5/7] Building guided tour...`
 
-Dispatch a subagent using the `tour-builder` agent definition (at `agents/tour-builder.md`). Append the following additional context:
+Dispatch a subagent with `subagent_type: understand-anything:tour-builder`. If the host cannot dispatch registered plugin agents by type, load the fallback prompt from `$PLUGIN_ROOT/agents/tour-builder.md`. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -677,7 +677,7 @@ If the script exits non-zero, read stderr, fix the script, and retry once.
 
 If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent as follows:
 
-Dispatch a subagent using the `graph-reviewer` agent definition (at `agents/graph-reviewer.md`). Append the following additional context:
+Dispatch a subagent with `subagent_type: understand-anything:graph-reviewer`. If the host cannot dispatch registered plugin agents by type, load the fallback prompt from `$PLUGIN_ROOT/agents/graph-reviewer.md`. Append the following additional context:
 
 > **Additional context from main session:**
 >
