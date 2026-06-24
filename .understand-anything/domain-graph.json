@@ -1,0 +1,1610 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "understand-anything",
+    "languages": [
+      "typescript",
+      "javascript",
+      "python",
+      "markdown",
+      "json",
+      "yaml",
+      "css",
+      "html",
+      "shell",
+      "powershell",
+      "astro",
+      "wasm"
+    ],
+    "frameworks": [
+      "Astro",
+      "GitHub Actions",
+      "React",
+      "Tailwind CSS",
+      "Vite",
+      "Vitest",
+      "Zustand"
+    ],
+    "description": "An open-source tool combining LLM intelligence + static analysis to produce interactive dashboards for understanding codebases.",
+    "analyzedAt": "2026-06-24T15:35:52.539Z",
+    "gitCommitHash": "dee750facc588fc860744f8c6061a150e6852d9f"
+  },
+  "nodes": [
+    {
+      "id": "domain:codebase-analysis-pipeline",
+      "type": "domain",
+      "name": "Codebase Analysis Pipeline",
+      "summary": "The end-to-end /understand orchestration that turns a raw repository into a committed knowledge graph. It scans the project, batches files, analyzes each batch with LLM + structural extraction, merges and normalizes results, assembles the graph, detects layers, builds a guided tour, validates, and persists.",
+      "tags": [
+        "pipeline",
+        "orchestration",
+        "knowledge-graph",
+        "llm"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "ProjectScan",
+          "FileBatch",
+          "BatchGraph",
+          "KnowledgeGraph",
+          "Layer",
+          "Tour"
+        ],
+        "businessRules": [
+          "Every node must pass schema validation before the graph is saved",
+          "Each source file is assigned to exactly one architectural layer",
+          "Merge must dedupe node IDs and normalize edge direction across batches",
+          "Tour has 5-15 pedagogical steps ordered for learning"
+        ],
+        "crossDomainInteractions": [
+          "Invokes the Structural Extraction Engine to parse each file batch",
+          "Reuses fingerprints from Incremental Update & Staleness to skip unchanged files",
+          "Produces the knowledge-graph.json consumed by Dashboard Visualization and Graph-Powered Skill Flows"
+        ]
+      }
+    },
+    {
+      "id": "flow:run-understand-scan",
+      "type": "flow",
+      "name": "Run Full Codebase Analysis",
+      "summary": "Drives the /understand command through scanning, batched analysis, merge, assembly, layering, tour generation, validation, and save to produce knowledge-graph.json.",
+      "tags": [
+        "scan",
+        "merge",
+        "assemble",
+        "tour"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "/understand",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:run-understand-scan:scan-project",
+      "type": "step",
+      "name": "Scan project inventory",
+      "summary": "project-scanner agent walks the repo to inventory files, detect languages/frameworks, build the import map, and estimate complexity.",
+      "tags": [
+        "scan",
+        "inventory"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/agents/project-scanner.md"
+    },
+    {
+      "id": "step:run-understand-scan:analyze-batches",
+      "type": "step",
+      "name": "Analyze file batches",
+      "summary": "file-analyzer agent processes each batch with structural extraction plus LLM semantic analysis to emit per-batch nodes and edges.",
+      "tags": [
+        "llm",
+        "batch",
+        "extraction"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/agents/file-analyzer.md"
+    },
+    {
+      "id": "step:run-understand-scan:merge-batches",
+      "type": "step",
+      "name": "Merge batch graphs",
+      "summary": "merge-batch-graphs.py combines all batch outputs, normalizes node IDs, links tests to production files, and reconciles edge direction.",
+      "tags": [
+        "merge",
+        "normalize"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/skills/understand/merge-batch-graphs.py",
+      "lineRange": [
+        724,
+        908
+      ]
+    },
+    {
+      "id": "step:run-understand-scan:assemble-graph",
+      "type": "step",
+      "name": "Assemble and review graph",
+      "summary": "GraphBuilder assembles the merged graph and the assemble-reviewer agent recovers dropped nodes/edges and fills cross-batch gaps.",
+      "tags": [
+        "assemble",
+        "review"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/packages/core/src/analyzer/graph-builder.ts",
+      "lineRange": [
+        60,
+        337
+      ]
+    },
+    {
+      "id": "step:run-understand-scan:detect-layers",
+      "type": "step",
+      "name": "Detect architectural layers",
+      "summary": "layer-detector uses LLM prompting plus heuristics to group files into layers and assign each file to exactly one layer.",
+      "tags": [
+        "layers",
+        "architecture"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/analyzer/layer-detector.ts",
+      "lineRange": [
+        105,
+        144
+      ]
+    },
+    {
+      "id": "step:run-understand-scan:generate-tour",
+      "type": "step",
+      "name": "Generate guided tour",
+      "summary": "tour-generator builds an ordered set of pedagogical steps (heuristic or LLM) that teach the codebase architecture.",
+      "tags": [
+        "tour",
+        "pedagogy"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/analyzer/tour-generator.ts",
+      "lineRange": [
+        135,
+        293
+      ]
+    },
+    {
+      "id": "step:run-understand-scan:validate-graph",
+      "type": "step",
+      "name": "Validate and auto-fix graph",
+      "summary": "schema.ts sanitizes and auto-fixes the assembled graph, and the graph-reviewer agent renders an approval/rejection decision.",
+      "tags": [
+        "validation",
+        "schema"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/schema.ts",
+      "lineRange": [
+        196,
+        351
+      ]
+    },
+    {
+      "id": "step:run-understand-scan:save-and-fingerprint",
+      "type": "step",
+      "name": "Save graph and write fingerprints",
+      "summary": "Persistence writes knowledge-graph.json and build-fingerprints.mjs records per-file fingerprints so later runs can detect staleness.",
+      "tags": [
+        "persistence",
+        "fingerprint"
+      ],
+      "complexity": "simple",
+      "filePath": "understand-anything-plugin/skills/understand/build-fingerprints.mjs"
+    },
+    {
+      "id": "domain:structural-extraction-engine",
+      "type": "domain",
+      "name": "Structural Extraction Engine",
+      "summary": "The shared static-analysis core that parses source files into structural facts. It registers tree-sitter language extractors and config parsers, resolves language/framework detection, and produces functions, classes, imports, and an import map without any LLM involvement.",
+      "tags": [
+        "tree-sitter",
+        "static-analysis",
+        "parsers",
+        "core"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "TreeSitterPlugin",
+          "Extractor",
+          "Parser",
+          "LanguageRegistry",
+          "FrameworkRegistry",
+          "ImportMap"
+        ],
+        "businessRules": [
+          "Uses web-tree-sitter (WASM) rather than native bindings for cross-platform compatibility",
+          "Every supported language registers exactly one extractor in the plugin registry",
+          "Config formats (JSON/YAML/TOML/etc.) route to dedicated non-tree-sitter parsers"
+        ],
+        "crossDomainInteractions": [
+          "Supplies parsed structure to the Codebase Analysis Pipeline's batch analysis step",
+          "Provides import-map data reused by Incremental Update & Staleness during merges"
+        ]
+      }
+    },
+    {
+      "id": "flow:extract-file-structure",
+      "type": "flow",
+      "name": "Extract Structure From a File",
+      "summary": "Selects the right language plugin/parser for a file, parses it via tree-sitter or a config parser, and walks the AST to emit structural nodes and import edges.",
+      "tags": [
+        "extraction",
+        "ast",
+        "tree-sitter"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "PluginRegistry.extract(file)",
+        "entryType": "manual"
+      }
+    },
+    {
+      "id": "step:extract-file-structure:detect-language",
+      "type": "step",
+      "name": "Detect language and framework",
+      "summary": "LanguageRegistry and FrameworkRegistry resolve a file's language and any framework signals from extension and content.",
+      "tags": [
+        "detection",
+        "registry"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/languages/language-registry.ts",
+      "lineRange": [
+        9,
+        64
+      ]
+    },
+    {
+      "id": "step:extract-file-structure:select-plugin",
+      "type": "step",
+      "name": "Select extractor or parser",
+      "summary": "PluginRegistry dispatches to the matching tree-sitter extractor or, for config formats, to a registered config parser.",
+      "tags": [
+        "registry",
+        "dispatch"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/plugins/registry.ts",
+      "lineRange": [
+        11,
+        81
+      ]
+    },
+    {
+      "id": "step:extract-file-structure:parse-tree-sitter",
+      "type": "step",
+      "name": "Parse with tree-sitter plugin",
+      "summary": "TreeSitterPlugin loads the WASM grammar and produces a parse tree for the source file.",
+      "tags": [
+        "tree-sitter",
+        "wasm"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/packages/core/src/plugins/tree-sitter-plugin.ts",
+      "lineRange": [
+        31,
+        299
+      ]
+    },
+    {
+      "id": "step:extract-file-structure:walk-ast",
+      "type": "step",
+      "name": "Walk AST with language extractor",
+      "summary": "A language-specific extractor (e.g. TypeScriptExtractor, PythonExtractor) traverses the tree to capture functions, classes, and imports.",
+      "tags": [
+        "ast",
+        "extractor"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/packages/core/src/plugins/extractors/typescript-extractor.ts",
+      "lineRange": [
+        106,
+        494
+      ]
+    },
+    {
+      "id": "step:extract-file-structure:parse-config",
+      "type": "step",
+      "name": "Parse config formats",
+      "summary": "Dedicated parsers (JSON/YAML/TOML/SQL/Dockerfile/etc.) handle non-tree-sitter config files via registerAllParsers.",
+      "tags": [
+        "config",
+        "parsers"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/plugins/parsers/index.ts",
+      "lineRange": [
+        31,
+        44
+      ]
+    },
+    {
+      "id": "domain:incremental-update-staleness",
+      "type": "domain",
+      "name": "Incremental Update & Staleness",
+      "summary": "Keeps a committed knowledge graph in sync with a changing codebase. It fingerprints files, compares against the stored fingerprint store, classifies the scope of change, and feeds only affected files back through analysis for an incremental merge. A deterministic CI guard validates the self-graph and flags staleness.",
+      "tags": [
+        "incremental",
+        "fingerprint",
+        "staleness",
+        "ci-guard"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "FileFingerprint",
+          "FingerprintStore",
+          "ChangeSet",
+          "UpdateClassification"
+        ],
+        "businessRules": [
+          "Unchanged files (matching fingerprints) are skipped on re-analysis",
+          "Change classification decides between incremental update and full re-scan",
+          "The committed self-graph must validate against the schema and not be stale relative to tracked source"
+        ],
+        "crossDomainInteractions": [
+          "Triggers targeted runs of the Codebase Analysis Pipeline for changed files only",
+          "Reuses import-map data from the Structural Extraction Engine",
+          "Its check-graph guard runs inside the Packaging & Distribution CI workflow"
+        ]
+      }
+    },
+    {
+      "id": "flow:incremental-graph-update",
+      "type": "flow",
+      "name": "Incrementally Update the Graph",
+      "summary": "Detects changed files via fingerprints, classifies the change scope, and merges fresh analysis of affected files back into the existing graph.",
+      "tags": [
+        "fingerprint",
+        "diff",
+        "merge"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "/understand (with existing graph)",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:incremental-graph-update:build-fingerprints",
+      "type": "step",
+      "name": "Compute file fingerprints",
+      "summary": "extractFileFingerprint and buildFingerprintStore compute per-file content fingerprints for the current working tree.",
+      "tags": [
+        "fingerprint"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/fingerprint.ts",
+      "lineRange": [
+        79,
+        122
+      ]
+    },
+    {
+      "id": "step:incremental-graph-update:detect-changes",
+      "type": "step",
+      "name": "Detect changed files",
+      "summary": "compareFingerprints and analyzeChanges diff the new fingerprints against the stored store to find added/modified/removed files.",
+      "tags": [
+        "diff",
+        "staleness"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/fingerprint.ts",
+      "lineRange": [
+        131,
+        246
+      ]
+    },
+    {
+      "id": "step:incremental-graph-update:classify-change",
+      "type": "step",
+      "name": "Classify update scope",
+      "summary": "classifyUpdate and detectDirectoryChanges decide whether changes warrant an incremental update or a full re-scan.",
+      "tags": [
+        "classification"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/core/src/change-classifier.ts",
+      "lineRange": [
+        21,
+        87
+      ]
+    },
+    {
+      "id": "step:incremental-graph-update:merge-subgraphs",
+      "type": "step",
+      "name": "Merge updated subgraphs",
+      "summary": "merge-subdomain-graphs.py folds freshly analyzed subgraphs of affected files back into the existing knowledge graph.",
+      "tags": [
+        "merge",
+        "incremental"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/skills/understand/merge-subdomain-graphs.py",
+      "lineRange": [
+        52,
+        232
+      ]
+    },
+    {
+      "id": "flow:guard-committed-graph",
+      "type": "flow",
+      "name": "Guard the Committed Self-Graph",
+      "summary": "A deterministic CI check that loads the committed knowledge graph, validates it against the schema, and verifies it is not stale relative to tracked source files or the domain graph.",
+      "tags": [
+        "ci-guard",
+        "validation",
+        "staleness"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "node scripts/check-graph.mjs",
+        "entryType": "cron"
+      }
+    },
+    {
+      "id": "step:guard-committed-graph:load-core",
+      "type": "step",
+      "name": "Load core validators",
+      "summary": "loadCore dynamically imports the built core schema utilities used to validate the committed graphs.",
+      "tags": [
+        "bootstrap"
+      ],
+      "complexity": "simple",
+      "filePath": "scripts/check-graph.mjs",
+      "lineRange": [
+        54,
+        66
+      ]
+    },
+    {
+      "id": "step:guard-committed-graph:validate-schema",
+      "type": "step",
+      "name": "Validate graph schema",
+      "summary": "validateOne runs schema validation against each committed graph and reports any structural errors.",
+      "tags": [
+        "schema",
+        "validation"
+      ],
+      "complexity": "moderate",
+      "filePath": "scripts/check-graph.mjs",
+      "lineRange": [
+        68,
+        93
+      ]
+    },
+    {
+      "id": "step:guard-committed-graph:check-source-staleness",
+      "type": "step",
+      "name": "Check source staleness",
+      "summary": "trackedSourceFiles and checkStaleness compare the committed graph against git-tracked source files to detect drift.",
+      "tags": [
+        "staleness",
+        "git"
+      ],
+      "complexity": "moderate",
+      "filePath": "scripts/check-graph.mjs",
+      "lineRange": [
+        109,
+        168
+      ]
+    },
+    {
+      "id": "step:guard-committed-graph:check-domain-sync",
+      "type": "step",
+      "name": "Check domain graph sync",
+      "summary": "checkDomainSync verifies the domain graph stays version-matched (commit hash) with the knowledge graph.",
+      "tags": [
+        "domain",
+        "sync"
+      ],
+      "complexity": "moderate",
+      "filePath": "scripts/check-graph.mjs",
+      "lineRange": [
+        175,
+        215
+      ]
+    },
+    {
+      "id": "domain:domain-knowledge-extraction",
+      "type": "domain",
+      "name": "Domain & Knowledge Extraction",
+      "summary": "Produces higher-level graphs beyond raw structure. /understand-domain extracts business domains, flows, and steps either standalone or derived from an existing knowledge graph, while /understand-knowledge parses Karpathy-pattern wiki knowledge bases into entity/relationship graphs.",
+      "tags": [
+        "domain-graph",
+        "knowledge-base",
+        "extraction",
+        "llm"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "DomainGraph",
+          "BusinessFlow",
+          "ProcessStep",
+          "WikiEntity",
+          "TopicCluster"
+        ],
+        "businessRules": [
+          "Domain graphs carry empty layers/tour and render in a dedicated dashboard view",
+          "When a knowledge graph exists, domains are derived from it without rescanning source files",
+          "The domain graph's commit hash is matched to the knowledge graph it derives from"
+        ],
+        "crossDomainInteractions": [
+          "Derives domain graphs from the Codebase Analysis Pipeline's knowledge-graph.json",
+          "Outputs graphs consumed by Dashboard Visualization's domain view",
+          "Standalone mode uses lightweight scanning instead of the Structural Extraction Engine"
+        ]
+      }
+    },
+    {
+      "id": "flow:extract-domain-graph",
+      "type": "flow",
+      "name": "Extract Business Domain Graph",
+      "summary": "Builds domain context (standalone or from the knowledge graph), runs the domain-analyzer agent to identify domains/flows/steps, and persists a validated domain graph.",
+      "tags": [
+        "domain",
+        "business-flow"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "/understand-domain",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:extract-domain-graph:build-context",
+      "type": "step",
+      "name": "Build domain context",
+      "summary": "extract-domain-context.py scans the file tree, detects entry points, and extracts file signatures when no knowledge graph is present.",
+      "tags": [
+        "scan",
+        "context"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/skills/understand-domain/extract-domain-context.py",
+      "lineRange": [
+        376,
+        424
+      ]
+    },
+    {
+      "id": "step:extract-domain-graph:analyze-domains",
+      "type": "step",
+      "name": "Analyze domains, flows, steps",
+      "summary": "domain-analyzer agent derives the three-level hierarchy from the context or knowledge graph node summaries.",
+      "tags": [
+        "llm",
+        "domain-analysis"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/agents/domain-analyzer.md"
+    },
+    {
+      "id": "step:extract-domain-graph:persist-domain-graph",
+      "type": "step",
+      "name": "Persist domain graph",
+      "summary": "loadDomainGraph and persistence utilities save and reload the domain graph with its version-matched commit hash.",
+      "tags": [
+        "persistence"
+      ],
+      "complexity": "simple",
+      "filePath": "understand-anything-plugin/packages/core/src/persistence/index.ts",
+      "lineRange": [
+        162,
+        182
+      ]
+    },
+    {
+      "id": "flow:extract-knowledge-base-graph",
+      "type": "flow",
+      "name": "Extract Knowledge-Base Graph",
+      "summary": "Parses a Karpathy-pattern wiki/knowledge base, runs the article-analyzer agent to extract entities and implicit relationships, and merges results into a topic-clustered knowledge graph.",
+      "tags": [
+        "knowledge-base",
+        "wiki",
+        "entities"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "/understand-knowledge",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:extract-knowledge-base-graph:parse-knowledge-base",
+      "type": "step",
+      "name": "Parse knowledge base",
+      "summary": "parse-knowledge-base.py detects the wiki format, resolves wikilinks, and parses index/log/wiki structures into raw entries.",
+      "tags": [
+        "parse",
+        "wiki"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/skills/understand-knowledge/parse-knowledge-base.py",
+      "lineRange": [
+        278,
+        479
+      ]
+    },
+    {
+      "id": "step:extract-knowledge-base-graph:analyze-articles",
+      "type": "step",
+      "name": "Analyze articles for entities",
+      "summary": "article-analyzer agent extracts entities, claims, and implicit relationships from parsed markdown.",
+      "tags": [
+        "llm",
+        "entities"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/agents/article-analyzer.md"
+    },
+    {
+      "id": "step:extract-knowledge-base-graph:merge-knowledge-graph",
+      "type": "step",
+      "name": "Merge knowledge graph",
+      "summary": "merge-knowledge-graph.py combines per-article outputs into a single topic-clustered knowledge graph.",
+      "tags": [
+        "merge",
+        "clustering"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/skills/understand-knowledge/merge-knowledge-graph.py",
+      "lineRange": [
+        92,
+        380
+      ]
+    },
+    {
+      "id": "domain:dashboard-visualization",
+      "type": "domain",
+      "name": "Dashboard Visualization",
+      "summary": "The React + TypeScript web dashboard that renders knowledge and domain graphs interactively. It loads and validates the graph, computes layout via ELK/Dagre, draws React Flow overview/layer/domain views, and serves source through a token-gated, path-allowlisted code viewer.",
+      "tags": [
+        "dashboard",
+        "react-flow",
+        "visualization",
+        "elk"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entities": [
+          "KnowledgeGraph",
+          "DomainGraph",
+          "Layer",
+          "Tour",
+          "ReactFlowNode",
+          "CodeViewer"
+        ],
+        "businessRules": [
+          "Graph is schema-validated on load with an error banner on failure",
+          "Source content is gated by an access token plus a graph-derived path allowlist",
+          "Domain graphs render in a dedicated view that ignores layers and tours"
+        ],
+        "crossDomainInteractions": [
+          "Consumes knowledge-graph.json from the Codebase Analysis Pipeline",
+          "Renders domain graphs produced by Domain & Knowledge Extraction",
+          "Built and deployed as a demo by the Packaging & Distribution CI workflow"
+        ]
+      }
+    },
+    {
+      "id": "flow:render-graph-dashboard",
+      "type": "flow",
+      "name": "Render Interactive Graph",
+      "summary": "Loads and validates the graph, computes a layout, and renders the overview, layer-detail, or domain view in React Flow.",
+      "tags": [
+        "render",
+        "layout",
+        "react-flow"
+      ],
+      "complexity": "complex",
+      "domainMeta": {
+        "entryPoint": "pnpm dev:dashboard",
+        "entryType": "http"
+      }
+    },
+    {
+      "id": "step:render-graph-dashboard:load-validate",
+      "type": "step",
+      "name": "Load and validate graph",
+      "summary": "The Dashboard app fetches the graph JSON, runs schema validation, and shows an error banner if validation fails.",
+      "tags": [
+        "load",
+        "validation"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/dashboard/src/App.tsx",
+      "lineRange": [
+        222,
+        713
+      ]
+    },
+    {
+      "id": "step:render-graph-dashboard:compute-layout",
+      "type": "step",
+      "name": "Compute ELK layout",
+      "summary": "elk-layout utilities repair the ELK input and apply hierarchical layout to position nodes and edges.",
+      "tags": [
+        "layout",
+        "elk"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/packages/dashboard/src/utils/elk-layout.ts",
+      "lineRange": [
+        225,
+        244
+      ]
+    },
+    {
+      "id": "step:render-graph-dashboard:render-views",
+      "type": "step",
+      "name": "Render graph views",
+      "summary": "GraphView composes overview, layer-detail, and topology hooks to render the structural graph in React Flow.",
+      "tags": [
+        "react-flow",
+        "views"
+      ],
+      "complexity": "complex",
+      "filePath": "understand-anything-plugin/packages/dashboard/src/components/GraphView.tsx",
+      "lineRange": [
+        1299,
+        1573
+      ]
+    },
+    {
+      "id": "step:render-graph-dashboard:render-domain-view",
+      "type": "step",
+      "name": "Render domain view",
+      "summary": "DomainGraphView builds the domain overview and per-domain detail graphs for the dedicated domain rendering.",
+      "tags": [
+        "domain",
+        "view"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/dashboard/src/components/DomainGraphView.tsx",
+      "lineRange": [
+        167,
+        271
+      ]
+    },
+    {
+      "id": "step:render-graph-dashboard:serve-source",
+      "type": "step",
+      "name": "Serve gated source",
+      "summary": "The dev server's readSourceFile endpoint serves file content gated by access token and a graph-derived path allowlist for the CodeViewer.",
+      "tags": [
+        "code-viewer",
+        "security"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/packages/dashboard/vite.config.ts",
+      "lineRange": [
+        114,
+        177
+      ]
+    },
+    {
+      "id": "domain:graph-powered-skill-flows",
+      "type": "domain",
+      "name": "Graph-Powered Skill Flows",
+      "summary": "The TypeScript-backed slash-command skills that answer questions over an existing knowledge graph. They build graph-derived context and prompts for codebase Q&A, git-diff impact analysis, deep file/function explanations, and new-hire onboarding guides.",
+      "tags": [
+        "skills",
+        "chat",
+        "diff",
+        "explain",
+        "onboard"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": [
+          "ChatContext",
+          "DiffContext",
+          "ExplainContext",
+          "OnboardingGuide"
+        ],
+        "businessRules": [
+          "All flows operate on a previously built knowledge graph rather than rescanning source",
+          "Context is assembled from graph nodes/edges before being formatted into an LLM prompt"
+        ],
+        "crossDomainInteractions": [
+          "Read the knowledge-graph.json produced by the Codebase Analysis Pipeline",
+          "The diff flow overlaps with Incremental Update & Staleness in identifying affected components"
+        ]
+      }
+    },
+    {
+      "id": "flow:answer-codebase-question",
+      "type": "flow",
+      "name": "Answer a Codebase Question",
+      "summary": "Builds chat context from the knowledge graph and formats a prompt so the LLM can answer questions about architecture and components.",
+      "tags": [
+        "chat",
+        "qa"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "/understand-chat",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:answer-codebase-question:build-context",
+      "type": "step",
+      "name": "Build chat context",
+      "summary": "buildChatContext selects relevant graph nodes and edges to ground the question.",
+      "tags": [
+        "context"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/src/context-builder.ts",
+      "lineRange": [
+        25,
+        80
+      ]
+    },
+    {
+      "id": "step:answer-codebase-question:format-prompt",
+      "type": "step",
+      "name": "Format chat prompt",
+      "summary": "formatContextForPrompt and buildChatPrompt render the context into the final LLM prompt.",
+      "tags": [
+        "prompt"
+      ],
+      "complexity": "simple",
+      "filePath": "understand-anything-plugin/src/understand-chat.ts",
+      "lineRange": [
+        8,
+        29
+      ]
+    },
+    {
+      "id": "flow:analyze-diff-impact",
+      "type": "flow",
+      "name": "Analyze Diff Impact",
+      "summary": "Builds context from a git diff against the knowledge graph and formats an analysis of changed files, affected components, and risks.",
+      "tags": [
+        "diff",
+        "impact"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "/understand-diff",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:analyze-diff-impact:build-diff-context",
+      "type": "step",
+      "name": "Build diff context",
+      "summary": "buildDiffContext maps changed files to graph nodes to identify affected components.",
+      "tags": [
+        "diff",
+        "context"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/src/diff-analyzer.ts",
+      "lineRange": [
+        22,
+        88
+      ]
+    },
+    {
+      "id": "step:analyze-diff-impact:format-analysis",
+      "type": "step",
+      "name": "Format diff analysis",
+      "summary": "formatDiffAnalysis renders the affected components and risk summary for the diff.",
+      "tags": [
+        "analysis"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/src/diff-analyzer.ts",
+      "lineRange": [
+        93,
+        198
+      ]
+    },
+    {
+      "id": "flow:explain-and-onboard",
+      "type": "flow",
+      "name": "Explain Code & Onboard",
+      "summary": "Produces deep explanations of a file/function and generates onboarding guides for new team members, both grounded in the knowledge graph.",
+      "tags": [
+        "explain",
+        "onboard"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "/understand-explain, /understand-onboard",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:explain-and-onboard:build-explain-context",
+      "type": "step",
+      "name": "Build explain context",
+      "summary": "buildExplainContext gathers the target file/function plus its neighbors from the graph.",
+      "tags": [
+        "explain",
+        "context"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/src/explain-builder.ts",
+      "lineRange": [
+        22,
+        103
+      ]
+    },
+    {
+      "id": "step:explain-and-onboard:format-explain-prompt",
+      "type": "step",
+      "name": "Format explain prompt",
+      "summary": "formatExplainPrompt renders the deep-dive explanation prompt for the LLM.",
+      "tags": [
+        "prompt"
+      ],
+      "complexity": "simple",
+      "filePath": "understand-anything-plugin/src/explain-builder.ts",
+      "lineRange": [
+        108,
+        196
+      ]
+    },
+    {
+      "id": "step:explain-and-onboard:build-onboarding-guide",
+      "type": "step",
+      "name": "Build onboarding guide",
+      "summary": "buildOnboardingGuide assembles a new-hire onboarding guide from the graph's layers and key components.",
+      "tags": [
+        "onboard",
+        "guide"
+      ],
+      "complexity": "moderate",
+      "filePath": "understand-anything-plugin/src/onboard-builder.ts",
+      "lineRange": [
+        7,
+        124
+      ]
+    },
+    {
+      "id": "domain:packaging-distribution",
+      "type": "domain",
+      "name": "Packaging & Distribution",
+      "summary": "Installs the plugin across Claude Code and other platforms and runs CI/CD. Shell and PowerShell installers link skills/agents into the host platform, while GitHub Actions workflows lint/build/test the monorepo and deploy the homepage and demo dashboard.",
+      "tags": [
+        "install",
+        "ci-cd",
+        "distribution",
+        "deploy"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entities": [
+          "Installer",
+          "PlatformTarget",
+          "CIWorkflow",
+          "DeployArtifact"
+        ],
+        "businessRules": [
+          "Installers must support multiple host platforms (Claude Code, opencode, cursor, copilot)",
+          "CI runs lint, build, and tests on pull requests and pushes to main",
+          "Homepage deploy publishes the combined homepage + demo dashboard to GitHub Pages"
+        ],
+        "crossDomainInteractions": [
+          "Builds and deploys the Dashboard Visualization demo",
+          "Runs the Incremental Update & Staleness check-graph guard as a CI step",
+          "Distributes the skills that drive all other domains"
+        ]
+      }
+    },
+    {
+      "id": "flow:install-plugin",
+      "type": "flow",
+      "name": "Install the Plugin",
+      "summary": "Resolves the host platform, clones or updates the repo, and links skills/agents into the platform's plugin directory.",
+      "tags": [
+        "install",
+        "multi-platform"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "./install.sh / install.ps1",
+        "entryType": "cli"
+      }
+    },
+    {
+      "id": "step:install-plugin:resolve-platform",
+      "type": "step",
+      "name": "Resolve target platform",
+      "summary": "resolve_platform / prompt_platform determine which host platform (Claude Code, cursor, etc.) to install into.",
+      "tags": [
+        "platform"
+      ],
+      "complexity": "simple",
+      "filePath": "install.sh",
+      "lineRange": [
+        50,
+        60
+      ]
+    },
+    {
+      "id": "step:install-plugin:link-skills",
+      "type": "step",
+      "name": "Link skills and agents",
+      "summary": "link_skills wires the plugin's skills and agents into the resolved platform's directory.",
+      "tags": [
+        "link"
+      ],
+      "complexity": "moderate",
+      "filePath": "install.sh",
+      "lineRange": [
+        120,
+        142
+      ]
+    },
+    {
+      "id": "step:install-plugin:run-install",
+      "type": "step",
+      "name": "Run install command",
+      "summary": "cmd_install orchestrates clone/update and linking; cmd_uninstall reverses it.",
+      "tags": [
+        "orchestration"
+      ],
+      "complexity": "moderate",
+      "filePath": "install.sh",
+      "lineRange": [
+        181,
+        232
+      ]
+    },
+    {
+      "id": "flow:ci-cd-pipeline",
+      "type": "flow",
+      "name": "Run CI/CD",
+      "summary": "On pull requests and pushes, lints/builds/tests the monorepo (including the graph guard) and deploys the homepage and demo dashboard to GitHub Pages.",
+      "tags": [
+        "ci",
+        "deploy",
+        "github-actions"
+      ],
+      "complexity": "moderate",
+      "domainMeta": {
+        "entryPoint": "GitHub Actions (push/PR)",
+        "entryType": "event"
+      }
+    },
+    {
+      "id": "step:ci-cd-pipeline:ci-lint-build-test",
+      "type": "step",
+      "name": "Lint, build, and test",
+      "summary": "The CI job checks out the repo, sets up pnpm and Node, installs dependencies, then lints, builds core, and runs tests.",
+      "tags": [
+        "ci",
+        "test"
+      ],
+      "complexity": "moderate",
+      "filePath": ".github/workflows/ci.yml"
+    },
+    {
+      "id": "step:ci-cd-pipeline:guard-graph",
+      "type": "step",
+      "name": "Guard committed graph",
+      "summary": "CI runs scripts/check-graph.mjs to validate the committed self-graph and flag schema or staleness regressions.",
+      "tags": [
+        "ci-guard",
+        "staleness"
+      ],
+      "complexity": "moderate",
+      "filePath": "scripts/check-graph.mjs",
+      "lineRange": [
+        217,
+        239
+      ]
+    },
+    {
+      "id": "step:ci-cd-pipeline:build-deploy-homepage",
+      "type": "step",
+      "name": "Build and deploy homepage",
+      "summary": "The deploy workflow builds the homepage, core, and demo dashboard, then publishes the artifact to GitHub Pages.",
+      "tags": [
+        "deploy",
+        "homepage"
+      ],
+      "complexity": "moderate",
+      "filePath": ".github/workflows/deploy-homepage.yml"
+    }
+  ],
+  "edges": [
+    {
+      "source": "domain:codebase-analysis-pipeline",
+      "target": "flow:run-understand-scan",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:scan-project",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.1
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:analyze-batches",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.2
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:merge-batches",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:assemble-graph",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.4
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:detect-layers",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:generate-tour",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:validate-graph",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "flow:run-understand-scan",
+      "target": "step:run-understand-scan:save-and-fingerprint",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "domain:structural-extraction-engine",
+      "target": "flow:extract-file-structure",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:extract-file-structure",
+      "target": "step:extract-file-structure:detect-language",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.2
+    },
+    {
+      "source": "flow:extract-file-structure",
+      "target": "step:extract-file-structure:select-plugin",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.4
+    },
+    {
+      "source": "flow:extract-file-structure",
+      "target": "step:extract-file-structure:parse-tree-sitter",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:extract-file-structure",
+      "target": "step:extract-file-structure:walk-ast",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "flow:extract-file-structure",
+      "target": "step:extract-file-structure:parse-config",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:incremental-update-staleness",
+      "target": "flow:incremental-graph-update",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:incremental-graph-update",
+      "target": "step:incremental-graph-update:build-fingerprints",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:incremental-graph-update",
+      "target": "step:incremental-graph-update:detect-changes",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:incremental-graph-update",
+      "target": "step:incremental-graph-update:classify-change",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "flow:incremental-graph-update",
+      "target": "step:incremental-graph-update:merge-subgraphs",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:incremental-update-staleness",
+      "target": "flow:guard-committed-graph",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:guard-committed-graph",
+      "target": "step:guard-committed-graph:load-core",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:guard-committed-graph",
+      "target": "step:guard-committed-graph:validate-schema",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:guard-committed-graph",
+      "target": "step:guard-committed-graph:check-source-staleness",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "flow:guard-committed-graph",
+      "target": "step:guard-committed-graph:check-domain-sync",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:domain-knowledge-extraction",
+      "target": "flow:extract-domain-graph",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:extract-domain-graph",
+      "target": "step:extract-domain-graph:build-context",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:extract-domain-graph",
+      "target": "step:extract-domain-graph:analyze-domains",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:extract-domain-graph",
+      "target": "step:extract-domain-graph:persist-domain-graph",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "domain:domain-knowledge-extraction",
+      "target": "flow:extract-knowledge-base-graph",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:extract-knowledge-base-graph",
+      "target": "step:extract-knowledge-base-graph:parse-knowledge-base",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:extract-knowledge-base-graph",
+      "target": "step:extract-knowledge-base-graph:analyze-articles",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:extract-knowledge-base-graph",
+      "target": "step:extract-knowledge-base-graph:merge-knowledge-graph",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "domain:dashboard-visualization",
+      "target": "flow:render-graph-dashboard",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:render-graph-dashboard",
+      "target": "step:render-graph-dashboard:load-validate",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.2
+    },
+    {
+      "source": "flow:render-graph-dashboard",
+      "target": "step:render-graph-dashboard:compute-layout",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.4
+    },
+    {
+      "source": "flow:render-graph-dashboard",
+      "target": "step:render-graph-dashboard:render-views",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:render-graph-dashboard",
+      "target": "step:render-graph-dashboard:render-domain-view",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "flow:render-graph-dashboard",
+      "target": "step:render-graph-dashboard:serve-source",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:graph-powered-skill-flows",
+      "target": "flow:answer-codebase-question",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:answer-codebase-question",
+      "target": "step:answer-codebase-question:build-context",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "flow:answer-codebase-question",
+      "target": "step:answer-codebase-question:format-prompt",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:graph-powered-skill-flows",
+      "target": "flow:analyze-diff-impact",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:analyze-diff-impact",
+      "target": "step:analyze-diff-impact:build-diff-context",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "flow:analyze-diff-impact",
+      "target": "step:analyze-diff-impact:format-analysis",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "domain:graph-powered-skill-flows",
+      "target": "flow:explain-and-onboard",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:explain-and-onboard",
+      "target": "step:explain-and-onboard:build-explain-context",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:explain-and-onboard",
+      "target": "step:explain-and-onboard:format-explain-prompt",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:explain-and-onboard",
+      "target": "step:explain-and-onboard:build-onboarding-guide",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "domain:packaging-distribution",
+      "target": "flow:install-plugin",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:install-plugin",
+      "target": "step:install-plugin:resolve-platform",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:install-plugin",
+      "target": "step:install-plugin:link-skills",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:install-plugin",
+      "target": "step:install-plugin:run-install",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "domain:packaging-distribution",
+      "target": "flow:ci-cd-pipeline",
+      "type": "contains_flow",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "flow:ci-cd-pipeline",
+      "target": "step:ci-cd-pipeline:ci-lint-build-test",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.3
+    },
+    {
+      "source": "flow:ci-cd-pipeline",
+      "target": "step:ci-cd-pipeline:guard-graph",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "flow:ci-cd-pipeline",
+      "target": "step:ci-cd-pipeline:build-deploy-homepage",
+      "type": "flow_step",
+      "direction": "forward",
+      "weight": 0.9
+    },
+    {
+      "source": "domain:codebase-analysis-pipeline",
+      "target": "domain:structural-extraction-engine",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Batch analysis invokes the extraction engine to parse each file into structural facts",
+      "weight": 0.8
+    },
+    {
+      "source": "domain:codebase-analysis-pipeline",
+      "target": "domain:incremental-update-staleness",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Saves fingerprints and reuses them so later runs only re-analyze changed files",
+      "weight": 0.7
+    },
+    {
+      "source": "domain:incremental-update-staleness",
+      "target": "domain:structural-extraction-engine",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Reuses import-map data from the extraction engine during incremental merges",
+      "weight": 0.5
+    },
+    {
+      "source": "domain:domain-knowledge-extraction",
+      "target": "domain:codebase-analysis-pipeline",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Derives domain graphs from the knowledge-graph.json produced by the pipeline",
+      "weight": 0.7
+    },
+    {
+      "source": "domain:dashboard-visualization",
+      "target": "domain:codebase-analysis-pipeline",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Loads and renders the knowledge graph produced by the pipeline",
+      "weight": 0.8
+    },
+    {
+      "source": "domain:dashboard-visualization",
+      "target": "domain:domain-knowledge-extraction",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Renders domain graphs in a dedicated layer-free view",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:graph-powered-skill-flows",
+      "target": "domain:codebase-analysis-pipeline",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "Build context from the knowledge graph produced by the pipeline",
+      "weight": 0.7
+    },
+    {
+      "source": "domain:graph-powered-skill-flows",
+      "target": "domain:incremental-update-staleness",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "The diff flow overlaps in mapping changed files to affected graph components",
+      "weight": 0.5
+    },
+    {
+      "source": "domain:packaging-distribution",
+      "target": "domain:dashboard-visualization",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "CI builds and deploys the dashboard as a demo to GitHub Pages",
+      "weight": 0.6
+    },
+    {
+      "source": "domain:packaging-distribution",
+      "target": "domain:incremental-update-staleness",
+      "type": "cross_domain",
+      "direction": "forward",
+      "description": "CI runs the check-graph staleness guard as a build step",
+      "weight": 0.6
+    }
+  ],
+  "layers": [],
+  "tour": []
+}

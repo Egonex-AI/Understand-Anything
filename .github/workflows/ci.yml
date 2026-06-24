@@ -43,6 +43,9 @@ jobs:
       - name: Build skill
         run: pnpm --filter @understand-anything/skill build
 
+      - name: Check knowledge graph
+        run: node scripts/check-graph.mjs
+
       - name: Test core
         run: pnpm --filter @understand-anything/core test
 
