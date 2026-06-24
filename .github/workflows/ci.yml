@@ -19,7 +19,14 @@ concurrency:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    # Run the suite on Linux AND Windows. Windows-specific breakage (CRLF
+    # checkout, cp1252 stdio, POSIX-vs-Windows paths) used to slip through a
+    # Linux-only CI; this matrix locks in the cross-platform fixes.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 

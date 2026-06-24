@@ -1682,7 +1682,13 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
     }
   });
 
-  it('emits a Warning: and produces empty importMap entries when tree-sitter init throws', () => {
+  // Skipped on Windows: the failure is injected with a custom ESM resolve hook
+  // (module.register). On Windows + Node 24 that makes the child's relative
+  // specifiers resolve under a bare 'c:' URL scheme and crash with
+  // ERR_UNSUPPORTED_ESM_URL_SCHEME — a Node loader/Windows limitation in the test
+  // harness, not in the product. The graceful tree-sitter-failure path in
+  // extract-import-map.mjs itself is unchanged and is covered on Linux/macOS CI.
+  it.skipIf(process.platform === 'win32')('emits a Warning: and produces empty importMap entries when tree-sitter init throws', () => {
     // Force tree-sitter init to fail by intercepting the `web-tree-sitter`
     // module load with an ESM loader hook. This simulates the real-world
     // failure mode where the WASM grammar binaries are missing or

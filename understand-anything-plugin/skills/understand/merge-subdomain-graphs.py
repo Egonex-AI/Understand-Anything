@@ -20,6 +20,13 @@ Output:
 
 import json
 import sys
+
+# Force UTF-8 stdio so non-ASCII output (e.g. "—") survives on Windows, where the
+# default cp1252 codepage otherwise mangles it into "?"/"�" (breaks downstream parsing).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 from collections import Counter
 from pathlib import Path
 from typing import Any
