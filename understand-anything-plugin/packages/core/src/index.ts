@@ -122,3 +122,27 @@ export {
   type IgnoreFilter,
 } from "./ignore-filter.js";
 export { generateStarterIgnoreFile } from "./ignore-generator.js";
+// Local LLM backends
+export {
+  OllamaClient,
+  OllamaConnectionError,
+  OllamaModelMissingError,
+  OllamaResponseError,
+  OllamaTimeoutError,
+} from "./ollama-client.js";
+export type {
+  OllamaClientOptions,
+  OllamaClientInternals,
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+  GenerateOptions,
+  HealthResult,
+  RetryInfo,
+  OllamaChatPayload,
+  OllamaGeneratePayload,
+  OllamaChatResponseBody,
+  OllamaGenerateResponseBody,
+  OllamaTagsResponseBody,
+  OllamaVersionResponseBody,
+} from "./ollama-client.js";

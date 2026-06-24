@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>]"]
+argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>] [--ollama]"]
 ---
 
 # /understand
@@ -17,6 +17,7 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
+  - `--ollama` — Drive the analysis through a local Ollama server instead of dispatching host-platform subagents. Pre-flight, scan, batch, assemble, review, and clean phases run identically to the cloud path; the per-file analysis (Phase 2), layer detection (Phase 4), and tour generation (Phase 5) are executed by `node <PLUGIN_ROOT>/skills/understand-ollama/run-pipeline.mjs`. The Ollama URL and model come from `.understand-anything/config.json` (`ollama: { baseUrl, model, concurrency }`), or fall back to `http://127.0.0.1:11434` and `qwen2.5-coder:1.5b`. Pass `--ollama-url` / `--model` via `/understand-ollama` if you need to override.
 
 ---
 
@@ -277,6 +278,24 @@ If the script exits non-zero, the failure is hard — relay the full stderr to t
 ---
 
 ## Phase 2 — ANALYZE
+
+### Local Ollama path (`--ollama` flag)
+
+If `$ARGUMENTS` contains `--ollama`, skip the host-platform dispatch below entirely and run the bundled Ollama driver instead. The driver owns Phase 2 (analyze) AND Phases 4 (layers) and 5 (tour) — return from the pipeline here and do not run Phases 2/4/5 in the cloud path.
+
+```bash
+node <PLUGIN_ROOT>/skills/understand-ollama/run-pipeline.mjs \
+  --project-root "$PROJECT_ROOT" \
+  --plugin-root "$PLUGIN_ROOT" \
+  ${OLLAMA_URL:+--ollama-url "$OLLAMA_URL"} \
+  ${OLLAMA_MODEL:+--model "$OLLAMA_MODEL"} \
+  --language "$OUTPUT_LANGUAGE" \
+  ${OLLAMA_CONCURRENCY:+--concurrency "$OLLAMA_CONCURRENCY"}
+```
+
+Where `OLLAMA_URL`, `OLLAMA_MODEL`, and `OLLAMA_CONCURRENCY` come from the persisted `ollama: { baseUrl, model, concurrency }` block in `$PROJECT_ROOT/.understand-anything/config.json` (read with `loadConfig` from `@understand-anything/core`). If any value is absent, the driver's own defaults apply (`http://127.0.0.1:11434`, `qwen2.5-coder:1.5b`, `2`).
+
+If the driver exits non-zero, report its stderr and **STOP** — do not fall back to the host-platform dispatch on failure. The driver surfaces every warning or partial-result condition in its own progress output.
 
 ### Full analysis path
 
