@@ -69,6 +69,9 @@ importers:
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
+      tree-sitter-bash:
+        specifier: 0.25.1
+        version: 0.25.1
       tree-sitter-c-sharp:
         specifier: ^0.23.1
         version: 0.23.5
@@ -2821,6 +2824,14 @@ packages:
   tinyspy@4.0.4:
     resolution: {integrity: sha512-azl+t0z7pw/z958Gy9svOTuzqIk6xq+NSheJzn5MMWtWTFywIacg2wUlzKFGtt3cthx0r2SxMK0yzJOR0IES7Q==}
     engines: {node: '>=14.0.0'}
+
+  tree-sitter-bash@0.25.1:
+    resolution: {integrity: sha512-7hMytuYIMoXOq24yRulgIxthE9YmggZIOHCyPTTuJcu6EU54tYD+4G39cUb28kxC6jMf/AbPfWGLQtgPTdh3xw==}
+    peerDependencies:
+      tree-sitter: ^0.25.0
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
 
   tree-sitter-c-sharp@0.23.5:
     resolution: {integrity: sha512-xJGOeXPMmld0nES5+080N/06yY6LQi+KWGWV4LfZaZe6srJPtUtfhIbRSN7EZN6IaauzW28v6W4QHFwmeUW6HQ==}
@@ -6242,6 +6253,11 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyspy@4.0.4: {}
+
+  tree-sitter-bash@0.25.1:
+    dependencies:
+      node-addon-api: 8.6.0
+      node-gyp-build: 4.8.4
 
   tree-sitter-c-sharp@0.23.5:
     dependencies:
