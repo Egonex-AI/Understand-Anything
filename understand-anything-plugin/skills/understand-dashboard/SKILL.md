@@ -1,7 +1,7 @@
 ---
 name: understand-dashboard
 description: Launch the interactive web dashboard to visualize a codebase's knowledge graph
-argument-hint: [project-path]
+argument-hint: "[project-path]"
 ---
 
 # /understand-dashboard
