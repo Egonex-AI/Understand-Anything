@@ -27,6 +27,12 @@ fi
 echo "$PROJECT_ROOT"
 `;
 
+function normalizePath(p) {
+  let normalized = p.trim().replace(/\\/g, '/');
+  normalized = normalized.replace(/^\/([a-zA-Z])(?=\/|$)/, (_, letter) => `${letter.toUpperCase()}:`);
+  return normalized;
+}
+
 function runResolve(projectRoot, env = {}) {
   // No `set -e` — the snippet relies on `git ... 2>/dev/null` returning empty
   // strings when not in a git repo; `set -e` would short-circuit instead.
@@ -64,19 +70,19 @@ afterAll(() => {
 
 describe("worktree-redirect snippet (issue #133)", () => {
   it("leaves PROJECT_ROOT alone in a normal checkout", () => {
-    expect(runResolve(mainRepo)).toBe(mainRepo);
+    expect(normalizePath(runResolve(mainRepo))).toBe(normalizePath(mainRepo));
   });
 
   it("redirects PROJECT_ROOT to the main repo when started in a worktree", () => {
-    expect(runResolve(worktree)).toBe(mainRepo);
+    expect(normalizePath(runResolve(worktree))).toBe(normalizePath(mainRepo));
   });
 
   it("redirects from a subdirectory inside a worktree", () => {
-    expect(runResolve(subdir)).toBe(mainRepo);
+    expect(normalizePath(runResolve(subdir))).toBe(normalizePath(mainRepo));
   });
 
   it("respects UNDERSTAND_NO_WORKTREE_REDIRECT=1", () => {
-    expect(runResolve(worktree, { UNDERSTAND_NO_WORKTREE_REDIRECT: "1" })).toBe(worktree);
+    expect(normalizePath(runResolve(worktree, { UNDERSTAND_NO_WORKTREE_REDIRECT: "1" }))).toBe(normalizePath(worktree));
   });
 
   it("leaves PROJECT_ROOT alone when not inside a git repo", () => {
@@ -84,6 +90,6 @@ describe("worktree-redirect snippet (issue #133)", () => {
     // inside a parent git repo (e.g. when /tmp is symlinked into one).
     const nonGit = join(tmpRoot, "no-git");
     mkdirSync(nonGit, { recursive: true });
-    expect(runResolve(nonGit)).toBe(nonGit);
+    expect(normalizePath(runResolve(nonGit))).toBe(normalizePath(nonGit));
   });
 });

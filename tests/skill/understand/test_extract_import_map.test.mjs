@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(__dirname, '../../../understand-anything-plugin/skills/understand/extract-import-map.mjs');
@@ -1722,7 +1722,7 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
           { path: 'src/lib.ts', language: 'typescript', fileCategory: 'code' },
         ],
       },
-      ['--import', loaderPath],
+      ['--import', pathToFileURL(loaderPath).href],
     );
 
     expect(result.status).toBe(0);

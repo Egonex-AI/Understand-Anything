@@ -13,8 +13,10 @@ let projectRoot;
 let intermediateDir;
 
 function runMerge() {
-  const result = spawnSync("python3", [MERGE_SCRIPT, projectRoot], {
+  const pythonCmd = process.platform === "win32" ? "python" : "python3";
+  const result = spawnSync(pythonCmd, [MERGE_SCRIPT, projectRoot], {
     encoding: "utf-8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   if (result.status !== 0) {
     throw new Error(`merge script failed: status=${result.status}\nstderr:\n${result.stderr}`);
