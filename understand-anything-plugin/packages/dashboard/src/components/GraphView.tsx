@@ -50,8 +50,9 @@ import {
   computePortals,
   findCrossLayerFileNodes,
 } from "../utils/edgeAggregation";
-import { deriveContainers } from "../utils/containers";
+import { deriveContainerLevel } from "../utils/containers";
 import type { DerivedContainer } from "../utils/containers";
+import { fileChildren } from "../utils/fileChildren";
 import { computeLayerStats } from "../utils/layerStats";
 
 const nodeTypes = {
@@ -378,6 +379,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const detailLevel = useDashboardStore((s) => s.detailLevel);
   const showFunctionsInClassView = useDashboardStore((s) => s.showFunctionsInClassView);
+  const focusedContainerId = useDashboardStore((s) => s.focusedContainerId);
 
   const handleNodeSelect = useCallback(
     (nodeId: string) => {
@@ -473,20 +475,118 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       );
     }
 
-    // Derive containers + bucket edges
-    const { containers, ungrouped } = deriveContainers(
-      filteredGraphNodes,
-      filteredGraphEdges,
+    // ── Recursive container derivation ─────────────────────────────────────
+    // When a container is focused, scope nodes to that container's nodeIds
+    // and root the derivation at its prefix. Otherwise derive from the full
+    // filtered node set at the layer root prefix "".
+    //
+    // The recursion is bounded by MAX_DEPTH and a visited-prefix set so
+    // malformed paths can never cause an infinite loop.
+    const MAX_DEPTH = 12;
+
+    // Build a nodeById map for fileChildren lookups.
+    const nodeById = new Map<string, GraphNode>(
+      filteredGraphNodes.map((n) => [n.id, n]),
     );
-    const ungroupedSet = new Set(ungrouped);
-    const nodeToContainer = new Map<string, string>();
-    for (const c of containers) {
-      for (const id of c.nodeIds) nodeToContainer.set(id, c.id);
+
+    // Determine the scope for this render pass.
+    // If focused, find the focused container's data from a quick top-level derivation.
+    let scopeNodes = filteredGraphNodes;
+    let rootPrefix = "";
+
+    if (focusedContainerId) {
+      // Quick top-level derivation to find the focused container's nodeIds + prefix.
+      const topLevel = deriveContainerLevel(filteredGraphNodes, filteredGraphEdges, "");
+      const focusedC = topLevel.containers.find((c) => c.id === focusedContainerId);
+      if (focusedC) {
+        scopeNodes = filteredGraphNodes.filter((n) => focusedC.nodeIds.includes(n.id));
+        rootPrefix = focusedC.prefix;
+      }
+      // If not found at the top level, keep the full scope (safe fallback).
     }
+
+    // Recursive builder: derives containers at `prefix` for `nodes`,
+    // recursing into expanded containers. Emits flat ContainerFlowNode[] and
+    // leaf CustomFlowNode[] with parentId set appropriately.
+    const allContainers: DerivedContainer[] = [];
+    const allUngrouped: string[] = [];
+    const nodeToContainer = new Map<string, string>();
+
+    function buildLevel(
+      nodes: GraphNode[],
+      prefix: string,
+      parentContainerId: string | null,
+      depth: number,
+      visited: Set<string>,
+    ): void {
+      if (depth > MAX_DEPTH || visited.has(prefix)) {
+        console.warn("[GraphView] nesting depth guard hit at", prefix);
+        // Render remaining nodes flat under their parent (or as ungrouped).
+        for (const n of nodes) {
+          allUngrouped.push(n.id);
+          nodeToContainer.set(n.id, parentContainerId ?? n.id);
+        }
+        return;
+      }
+      visited.add(prefix);
+
+      const level = deriveContainerLevel(nodes, filteredGraphEdges, prefix);
+
+      // Register containers at this level.
+      for (const c of level.containers) {
+        allContainers.push({ ...c, nodeIds: c.nodeIds });
+        for (const id of c.nodeIds) nodeToContainer.set(id, c.id);
+      }
+
+      // Register leaves at this level (they map to parentContainerId if nested,
+      // or to themselves as ungrouped atoms at the root level).
+      for (const leafId of level.leaves) {
+        nodeToContainer.set(leafId, parentContainerId ?? leafId);
+        if (!parentContainerId) allUngrouped.push(leafId);
+      }
+
+      // Recurse into expanded containers at this level.
+      const expandedNow = useDashboardStore.getState().expandedContainers;
+      for (const c of level.containers) {
+        if (!expandedNow.has(c.id)) continue;
+        // The container is expanded — recurse into its children.
+        const childNodes = filteredGraphNodes.filter((n) => c.nodeIds.includes(n.id));
+        const visitedNext = new Set(visited);
+        buildLevel(childNodes, c.prefix, c.id, depth + 1, visitedNext);
+
+        // Lazy file→function expansion: if a file node inside this expanded
+        // container is itself in expandedContainers, append its function children.
+        for (const childId of c.nodeIds) {
+          if (!expandedNow.has(childId)) continue;
+          const fileNode = nodeById.get(childId);
+          if (!fileNode) continue;
+          const fnChildren = fileChildren(childId, filteredGraphEdges, nodeById);
+          if (fnChildren.length === 0) {
+            console.debug("[GraphView] fileChildren: no children for", childId);
+            continue;
+          }
+          // Add function nodes as leaves parented to their file.
+          for (const fn of fnChildren) {
+            // Only add if not already in filteredGraphNodes (avoid duplicates).
+            if (!nodeById.has(fn.id)) {
+              nodeById.set(fn.id, fn);
+              filteredGraphNodes.push(fn);
+            }
+            nodeToContainer.set(fn.id, childId);
+          }
+        }
+      }
+    }
+
+    buildLevel(scopeNodes, rootPrefix, null, 0, new Set<string>());
+
+    const containers = allContainers;
+    const ungroupedSet = new Set(allUngrouped);
+
     // Ungrouped nodes are their own atoms — register them so edge
     // aggregation treats inter-(container,ungrouped) edges as cross-atom.
     for (const id of ungroupedSet) {
-      nodeToContainer.set(id, id);
+      if (!nodeToContainer.has(id)) nodeToContainer.set(id, id);
     }
     const { intraContainer, interContainerAggregated } = aggregateContainerEdges(
       filteredGraphEdges,
@@ -626,7 +726,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
 
     return {
       containers,
-      ungrouped,
+      ungrouped: allUngrouped,
       nodeToContainer,
       intraContainer,
       filteredGraphNodes,
@@ -652,6 +752,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     showFunctionsInClassView,
     handleNodeSelect,
     handleContainerToggle,
+    focusedContainerId,
   ]);
 
   // ── Async ELK Stage 1 layout ────────────────────────────────────────────
@@ -866,8 +967,24 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           const deviated = dw > 0.2 || dh > 0.2;
           return { containerId, childPositions, actualSize, deviated };
         } catch (err) {
-          console.error(`[Stage 2 ${containerId}] layout failed:`, err);
-          return null;
+          // ELK fallback: warn and synthesise a simple grid layout so the
+          // canvas is never left blank for an expanded container.
+          console.warn(`[Stage 2 ${containerId}] ELK layout failed — falling back to flat grid layout:`, err);
+          const childPositions = new Map<string, { x: number; y: number }>();
+          const COLS = Math.max(1, Math.ceil(Math.sqrt(c.nodeIds.length)));
+          let maxX = 0;
+          let maxY = 0;
+          c.nodeIds.forEach((id, i) => {
+            const col = i % COLS;
+            const row = Math.floor(i / COLS);
+            const x = col * (NODE_WIDTH + 16);
+            const y = row * (NODE_HEIGHT + 16);
+            childPositions.set(id, { x, y });
+            if (x + NODE_WIDTH > maxX) maxX = x + NODE_WIDTH;
+            if (y + NODE_HEIGHT > maxY) maxY = y + NODE_HEIGHT;
+          });
+          const actualSize = { width: maxX + 40, height: maxY + 60 };
+          return { containerId, childPositions, actualSize, deviated: false };
         }
       }),
     ).then((results) => {

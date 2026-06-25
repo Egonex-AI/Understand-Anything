@@ -1,5 +1,5 @@
 // src/__tests__/store.focus.test.ts  (create)
-import { describe, it, expect, beforeEach } from "vitest";
+import { it, expect, beforeEach } from "vitest";
 import { useDashboardStore } from "../store";
 beforeEach(() => useDashboardStore.getState().clearFocus?.());
 it("focusContainer sets id and focusBreadcrumb derives crumbs", () => {

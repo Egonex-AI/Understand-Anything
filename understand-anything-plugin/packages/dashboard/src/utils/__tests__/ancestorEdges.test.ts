@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { aggregateEdges } from "../ancestorEdges";
 
 it("lifts endpoints to nearest visible ancestor and dedupes", () => {
