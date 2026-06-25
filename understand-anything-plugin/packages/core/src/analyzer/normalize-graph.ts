@@ -38,10 +38,13 @@ function stripToValidPrefix(id: string): { prefix: string | null; path: string }
 
     const segment = remaining.slice(0, colonIdx);
     if (VALID_PREFIXES.has(segment)) {
-      // Check for double valid prefix (e.g., "file:file:src/foo.ts")
+      // Check for a true duplicate prefix (e.g., "file:file:src/foo.ts").
+      // Only collapse when the next segment is the SAME prefix — a different
+      // reserved word in the middle (e.g. "endpoint:service:x") is a real
+      // path segment, not a duplicate, and must not be stripped.
       const rest = remaining.slice(colonIdx + 1);
       const innerColonIdx = rest.indexOf(":");
-      if (innerColonIdx > 0 && VALID_PREFIXES.has(rest.slice(0, innerColonIdx))) {
+      if (innerColonIdx > 0 && rest.slice(0, innerColonIdx) === segment) {
         // Double-prefixed — skip the outer, recurse on inner
         remaining = rest;
         continue;

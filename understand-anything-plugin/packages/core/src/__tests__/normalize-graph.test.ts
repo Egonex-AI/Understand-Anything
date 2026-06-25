@@ -31,6 +31,22 @@ describe("normalizeNodeId", () => {
     ).toBe("file:src/foo.ts");
   });
 
+  it("keeps a real prefix when a different reserved word is a middle segment", () => {
+    // Regression: "endpoint:service:x" is a valid prefix followed by a real
+    // path segment that happens to be a reserved word. The outer "endpoint"
+    // prefix must be preserved, not dropped in favour of "service".
+    expect(
+      normalizeNodeId("endpoint:service:getUser", { type: "endpoint" }),
+    ).toBe("endpoint:service:getUser");
+  });
+
+  it("is idempotent for IDs whose middle segment is a reserved word", () => {
+    const once = normalizeNodeId("endpoint:service:getUser", {
+      type: "endpoint",
+    });
+    expect(normalizeNodeId(once, { type: "endpoint" })).toBe(once);
+  });
+
   it("strips project-name prefix when valid prefix follows", () => {
     expect(
       normalizeNodeId("my-project:file:src/foo.ts", { type: "file" }),
