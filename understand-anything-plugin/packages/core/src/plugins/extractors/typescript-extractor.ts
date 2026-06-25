@@ -209,6 +209,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
         break;
 
       case "class_declaration":
+      case "abstract_class_declaration":
         this.extractClass(node, classes);
         break;
 
@@ -284,7 +285,11 @@ export class TypeScriptExtractor implements LanguageExtractor {
         const member = classBody.child(j);
         if (!member) continue;
 
-        if (member.type === "method_definition") {
+        if (
+          member.type === "method_definition" ||
+          member.type === "abstract_method_signature" ||
+          member.type === "method_signature"
+        ) {
           const methodName = member.children.find(
             (c) => c.type === "property_identifier",
           );
@@ -330,13 +335,16 @@ export class TypeScriptExtractor implements LanguageExtractor {
           valueNode.type === "function_expression" ||
           valueNode.type === "function")
       ) {
-        const params = extractParams(
-          valueNode.childForFieldName("parameters") ??
-            valueNode.children.find(
-              (c) => c.type === "formal_parameters",
-            ) ??
-            null,
-        );
+        const singleParam = valueNode.childForFieldName("parameter");
+        const params = singleParam
+          ? [singleParam.text]
+          : extractParams(
+              valueNode.childForFieldName("parameters") ??
+                valueNode.children.find(
+                  (c) => c.type === "formal_parameters",
+                ) ??
+                null,
+            );
         const returnType = extractReturnType(valueNode);
 
         functions.push({
@@ -416,7 +424,8 @@ export class TypeScriptExtractor implements LanguageExtractor {
           break;
         }
 
-        case "class_declaration": {
+        case "class_declaration":
+        case "abstract_class_declaration": {
           this.extractClass(child, classes);
           const nameNode = child.children.find(
             (c) =>
