@@ -229,6 +229,12 @@ interface DashboardStore {
 
   containerSizeMemory: Map<string, { width: number; height: number }>;
 
+  // Nested container focus + breadcrumb navigation
+  focusedContainerId: string | null;
+  focusContainer: (id: string) => void;
+  clearFocus: () => void;
+  focusBreadcrumb: () => { id: string; name: string }[];
+
   stage1Tick: number;
   bumpStage1Tick: () => void;
 
@@ -283,6 +289,7 @@ function layerResetIfChanged(
     // layer and would otherwise re-collide with a same-id container in
     // the new layer for the duration of the 1.2s timer.
     pendingFocusContainer: null,
+    focusedContainerId: null,
   };
 }
 
@@ -299,6 +306,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   navigationLevel: "overview",
   activeLayerId: null,
+  focusedContainerId: null,
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
@@ -388,6 +396,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       expandedContainers: new Set(),
       pendingFocusContainer: null,
       containerSizeMemory: new Map(),
+      focusedContainerId: null,
       stage1Tick: 0,
       layoutIssues: [],
     });
@@ -487,6 +496,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       containerSizeMemory: new Map(),
       expandedContainers: new Set(),
       pendingFocusContainer: null,
+      focusedContainerId: null,
     }),
 
   navigateToOverview: () =>
@@ -502,6 +512,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       containerSizeMemory: new Map(),
       expandedContainers: new Set(),
       pendingFocusContainer: null,
+      focusedContainerId: null,
     }),
 
   setFocusNode: (nodeId) =>
@@ -762,6 +773,19 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     set({ containerLayoutCache: new Map(), expandedContainers: new Set(), pendingFocusContainer: null }),
 
   containerSizeMemory: new Map(),
+
+  focusBreadcrumb: () => {
+    const id = get().focusedContainerId;
+    if (!id) return [];
+    const path = id.replace(/^container:/, "");
+    const segs = path.split("/").filter(Boolean);
+    const crumbs: { id: string; name: string }[] = [];
+    let acc = "";
+    for (const s of segs) { acc = acc ? `${acc}/${s}` : s; crumbs.push({ id: `container:${acc}`, name: s }); }
+    return crumbs;
+  },
+  focusContainer: (id) => set({ focusedContainerId: id, containerLayoutCache: new Map(), containerSizeMemory: new Map() }),
+  clearFocus: () => set({ focusedContainerId: null, containerLayoutCache: new Map(), containerSizeMemory: new Map() }),
 
   stage1Tick: 0,
   bumpStage1Tick: () => set((s) => ({ stage1Tick: s.stage1Tick + 1 })),
