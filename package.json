@@ -57,5 +57,8 @@
       "tree-sitter-rust",
       "tree-sitter-typescript"
     ]
+  },
+  "dependencies": {
+    "astro": "6.4.6"
   }
 }
