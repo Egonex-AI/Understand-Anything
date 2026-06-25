@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getLayerColor } from "./LayerLegend";
+import { useDashboardStore } from "../store";
 
 export interface ContainerNodeData extends Record<string, unknown> {
   containerId: string;
@@ -34,6 +35,14 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
   const handleToggle = (e: React.SyntheticEvent) => {
     e.stopPropagation();
     data.onToggle(data.containerId);
+  };
+
+  // Focus re-roots the whole canvas to this container's subtree and drives the
+  // breadcrumb. Read the action via getState() so this presentational node
+  // doesn't subscribe to the store (keeps memo() effective).
+  const handleFocus = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    useDashboardStore.getState().focusContainer(data.containerId);
   };
 
   return (
@@ -89,7 +98,27 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
             </span>
           )}
         </span>
-        <span style={{ color: "#a39787", fontSize: 11 }}>{data.childCount}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            onClick={handleFocus}
+            aria-label={`Focus ${labelText}`}
+            title="Focus this container"
+            className="focus:outline-none focus:ring-1 focus:ring-[rgba(212,165,116,0.6)] hover:text-gold-bright transition-colors"
+            style={{
+              color: color.label,
+              fontSize: 14,
+              lineHeight: 1,
+              cursor: "pointer",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+            }}
+          >
+            ⊕
+          </button>
+          <span style={{ color: "#a39787", fontSize: 11 }}>{data.childCount}</span>
+        </span>
       </div>
     </div>
   );

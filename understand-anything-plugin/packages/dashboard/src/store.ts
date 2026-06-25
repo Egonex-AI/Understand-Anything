@@ -8,6 +8,7 @@ import type {
   TourStep,
 } from "@understand-anything/core/types";
 import type { ReactFlowInstance } from "@xyflow/react";
+import { TRANSPARENT } from "./utils/containers";
 
 export type Persona = "non-technical" | "junior" | "experienced";
 export type NavigationLevel = "overview" | "layer-detail";
@@ -777,11 +778,23 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   focusBreadcrumb: () => {
     const id = get().focusedContainerId;
     if (!id) return [];
+    // Community clusters have no folder path — show a single crumb so the user
+    // can still see they are focused and click the layer crumb to exit.
+    if (id.startsWith("container:cluster-")) {
+      return [{ id, name: id.replace("container:", "") }];
+    }
     const path = id.replace(/^container:/, "");
     const segs = path.split("/").filter(Boolean);
     const crumbs: { id: string; name: string }[] = [];
     let acc = "";
-    for (const s of segs) { acc = acc ? `${acc}/${s}` : s; crumbs.push({ id: `container:${acc}`, name: s }); }
+    for (const s of segs) {
+      acc = acc ? `${acc}/${s}` : s;
+      // Transparent segments (src/app/lib/source) are never their own
+      // container — fold them into the next real crumb. Their path still
+      // accumulates into `acc` so deeper crumb ids stay correct.
+      if (TRANSPARENT.has(s)) continue;
+      crumbs.push({ id: `container:${acc}`, name: s });
+    }
     return crumbs;
   },
   focusContainer: (id) => set({ focusedContainerId: id, containerLayoutCache: new Map(), containerSizeMemory: new Map() }),

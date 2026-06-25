@@ -511,20 +511,47 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       filteredGraphNodes.map((n) => [n.id, n]),
     );
 
-    // Determine the scope for this render pass.
-    // If focused, find the focused container's data from a quick top-level derivation.
+    // Determine the scope for this render pass. When a container is focused we
+    // re-root the derivation at that container's subtree. This must work at ANY
+    // depth (focus a deeply-nested folder), so we scope by path prefix rather
+    // than searching only the top level — the focused id is path-qualified
+    // (`container:<fullPath>`) and a node belongs to the subtree iff its
+    // filePath is, or lives under, that prefix.
     let scopeNodes = filteredGraphNodes;
     let rootPrefix = "";
 
     if (focusedContainerId) {
-      // Quick top-level derivation to find the focused container's nodeIds + prefix.
-      const topLevel = deriveContainerLevel(filteredGraphNodes, filteredGraphEdges, "");
-      const focusedC = topLevel.containers.find((c) => c.id === focusedContainerId);
-      if (focusedC) {
-        scopeNodes = filteredGraphNodes.filter((n) => focusedC.nodeIds.includes(n.id));
-        rootPrefix = focusedC.prefix;
+      if (focusedContainerId.startsWith("container:cluster-")) {
+        // Community clusters have no path prefix — resolve by membership at the
+        // layer root (clusters only ever exist at the top level).
+        const topLevel = deriveContainerLevel(filteredGraphNodes, filteredGraphEdges, "");
+        const focusedC = topLevel.containers.find((c) => c.id === focusedContainerId);
+        if (focusedC) {
+          const idSet = new Set(focusedC.nodeIds);
+          scopeNodes = filteredGraphNodes.filter((n) => idSet.has(n.id));
+          rootPrefix = focusedC.prefix; // "" for clusters
+        } else if (import.meta.env.DEV) {
+          console.warn(
+            `[GraphView] focused cluster "${focusedContainerId}" not found at layer root — ignoring focus`,
+          );
+        }
+      } else {
+        // Folder container: scope to every node whose path lives under the prefix.
+        const prefix = focusedContainerId.replace(/^container:/, "");
+        const scoped = filteredGraphNodes.filter((n) => {
+          const fp = n.filePath;
+          return !!fp && (fp === prefix || fp.startsWith(prefix + "/"));
+        });
+        if (scoped.length > 0) {
+          scopeNodes = scoped;
+          rootPrefix = prefix;
+        } else if (import.meta.env.DEV) {
+          console.warn(
+            `[GraphView] focused container "${focusedContainerId}" matched no nodes — ignoring focus (showing full layer)`,
+          );
+        }
       }
-      // If not found at the top level, keep the full scope (safe fallback).
+      // If nothing matched, keep the full scope (safe fallback — never blank).
     }
 
     // Recursive builder: derives containers at `prefix` for `nodes`, emitting
@@ -751,7 +778,12 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       const seenAtoms = new Set<string>();
       for (const fileId of crossFiles) {
         if (!filteredNodeIds.has(fileId)) continue;
-        const atomId = nodeToContainer.get(fileId) ?? fileId;
+        // The portal edge must start at an atom that actually renders. A file
+        // outside the current (possibly focused) scope has no entry in
+        // nodeToContainer — skip it rather than sourcing the edge off a raw
+        // file id that isn't in the ELK input (which strict ELK drops/throws).
+        const atomId = nodeToContainer.get(fileId);
+        if (!atomId) continue;
         if (seenAtoms.has(atomId)) continue;
         seenAtoms.add(atomId);
         portalEdges.push({
@@ -1104,6 +1136,17 @@ function useLayerDetailTopology(): LayerDetailTopology & {
 const STAGE1_MAX_CONTAINER_WIDTH = 800;
 const STAGE1_MAX_CONTAINER_HEIGHT = 600;
 
+/** True when a size has finite, strictly-positive width and height. */
+function isValidSize(s: { width: number; height: number } | undefined): boolean {
+  return (
+    !!s &&
+    Number.isFinite(s.width) &&
+    Number.isFinite(s.height) &&
+    s.width > 0 &&
+    s.height > 0
+  );
+}
+
 /** Stage-1 width estimate for a container, by its descendant count. */
 function estimateContainerWidth(
   descendantCount: number,
@@ -1410,19 +1453,47 @@ function useLayerDetailGraph() {
         const isFocusedViaChild =
           focusContainerIds.has(cid) || selectionContainerIds.has(cid);
 
+        // Size an expanded container to its Stage-2 actual footprint. Stage-1
+        // sizes the atom from a descendant-count estimate CAPPED at
+        // STAGE1_MAX_CONTAINER_{WIDTH,HEIGHT} (800×600), but the children's
+        // ELK layout can span far larger. With `extent: "parent"` on the
+        // child nodes, React Flow clamps every child into the capped box —
+        // collapsing them onto a shared corner (the overlap bug). Driving the
+        // box straight from cache.actualSize gives the children room so the
+        // clamp is a no-op. (The stage1Tick path reflows SIBLING atoms but
+        // does not reliably resize this atom, so we set it explicitly here.)
+        const cache = isExpanded ? containerLayoutCache.get(cid) : undefined;
+        // Only trust a cached size that is finite and positive — a degenerate
+        // Stage-2 result (empty/failed ELK on some repo) must not shrink the
+        // box to 0 and re-trigger the clamp. Fall back to the Stage-1 estimate.
+        const cachedSize = isValidSize(cache?.actualSize) ? cache!.actualSize : null;
+        if (cache && !cachedSize && import.meta.env.DEV) {
+          console.warn(
+            `[GraphView] expanded container "${cid}" has invalid cached size`,
+            cache.actualSize,
+            "— falling back to Stage-1 estimate",
+          );
+        }
+        const width = cachedSize ? cachedSize.width : node.width;
+        const height = cachedSize ? cachedSize.height : node.height;
+
         // Skip creating a new object if nothing changed.
         if (
           data.isExpanded === isExpanded &&
           data.hasSearchHits === hasSearchHits &&
           data.searchHitCount === searchHitCount &&
           data.isDiffAffected === isDiffAffected &&
-          data.isFocusedViaChild === isFocusedViaChild
+          data.isFocusedViaChild === isFocusedViaChild &&
+          node.width === width &&
+          node.height === height
         ) {
           return node;
         }
 
         return {
           ...node,
+          width,
+          height,
           data: {
             ...data,
             isExpanded,
@@ -1466,6 +1537,7 @@ function useLayerDetailGraph() {
     searchResults,
     tourHighlightedNodeIds,
     expandedContainers,
+    containerLayoutCache,
     searchHitsByContainer,
     diffContainers,
     focusContainerIds,

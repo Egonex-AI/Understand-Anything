@@ -22,8 +22,10 @@ export interface DeriveResult {
   ungrouped: string[];
 }
 
-// Folder segments that are "transparent" — skipped when grouping by next meaningful segment.
-const TRANSPARENT = new Set(["src", "app", "lib", "source"]);
+// Folder segments that are "transparent" — skipped when grouping by next
+// meaningful segment. Exported so the breadcrumb can fold these segments into
+// the next real crumb (they are never their own container).
+export const TRANSPARENT = new Set(["src", "app", "lib", "source"]);
 
 /**
  * Returns the path segments of `filePath` *after* the given `prefix`, or null
