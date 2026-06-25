@@ -235,6 +235,9 @@ interface DashboardStore {
   focusContainer: (id: string) => void;
   clearFocus: () => void;
   focusBreadcrumb: () => { id: string; name: string }[];
+  // Reveal a node (e.g. from search) by drilling the flat view to its folder
+  // and selecting it.
+  revealNode: (id: string) => void;
 
   stage1Tick: number;
   bumpStage1Tick: () => void;
@@ -797,8 +800,44 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }
     return crumbs;
   },
-  focusContainer: (id) => set({ focusedContainerId: id, containerLayoutCache: new Map(), containerSizeMemory: new Map() }),
-  clearFocus: () => set({ focusedContainerId: null, containerLayoutCache: new Map(), containerSizeMemory: new Map() }),
+  // Flat drill-by-level model: focusing a container re-roots the view to that
+  // container's subtree and renders a single FLAT level (its sub-clusters +
+  // direct files, with aggregated links). expandedContainers is reset so no
+  // nested-box rendering ever kicks in. Navigation is the breadcrumb.
+  focusContainer: (id) =>
+    set({
+      focusedContainerId: id,
+      expandedContainers: new Set(),
+      containerLayoutCache: new Map(),
+      containerSizeMemory: new Map(),
+      selectedNodeId: null,
+    }),
+  clearFocus: () =>
+    set({
+      focusedContainerId: null,
+      expandedContainers: new Set(),
+      containerLayoutCache: new Map(),
+      containerSizeMemory: new Map(),
+      selectedNodeId: null,
+    }),
+  revealNode: (id) =>
+    set((state) => {
+      const fp = state.nodesById.get(id)?.filePath;
+      const slash = fp ? fp.lastIndexOf("/") : -1;
+      const dir = slash >= 0 ? fp!.slice(0, slash) : "";
+      const target = dir ? `container:${dir}` : null;
+      // Already focused on the node's folder — just (re)select it. Avoids
+      // resetting caches (and an effect loop when the node is a function whose
+      // file shows but the function node itself isn't rendered as an atom).
+      if (state.focusedContainerId === target) return { selectedNodeId: id };
+      return {
+        selectedNodeId: id,
+        focusedContainerId: target,
+        expandedContainers: new Set(),
+        containerLayoutCache: new Map(),
+        containerSizeMemory: new Map(),
+      };
+    }),
 
   stage1Tick: 0,
   bumpStage1Tick: () => set((s) => ({ stage1Tick: s.stage1Tick + 1 })),

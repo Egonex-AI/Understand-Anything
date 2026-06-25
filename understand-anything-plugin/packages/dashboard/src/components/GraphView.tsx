@@ -1665,32 +1665,24 @@ function GraphViewInner() {
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
+  const focusContainer = useDashboardStore((s) => s.focusContainer);
   const setReactFlowInstance = useDashboardStore((s) => s.setReactFlowInstance);
-  const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
-  const expandContainer = useDashboardStore((s) => s.expandContainer);
-  const collapseContainer = useDashboardStore((s) => s.collapseContainer);
-  const pendingFocusContainer = useDashboardStore((s) => s.pendingFocusContainer);
-  const setPendingFocusContainer = useDashboardStore((s) => s.setPendingFocusContainer);
   const tourFitPending = useDashboardStore((s) => s.tourFitPending);
   const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
   const detailGraph = useLayerDetailGraph();
 
-  const {
-    nodes: initialNodes,
-    edges: initialEdges,
-    nodeToContainer,
-    containerIds,
-    layoutStatus,
-  } = navigationLevel === "overview"
-    ? { ...overviewGraph, nodeToContainer: undefined, containerIds: undefined }
-    : detailGraph;
+  const { nodes: initialNodes, edges: initialEdges, layoutStatus } =
+    navigationLevel === "overview" ? overviewGraph : detailGraph;
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  const { fitView, getViewport, setCenter } = useReactFlow();
+  const { fitView } = useReactFlow();
+  const focusedContainerId = useDashboardStore((s) => s.focusedContainerId);
+  const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
+  const revealNode = useDashboardStore((s) => s.revealNode);
 
   useEffect(() => {
     setNodes(initialNodes);
@@ -1706,8 +1698,10 @@ function GraphViewInner() {
   // a pending fit on navigation and run it when nodes actually populate.
   const pendingFitRef = useRef(false);
   useEffect(() => {
+    // Re-fit on layer navigation AND on every drill (focus change) so the new
+    // flat level lands centered in the viewport.
     pendingFitRef.current = true;
-  }, [navigationLevel, activeLayerId]);
+  }, [navigationLevel, activeLayerId, focusedContainerId]);
 
   useEffect(() => {
     if (!pendingFitRef.current) return;
@@ -1720,138 +1714,29 @@ function GraphViewInner() {
     return () => cancelAnimationFrame(raf);
   }, [nodes, fitView]);
 
-  // Lock viewport onto a container the user just manually expanded so it
-  // appears to expand in place rather than getting yanked off-screen by
-  // the surrounding ELK reflow. Re-runs as nodes update (Stage 2 may
-  // shift positions a few times) and clears itself after a short window
-  // so subsequent layout shifts stop hijacking the viewport.
+  // Reveal-on-select: when a node is selected (e.g. from search) that isn't
+  // rendered at the current flat level, drill to its folder so it's visible.
+  // Clicking an already-visible node is a no-op here.
   useEffect(() => {
-    if (!pendingFocusContainer) return;
-    const node = nodes.find((n) => n.id === pendingFocusContainer);
-    if (!node) return;
-    const w =
-      (node.width as number | undefined) ??
-      ((node.style?.width as number | undefined) ?? 0);
-    const h =
-      (node.height as number | undefined) ??
-      ((node.style?.height as number | undefined) ?? 0);
-    const cx = node.position.x + w / 2;
-    const cy = node.position.y + h / 2;
-    const { zoom } = getViewport();
-    setCenter(cx, cy, { zoom, duration: 0 });
-  }, [pendingFocusContainer, nodes, getViewport, setCenter]);
-
-  useEffect(() => {
-    if (!pendingFocusContainer) return;
-    const t = window.setTimeout(() => setPendingFocusContainer(null), 1200);
-    return () => window.clearTimeout(t);
-  }, [pendingFocusContainer, setPendingFocusContainer]);
-
-  // ── Auto-expand triggers (Task 13) ─────────────────────────────────────
-  // Only meaningful in layer-detail; in overview mode there are no
-  // containers so all three effects no-op.
-
-  // Focus: when focusNodeId resolves to a node inside a container, expand it.
-  // Reading expandContainer is stable (Zustand setter); intentionally omitting
-  // expandedContainers from deps so focus changes are the only trigger.
-  useEffect(() => {
-    if (!focusNodeId || !nodeToContainer) return;
-    const cid = nodeToContainer.get(focusNodeId);
-    // Self-maps mean ungrouped nodes have cid === focusNodeId — skip those.
-    if (cid && cid !== focusNodeId) expandContainer(cid);
-  }, [focusNodeId, nodeToContainer, expandContainer]);
-
-  // Tour: expand containers needed for the current step, and release any
-  // containers we expanded for the previous step that aren't needed now.
-  // Containers the user expanded manually aren't tracked here, so they're
-  // never auto-collapsed. stopTour resets tourHighlightedNodeIds to [],
-  // which falls through to the "release all" branch.
-  const tourBorrowedContainersRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (!nodeToContainer) return;
-
-    const needed = new Set<string>();
-    for (const nid of tourHighlightedNodeIds) {
-      const cid = nodeToContainer.get(nid);
-      if (cid && cid !== nid) needed.add(cid);
-    }
-
-    const stillBorrowed = new Set<string>();
-    for (const cid of tourBorrowedContainersRef.current) {
-      if (needed.has(cid)) {
-        stillBorrowed.add(cid);
-      } else {
-        collapseContainer(cid);
-      }
-    }
-
-    const expandedNow = useDashboardStore.getState().expandedContainers;
-    for (const cid of needed) {
-      if (!expandedNow.has(cid)) {
-        expandContainer(cid);
-        stillBorrowed.add(cid);
-      }
-    }
-
-    tourBorrowedContainersRef.current = stillBorrowed;
-  }, [tourHighlightedNodeIds, nodeToContainer, expandContainer, collapseContainer]);
-
-  // Zoom: debounced auto-expand when the user has zoomed in past 1.0.
-  // Hysteresis: zoom < 0.6 = no auto-expand AND no auto-collapse (v1, the
-  // user collapses manually). The handler reads expandedContainers via
-  // getState() inside the timeout to avoid re-creating on every expand.
-  const zoomTimeoutRef = useRef<number | null>(null);
-  // Only auto-expand on user-driven zoom-INs. Skip programmatic moves
-  // (e.g. fitView at layer entry, which would otherwise cascade-expand
-  // every container the moment the layer paints) and skip pans/zoom-outs
-  // (so a user who manually collapses a container at zoom > 1 can pan
-  // around without seeing it pop back open).
-  const prevZoomRef = useRef<number | null>(null);
-  const onMove = useCallback(
-    (event: MouseEvent | TouchEvent | null) => {
-      if (event === null) return; // programmatic — skip
-      if (!containerIds || containerIds.length === 0) return;
-      if (zoomTimeoutRef.current !== null) {
-        window.clearTimeout(zoomTimeoutRef.current);
-      }
-      zoomTimeoutRef.current = window.setTimeout(() => {
-        const vp = getViewport();
-        const prev = prevZoomRef.current;
-        prevZoomRef.current = vp.zoom;
-        if (vp.zoom <= 1.0) return;
-        // Only fire when zoom actually increased — pan and zoom-out are no-ops.
-        if (prev !== null && vp.zoom <= prev) return;
-        const expanded = useDashboardStore.getState().expandedContainers;
-        for (const cid of containerIds) {
-          if (!expanded.has(cid)) expandContainer(cid);
-        }
-      }, 200);
-    },
-    [containerIds, getViewport, expandContainer],
-  );
-
-  // Clear any pending zoom timer on unmount or when handler identity changes.
-  useEffect(() => {
-    return () => {
-      if (zoomTimeoutRef.current !== null) {
-        window.clearTimeout(zoomTimeoutRef.current);
-        zoomTimeoutRef.current = null;
-      }
-    };
-  }, [onMove]);
+    if (navigationLevel !== "layer-detail" || !selectedNodeId) return;
+    if (nodes.some((n) => n.id === selectedNodeId)) return;
+    revealNode(selectedNodeId);
+  }, [selectedNodeId, nodes, navigationLevel, revealNode]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: { id: string }) => {
       if (navigationLevel === "overview") {
         drillIntoLayer(node.id);
       } else if (node.id.startsWith("portal:")) {
-        const targetLayerId = node.id.replace("portal:", "");
-        drillIntoLayer(targetLayerId);
+        drillIntoLayer(node.id.replace("portal:", ""));
+      } else if (node.id.startsWith("container:")) {
+        // Flat drill-by-level: clicking a cluster re-roots into it.
+        focusContainer(node.id);
       } else {
         selectNode(node.id);
       }
     },
-    [navigationLevel, drillIntoLayer, selectNode],
+    [navigationLevel, drillIntoLayer, selectNode, focusContainer],
   );
 
   const onPaneClick = useCallback(() => {
@@ -1887,7 +1772,6 @@ function GraphViewInner() {
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
-        onMove={navigationLevel === "layer-detail" ? onMove : undefined}
         onInit={setReactFlowInstance}
         nodeTypes={nodeTypes}
         nodesDraggable={false}
