@@ -544,8 +544,27 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     // top-level container nodes. Nested sub-containers (of expanded
     // containers) are rendered as React Flow children via expandedChildNodes.
     const rootContainerIds = new Set<string>();
+    // Ids already pushed into allContainers — prevents duplicates when a
+    // container is reached both as a parent's immediate sub-container AND as
+    // the root of a deeper recursion (when it is itself expanded).
+    const registeredContainerIds = new Set<string>();
     const allUngrouped: string[] = [];
     const nodeToContainer = new Map<string, string>();
+
+    // Build a full NestedContainer atom for `c`: compute its own immediate
+    // children (one level down) and push it once. Returns the immediate
+    // sub-container objects so callers can register those too. Idempotent.
+    function registerContainerAtom(c: DerivedContainer): DerivedContainer[] {
+      const childNodes = filteredGraphNodes.filter((n) => c.nodeIds.includes(n.id));
+      const subLevel = deriveContainerLevel(childNodes, filteredGraphEdges, c.prefix);
+      const immediateContainerIds = subLevel.containers.map((sc) => sc.id);
+      const directLeafIds = subLevel.leaves;
+      if (!registeredContainerIds.has(c.id)) {
+        registeredContainerIds.add(c.id);
+        allContainers.push({ ...c, nodeIds: c.nodeIds, immediateContainerIds, directLeafIds });
+      }
+      return subLevel.containers;
+    }
 
     function buildLevel(
       nodes: GraphNode[],
@@ -568,21 +587,21 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       const level = deriveContainerLevel(nodes, filteredGraphEdges, prefix);
       const expandedNow = expandedContainersForBuild;
 
-      // Register containers at this level, computing each one's IMMEDIATE
-      // children (the next level down) so the renderer can nest atoms.
+      // Register containers at this level as full atoms. CRUCIALLY also
+      // register each container's IMMEDIATE sub-containers as atoms right
+      // away — the renderer needs the sub-container OBJECTS present in
+      // topo.containers the instant the parent expands, independent of
+      // whether the recursion below has descended into them (it only
+      // recurses into sub-containers that are themselves expanded). Without
+      // this, expanding a folder shows its direct-leaf files but its nested
+      // sub-folders never resolve (containerById.get(scId) === undefined).
       for (const c of level.containers) {
-        const childNodes = filteredGraphNodes.filter((n) => c.nodeIds.includes(n.id));
-        const subLevel = deriveContainerLevel(childNodes, filteredGraphEdges, c.prefix);
-        const immediateContainerIds = subLevel.containers.map((sc) => sc.id);
-        const directLeafIds = subLevel.leaves;
-
-        allContainers.push({
-          ...c,
-          nodeIds: c.nodeIds,
-          immediateContainerIds,
-          directLeafIds,
-        });
+        const subContainers = registerContainerAtom(c);
         if (depth === 0) rootContainerIds.add(c.id);
+
+        // Register the immediate sub-containers as atoms too (one level down)
+        // so they resolve in expandedChildNodes the instant `c` is expanded.
+        for (const sc of subContainers) registerContainerAtom(sc);
 
         // Default: every descendant maps to this container atom. Recursion
         // below overrides the mapping for the children of an expanded container.
