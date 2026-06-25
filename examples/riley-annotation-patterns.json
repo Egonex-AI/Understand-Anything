@@ -1,0 +1,20 @@
+{
+  "description": "RILEY platform annotation patterns — extracts governance cross-references from .ai/ Python files",
+  "patterns": [
+    {
+      "name": "rule-ref",
+      "regex": "RULE-\\d+",
+      "edge_type": "enforces-rule"
+    },
+    {
+      "name": "bcp-ref",
+      "regex": "BCP-[A-Z]+-\\d+",
+      "edge_type": "implements-bcp"
+    },
+    {
+      "name": "prd-ref",
+      "regex": "PRD-\\d+",
+      "edge_type": "born-from-prd"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# CVEs suppressed: upstream VS Code plugin dependencies.
+# These DoS vulnerabilities apply to server contexts, not local CLI/plugin tooling.
+CVE-2026-42570
+CVE-2026-33671

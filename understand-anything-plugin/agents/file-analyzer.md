@@ -144,6 +144,15 @@ Treat these the same as tree-sitter-derived functions for node creation (Step 2 
 
 After the script completes, read `$PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<batchIndex>.json`. Use these structured results as the foundation for your analysis. Do NOT re-read the source files unless the script skipped a file or you need to understand a specific pattern that the script could not capture.
 
+### Annotation Pre-pass Injection
+
+If `$ANNOTATION_INDEX_AVAILABLE = true` (set when `--annotation-index` flag was used in Phase 1.25), read `.understand-anything/intermediate/annotation-index.json` once before processing your batch. For each file you are analyzing, look up its project-relative path in the index. If entries exist, prepend the following block to your semantic analysis prompt for that file:
+
+> **Pre-extracted annotation references:** `[RULE-023, BCP-REL-307, PRD-2990]`
+> These annotation IDs were extracted by regex from this file's source. They are confirmed relationship edges — document each as a typed `GraphEdge` using the `edge_type` from the pattern config (e.g. `enforces-rule`, `implements-bcp`, `born-from-prd`). Do not search the source for these IDs; they are already found.
+
+This eliminates LLM re-discovery of known structured annotations and reduces prompt length for annotation-heavy files.
+
 For each file in the script's `results` array, produce `GraphNode` and `GraphEdge` objects by combining the script's structural data with your expert judgment.
 
 ### Step 1 -- Create File Node
@@ -474,6 +483,21 @@ Use these hints for common edge patterns:
 - NEVER produce duplicate node IDs within your batch.
 - NEVER create self-referencing edges (where source equals target).
 - Trust the script's structural extraction. Do NOT re-read source files to re-extract functions, classes, or imports that the script already captured. Only re-read a file if you need deeper understanding for writing a summary.
+
+## Caveman Mode
+
+When the dispatch prompt includes `**Caveman mode: ON**`, apply these overrides to reduce token consumption:
+
+1. **Skip function and class nodes entirely.** Do NOT create `function:` or `class:` nodes. Do NOT create `contains` edges from files to functions/classes. Only create file-level nodes (one per file in the batch).
+2. **Skip import edges entirely.** Ignore `batchImportData`. Do not create any `imports` edges. Do not create `calls`, `inherits`, `implements`, or `exports` edges.
+3. **Shorter summaries.** Write exactly 1 sentence per file node (not 1-2). Focus on the file's primary purpose.
+4. **Skip `languageNotes`.** Do not include the `languageNotes` field on any node.
+5. **Non-code edges still apply.** For non-code files (config, docs, infra, data), still create cross-file edges (`configures`, `documents`, `deploys`, `migrates`, `triggers`, `defines_schema`, `serves`, `provisions`, `routes`, `depends_on`, `related`) as normal — these are cheap and valuable for the graph.
+6. **Non-code sub-nodes still apply.** If the structural extraction script produces `services`, `endpoints`, `resources`, `steps`, or `definitions` arrays for non-code files, still emit sub-nodes for significant entries as described in Phase 1 Step 3.
+
+All other rules (node types, ID conventions, required fields, output format) remain unchanged.
+
+---
 
 ## Writing Results — single or multi-part
 
