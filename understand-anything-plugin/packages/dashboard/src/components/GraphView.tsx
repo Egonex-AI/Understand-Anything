@@ -331,6 +331,21 @@ function useOverviewGraph() {
 
 // ── Layer detail level: topology (ELK Stage 1) + visual overlay ─────────
 
+/**
+ * A container in the visible nesting tree. Extends DerivedContainer (which
+ * carries `nodeIds` = ALL descendant file ids, used for sizing + edge
+ * aggregation) with its IMMEDIATE children — the one-level-down sub-containers
+ * and the files sitting directly in this folder. This is what makes nesting
+ * recurse: Stage 2 lays out and `expandedChildNodes` renders these immediate
+ * children (sub-container atoms + direct leaves), not the flat descendant set.
+ */
+interface NestedContainer extends DerivedContainer {
+  /** Ids of the sub-containers one level below this folder. */
+  immediateContainerIds: string[];
+  /** Ids of files that live directly in this folder (no deeper sub-folder). */
+  directLeafIds: string[];
+}
+
 interface LayerDetailTopology {
   nodes: Node[];
   edges: Edge[];
@@ -338,7 +353,7 @@ interface LayerDetailTopology {
   portalEdges: Edge[];
   filteredEdges: KnowledgeGraph["edges"];
   filteredNodes: GraphNode[];
-  containers: DerivedContainer[];
+  containers: NestedContainer[];
   nodeToContainer: Map<string, string>;
   intraContainer: GraphEdge[];
 }
@@ -356,12 +371,14 @@ const EMPTY_TOPOLOGY: LayerDetailTopology = {
 };
 
 /**
- * Topology hook: derives containers, aggregates inter-container edges, then
- * runs Stage 1 ELK on container atoms (no children rendered yet — Task 12
- * lazy-expands them). Only recomputes when the graph structure, active
- * layer, persona, diff state, focus, or filters change. Does NOT depend on
- * selectedNodeId, searchResults, tourHighlightedNodeIds, or
- * expandedContainers (Stage 2 concern).
+ * Topology hook: derives the visible container tree (recursively, one level
+ * per expanded container), aggregates inter-container edges, then runs Stage 1
+ * ELK on the root container atoms. Recomputes when the graph structure, active
+ * layer, persona, diff state, focus, filters, OR expandedContainers change —
+ * the last so a newly-expanded container registers its nested sub-containers.
+ * Stage 1 ELK only positions the small root-atom set; per-container child
+ * layout (sub-container atoms + direct-leaf files) is Stage 2's concern. Does
+ * NOT depend on selectedNodeId, searchResults, or tourHighlightedNodeIds.
  */
 function useLayerDetailTopology(): LayerDetailTopology & {
   layoutStatus: "computing" | "ready";
@@ -380,6 +397,11 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   const detailLevel = useDashboardStore((s) => s.detailLevel);
   const showFunctionsInClassView = useDashboardStore((s) => s.showFunctionsInClassView);
   const focusedContainerId = useDashboardStore((s) => s.focusedContainerId);
+  // The structural build must react to expand/collapse so newly-expanded
+  // containers register their nested sub-containers. (Stage 1 ELK re-runs as a
+  // consequence, but it only lays out the small set of root atoms + ungrouped
+  // + portals; container growth is already absorbed by containerSizeMemory.)
+  const expandedContainersForBuild = useDashboardStore((s) => s.expandedContainers);
 
   const handleNodeSelect = useCallback(
     (nodeId: string) => {
@@ -505,10 +527,23 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       // If not found at the top level, keep the full scope (safe fallback).
     }
 
-    // Recursive builder: derives containers at `prefix` for `nodes`,
-    // recursing into expanded containers. Emits flat ContainerFlowNode[] and
-    // leaf CustomFlowNode[] with parentId set appropriately.
-    const allContainers: DerivedContainer[] = [];
+    // Recursive builder: derives containers at `prefix` for `nodes`, emitting
+    // EVERY container in the visible tree as an atom. Each container records
+    // its IMMEDIATE children (one-level-down sub-containers + direct-leaf
+    // files) so nesting recurses: a container's box renders its sub-container
+    // atoms, and expanding a sub-container drills one level deeper.
+    //
+    // `nodeToContainer` maps each leaf file id to its DEEPEST visible atom:
+    //   - if the file's container is collapsed, it maps to that container id
+    //   - if expanded, it maps to the file id itself (the file becomes an atom
+    //     rendered inside its parent), or further down to a sub-container
+    // This keeps edge aggregation correct as the user drills in.
+    const allContainers: NestedContainer[] = [];
+    // Containers emitted at the visible ROOT level (depth 0). These are the
+    // only containers fed to Stage 1 ELK + the only ones rendered as
+    // top-level container nodes. Nested sub-containers (of expanded
+    // containers) are rendered as React Flow children via expandedChildNodes.
+    const rootContainerIds = new Set<string>();
     const allUngrouped: string[] = [];
     const nodeToContainer = new Map<string, string>();
 
@@ -531,25 +566,41 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       visited.add(prefix);
 
       const level = deriveContainerLevel(nodes, filteredGraphEdges, prefix);
+      const expandedNow = expandedContainersForBuild;
 
-      // Register containers at this level.
+      // Register containers at this level, computing each one's IMMEDIATE
+      // children (the next level down) so the renderer can nest atoms.
       for (const c of level.containers) {
-        allContainers.push({ ...c, nodeIds: c.nodeIds });
+        const childNodes = filteredGraphNodes.filter((n) => c.nodeIds.includes(n.id));
+        const subLevel = deriveContainerLevel(childNodes, filteredGraphEdges, c.prefix);
+        const immediateContainerIds = subLevel.containers.map((sc) => sc.id);
+        const directLeafIds = subLevel.leaves;
+
+        allContainers.push({
+          ...c,
+          nodeIds: c.nodeIds,
+          immediateContainerIds,
+          directLeafIds,
+        });
+        if (depth === 0) rootContainerIds.add(c.id);
+
+        // Default: every descendant maps to this container atom. Recursion
+        // below overrides the mapping for the children of an expanded container.
         for (const id of c.nodeIds) nodeToContainer.set(id, c.id);
       }
 
-      // Register leaves at this level (they map to parentContainerId if nested,
-      // or to themselves as ungrouped atoms at the root level).
+      // Register leaves at this level (files sitting directly in `prefix`).
+      // They map to parentContainerId if nested, or to themselves as
+      // ungrouped atoms at the root level.
       for (const leafId of level.leaves) {
         nodeToContainer.set(leafId, parentContainerId ?? leafId);
         if (!parentContainerId) allUngrouped.push(leafId);
       }
 
-      // Recurse into expanded containers at this level.
-      const expandedNow = useDashboardStore.getState().expandedContainers;
+      // Recurse into expanded containers at this level so their sub-containers
+      // become atoms and their direct-leaf files become rendered file atoms.
       for (const c of level.containers) {
         if (!expandedNow.has(c.id)) continue;
-        // The container is expanded — recurse into its children.
         const childNodes = filteredGraphNodes.filter((n) => c.nodeIds.includes(n.id));
         const visitedNext = new Set(visited);
         buildLevel(childNodes, c.prefix, c.id, depth + 1, visitedNext);
@@ -593,46 +644,16 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       nodeToContainer,
     );
 
-    // Container size estimate (size memory takes priority).
-    // Caps prevent first-paint sprawl: at 100 children sqrt() yields
-    // ~3360px which renders as a huge empty box pre-expansion. Stage 2
-    // sets the actual size once it's measured, and Task 15 re-flows.
-    const STAGE1_MAX_CONTAINER_WIDTH = 800;
-    const STAGE1_MAX_CONTAINER_HEIGHT = 600;
+    // Container size estimate (size memory takes priority). Caps prevent
+    // first-paint sprawl. Stage 2 sets the actual size once measured.
     const sizeMemory = useDashboardStore.getState().containerSizeMemory;
-    const containerWidth = (c: DerivedContainer) => {
-      const memo = sizeMemory.get(c.id)?.width;
-      if (memo) return memo;
-      const estimate = Math.sqrt(c.nodeIds.length) * NODE_WIDTH * 1.2;
-      return Math.min(STAGE1_MAX_CONTAINER_WIDTH, Math.max(NODE_WIDTH, estimate));
-    };
-    const containerHeight = (c: DerivedContainer) => {
-      const memo = sizeMemory.get(c.id)?.height;
-      if (memo) return memo;
-      const estimate = Math.sqrt(c.nodeIds.length) * NODE_HEIGHT * 1.2;
-      return Math.min(STAGE1_MAX_CONTAINER_HEIGHT, Math.max(NODE_HEIGHT, estimate));
-    };
 
-    // Build container flow nodes (children NOT rendered yet — Task 12)
-    const containerFlowNodes: ContainerFlowNode[] = containers.map((c, idx) => ({
-      id: c.id,
-      type: "container" as const,
-      position: { x: 0, y: 0 },
-      width: containerWidth(c),
-      height: containerHeight(c),
-      data: {
-        containerId: c.id,
-        name: c.name,
-        childCount: c.nodeIds.length,
-        strategy: c.strategy,
-        colorIndex: idx % 12,
-        isExpanded: false,
-        hasSearchHits: false,
-        isDiffAffected: false, // Task 14 will populate this
-        isFocusedViaChild: false,
-        onToggle: handleContainerToggle,
-      },
-    }));
+    // Build container flow nodes ONLY for root-level containers. Nested
+    // sub-containers (of expanded containers) are rendered as React Flow
+    // children via expandedChildNodes, not as top-level Stage 1 atoms.
+    const containerFlowNodes: ContainerFlowNode[] = containers
+      .filter((c) => rootContainerIds.has(c.id))
+      .map((c, idx) => buildContainerFlowNode(c, idx, sizeMemory, handleContainerToggle));
 
     // Build ungrouped file flow nodes (existing CustomFlowNode shape)
     const ungroupedFlowNodes: CustomFlowNode[] = filteredGraphNodes
@@ -753,6 +774,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     handleNodeSelect,
     handleContainerToggle,
     focusedContainerId,
+    expandedContainersForBuild,
   ]);
 
   // ── Async ELK Stage 1 layout ────────────────────────────────────────────
@@ -899,30 +921,84 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     // used. (setContainerLayout overwrites containerSizeMemory with the
     // new actualSize.)
     const sizeMemoryBefore = useDashboardStore.getState().containerSizeMemory;
+    const containerById = new Map(stage2Containers.map((cc) => [cc.id, cc]));
     Promise.all(
       toCompute.map(async (containerId) => {
-        const c = stage2Containers.find((cc) => cc.id === containerId);
+        const c = containerById.get(containerId);
         if (!c) return null;
-        const childIds = new Set(c.nodeIds);
-        const childEdges = stage2Intra.filter(
-          (e) => childIds.has(e.source) && childIds.has(e.target),
-        );
-        const stage2Children: ElkChild[] = c.nodeIds.map((id) => ({
-          id,
-          width: NODE_WIDTH,
-          height: NODE_HEIGHT,
-        }));
-        const stage2Edges: ElkEdge[] = childEdges.map((e, i) => ({
-          id: `${containerId}-e${i}`,
-          sources: [e.source],
-          targets: [e.target],
-        }));
+
+        // Stage 2 lays out a container's IMMEDIATE children, NOT its full
+        // descendant set: sub-container atoms (sized by their own descendant
+        // count via the Stage-1 formula) + direct-leaf files (NODE size).
+        // This is what makes nesting render — each expanded container shows
+        // its folder sub-atoms, and expanding one of those drills deeper
+        // through this same path.
+        const memberIds = [...c.immediateContainerIds, ...c.directLeafIds];
+        const memberSet = new Set(memberIds);
+
+        // Lazy file→function children: if a direct-leaf file is itself
+        // expanded, its functions become its rendered members (handled in
+        // expandedChildNodes); here we just size the file atom normally.
+
+        const stage2Children: ElkChild[] = [
+          ...c.immediateContainerIds.map((scId) => {
+            const sc = containerById.get(scId);
+            const descendantCount = sc?.nodeIds.length ?? 1;
+            return {
+              id: scId,
+              width: estimateContainerWidth(descendantCount, sizeMemoryBefore, scId),
+              height: estimateContainerHeight(descendantCount, sizeMemoryBefore, scId),
+            };
+          }),
+          ...c.directLeafIds.map((id) => ({
+            id,
+            width: NODE_WIDTH,
+            height: NODE_HEIGHT,
+          })),
+        ];
+
+        // Edges between immediate members: map each intra-container edge's
+        // endpoints up to the immediate member that contains them.
+        const memberOf = (nodeId: string): string | null => {
+          if (memberSet.has(nodeId)) return nodeId;
+          // Walk sub-containers and check membership by their full descendant set.
+          for (const scId of c.immediateContainerIds) {
+            const sc = containerById.get(scId);
+            if (sc && sc.nodeIds.includes(nodeId)) return scId;
+          }
+          return null;
+        };
+        const edgeKeys = new Set<string>();
+        const stage2Edges: ElkEdge[] = [];
+        let edgeIdx = 0;
+        for (const e of stage2Intra) {
+          const sm = memberOf(e.source);
+          const tm = memberOf(e.target);
+          if (!sm || !tm || sm === tm) continue;
+          const k = `${sm}|${tm}`;
+          if (edgeKeys.has(k)) continue;
+          edgeKeys.add(k);
+          stage2Edges.push({
+            id: `${containerId}-e${edgeIdx++}`,
+            sources: [sm],
+            targets: [tm],
+          });
+        }
+
         const stage2Input: ElkInput = {
           id: containerId,
           layoutOptions: ELK_DEFAULT_LAYOUT_OPTIONS,
           children: stage2Children,
           edges: stage2Edges,
         };
+
+        // Reusable estimate of this container's Stage-1 size (descendant count).
+        const memo = sizeMemoryBefore.get(containerId);
+        const stage1Width = memo?.width
+          ?? estimateContainerWidth(c.nodeIds.length, sizeMemoryBefore, `__nomemo_${containerId}`);
+        const stage1Height = memo?.height
+          ?? estimateContainerHeight(c.nodeIds.length, sizeMemoryBefore, `__nomemo_${containerId}`);
+
         try {
           const { positioned, issues } = await applyElkLayout(stage2Input, {
             strict: import.meta.env.DEV,
@@ -946,35 +1022,19 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           // Pad for container chrome (header + border)
           const actualSize = { width: maxX + 40, height: maxY + 60 };
 
-          // Recompute the Stage 1 estimate for this container using the
-          // SAME formula `built` used so we know what Stage 1 actually
-          // routed against. (Memo if present, else sqrt-clamped estimate.)
-          const memo = sizeMemoryBefore.get(containerId);
-          const STAGE1_MAX_W = 800;
-          const STAGE1_MAX_H = 600;
-          const stage1Width = memo?.width
-            ?? Math.min(
-              STAGE1_MAX_W,
-              Math.max(NODE_WIDTH, Math.sqrt(c.nodeIds.length) * NODE_WIDTH * 1.2),
-            );
-          const stage1Height = memo?.height
-            ?? Math.min(
-              STAGE1_MAX_H,
-              Math.max(NODE_HEIGHT, Math.sqrt(c.nodeIds.length) * NODE_HEIGHT * 1.2),
-            );
           const dw = Math.abs(actualSize.width - stage1Width) / stage1Width;
           const dh = Math.abs(actualSize.height - stage1Height) / stage1Height;
           const deviated = dw > 0.2 || dh > 0.2;
           return { containerId, childPositions, actualSize, deviated };
         } catch (err) {
-          // ELK fallback: warn and synthesise a simple grid layout so the
-          // canvas is never left blank for an expanded container.
+          // ELK fallback: warn and synthesise a simple grid of the immediate
+          // members so the canvas is never left blank for an expanded container.
           console.warn(`[Stage 2 ${containerId}] ELK layout failed — falling back to flat grid layout:`, err);
           const childPositions = new Map<string, { x: number; y: number }>();
-          const COLS = Math.max(1, Math.ceil(Math.sqrt(c.nodeIds.length)));
+          const COLS = Math.max(1, Math.ceil(Math.sqrt(memberIds.length)));
           let maxX = 0;
           let maxY = 0;
-          c.nodeIds.forEach((id, i) => {
+          memberIds.forEach((id, i) => {
             const col = i % COLS;
             const row = Math.floor(i / COLS);
             const x = col * (NODE_WIDTH + 16);
@@ -1016,6 +1076,70 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   ]);
 
   return { ...topology, layoutStatus };
+}
+
+// ── Shared container sizing + flow-node builders ───────────────────────────
+// Used by both Stage 1 (top-level container atoms) and the nested renderer
+// (sub-container atoms inside an expanded container). Kept module-scope so
+// the sizing formula is identical everywhere a container atom is drawn.
+const STAGE1_MAX_CONTAINER_WIDTH = 800;
+const STAGE1_MAX_CONTAINER_HEIGHT = 600;
+
+/** Stage-1 width estimate for a container, by its descendant count. */
+function estimateContainerWidth(
+  descendantCount: number,
+  sizeMemory: Map<string, { width: number; height: number }>,
+  id: string,
+): number {
+  const memo = sizeMemory.get(id)?.width;
+  if (memo) return memo;
+  const estimate = Math.sqrt(descendantCount) * NODE_WIDTH * 1.2;
+  return Math.min(STAGE1_MAX_CONTAINER_WIDTH, Math.max(NODE_WIDTH, estimate));
+}
+
+/** Stage-1 height estimate for a container, by its descendant count. */
+function estimateContainerHeight(
+  descendantCount: number,
+  sizeMemory: Map<string, { width: number; height: number }>,
+  id: string,
+): number {
+  const memo = sizeMemory.get(id)?.height;
+  if (memo) return memo;
+  const estimate = Math.sqrt(descendantCount) * NODE_HEIGHT * 1.2;
+  return Math.min(STAGE1_MAX_CONTAINER_HEIGHT, Math.max(NODE_HEIGHT, estimate));
+}
+
+/**
+ * Build a ContainerFlowNode for a NestedContainer. Reused for top-level
+ * container atoms and for sub-container atoms rendered inside an expanded
+ * container (the latter pass `parentId`/`extent`/`position`). The container
+ * UI (expand chevron) is identical so the user can keep drilling at any depth.
+ */
+function buildContainerFlowNode(
+  c: NestedContainer,
+  idx: number,
+  sizeMemory: Map<string, { width: number; height: number }>,
+  onToggle: (id: string) => void,
+): ContainerFlowNode {
+  return {
+    id: c.id,
+    type: "container" as const,
+    position: { x: 0, y: 0 },
+    width: estimateContainerWidth(c.nodeIds.length, sizeMemory, c.id),
+    height: estimateContainerHeight(c.nodeIds.length, sizeMemory, c.id),
+    data: {
+      containerId: c.id,
+      name: c.name,
+      childCount: c.nodeIds.length,
+      strategy: c.strategy,
+      colorIndex: idx % 12,
+      isExpanded: false,
+      hasSearchHits: false,
+      isDiffAffected: false,
+      isFocusedViaChild: false,
+      onToggle,
+    },
+  };
 }
 
 /**
@@ -1093,20 +1217,48 @@ function useLayerDetailGraph() {
 
   const topo = useLayerDetailTopology();
 
+  // Stable container-toggle handler so nested sub-container atoms can be
+  // expanded/collapsed by the user (same store action top-level atoms use).
+  const handleContainerToggle = useCallback(
+    (id: string) => useDashboardStore.getState().toggleContainer(id),
+    [],
+  );
+
   // Build expanded child nodes from the layout cache for any expanded
-  // container whose layout has been computed. Collapsed containers
-  // contribute zero children (gating on `expandedContainers`).
+  // container whose layout has been computed. Each expanded container renders
+  // its IMMEDIATE children: sub-container atoms (CONTAINER nodes, so the user
+  // can keep drilling) + direct-leaf files (custom nodes). Both are parented
+  // to the container via parentId/extent so they nest visually inside its box.
   const expandedChildNodes = useMemo<Node[]>(() => {
     if (expandedContainers.size === 0) return [];
     const out: Node[] = [];
     const nodeById = new Map(topo.filteredNodes.map((n) => [n.id, n]));
+    const containerById = new Map(topo.containers.map((c) => [c.id, c]));
+    const sizeMemory = useDashboardStore.getState().containerSizeMemory;
+
     for (const containerId of expandedContainers) {
       const cache = containerLayoutCache.get(containerId);
-      const container = topo.containers.find((c) => c.id === containerId);
+      const container = containerById.get(containerId);
       if (!cache || !container) continue;
-      for (const childId of container.nodeIds) {
-        const node = nodeById.get(childId);
-        const pos = cache.childPositions.get(childId);
+
+      // Sub-container atoms (immediate children one level down).
+      container.immediateContainerIds.forEach((scId, idx) => {
+        const sc = containerById.get(scId);
+        const pos = cache.childPositions.get(scId);
+        if (!sc || !pos) return;
+        const base = buildContainerFlowNode(sc, idx, sizeMemory, handleContainerToggle);
+        out.push({
+          ...base,
+          parentId: containerId,
+          extent: "parent",
+          position: pos,
+        } as Node);
+      });
+
+      // Direct-leaf file atoms (files sitting directly in this folder).
+      for (const leafId of container.directLeafIds) {
+        const node = nodeById.get(leafId);
+        const pos = cache.childPositions.get(leafId);
         if (!node || !pos) continue;
         const base = buildCustomFlowNode(node, {
           diffMode,
@@ -1132,6 +1284,7 @@ function useLayerDetailGraph() {
     changedNodeIds,
     affectedNodeIds,
     handleNodeSelect,
+    handleContainerToggle,
   ]);
 
   // ── Container visual overlay flags (Task 14) ────────────────────────────
