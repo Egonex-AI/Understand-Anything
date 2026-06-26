@@ -357,9 +357,10 @@ nodes = graph.get("nodes", [])
 edges = graph.get("edges", [])
 layers = graph.get("layers", [])
 
-# Cross-repo edge count comes from the linker's emitted file — authoritative source
-cross_edge_count = len(edges_raw)
-low_conf = [e for e in edges_raw if e.get("confidence", "high") == "low"]
+# Cross-repo edges actually applied (assigned x<i> ids by apply-interlinks.py)
+kg_edges = graph.get("edges", [])
+cross_edge_count = len([e for e in kg_edges if str(e.get("id", "")).startswith("x")])
+low_conf = [e for e in edges_raw if isinstance(e.get("confidence"), (int, float)) and e["confidence"] < 0.5]
 
 print(f"Nodes: {len(nodes)}")
 print(f"Edges total: {len(edges)}")

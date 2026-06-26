@@ -56,47 +56,18 @@ const VALUES_YAML_RE = /^values.*\.ya?ml$/i;
 // Env key patterns that indicate outbound service URLs
 const OUTBOUND_KEY_RE = /_(URL|HOST|ENDPOINT|BASE)$/i;
 
-// Literal URL pattern in source/config
-const LITERAL_URL_RE = /https?:\/\/([a-zA-Z0-9._-]+(?:\/[^\s"'`<>]*)?)/g;
-
-// FastAPI / Flask route decorators
-const PY_ROUTE_RE = /@(?:app|router)\.(get|post|put|patch|delete|options|head)\(["']([^"']+)["']/g;
-
-// Express routes: router.get('/path') or app.post('/path')
-const JS_ROUTE_RE = /(?:router|app)\.(get|post|put|patch|delete|options|head)\(["'`]([^"'`]+)["'`]/g;
-
-// Router prefix in Python: APIRouter(prefix="...")
-const PY_ROUTER_PREFIX_RE = /APIRouter\s*\([^)]*prefix\s*=\s*["']([^"']+)["']/g;
-
-// Keycloak realm, client_id / clientId / resource
+// Keycloak realm, client_id / clientId / resource (used in scanKeycloak)
 const KC_REALM_RE = /"?realm"?\s*[:=]\s*["']([^"']+)["']/;
 const KC_CLIENT_RE = /"?(?:client_id|clientId|resource)"?\s*[:=]\s*["']([^"']+)["']/;
 const KC_AUTH_URL_RE = /"?(?:auth-server-url|authServerUrl|issuer)"?\s*[:=]\s*["']([^"']+)["']/;
 const KC_CLIENT_ENV_RE = /KEYCLOAK_CLIENT(?:_ID)?\s*=\s*(.+)/i;
 const JWKS_RE = /(?:jwks|\.well-known\/openid)/i;
 
-// Keycloak JSON "resource" field (Keycloak adapter config)
-const KC_RESOURCE_RE = /"resource"\s*:\s*"([^"]+)"/;
-
-// iframe embed
-const IFRAME_SRC_RE = /<iframe[^>]+src=["']([^"']+)["']/g;
+// iframe + ct_token embed detection
 const CT_TOKEN_RE = /\bct_token\b|\bembedded=/;
-
-// GCS / Pub/Sub
-const GCS_BUCKET_RE = /gs:\/\/([a-zA-Z0-9._-]+)/g;
-const BUCKET_ENV_RE = /([A-Z][A-Z0-9_]*_BUCKET)\s*=\s*([^\s#]+)/g;
-const PUBSUB_TOPIC_RE = /projects\/[^/]+\/topics\/([a-zA-Z0-9._-]+)/g;
-const PUBSUB_TOPIC_NAME_RE = /["']([a-zA-Z0-9._-]+-topic[s]?)["']/g;
-
-// DB host patterns in env/config
-const DB_HOST_RE = /(?:DB_HOST|DATABASE_HOST|POSTGRES_HOST|MYSQL_HOST)\s*=\s*([^\s#]+)/gi;
-const DB_URL_RE = /(?:DATABASE_URL|DB_URL)\s*=\s*((?:postgres|mysql|mongodb|sqlite)[^:\s]*:\/\/[^\s#]+)/gi;
 
 // CORS origins in Python/JS
 const CORS_ORIGIN_RE = /(?:allow_origins|allowedOrigins|origins)\s*[=:]\s*\[([^\]]+)\]/;
-
-// Ingress host in helm values YAML
-const INGRESS_HOST_RE = /host\s*:\s*(.+)/;
 
 // pyproject.toml / package.json name
 const PYPROJECT_NAME_RE = /^name\s*=\s*["']?([^"'\n]+)["']?/m;
