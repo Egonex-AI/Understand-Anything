@@ -233,7 +233,7 @@ def apply(out: Path) -> None:
             edge["label"] = e["label"]
         if e.get("confidence") is not None:
             edge["confidence"] = e["confidence"]
-        if (e.get("confidence") or 1.0) < 0.5:
+        if e.get("confidence") is not None and e["confidence"] < 0.5:
             edge["lowConfidence"] = True
         # fineTarget: keep coarse edge always; annotate if fine node exists
         fine = e.get("fineTarget")

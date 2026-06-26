@@ -345,6 +345,63 @@ def test_dedup_edges():
         assert len(cross) == 1, f"Duplicate edge not deduped: found {len(cross)}"
 
 
+def test_zero_confidence_tagged_low_confidence():
+    """confidence==0.0 is falsy but must still be tagged lowConfidence; confidence>=0.5 must NOT be."""
+    with tempfile.TemporaryDirectory() as tmp_str:
+        out = Path(tmp_str)
+        make_combined_graph(out)
+
+        intermediate = out / ".understand-anything" / "intermediate"
+        edges = [
+            # zero-confidence: falsy 0.0 must be tagged lowConfidence
+            {
+                "source": "module:svc_a",
+                "target": "module:svc_b",
+                "type": "api-call",
+                "weight": 0.5,
+                "direction": "forward",
+                "confidence": 0.0,
+                "evidence": "zero-confidence edge",
+            },
+            # high-confidence: must NOT be tagged lowConfidence
+            {
+                "source": "module:svc_b",
+                "target": "module:svc_a",
+                "type": "event-dependency",
+                "weight": 0.8,
+                "direction": "forward",
+                "confidence": 0.9,
+                "evidence": "high-confidence edge",
+            },
+        ]
+        (intermediate / "crossrepo-edges.json").write_text(json.dumps(edges), encoding="utf-8")
+
+        result = run_apply(out)
+        assert result.returncode == 0, f"apply-interlinks failed:\n{result.stderr}"
+
+        kg = json.loads((out / ".understand-anything" / "knowledge-graph.json").read_text())
+        cross = [e for e in kg["edges"] if e.get("id", "").startswith("x")]
+
+        zero_edge = next(
+            (e for e in cross if e.get("source") == "module:svc_a" and e.get("target") == "module:svc_b"),
+            None,
+        )
+        assert zero_edge is not None, "zero-confidence edge was dropped (should be kept)"
+        assert zero_edge.get("confidence") == 0.0, f"confidence not stored correctly: {zero_edge}"
+        assert zero_edge.get("lowConfidence") is True, (
+            f"confidence==0.0 edge must have lowConfidence:true, got: {zero_edge}"
+        )
+
+        high_edge = next(
+            (e for e in cross if e.get("source") == "module:svc_b" and e.get("target") == "module:svc_a"),
+            None,
+        )
+        assert high_edge is not None, "high-confidence edge was dropped"
+        assert not high_edge.get("lowConfidence"), (
+            f"confidence==0.9 edge must NOT have lowConfidence, got: {high_edge}"
+        )
+
+
 if __name__ == "__main__":
     tests = [
         test_external_node_and_layer_created,
@@ -353,6 +410,7 @@ if __name__ == "__main__":
         test_validator_zero_issues,
         test_meta_json_written,
         test_dedup_edges,
+        test_zero_confidence_tagged_low_confidence,
     ]
     passed = failed = 0
     for t in tests:
