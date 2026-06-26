@@ -68,6 +68,24 @@ def make_repo(tmp: Path, ns: str) -> Path:
                 "summary": "Item business logic",
                 "tags": [],
             },
+            {
+                "id": "config:values-staging.yaml",
+                "type": "config",
+                "name": "values-staging.yaml",
+                "filePath": "deploy/values-staging.yaml",
+                "summary": "Helm values",
+                "tags": [],
+            },
+            {
+                # id-prefix (step) deliberately differs from type (pipeline) —
+                # layer membership must key off type, not the id prefix.
+                "id": "step:ci.yml:build",
+                "type": "pipeline",
+                "name": "build",
+                "filePath": "ci.yml",
+                "summary": "CI build step",
+                "tags": [],
+            },
         ],
         "edges": [
             {
@@ -159,6 +177,15 @@ def test_both_layers_present_with_correct_nodeids():
             f"endpoint node missing from layer_a nodeIds: {layer_a['nodeIds']}"
         assert "service:repo_a/ItemService" in layer_a["nodeIds"], \
             f"service node missing from layer_a nodeIds: {layer_a['nodeIds']}"
+
+        # ALL validator file-level types must be in the layer, keyed by node.type
+        # not id-prefix — else the assembled graph fails "File node not in any layer".
+        # config-typed node:
+        assert "config:repo_a/values-staging.yaml" in layer_a["nodeIds"], \
+            f"config node missing from layer_a nodeIds: {layer_a['nodeIds']}"
+        # pipeline-typed node whose id-prefix is 'step' (type-not-prefix regression):
+        assert "step:repo_a/ci.yml:build" in layer_a["nodeIds"], \
+            f"pipeline (step:) node missing from layer_a nodeIds: {layer_a['nodeIds']}"
 
         # module anchor must be in each layer
         assert "module:repo_a" in layer_a["nodeIds"], f"module:repo_a missing from layer nodeIds: {layer_a['nodeIds']}"

@@ -61,10 +61,18 @@ def _is_scan_artifact(node: dict) -> bool:
     return False
 
 
-def _is_top_level(namespaced_id: str) -> bool:
-    """True for file/endpoint/service nodes — not function/class members."""
-    kind = namespaced_id.split(":")[0]
-    return kind in ("file", "endpoint", "service")
+# File-level node types per the canonical graph validator
+# (skills/understand/SKILL.md Phase 6). EVERY node of one of these types must
+# belong to exactly one layer or the validator rejects the graph. Match by
+# node.type, NOT id-prefix: e.g. a `pipeline`-type node can have a `step:` id.
+FILE_LEVEL_TYPES = frozenset(
+    {"file", "config", "document", "service", "pipeline", "table", "schema", "resource", "endpoint"}
+)
+
+
+def _is_top_level(node: dict) -> bool:
+    """True for file-level nodes (validator's set) — not function/class members."""
+    return node.get("type") in FILE_LEVEL_TYPES
 
 
 def load_graph(path: Path) -> dict | None:
@@ -147,7 +155,7 @@ def namespace_repo(graph: dict, ns: str) -> tuple[dict, dict]:
 def build_layer(ns: str, ns_nodes: list[dict]) -> dict:
     """One layer:<ns> whose nodeIds = file-level nodes + module:<ns> anchor."""
     top_level_ids = sorted(
-        n["id"] for n in ns_nodes if _is_top_level(n["id"])
+        n["id"] for n in ns_nodes if _is_top_level(n)
     )
     anchor_id = f"module:{ns}"
     node_ids = sorted(set(top_level_ids + [anchor_id]))
