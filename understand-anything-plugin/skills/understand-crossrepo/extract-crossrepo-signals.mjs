@@ -40,6 +40,14 @@ const SKIP_DIRS = new Set([
   '.understand-anything', 'venv', '.venv', '__pycache__',
 ]);
 
+// Dependency lock files: huge, full of registry/vcs URLs (e.g. github.com), never
+// a real integration signal. Skipped by exact basename (their extensions are
+// .json/.yaml so BINARY_EXTS '.lock' alone doesn't catch them).
+const SKIP_FILES = new Set([
+  'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json',
+  'poetry.lock', 'Pipfile.lock', 'composer.lock', 'Cargo.lock', 'Gemfile.lock',
+]);
+
 // Files whose names match (case-insensitive) are scanned for env/config signals
 const ENV_FILE_RE = /^\.env(\.|$)/i;
 const CONFIG_FILE_RE = /^config\./i;
@@ -125,6 +133,7 @@ function walkRepo(repoPath) {
       if (entry.isDirectory()) {
         walk(abs);
       } else if (entry.isFile()) {
+        if (SKIP_FILES.has(entry.name)) continue;
         const ext = extname(entry.name).toLowerCase();
         if (BINARY_EXTS.has(ext)) continue;
         let size = 0;
