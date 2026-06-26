@@ -703,11 +703,19 @@ function useLayerDetailGraph() {
     }
     const hasSelection = !!selectedNodeId;
 
+    // layoutNestedTree returns ABSOLUTE coords; React Flow treats a child's
+    // position as RELATIVE to its parent. Subtract the immediate parent's
+    // absolute position so nested boxes don't double-offset (and so
+    // extent:"parent" doesn't clamp them onto each other at depth >=2).
+    const absById = new Map(layout.positioned.map((p) => [p.id, p]));
     const out: Node[] = [];
     layout.positioned.forEach((p, idx) => {
       const vn = visibleById.get(p.id);
       if (!vn) return;
       const nested = p.parentId !== null;
+      const parentAbs = nested ? absById.get(p.parentId!) : undefined;
+      const posX = p.x - (parentAbs?.x ?? 0);
+      const posY = p.y - (parentAbs?.y ?? 0);
 
       if (vn.kind === "cluster") {
         const cid = p.id;
@@ -716,7 +724,7 @@ function useLayerDetailGraph() {
         const node: ContainerFlowNode = {
           id: cid,
           type: "container",
-          position: { x: p.x, y: p.y },
+          position: { x: posX, y: posY },
           width: p.width,
           height: p.height,
           ...(nested ? { parentId: p.parentId!, extent: "parent" as const } : {}),
@@ -751,7 +759,7 @@ function useLayerDetailGraph() {
       const isNeighbor = hasSelection && neighborNodeIds.has(p.id) && !isSelected;
       out.push({
         ...base,
-        position: { x: p.x, y: p.y },
+        position: { x: posX, y: posY },
         ...(nested ? { parentId: p.parentId!, extent: "parent" as const } : {}),
         data: {
           ...base.data,
