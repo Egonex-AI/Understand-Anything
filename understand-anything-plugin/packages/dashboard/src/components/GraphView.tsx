@@ -122,7 +122,8 @@ function TourFitView() {
     // After we've already shown the fallback for this step, suppress the
     // "Locating tour highlight…" overlay on subsequent re-fires (each
     // `nodes` change re-enters the effect, but the user has already given
-    // up waiting). The retry still runs silently in case Stage 2 lands.
+    // up waiting). The retry still runs silently in case the async layout
+    // lands the highlighted ids.
     if (fallbackKeyRef.current !== targetKey) setTourFitPending(true);
 
     const tick = () => {
@@ -154,8 +155,8 @@ function TourFitView() {
       }
       // Highlights still not ready after the poll window. Pan into the
       // layer so the user isn't stranded, but DON'T set fittedKeyRef —
-      // if Stage 2 lands later, a `nodes` change will re-fire this effect
-      // and we'll get another shot at the proper highlight fit.
+      // if the async layout lands later, a `nodes` change will re-fire this
+      // effect and we'll get another shot at the proper highlight fit.
       // `fallbackKeyRef` prevents the fallback fitView from re-firing on
       // every subsequent nodes update for the same step.
       if (fallbackKeyRef.current !== targetKey) {
@@ -482,13 +483,18 @@ function useLayerDetailGraph() {
     }
 
     // Visible nesting tree — expansion drives depth, no re-root.
-    const nodeById = new Map(filteredGraphNodes.map((n) => [n.id, n]));
+    // File→function children resolve from the FULL graph (graph.edges +
+    // nodesById), not the layer-filtered sets: in the default "file"
+    // detailLevel, function/class nodes are excluded from filteredGraphNodes/
+    // Edges, so filtering here would make file expansion render nothing.
+    // visibleTree only surfaces these children when the file is expanded, so
+    // this doesn't leak functions into folder derivation.
     const tree = buildVisibleTree({
       scopeNodes: filteredGraphNodes,
       edges: filteredGraphEdges,
       rootPrefix: "",
       expanded: expandedContainers,
-      fileChildrenOf: (fileId) => fileChildren(fileId, filteredGraphEdges, nodeById),
+      fileChildrenOf: (fileId) => fileChildren(fileId, graph.edges, nodesById),
     });
     const vEdges = aggregateVisibleEdges(filteredGraphEdges, tree.visibleAtomOf);
 
@@ -876,10 +882,20 @@ function GraphViewInner() {
 
   // Reveal-on-select: when a node is selected (e.g. from search) that isn't
   // rendered at the current flat level, drill to its folder so it's visible.
-  // Clicking an already-visible node is a no-op here.
+  // Clicking an already-visible node is a no-op here. `nodes` is in the dep
+  // array (so this re-runs once the revealed node lands after async layout),
+  // but `revealNode` is only attempted ONCE per selected id — otherwise an
+  // un-revealable node (no filePath / out of layer scope) would re-fire
+  // revealNode on every layout settle.
+  const lastRevealAttemptRef = useRef<string | null>(null);
   useEffect(() => {
     if (navigationLevel !== "layer-detail" || !selectedNodeId) return;
-    if (nodes.some((n) => n.id === selectedNodeId)) return;
+    if (nodes.some((n) => n.id === selectedNodeId)) {
+      lastRevealAttemptRef.current = null;
+      return;
+    }
+    if (lastRevealAttemptRef.current === selectedNodeId) return;
+    lastRevealAttemptRef.current = selectedNodeId;
     revealNode(selectedNodeId);
   }, [selectedNodeId, nodes, navigationLevel, revealNode]);
 

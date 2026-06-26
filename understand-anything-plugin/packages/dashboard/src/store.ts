@@ -679,7 +679,13 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     set((s) => {
       const node = s.nodesById.get(id); const fp = node?.filePath; const n = new Set(s.expandedContainers);
       if (fp) { for (const cid of ancestorContainerIds(fp)) n.add(cid); if (node?.type === "function" || node?.type === "class") n.add(`file:${fp}`); }
-      return { expandedContainers: n, selectedNodeId: id };
+      // Record back-nav history the same way selectNode does — search/tour
+      // reveals must not silently drop the "back" affordance.
+      const nodeHistory =
+        s.selectedNodeId && s.selectedNodeId !== id
+          ? [...s.nodeHistory, s.selectedNodeId].slice(-MAX_HISTORY)
+          : s.nodeHistory;
+      return { expandedContainers: n, selectedNodeId: id, nodeHistory };
     }),
 
   layoutIssues: [],
