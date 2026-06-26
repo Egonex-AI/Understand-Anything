@@ -14,7 +14,6 @@ export interface ContainerNodeData extends Record<string, unknown> {
   searchHitCount?: number;
   isDiffAffected: boolean;
   isFocusedViaChild: boolean;
-  onToggle: (containerId: string) => void;
 }
 
 export type ContainerFlowNode = Node<ContainerNodeData, "container">;
@@ -32,19 +31,17 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
   const labelDimmed = data.name === "~";
   const labelText = labelDimmed ? "(root)" : data.name;
 
-  // Flat drill-by-level: clicking a cluster box drills INTO it (re-roots the
-  // canvas to its subtree and grows the breadcrumb). Read the action via
-  // getState() so this presentational node doesn't subscribe (keeps memo()).
-  const handleDrill = (e: React.SyntheticEvent) => {
+  const handleToggle = (e: React.SyntheticEvent) => {
     e.stopPropagation();
-    useDashboardStore.getState().focusContainer(data.containerId);
+    useDashboardStore.getState().toggleContainer(data.containerId);
   };
 
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${labelText} cluster, ${data.childCount} item${data.childCount !== 1 ? "s" : ""}, click to drill in`}
+      aria-label={`${labelText} cluster, ${data.childCount} item${data.childCount !== 1 ? "s" : ""}, ${data.isExpanded ? "expanded" : "collapsed"}`}
+      aria-expanded={data.isExpanded}
       className="rounded-xl cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-[rgba(212,165,116,0.6)] hover:border-gold/60"
       style={{
         width,
@@ -53,11 +50,11 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
         border: `${borderWidth}px solid ${borderColor}`,
         position: "relative",
       }}
-      onClick={handleDrill}
+      onClick={handleToggle}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          handleDrill(e);
+          handleToggle(e);
         }
       }}
     >
@@ -74,6 +71,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
           className={labelDimmed ? "opacity-50" : ""}
           style={{ display: "flex", alignItems: "center", gap: 6 }}
         >
+          <span style={{ fontSize: 10, color: color.label }}>{data.isExpanded ? "▾" : "▸"}</span>
           {labelText}
           {data.searchHitCount != null && data.searchHitCount > 0 && (
             <span
@@ -91,10 +89,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
             </span>
           )}
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#a39787", fontSize: 11 }}>
-          <span>{data.childCount}</span>
-          <span aria-hidden style={{ fontSize: 13, lineHeight: 1, color: color.label }}>›</span>
-        </span>
+        <span style={{ color: "#a39787", fontSize: 11 }}>{data.childCount}</span>
       </div>
     </div>
   );
