@@ -11,6 +11,7 @@ export interface ElkChild {
   y?: number;
   children?: ElkChild[];
   parentId?: string;
+  layoutOptions?: Record<string, string>;
 }
 
 export interface ElkEdge {

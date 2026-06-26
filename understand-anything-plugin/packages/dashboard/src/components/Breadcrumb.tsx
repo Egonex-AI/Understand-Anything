@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 
@@ -7,17 +6,12 @@ export default function Breadcrumb() {
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
   const graph = useDashboardStore((s) => s.graph);
   const navigateToOverview = useDashboardStore((s) => s.navigateToOverview);
-  // Subscribe to focusedContainerId so the trail re-renders as the user drills
-  // in/out; focusBreadcrumb() derives the (cleaned) crumb path from it.
-  const focusedContainerId = useDashboardStore((s) => s.focusedContainerId);
-  const focusBreadcrumb = useDashboardStore((s) => s.focusBreadcrumb);
-  const focusContainer = useDashboardStore((s) => s.focusContainer);
-  const clearFocus = useDashboardStore((s) => s.clearFocus);
   const { t } = useI18n();
 
   const activeLayer = graph?.layers.find((l) => l.id === activeLayerId);
-  const crumbs = focusedContainerId ? focusBreadcrumb() : [];
   const layerName = activeLayer?.name ?? t.layer.defaultName;
+  // ponytail: expand-in-place removed the focus/re-root trail — the crumb is
+  // just Project › Layer now (containers expand in place, no breadcrumb depth).
 
   return (
     <div className="absolute top-4 left-4 z-10 flex items-center gap-2 max-w-[calc(100%-2rem)]">
@@ -36,47 +30,10 @@ export default function Breadcrumb() {
             {t.breadcrumb.project}
           </button>
           <span className="text-text-muted">›</span>
-
-          {/* Layer crumb. When focused into a container it becomes a button that
-              clears focus (back to the whole layer); otherwise it's plain text. */}
-          {crumbs.length > 0 ? (
-            <button
-              onClick={clearFocus}
-              className="text-gold hover:text-gold-bright transition-colors whitespace-nowrap"
-            >
-              {layerName}
-            </button>
-          ) : (
-            <span className="text-text-primary whitespace-nowrap">{layerName}</span>
-          )}
-
-          {/* Focus trail — one crumb per nesting level. Every crumb except the
-              last re-roots to that ancestor on click, so the user can step back
-              up level by level. */}
-          {crumbs.map((c, i) => {
-            const isLast = i === crumbs.length - 1;
-            return (
-              <Fragment key={c.id}>
-                <span className="text-text-muted">›</span>
-                {isLast ? (
-                  <span className="text-text-primary whitespace-nowrap">{c.name}</span>
-                ) : (
-                  <button
-                    onClick={() => focusContainer(c.id)}
-                    className="text-gold hover:text-gold-bright transition-colors whitespace-nowrap"
-                  >
-                    {c.name}
-                  </button>
-                )}
-              </Fragment>
-            );
-          })}
-
-          {crumbs.length === 0 && (
-            <span className="text-text-muted ml-1 text-[10px] normal-case tracking-normal whitespace-nowrap">
-              ({t.breadcrumb.escBack})
-            </span>
-          )}
+          <span className="text-text-primary whitespace-nowrap">{layerName}</span>
+          <span className="text-text-muted ml-1 text-[10px] normal-case tracking-normal whitespace-nowrap">
+            ({t.breadcrumb.escBack})
+          </span>
         </div>
       )}
     </div>
