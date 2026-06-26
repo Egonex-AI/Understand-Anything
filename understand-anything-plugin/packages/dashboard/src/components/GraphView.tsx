@@ -496,7 +496,20 @@ function useLayerDetailGraph() {
       expanded: expandedContainers,
       fileChildrenOf: (fileId) => fileChildren(fileId, graph.edges, nodesById),
     });
-    const vEdges = aggregateVisibleEdges(filteredGraphEdges, tree.visibleAtomOf);
+    // Resolve EVERY node — including function/class nodes that are filtered out
+    // of the view in "Files" mode — to its file's visible atom. Without this,
+    // relationships that run through a function (most cross-folder imports) have
+    // an unmapped endpoint and get dropped, so collapsed clusters look
+    // unconnected. We then aggregate from the FULL graph edges so those
+    // relationships surface as cluster↔cluster links (count-labelled), which is
+    // the "links at a glance" the view is for. Cross-layer endpoints stay
+    // unmapped and are dropped here (portals handle them).
+    for (const n of graph.nodes) {
+      if (tree.visibleAtomOf.has(n.id) || !n.filePath) continue;
+      const fileAtom = tree.visibleAtomOf.get(`file:${n.filePath}`);
+      if (fileAtom) tree.visibleAtomOf.set(n.id, fileAtom);
+    }
+    const vEdges = aggregateVisibleEdges(graph.edges, tree.visibleAtomOf);
 
     // Portals for connected external layers (unchanged), sourced off the
     // visible atom for each cross-layer file (skip undefined atoms).
