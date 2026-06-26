@@ -262,9 +262,8 @@ def apply(out: Path) -> None:
             "weight": float(weight),
         }
         if label:
-            # `description` survives the dashboard schema (which strips unknown edge
-            # fields like `label`); keep `label` too for the raw/intermediate file.
-            edge["label"] = label
+            # Use `description` (which the dashboard schema keeps) rather than `label`
+            # (which it strips) — nothing downstream reads the edge label.
             edge["description"] = label
         if e.get("confidence") is not None:
             edge["confidence"] = e["confidence"]
@@ -296,7 +295,6 @@ def apply(out: Path) -> None:
         ])[:2]
         step_nodes = [anchor] + [s for s in sample if s in node_ids]
         repo_steps.append({
-            "order": len(repo_steps) + 2,
             "title": f"{ns} service",
             "description": f"Key nodes in the {ns} repo.",
             "nodeIds": step_nodes,
@@ -312,21 +310,18 @@ def apply(out: Path) -> None:
 
     tour = [
         {
-            "order": 1,
             "title": "Platform Overview",
             "description": "High-level view of all repos and their module anchors.",
             "nodeIds": module_anchors,
         },
         *repo_steps,
         {
-            "order": len(repo_steps) + 2,
             "title": "Cross-Repo Interlinks",
             "description": "Nodes at the boundaries of inter-service dependencies.",
             "nodeIds": interlink_endpoints,
         },
     ]
-    # Renumber tour sequentially so order is unique and 1-based regardless of how
-    # repo_steps were accumulated.
+    # `order` is assigned here as the single source of truth — sequential, unique, 1-based.
     for i, step in enumerate(tour):
         step["order"] = i + 1
 
