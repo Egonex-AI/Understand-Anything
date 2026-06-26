@@ -501,6 +501,7 @@ function scanHelmValues(content, relPath, collector) {
     }
 
     // K8s env var form: `- name: X_BUCKET` followed by `  value: ...`
+    // ponytail: pendingEnvKey can mis-pair if a bare 'value:' appears at document level between name/value stanzas in freeform yaml; acceptable for values.yaml signal extraction
     {
       const nameMatch = line.match(/^\s*-?\s*name\s*:\s*([A-Z][A-Z0-9_]*_(BUCKET|TOPIC))\s*$/);
       if (nameMatch) {

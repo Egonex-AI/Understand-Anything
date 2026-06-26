@@ -266,3 +266,37 @@ test('Fix 2: values-staging.yaml BUCKET and TOPIC keys produce identity and outb
   assert.ok(pubsubSig, `no pubsub outbound for savo-events-staging: ${JSON.stringify(out.outbound)}`);
   assert.ok(pubsubSig.evidence.includes('values-staging.yaml'), `pubsub evidence must reference values-staging.yaml: ${pubsubSig.evidence}`);
 });
+
+// Fix 2b: K8s two-line env form (- name: / value:) in values YAML
+test('Fix 2b: K8s two-line name/value form in values YAML produces topic and bucket signals', () => {
+  const files = {
+    ...FIXTURE_FILES,
+    'helm/values-k8s.yaml': [
+      'env:',
+      '  - name: ORDER_TOPIC',
+      '    value: orders-topic',
+      '  - name: ARCHIVE_BUCKET',
+      '    value: gs://archive-bucket',
+    ].join('\n'),
+  };
+  const out = runExtractor(files, 'savo_pricing_service');
+
+  // ownedTopics and ownedBuckets
+  assert.ok(
+    out.identity.ownedTopics.includes('orders-topic'),
+    `ownedTopics missing orders-topic: ${JSON.stringify(out.identity.ownedTopics)}`,
+  );
+  assert.ok(
+    out.identity.ownedBuckets.some(b => b === 'gs://archive-bucket' || b === 'archive-bucket'),
+    `ownedBuckets missing archive-bucket: ${JSON.stringify(out.identity.ownedBuckets)}`,
+  );
+
+  // outbound pubsub + bucket with evidence pointing at the yaml file
+  const topicSig = out.outbound.find(s => s.kind === 'pubsub' && s.value.includes('orders-topic'));
+  assert.ok(topicSig, `no pubsub outbound for orders-topic: ${JSON.stringify(out.outbound)}`);
+  assert.ok(topicSig.evidence.includes('values-k8s.yaml'), `topic evidence must reference values-k8s.yaml: ${topicSig.evidence}`);
+
+  const bucketSig = out.outbound.find(s => s.kind === 'bucket' && s.value.includes('archive-bucket'));
+  assert.ok(bucketSig, `no bucket outbound for archive-bucket: ${JSON.stringify(out.outbound)}`);
+  assert.ok(bucketSig.evidence.includes('values-k8s.yaml'), `bucket evidence must reference values-k8s.yaml: ${bucketSig.evidence}`);
+});
