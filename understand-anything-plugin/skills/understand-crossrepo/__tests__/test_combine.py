@@ -37,7 +37,7 @@ def make_repo(tmp: Path, ns: str) -> Path:
                 "tags": [],
             },
             {
-                "id": f"file:src/main.py",
+                "id": "file:src/main.py",
                 "type": "file",
                 "name": "main.py",
                 "filePath": "src/main.py",
@@ -45,11 +45,27 @@ def make_repo(tmp: Path, ns: str) -> Path:
                 "tags": [],
             },
             {
-                "id": f"function:src/main.py:run",
+                "id": "function:src/main.py:run",
                 "type": "function",
                 "name": "run",
                 "filePath": "src/main.py",
                 "summary": "Main runner",
+                "tags": [],
+            },
+            {
+                "id": "endpoint:api/v1/items",
+                "type": "endpoint",
+                "name": "GET /api/v1/items",
+                "filePath": "src/main.py",
+                "summary": "List items endpoint",
+                "tags": [],
+            },
+            {
+                "id": "service:ItemService",
+                "type": "service",
+                "name": "ItemService",
+                "filePath": "src/main.py",
+                "summary": "Item business logic",
                 "tags": [],
             },
         ],
@@ -137,6 +153,12 @@ def test_both_layers_present_with_correct_nodeids():
         # function nodes must NOT be in the layer (only top-level)
         assert not any(nid.startswith("function:") for nid in layer_a["nodeIds"]), \
             "Function nodes should not be in repo layer"
+
+        # endpoint: and service: nodes MUST be in the layer (Task 5 relies on this)
+        assert "endpoint:repo_a/api/v1/items" in layer_a["nodeIds"], \
+            f"endpoint node missing from layer_a nodeIds: {layer_a['nodeIds']}"
+        assert "service:repo_a/ItemService" in layer_a["nodeIds"], \
+            f"service node missing from layer_a nodeIds: {layer_a['nodeIds']}"
 
         # module anchor must be in each layer
         assert "module:repo_a" in layer_a["nodeIds"], f"module:repo_a missing from layer nodeIds: {layer_a['nodeIds']}"

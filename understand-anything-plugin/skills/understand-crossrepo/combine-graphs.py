@@ -53,9 +53,11 @@ def _namespace_id(node_id: str, ns: str) -> str:
 def _is_scan_artifact(node: dict) -> bool:
     fp = node.get("filePath", "") or ""
     nid = node.get("id", "") or ""
-    for marker in _SCAN_ARTIFACT_MARKERS:
-        if marker in fp or marker in nid:
-            return True
+    if ".understand-anything" in fp or ".understand-anything" in nid:
+        return True
+    # ponytail: path-segment check — avoid matching "src/.trash-backup/file.py" mid-path
+    if fp.startswith(".trash-") or "/.trash-" in fp or nid.startswith(".trash-") or "/.trash-" in nid:
+        return True
     return False
 
 
@@ -162,6 +164,7 @@ def build_module_anchor(ns: str) -> dict:
         "type": "module",
         "name": ns,
         "repo": ns,
+        "tags": [f"repo:{ns}"],
     }
 
 
