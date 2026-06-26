@@ -210,3 +210,59 @@ test('node_modules and .git are skipped', () => {
     '.git must be skipped',
   );
 });
+
+// Fix 1: .env URL must produce exactly ONE api outbound entry (no bare-host duplicate)
+test('Fix 1: .env URL produces exactly one api outbound entry — no bare-host duplicate', () => {
+  const files = {
+    '.env': 'BRIDGE_API_URL=https://bridge.example/api\n',
+    'pyproject.toml': '[tool.poetry]\nname = "svc"\n',
+  };
+  const out = runExtractor(files, 'test_svc');
+  const apiSignals = out.outbound.filter(s => s.kind === 'api' && s.value.includes('bridge.example'));
+  assert.equal(
+    apiSignals.length,
+    1,
+    `expected exactly 1 api signal for bridge.example, got ${apiSignals.length}: ${JSON.stringify(apiSignals)}`,
+  );
+  // The single entry must be the structured KEY=value form from scanEnvConfig
+  assert.ok(
+    apiSignals[0].value.includes('BRIDGE_API_URL='),
+    `expected KEY=value form, got: ${apiSignals[0].value}`,
+  );
+});
+
+// Fix 2: values*.yaml bucket/topic signals are captured
+test('Fix 2: values-staging.yaml BUCKET and TOPIC keys produce identity and outbound signals', () => {
+  const files = {
+    ...FIXTURE_FILES,
+    'helm/values-staging.yaml': [
+      'replicaCount: 2',
+      'MEDIA_BUCKET: savo-media-staging',
+      'EVENTS_TOPIC: savo-events-staging',
+      'ingress:',
+      '  host: staging.example.com',
+    ].join('\n'),
+  };
+  const out = runExtractor(files, 'savo_pricing_service');
+
+  // ownedBuckets should include the bucket value
+  assert.ok(
+    out.identity.ownedBuckets.includes('savo-media-staging'),
+    `ownedBuckets missing savo-media-staging: ${JSON.stringify(out.identity.ownedBuckets)}`,
+  );
+
+  // ownedTopics should include the topic value
+  assert.ok(
+    out.identity.ownedTopics.includes('savo-events-staging'),
+    `ownedTopics missing savo-events-staging: ${JSON.stringify(out.identity.ownedTopics)}`,
+  );
+
+  // outbound should have bucket and pubsub entries with evidence pointing to the yaml file
+  const bucketSig = out.outbound.find(s => s.kind === 'bucket' && s.value.includes('savo-media-staging'));
+  assert.ok(bucketSig, `no bucket outbound for savo-media-staging: ${JSON.stringify(out.outbound)}`);
+  assert.ok(bucketSig.evidence.includes('values-staging.yaml'), `bucket evidence must reference values-staging.yaml: ${bucketSig.evidence}`);
+
+  const pubsubSig = out.outbound.find(s => s.kind === 'pubsub' && s.value.includes('savo-events-staging'));
+  assert.ok(pubsubSig, `no pubsub outbound for savo-events-staging: ${JSON.stringify(out.outbound)}`);
+  assert.ok(pubsubSig.evidence.includes('values-staging.yaml'), `pubsub evidence must reference values-staging.yaml: ${pubsubSig.evidence}`);
+});
