@@ -2,7 +2,7 @@ import type { VisibleNode } from "./visibleTree";
 import type { VisibleEdge } from "./visibleEdges";
 import { applyElkLayout } from "./elk-layout";
 import type { ElkChild, ElkInput } from "./elk-layout";
-import { NODE_WIDTH, NODE_HEIGHT, ELK_DEFAULT_LAYOUT_OPTIONS } from "./layout";
+import { NODE_WIDTH, NODE_HEIGHT } from "./layout";
 
 export interface LaidOutNode {
   id: string;
@@ -85,15 +85,27 @@ export async function layoutNestedTree(
     }
   }
 
+  // Each container lays out its OWN children independently (SEPARATE_CHILDREN,
+  // the default) — this guarantees no sibling overlap within a box. Edges are
+  // NOT handed to ELK: with separate-children layout, cross-container edges
+  // can't be routed by a single root pass, and React Flow draws every
+  // aggregated edge from the final node positions regardless. So ELK does pure
+  // nested node packing; edge rendering is React Flow's job.
+  // rectpacking packs each container's children into a compact, strictly
+  // non-overlapping grid (no edges needed). React Flow draws the aggregated
+  // edges from the final positions, so dropping edges from ELK is fine and
+  // avoids cross-hierarchy routing issues.
   const elkInput: ElkInput = {
     id: "root",
     layoutOptions: {
-      ...ELK_DEFAULT_LAYOUT_OPTIONS,
-      "elk.hierarchyHandling": "INCLUDE_CHILDREN",
+      "elk.algorithm": "rectpacking",
+      "elk.spacing.nodeNode": "28",
+      "elk.padding": "[top=20,left=20,right=20,bottom=20]",
     },
     children: buildElkChildren(roots, childrenOf, nodeMap),
-    edges: edges.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+    edges: [],
   };
+  void edges;
 
   try {
     const { positioned, issues } = await applyElkLayout(elkInput, { strict: false });

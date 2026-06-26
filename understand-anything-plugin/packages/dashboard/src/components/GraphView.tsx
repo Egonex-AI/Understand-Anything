@@ -915,6 +915,11 @@ function GraphViewInner() {
       } else if (node.id.startsWith("container:")) {
         // Expand-in-place: clicking a cluster toggles its expansion.
         toggleContainer(node.id);
+      } else if (node.id.startsWith("file:")) {
+        // A file expands in place to its functions/classes (the file's graph
+        // id IS the "file:<path>" expand key) AND selects it for the side panel.
+        toggleContainer(node.id);
+        selectNode(node.id);
       } else {
         selectNode(node.id);
       }

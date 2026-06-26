@@ -28,6 +28,15 @@ export function buildVisibleTree(args: {
   const visibleAtomOf = new Map<string, string>();
   const visitedPrefixes = new Set<string>();
 
+  // Function/class nodes share their FILE's path, so folder derivation would
+  // surface them as leaves siblings-of-the-file (overlapping). They belong to
+  // their file, not the folder: derive the tree from file-level nodes only and
+  // surface functions ONLY when their file is expanded (via fileChildrenOf).
+  // After the build we map each sub-file node to its file's visible atom so its
+  // edges still aggregate correctly while the file is collapsed.
+  const isSubFile = (n: GraphNode) => n.type === "function" || n.type === "class";
+  const structural = scopeNodes.filter((n) => !isSubFile(n));
+
   function recurse(
     nodesAtLevel: GraphNode[],
     prefix: string,
@@ -67,7 +76,7 @@ export function buildVisibleTree(args: {
       });
 
       if (expanded.has(c.id)) {
-        const next = scopeNodes.filter((n) => c.nodeIds.includes(n.id));
+        const next = structural.filter((n) => c.nodeIds.includes(n.id));
         recurse(next, c.prefix, c.id, depth + 1);
       } else {
         for (const id of c.nodeIds) {
@@ -110,6 +119,18 @@ export function buildVisibleTree(args: {
     }
   }
 
-  recurse(scopeNodes, rootPrefix, null, 0);
+  recurse(structural, rootPrefix, null, 0);
+
+  // Map each sub-file node (function/class) to its file's visible atom — unless
+  // its file is expanded, in which case fileChildrenOf already mapped it to
+  // itself. This keeps function→X edges aggregating to the file (or the folder
+  // box that holds the collapsed file) without ever rendering functions at the
+  // folder level.
+  for (const fn of scopeNodes) {
+    if (!isSubFile(fn) || visibleAtomOf.has(fn.id)) continue;
+    const fileAtom = fn.filePath ? visibleAtomOf.get(`file:${fn.filePath}`) : undefined;
+    if (fileAtom) visibleAtomOf.set(fn.id, fileAtom);
+  }
+
   return { nodes, visibleAtomOf };
 }

@@ -9,6 +9,24 @@ const nodes = [
   N("f3", "repo/src/api/client.ts"),
 ];
 
+it("function nodes (in scope) never become folder leaves; map to file's atom", () => {
+  // +Classes mode: a function node shares its file's path. Expanding the folder
+  // must NOT render the function as a sibling of its file.
+  const fileId = "file:repo/src/api/client.ts";
+  const fn = { id: "function:repo/src/api/client.ts:doThing", name: "doThing", type: "function", filePath: "repo/src/api/client.ts" } as any;
+  const withFn = [N("f3", "repo/src/api/client.ts"), { ...N("f3b", "repo/src/api/client.ts"), id: fileId }, fn];
+  // expand the api folder but NOT the file
+  const t = buildVisibleTree({
+    scopeNodes: withFn, edges: [], rootPrefix: "repo",
+    expanded: new Set(["container:repo/src/api"]),
+    fileChildrenOf: () => [],
+  });
+  // the function must NOT be a rendered node
+  expect(t.nodes.find((n) => n.id === fn.id)).toBeUndefined();
+  // but it must still resolve to its file's visible atom (the file box) for edges
+  expect(t.visibleAtomOf.get(fn.id)).toBe(fileId);
+});
+
 it("collapsed: clusters are boxes, descendants map to the box", () => {
   const t = buildVisibleTree({ scopeNodes: nodes, edges: [], rootPrefix: "repo", expanded: new Set(), fileChildrenOf: () => [] });
   const ids = t.nodes.filter(n => n.kind === "cluster").map(n => n.id).sort();
