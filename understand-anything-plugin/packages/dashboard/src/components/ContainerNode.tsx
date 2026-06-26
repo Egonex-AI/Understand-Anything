@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { Handle, Position } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getLayerColor } from "./LayerLegend";
 import { useDashboardStore } from "../store";
@@ -58,6 +59,9 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
         }
       }}
     >
+      {/* Aggregated edges anchor here when this box is collapsed; without a
+          Handle, React Flow silently drops every edge into a folder box. */}
+      <Handle type="target" position={Position.Top} className="!bg-text-muted !w-2 !h-2" />
       <div
         className="flex items-center justify-between font-heading"
         style={{
@@ -91,6 +95,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
         </span>
         <span style={{ color: "#a39787", fontSize: 11 }}>{data.childCount}</span>
       </div>
+      <Handle type="source" position={Position.Bottom} className="!bg-text-muted !w-2 !h-2" />
     </div>
   );
 }
