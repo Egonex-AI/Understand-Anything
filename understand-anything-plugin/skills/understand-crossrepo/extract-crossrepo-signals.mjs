@@ -295,8 +295,15 @@ function scanEnvConfig(content, relPath, collector) {
   });
 }
 
-/** Scan any file for literal https?:// URLs (outbound api). */
+/** Scan any file for literal https?:// URLs (outbound api).
+ *  Skips env/config files — those are already parsed by scanEnvConfig,
+ *  which emits structured KEY=value entries. Running here too would
+ *  duplicate the same target with a bare-host value. */
 function scanLiteralUrls(content, relPath, collector) {
+  const name = basename(relPath);
+  // ponytail: env/config files emit structured signals via scanEnvConfig; skip here to avoid dup api entries
+  if (isEnvFile(name) || isConfigFile(name)) return;
+
   // Exclude localhost / 127.0.0.1 — internal dev references
   const LOCAL_HOST_RE = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)/;
   let m;
@@ -389,6 +396,7 @@ function scanPythonRoutes(content, relPath, collector) {
     }
   }
 
+  // ponytail: only first APIRouter prefix per file is used; revisit if multi-router files appear in target repos
   const prefix = prefixes[0] || '';
 
   // Route decorators
@@ -457,17 +465,80 @@ function scanCors(content, relPath, collector) {
   }
 }
 
-/** Scan Helm values YAML for ingress hosts. */
+/** Scan Helm values YAML for ingress hosts and bucket/topic signals.
+ *  Handles both `KEY: value` (Helm) and K8s `- name: KEY` + `value: ...` forms. */
 function scanHelmValues(content, relPath, collector) {
   const lines = content.split('\n');
   let inIngress = false;
-  for (const line of lines) {
+  let pendingEnvKey = null; // for K8s - name: X_BUCKET / value: gs://...
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+    const evidence = `${relPath}:${lineNum}`;
+
+    // Ingress host detection
     if (/^\s*ingress\s*:/.test(line)) { inIngress = true; }
     if (inIngress) {
       const m = line.match(/host\s*:\s*(.+)/);
       if (m) {
         const host = m[1].trim().replace(/["']/g, '');
         if (host) collector.addHost(host);
+      }
+    }
+
+    // GCS gs:// URI anywhere in YAML (bucket identity/outbound)
+    {
+      let m;
+      const re = /gs:\/\/([a-zA-Z0-9._-]+)/g;
+      while ((m = re.exec(line)) !== null) {
+        const bucket = m[1];
+        if (!collector._bucketSet.has(bucket)) {
+          collector.addBucket(bucket);
+          collector.addOutbound('bucket', `gs://${bucket}`, evidence);
+        }
+      }
+    }
+
+    // K8s env var form: `- name: X_BUCKET` followed by `  value: ...`
+    {
+      const nameMatch = line.match(/^\s*-?\s*name\s*:\s*([A-Z][A-Z0-9_]*_(BUCKET|TOPIC))\s*$/);
+      if (nameMatch) {
+        pendingEnvKey = { key: nameMatch[1], kind: nameMatch[2] };
+      } else if (pendingEnvKey) {
+        const valMatch = line.match(/^\s*value\s*:\s*(.+)/);
+        if (valMatch) {
+          const val = valMatch[1].trim().replace(/["']/g, '');
+          if (pendingEnvKey.kind === 'BUCKET') {
+            collector.addBucket(val);
+            collector.addOutbound('bucket', `${pendingEnvKey.key}=${val}`, evidence);
+          } else {
+            collector.addTopic(val);
+            collector.addOutbound('pubsub', `${pendingEnvKey.key}=${val}`, evidence);
+          }
+          pendingEnvKey = null;
+        } else if (!/^\s*#/.test(line) && line.trim() !== '') {
+          pendingEnvKey = null; // non-value line resets pending key
+        }
+      }
+    }
+
+    // Helm flat form: `X_BUCKET: value` or `X_TOPIC: value`
+    {
+      const kvMatch = line.match(/^\s*([A-Z][A-Z0-9_]*_(BUCKET|TOPIC))\s*:\s*(.+)/);
+      if (kvMatch) {
+        const key = kvMatch[1];
+        const kind = kvMatch[2];
+        const val = kvMatch[3].trim().replace(/["']/g, '');
+        if (val) {
+          if (kind === 'BUCKET') {
+            collector.addBucket(val);
+            collector.addOutbound('bucket', `${key}=${val}`, evidence);
+          } else {
+            collector.addTopic(val);
+            collector.addOutbound('pubsub', `${key}=${val}`, evidence);
+          }
+        }
       }
     }
   }
