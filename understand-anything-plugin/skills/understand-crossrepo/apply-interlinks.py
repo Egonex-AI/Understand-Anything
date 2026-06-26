@@ -116,7 +116,13 @@ def _dump(path: Path, obj) -> None:
 
 
 def _backfill_node(node: dict) -> dict:
-    """Ensure every node has non-empty summary and tags (validator requires it)."""
+    """Normalize a node so it passes the dashboard's core/schema.ts GraphNodeSchema.
+
+    The inline .cjs validator only checks summary/tags, but the dashboard's stricter
+    schema also requires `complexity` and rejects a non-tuple `lineRange` (some
+    per-repo graphs store lineRange as a string) — a rejected node is dropped, which
+    cascades into dropped edges. Fix both here.
+    """
     if not node.get("summary"):
         ntype = node.get("type", "unknown")
         nname = node.get("name", node["id"])
@@ -124,7 +130,27 @@ def _backfill_node(node: dict) -> dict:
     if not node.get("tags"):
         repo = node.get("repo", "")
         node["tags"] = [f"repo:{repo}"] if repo else ["untagged"]
+    if node.get("complexity") not in ("simple", "moderate", "complex"):
+        node["complexity"] = "moderate"
+    # lineRange must be [int, int] or absent (it's optional) — drop anything else.
+    lr = node.get("lineRange")
+    if lr is not None and not (
+        isinstance(lr, (list, tuple)) and len(lr) == 2
+        and all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in lr)
+    ):
+        node.pop("lineRange", None)
     return node
+
+
+# The cross-repo linker emits semantic types (`authenticates_via`, `embeds`) that
+# are NOT in the dashboard's core/schema.ts EdgeTypeSchema enum — such edges get
+# dropped on load. Map the unsupported ones to the nearest allowed type and keep
+# the original meaning in the edge label. All other linker types (calls, depends_on,
+# reads_from, writes_to, publishes, subscribes) are already valid and pass through.
+_EDGE_TYPE_MAP = {
+    "authenticates_via": "depends_on",
+    "embeds": "depends_on",
+}
 
 
 def _svc_name_from_external(target: str) -> str:
@@ -170,7 +196,7 @@ def apply(out: Path) -> None:
         for e in crossrepo_raw
         if e.get("target", "").startswith("external:")
     })
-    external_nodes = [_make_external_node(s) for s in external_svcs]
+    external_nodes = [_backfill_node(_make_external_node(s)) for s in external_svcs]
     for en in external_nodes:
         if en["id"] not in node_ids:
             nodes.append(en)
@@ -221,16 +247,25 @@ def apply(out: Path) -> None:
         weight = e.get("weight")
         if weight is None:
             weight = 0.5
+        # Map linker types the dashboard schema doesn't know to an allowed type,
+        # preserving the original semantic in the label.
+        mapped_type = _EDGE_TYPE_MAP.get(etype, etype)
+        label = e.get("label")
+        if mapped_type != etype:
+            label = f"{etype}: {label}" if label else etype
         edge = {
             "id": f"x{xi}",
             "source": src,
             "target": tgt,
-            "type": etype,
+            "type": mapped_type,
             "direction": "forward",
             "weight": float(weight),
         }
-        if e.get("label"):
-            edge["label"] = e["label"]
+        if label:
+            # `description` survives the dashboard schema (which strips unknown edge
+            # fields like `label`); keep `label` too for the raw/intermediate file.
+            edge["label"] = label
+            edge["description"] = label
         if e.get("confidence") is not None:
             edge["confidence"] = e["confidence"]
         if e.get("confidence") is not None and e["confidence"] < 0.5:
@@ -292,6 +327,9 @@ def apply(out: Path) -> None:
     ]
 
     # ── 5. Assemble final graph ────────────────────────────────────────────────
+    # One timestamp + commit shared by project metadata and meta.json.
+    analyzed_at = datetime.now(tz=timezone.utc).isoformat()
+    git_commit_hash = "crossrepo"
     combined_project = combined.get("project") or {}
     project = {
         "name": f"{combined_project.get('name', 'combined')} — cross-repo",
@@ -301,6 +339,11 @@ def apply(out: Path) -> None:
             "description",
             "Cross-repo knowledge graph combining multiple service repos.",
         ),
+        # Required by the dashboard's core/schema.ts ProjectMetaSchema — the inline
+        # .cjs validator doesn't check these, but the dashboard rejects the graph
+        # without them ("Missing or invalid project metadata").
+        "analyzedAt": analyzed_at,
+        "gitCommitHash": git_commit_hash,
     }
 
     # Sort nodes and layers for determinism
@@ -353,8 +396,8 @@ def apply(out: Path) -> None:
     # ── 8. Write meta.json ────────────────────────────────────────────────────
     node_count = len(final_nodes)
     meta = {
-        "lastAnalyzedAt": datetime.now(tz=timezone.utc).isoformat(),
-        "gitCommitHash": "crossrepo",
+        "lastAnalyzedAt": analyzed_at,
+        "gitCommitHash": git_commit_hash,
         "version": "1.0.0",
         "analyzedFiles": node_count,
     }

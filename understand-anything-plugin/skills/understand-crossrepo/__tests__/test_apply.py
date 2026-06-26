@@ -402,8 +402,72 @@ def test_zero_confidence_tagged_low_confidence():
         )
 
 
+def test_dashboard_schema_requirements():
+    """Lock the e2e-found fixes: the assembled graph must satisfy the dashboard's
+    stricter core/schema.ts (which the inline .cjs does NOT check):
+      - project carries analyzedAt + gitCommitHash
+      - every node has a valid `complexity`
+      - a string `lineRange` (some per-repo graphs store it as a string) is dropped
+        rather than left to fail node validation (which cascades to dropped edges)
+      - linker edge types not in the schema enum (authenticates_via/embeds) are
+        mapped to an allowed type with the original semantic kept in `description`.
+    """
+    with tempfile.TemporaryDirectory() as tmp_str:
+        out = Path(tmp_str) / "out"
+        intermediate = out / ".understand-anything" / "intermediate"
+        intermediate.mkdir(parents=True, exist_ok=True)
+        graph = {
+            "version": "1.0.0",
+            "project": {"name": "x", "languages": [], "frameworks": [], "description": "d"},
+            "nodes": [
+                {  # malformed lineRange (string) + missing complexity
+                    "id": "file:svc_a/m.py", "type": "file", "name": "m.py",
+                    "filePath": "svc_a/m.py", "summary": "s", "tags": ["repo:svc_a"],
+                    "repo": "svc_a", "lineRange": "1-50",
+                },
+                {"id": "module:svc_a", "type": "module", "name": "svc_a",
+                 "summary": "anchor", "tags": ["repo:svc_a"], "repo": "svc_a"},
+            ],
+            "edges": [{"source": "module:svc_a", "target": "file:svc_a/m.py",
+                       "type": "contains", "direction": "forward", "weight": 0.8}],
+            "layers": [{"id": "layer:svc_a", "name": "svc_a", "description": "l",
+                        "nodeIds": ["file:svc_a/m.py", "module:svc_a"]}],
+        }
+        (intermediate / "combined-graph.json").write_text(json.dumps(graph), encoding="utf-8")
+        (intermediate / "crossrepo-edges.json").write_text(json.dumps([
+            {"source": "module:svc_a", "target": "external:keycloak",
+             "type": "authenticates_via", "label": "svc_a auth via Keycloak",
+             "weight": 0.8, "direction": "forward", "confidence": 0.9, "evidence": "OIDC"},
+        ]), encoding="utf-8")
+
+        proc = run_apply(out)
+        assert proc.returncode == 0, f"apply failed: {proc.stderr}"
+        kg = json.loads((out / ".understand-anything" / "knowledge-graph.json").read_text())
+
+        # project metadata required by core/schema.ts ProjectMetaSchema
+        assert kg["project"].get("analyzedAt"), "project.analyzedAt missing"
+        assert kg["project"].get("gitCommitHash"), "project.gitCommitHash missing"
+
+        # every node must have a valid complexity; no node may carry a string lineRange
+        for n in kg["nodes"]:
+            assert n.get("complexity") in ("simple", "moderate", "complex"), \
+                f"node {n['id']} bad complexity: {n.get('complexity')}"
+            lr = n.get("lineRange")
+            assert lr is None or (isinstance(lr, list) and len(lr) == 2), \
+                f"node {n['id']} has invalid lineRange survived: {lr}"
+        bad = next(n for n in kg["nodes"] if n["id"] == "file:svc_a/m.py")
+        assert "lineRange" not in bad, "string lineRange should have been dropped"
+
+        # authenticates_via must be remapped to an allowed type with semantic in description
+        auth = next(e for e in kg["edges"] if e.get("target") == "service:external/keycloak")
+        assert auth["type"] == "depends_on", f"expected mapped depends_on, got {auth['type']}"
+        assert "authenticates_via" in (auth.get("description") or ""), \
+            f"original type not preserved in description: {auth.get('description')}"
+
+
 if __name__ == "__main__":
     tests = [
+        test_dashboard_schema_requirements,
         test_external_node_and_layer_created,
         test_dangling_edge_dropped,
         test_valid_and_external_edges_present,
