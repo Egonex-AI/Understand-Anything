@@ -170,19 +170,238 @@ Report to the user:
 
 ---
 
-## Phases 1–7 (added in later tasks)
+## Phase 1 — Per-repo reuse-or-fill
 
-The following phases are scaffolded here for continuity. Their full logic is authored in Tasks 2–6.
+Report: `[Phase 1/7] Checking per-repo graphs (reuse vs. analyze)...`
 
-| Phase | Name | Task |
-|-------|------|------|
-| 1 | Per-repo scan | Task 2 |
-| 2 | Per-repo file analysis (parallel) | Task 2 |
-| 3 | Cross-repo linker — detect and emit cross-repo edges | Task 3 |
-| 4 | Merge into unified graph — one node set, typed cross-repo edges | Task 4 |
-| 5 | Architecture + tour over the combined graph | Task 5 |
-| 6 | Review + validate the combined graph | Task 5 |
-| 7 | Save `crossrepo-knowledge-graph.json` + launch dashboard | Task 6 |
+For each repo in `$REPO_NAMESPACES` (namespace → absolute path), decide whether its single-repo knowledge graph is fresh enough to reuse, or must be (re-)built.
+
+**For each repo:**
+
+```bash
+# Read existing meta (may not exist)
+META="<repoPath>/.understand-anything/meta.json"
+CURRENT_HASH=$(git -C "<repoPath>" rev-parse HEAD 2>/dev/null || echo "")
+if [ -f "$META" ]; then
+  STORED_HASH=$(python3 -c "import json,sys; print(json.load(open('$META')).get('gitCommitHash',''))" 2>/dev/null || echo "")
+else
+  STORED_HASH=""
+fi
+```
+
+| Condition | Action |
+|-----------|--------|
+| `$META` missing | Run `/understand <repoPath>` (full analysis) |
+| `$STORED_HASH` ≠ `$CURRENT_HASH` | Run `/understand <repoPath>` (stale graph) |
+| Hashes match | Reuse existing `<repoPath>/.understand-anything/knowledge-graph.json` |
+
+To trigger analysis, invoke the `/understand` skill passing `<repoPath>` as its argument. Wait for it to complete before proceeding to the next repo. (Repos are analyzed sequentially here to avoid saturating LLM quota; the signal extraction in Phase 2 is fast and does not need parallelism.)
+
+After processing all repos, report:
+
+> Phase 1 complete. Reused: [list of reused namespaces]. Analyzed: [list of analyzed namespaces (or "none").].
+
+Collect any per-repo failures in `$PHASE_WARNINGS`. A repo whose `/understand` run fails should be skipped with a warning — do not STOP the whole run for a single repo failure. However, if **all** repos fail, report the errors and STOP.
+
+---
+
+## Phase 2 — Extract signals
+
+Report: `[Phase 2/7] Extracting cross-repo signals...`
+
+`$SKILL_DIR` is the directory containing this SKILL.md file — resolve it the same way Phase 0 resolved `$PLUGIN_ROOT` (using the `realpath`/`readlink -f` pattern on `~/.agents/skills/understand-crossrepo`, then falling back to common paths).
+
+For each repo (namespace `<ns>`, path `<repoPath>`):
+
+```bash
+node "$SKILL_DIR/extract-crossrepo-signals.mjs" \
+  "<repoPath>" \
+  "<ns>" \
+  "$OUT_DIR/.understand-anything/intermediate/signals-<ns>.json"
+```
+
+Run all repos sequentially. If the extractor exits non-zero for a repo, add the error to `$PHASE_WARNINGS` and continue — a repo with no signals simply contributes nothing to cross-repo linking.
+
+After all repos are done:
+
+> Phase 2 complete. Signals extracted for: [list of namespaces with non-empty outbound arrays]. No outbound signals: [list or "none"].
+
+---
+
+## Phase 3 — Combine graphs
+
+Report: `[Phase 3/7] Combining per-repo graphs into unified substrate...`
+
+Build the `<repo>:<ns>` argument list from `$REPO_NAMESPACES`:
+
+```bash
+python3 "$SKILL_DIR/combine-graphs.py" "$OUT_DIR" \
+  "<repoPath1>:<ns1>" \
+  "<repoPath2>:<ns2>" \
+  ...
+```
+
+This writes:
+- `$OUT_DIR/.understand-anything/intermediate/combined-graph.json`
+- `$OUT_DIR/.understand-anything/intermediate/id-map.json`
+
+If `combine-graphs.py` exits non-zero, read stderr, report it, and STOP — the downstream steps cannot run without a combined graph.
+
+> Phase 3 complete. Combined graph written with [N] repos, [M] total nodes.
+
+(Read `M` from `combined-graph.json`: `len(graph["nodes"])`.)
+
+---
+
+## Phase 4 — Cross-repo linking (LLM)
+
+Report: `[Phase 4/7] Dispatching cross-repo linker agent...`
+
+Prepare the linker's input by reading:
+1. All `signals-<ns>.json` files from `$OUT_DIR/.understand-anything/intermediate/`.
+2. From `combined-graph.json`: collect every node whose `id` starts with `module:` or `endpoint:`.
+
+Dispatch a subagent using the `crossrepo-linker` agent definition (at `agents/crossrepo-linker.md` relative to `$PLUGIN_ROOT`). Pass this prompt to the agent:
+
+> You are the cross-repo linker. Your output path is:
+> `$OUT_DIR/.understand-anything/intermediate/crossrepo-edges.json`
+>
+> **Signal files** (one per repo):
+> ```json
+> [paste full JSON contents of each signals-<ns>.json, keyed by namespace]
+> ```
+>
+> **Available anchor node IDs from combined-graph.json** (module + endpoint nodes):
+> ```
+> [one node id per line — all ids starting with "module:" or "endpoint:"]
+> ```
+>
+> Follow the matching rules in your agent definition and WRITE your edge array to the output path above.
+
+Wait for the agent to complete. Verify that `crossrepo-edges.json` now exists and is valid JSON containing an array. If the file is missing or invalid, retry the dispatch **once** with the failure appended to the prompt. If still failing after the retry, write an empty array `[]` to `crossrepo-edges.json`, add a warning to `$PHASE_WARNINGS`, and continue.
+
+> Phase 4 complete. [N] cross-repo edges emitted by linker.
+
+(Read `N` from `crossrepo-edges.json`: `len(edges)`.)
+
+---
+
+## Phase 5 — Apply, assemble, and validate
+
+Report: `[Phase 5/7] Applying cross-repo edges and assembling final graph...`
+
+```bash
+python3 "$SKILL_DIR/apply-interlinks.py" "$OUT_DIR"
+```
+
+This script:
+1. Backfills missing summaries/tags on `module:<ns>` anchor nodes.
+2. Synthesizes `external:*` infra nodes for unmatched edge targets.
+3. Applies and deduplicates cross-repo edges from `crossrepo-edges.json`.
+4. Assembles `$OUT_DIR/.understand-anything/knowledge-graph.json`.
+5. Runs the inline validator; writes results to `$OUT_DIR/.understand-anything/intermediate/review.json`.
+6. Writes `$OUT_DIR/.understand-anything/meta.json`.
+
+If `apply-interlinks.py` exits non-zero, read stderr, report it, and STOP.
+
+After it completes, read `review.json`:
+
+```bash
+python3 -c "
+import json
+r = json.load(open('$OUT_DIR/.understand-anything/intermediate/review.json'))
+print('issues:', r.get('issues', []))
+print('warnings:', r.get('warnings', []))
+"
+```
+
+**If `issues` is non-empty:**
+- Report each issue to the user verbatim.
+- Set `$VALIDATION_PASSED=false`.
+- Tell the user: "Validation issues were found. The graph has been saved but the dashboard will not auto-launch. Fix the issues above and re-run `/understand-crossrepo` to rebuild."
+
+**If `issues` is empty:**
+- Set `$VALIDATION_PASSED=true`.
+- > Phase 5 complete. Graph assembled and validated. [N] nodes, [M] edges (including [X] cross-repo edges). [W] warnings.
+
+---
+
+## Phase 6 — Summary report
+
+Report: `[Phase 6/7] Building summary report...`
+
+Read the final graph and intermediate files:
+
+```bash
+python3 - <<'EOF'
+import json, sys
+
+graph = json.load(open("$OUT_DIR/.understand-anything/knowledge-graph.json"))
+try:
+    edges_raw = json.load(open("$OUT_DIR/.understand-anything/intermediate/crossrepo-edges.json"))
+except Exception:
+    edges_raw = []
+
+nodes = graph.get("nodes", [])
+edges = graph.get("edges", [])
+layers = graph.get("layers", [])
+
+# Cross-repo edges: those whose source and target are in different namespaces
+def ns(nid):
+    # module:ns/... → ns; otherwise first segment after colon up to /
+    parts = nid.split(":", 1)
+    if len(parts) < 2:
+        return ""
+    rest = parts[1]
+    return rest.split("/")[0]
+
+cross_edges = [e for e in edges if ns(e.get("source","")) != ns(e.get("target",""))]
+low_conf = [e for e in edges_raw if e.get("confidence","high") == "low"]
+
+print(f"Nodes: {len(nodes)}")
+print(f"Edges total: {len(edges)}")
+print(f"Cross-repo edges: {len(cross_edges)}")
+print(f"Low-confidence edges (linker): {len(low_conf)}")
+print(f"Layers: {len(layers)} — {[l.get('id') for l in layers]}")
+EOF
+```
+
+Report to the user:
+
+```
+Cross-repo graph summary
+========================
+Repos analyzed (fresh):  [list from Phase 1]
+Repos reused (cached):   [list from Phase 1]
+
+Layers:  [one per repo namespace + external layer if any]
+Nodes:   [total]
+Edges:   [total] ([X] cross-repo, [W] low-confidence)
+
+Output: $OUT_DIR/.understand-anything/knowledge-graph.json
+
+Warnings accumulated: [list from $PHASE_WARNINGS, or "none"]
+```
+
+> Phase 6 complete.
+
+---
+
+## Phase 7 — Dashboard
+
+Report: `[Phase 7/7] Launching dashboard...`
+
+**Only proceed if `$VALIDATION_PASSED=true`** (set in Phase 5).
+
+Invoke the `/understand-dashboard` skill, passing `$OUT_DIR` as its project-path argument:
+
+> `/understand-dashboard $OUT_DIR`
+
+Do not hand-roll a Vite or Node server command — reuse the skill as-is. The skill reads `$OUT_DIR/.understand-anything/knowledge-graph.json` and launches the interactive explorer.
+
+If `$VALIDATION_PASSED=false`, skip this phase and remind the user:
+
+> "Dashboard launch skipped due to validation issues. Fix the issues reported in Phase 5 and re-run `/understand-crossrepo` to rebuild."
 
 ---
 
