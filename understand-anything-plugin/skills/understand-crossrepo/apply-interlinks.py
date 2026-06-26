@@ -325,6 +325,10 @@ def apply(out: Path) -> None:
             "nodeIds": interlink_endpoints,
         },
     ]
+    # Renumber tour sequentially so order is unique and 1-based regardless of how
+    # repo_steps were accumulated.
+    for i, step in enumerate(tour):
+        step["order"] = i + 1
 
     # ── 5. Assemble final graph ────────────────────────────────────────────────
     # One timestamp + commit shared by project metadata and meta.json.
