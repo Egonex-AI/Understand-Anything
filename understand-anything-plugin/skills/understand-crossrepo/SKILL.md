@@ -209,15 +209,19 @@ Collect any per-repo failures in `$PHASE_WARNINGS`. A repo whose `/understand` r
 
 Report: `[Phase 2/7] Extracting cross-repo signals...`
 
-`$SKILL_DIR` is the directory containing this SKILL.md file — resolve it the same way Phase 0 resolved `$PLUGIN_ROOT` (using the `realpath`/`readlink -f` pattern on `~/.agents/skills/understand-crossrepo`, then falling back to common paths).
+`$SKILL_DIR` is `$PLUGIN_ROOT/skills/understand-crossrepo` (since `$PLUGIN_ROOT` was already resolved in Phase 0).
 
-For each repo (namespace `<ns>`, path `<repoPath>`):
+For each repo, bind `REPO_PATH` and `NS` from Phase 0's `$REPO_NAMESPACES` mapping (namespace → absolute path), then run:
 
 ```bash
+# For each repo in $REPO_NAMESPACES:
+REPO_PATH="<that repo's absolute path>"
+NS="<that repo's namespace>"
+
 node "$SKILL_DIR/extract-crossrepo-signals.mjs" \
-  "<repoPath>" \
-  "<ns>" \
-  "$OUT_DIR/.understand-anything/intermediate/signals-<ns>.json"
+  "$REPO_PATH" \
+  "$NS" \
+  "$OUT_DIR/.understand-anything/intermediate/signals-$NS.json"
 ```
 
 Run all repos sequentially. If the extractor exits non-zero for a repo, add the error to `$PHASE_WARNINGS` and continue — a repo with no signals simply contributes nothing to cross-repo linking.
@@ -232,7 +236,7 @@ After all repos are done:
 
 Report: `[Phase 3/7] Combining per-repo graphs into unified substrate...`
 
-Build the `<repo>:<ns>` argument list from `$REPO_NAMESPACES`:
+Build the `<repoPath>:<ns>` argument list from `$REPO_NAMESPACES` (each arg is the absolute path colon-joined with its namespace, e.g. `/workspace/savo_gemba_service:savo_gemba_service`):
 
 ```bash
 python3 "$SKILL_DIR/combine-graphs.py" "$OUT_DIR" \
@@ -304,16 +308,21 @@ This script:
 
 If `apply-interlinks.py` exits non-zero, read stderr, report it, and STOP.
 
-After it completes, read `review.json`:
+After it completes, read `review.json` and the assembled graph:
 
 ```bash
 python3 -c "
 import json
 r = json.load(open('$OUT_DIR/.understand-anything/intermediate/review.json'))
+g = json.load(open('$OUT_DIR/.understand-anything/knowledge-graph.json'))
+print('nodes:', len(g.get('nodes', [])))
+print('edges:', len(g.get('edges', [])))
 print('issues:', r.get('issues', []))
 print('warnings:', r.get('warnings', []))
 "
 ```
+
+Report the node and edge counts to the user unconditionally (before branching on issues).
 
 **If `issues` is non-empty:**
 - Report each issue to the user verbatim.
@@ -330,15 +339,17 @@ print('warnings:', r.get('warnings', []))
 
 Report: `[Phase 6/7] Building summary report...`
 
-Read the final graph and intermediate files:
+Read the final graph and intermediate files (pass `$OUT_DIR` via argv so the quoted heredoc does not shell-expand it):
 
 ```bash
-python3 - <<'EOF'
+python3 - "$OUT_DIR" <<'EOF'
 import json, sys
 
-graph = json.load(open("$OUT_DIR/.understand-anything/knowledge-graph.json"))
+out_dir = sys.argv[1]
+
+graph = json.load(open(f"{out_dir}/.understand-anything/knowledge-graph.json"))
 try:
-    edges_raw = json.load(open("$OUT_DIR/.understand-anything/intermediate/crossrepo-edges.json"))
+    edges_raw = json.load(open(f"{out_dir}/.understand-anything/intermediate/crossrepo-edges.json"))
 except Exception:
     edges_raw = []
 
@@ -346,21 +357,13 @@ nodes = graph.get("nodes", [])
 edges = graph.get("edges", [])
 layers = graph.get("layers", [])
 
-# Cross-repo edges: those whose source and target are in different namespaces
-def ns(nid):
-    # module:ns/... → ns; otherwise first segment after colon up to /
-    parts = nid.split(":", 1)
-    if len(parts) < 2:
-        return ""
-    rest = parts[1]
-    return rest.split("/")[0]
-
-cross_edges = [e for e in edges if ns(e.get("source","")) != ns(e.get("target",""))]
-low_conf = [e for e in edges_raw if e.get("confidence","high") == "low"]
+# Cross-repo edge count comes from the linker's emitted file — authoritative source
+cross_edge_count = len(edges_raw)
+low_conf = [e for e in edges_raw if e.get("confidence", "high") == "low"]
 
 print(f"Nodes: {len(nodes)}")
 print(f"Edges total: {len(edges)}")
-print(f"Cross-repo edges: {len(cross_edges)}")
+print(f"Cross-repo edges: {cross_edge_count}")
 print(f"Low-confidence edges (linker): {len(low_conf)}")
 print(f"Layers: {len(layers)} — {[l.get('id') for l in layers]}")
 EOF
