@@ -757,12 +757,18 @@ function useLayerDetailGraph() {
       const searchScore = searchMap.get(p.id);
       const isSelected = selectedNodeId === p.id;
       const isNeighbor = hasSelection && neighborNodeIds.has(p.id) && !isSelected;
+      // An expanded file nests its functions/classes — it must carry ELK's
+      // computed parent size (like a cluster) so extent:"parent" doesn't clamp
+      // the children onto its leaf-sized box and stack them.
+      const isExpandedBox = vn.expanded;
       out.push({
         ...base,
         position: { x: posX, y: posY },
+        ...(isExpandedBox ? { width: p.width, height: p.height } : {}),
         ...(nested ? { parentId: p.parentId!, extent: "parent" as const } : {}),
         data: {
           ...base.data,
+          isExpandedBox,
           isHighlighted: searchScore !== undefined,
           searchScore,
           isSelected,
@@ -843,6 +849,11 @@ function useLayerDetailGraph() {
 const EMPTY_MAP: Map<string, string> = new Map();
 const EMPTY_EDGES: GraphEdge[] = [];
 
+// File-level leaf node id prefixes — these expand in place to their
+// functions/classes (via the "file:<path>" expand key). Excludes function/
+// class (no deeper level) and module/container/portal (handled separately).
+const FILE_LIKE_NODE = /^(file|endpoint|service|schema|config|document|resource|pipeline):/;
+
 // ── Main inner component (must be inside ReactFlowProvider) ────────────
 
 function GraphViewInner() {
@@ -854,7 +865,6 @@ function GraphViewInner() {
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
   const toggleContainer = useDashboardStore((s) => s.toggleContainer);
-  const expandedContainers = useDashboardStore((s) => s.expandedContainers);
   const setReactFlowInstance = useDashboardStore((s) => s.setReactFlowInstance);
   const tourFitPending = useDashboardStore((s) => s.tourFitPending);
   const { preset } = useTheme();
@@ -868,7 +878,7 @@ function GraphViewInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  const { fitView, setCenter, getViewport } = useReactFlow();
+  const { fitView } = useReactFlow();
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const revealNode = useDashboardStore((s) => s.revealNode);
 
@@ -920,28 +930,10 @@ function GraphViewInner() {
     revealNode(selectedNodeId);
   }, [selectedNodeId, nodes, navigationLevel, revealNode]);
 
-  // Pan-on-expand: when a new container id is added to expandedContainers,
-  // gently re-center on its box (once laid out) at the current zoom, keeping
-  // neighbours visible. Guarded on the node lookup — if not yet positioned,
-  // skip; it'll be there next render.
-  const prevExpandedRef = useRef<Set<string>>(expandedContainers);
-  useEffect(() => {
-    const prev = prevExpandedRef.current;
-    prevExpandedRef.current = expandedContainers;
-    if (expandedContainers.size <= prev.size) return;
-    let added: string | undefined;
-    for (const id of expandedContainers) {
-      if (!prev.has(id)) { added = id; break; }
-    }
-    if (!added) return;
-    const box = nodes.find((n) => n.id === added);
-    if (!box) return;
-    const w = box.width ?? 0;
-    const h = box.height ?? 0;
-    const cx = box.position.x + w / 2;
-    const cy = box.position.y + h / 2;
-    setCenter(cx, cy, { zoom: getViewport().zoom, duration: 400 });
-  }, [expandedContainers, nodes, setCenter, getViewport]);
+  // No auto-pan on expand: clusters expand in place and neighbours reflow, so
+  // the viewport stays put (predictable). A buggy auto-pan that fired on stale
+  // pre-relayout positions was yanking focus off-screen; Fit View covers
+  // re-framing on demand.
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: { id: string }) => {
@@ -952,12 +944,17 @@ function GraphViewInner() {
       } else if (node.id.startsWith("container:")) {
         // Expand-in-place: clicking a cluster toggles its expansion.
         toggleContainer(node.id);
-      } else if (node.id.startsWith("file:")) {
-        // A file expands in place to its functions/classes (the file's graph
-        // id IS the "file:<path>" expand key) AND selects it for the side panel.
-        toggleContainer(node.id);
+      } else if (FILE_LIKE_NODE.test(node.id)) {
+        // Any file-level leaf — regardless of its primary type prefix
+        // (file/endpoint/service/schema/config/document/resource) — expands in
+        // place to its functions/classes. The expand key is always
+        // "file:<path>" (what visibleTree checks), derived from the id's path
+        // part so endpoint/service nodes drill too, not just "file:" ones.
+        const path = node.id.slice(node.id.indexOf(":") + 1);
+        toggleContainer(`file:${path}`);
         selectNode(node.id);
       } else {
+        // function/class/module — nothing deeper to expand; just select.
         selectNode(node.id);
       }
     },

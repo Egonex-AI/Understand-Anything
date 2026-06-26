@@ -73,6 +73,7 @@ export interface CustomNodeData extends Record<string, unknown> {
   isDiffFaded: boolean;
   isNeighbor: boolean;
   isSelectionFaded: boolean;
+  isExpandedBox?: boolean;
   onNodeClick?: (nodeId: string) => void;
   incomingCount?: number;
   outgoingCount?: number;
@@ -84,6 +85,8 @@ export type CustomFlowNode = Node<CustomNodeData, "custom">;
 function CustomNodeComponent({
   id,
   data,
+  width,
+  height,
 }: NodeProps<CustomFlowNode>) {
   const knownType = data.nodeType as NodeType;
   const barColor = typeColors[knownType] ?? typeColors.file;
@@ -131,9 +134,18 @@ function CustomNodeComponent({
   const truncatedName =
     name.length > 24 ? name.slice(0, 22) + "..." : name;
 
+  // Expanded files become a sized box that nests their functions/classes.
+  const sizeClass = data.isExpandedBox
+    ? "min-w-[180px]"
+    : "min-w-[180px] max-w-[220px] overflow-hidden";
+  const boxStyle = data.isExpandedBox && width && height
+    ? { width, height }
+    : undefined;
+
   return (
     <div
-      className={`relative rounded-lg bg-elevated border border-border-subtle ${extraClass} min-w-[180px] max-w-[220px] overflow-hidden transition-[box-shadow,outline,opacity,filter] duration-200 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3)]`}
+      className={`relative rounded-lg bg-elevated border border-border-subtle ${extraClass} ${sizeClass} transition-[box-shadow,outline,opacity,filter] duration-200 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3)]`}
+      style={boxStyle}
       onClick={() => data.onNodeClick?.(id)}
     >
       {/* Left color bar */}
@@ -172,9 +184,11 @@ function CustomNodeComponent({
           {truncatedName}
         </div>
 
-        <div className="text-[11px] text-text-secondary mt-1 line-clamp-2 leading-tight">
-          {data.summary}
-        </div>
+        {!data.isExpandedBox && (
+          <div className="text-[11px] text-text-secondary mt-1 line-clamp-2 leading-tight">
+            {data.summary}
+          </div>
+        )}
       </div>
 
       <Handle
