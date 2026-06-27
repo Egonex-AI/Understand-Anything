@@ -27,8 +27,17 @@ const TYPE_TO_PREFIX: Record<string, string> = {
 /**
  * Strips all non-valid prefixes from an ID, returning the bare path
  * and the first valid prefix found (if any).
+ *
+ * `expectedPrefix` is the canonical prefix for the node's declared type
+ * (e.g. "file" for a file node). It disambiguates a reserved word that
+ * appears before the expected prefix — a spurious project-name prefix that
+ * happens to collide with a reserved word — from a reserved word that is a
+ * legitimate middle path segment.
  */
-function stripToValidPrefix(id: string): { prefix: string | null; path: string } {
+function stripToValidPrefix(
+  id: string,
+  expectedPrefix?: string,
+): { prefix: string | null; path: string } {
   let remaining = id;
 
   // Peel off colon-separated segments until we find a valid prefix or run out
@@ -38,14 +47,22 @@ function stripToValidPrefix(id: string): { prefix: string | null; path: string }
 
     const segment = remaining.slice(0, colonIdx);
     if (VALID_PREFIXES.has(segment)) {
-      // Check for a true duplicate prefix (e.g., "file:file:src/foo.ts").
-      // Only collapse when the next segment is the SAME prefix — a different
-      // reserved word in the middle (e.g. "endpoint:service:x") is a real
-      // path segment, not a duplicate, and must not be stripped.
+      // Collapse the outer prefix only when the next segment is either:
+      //   - the SAME reserved word — a true duplicate ("file:file:src/foo.ts"), or
+      //   - the node's expected prefix — a spurious project-name prefix that
+      //     collides with a reserved word ("service:file:src/foo.ts" for a file
+      //     node), which must resolve to the canonical "file:src/foo.ts".
+      // A different reserved word that is NOT the expected prefix
+      // ("endpoint:service:x" for an endpoint node) is a real path segment and
+      // must be preserved.
       const rest = remaining.slice(colonIdx + 1);
       const innerColonIdx = rest.indexOf(":");
-      if (innerColonIdx > 0 && rest.slice(0, innerColonIdx) === segment) {
-        // Double-prefixed — skip the outer, recurse on inner
+      const innerSegment = innerColonIdx > 0 ? rest.slice(0, innerColonIdx) : "";
+      if (
+        innerColonIdx > 0 &&
+        (innerSegment === segment || innerSegment === expectedPrefix)
+      ) {
+        // Skip the outer prefix, recurse on the inner one
         remaining = rest;
         continue;
       }
@@ -72,7 +89,7 @@ export function normalizeNodeId(
   if (!trimmed) return trimmed;
 
   const expectedPrefix = TYPE_TO_PREFIX[node.type];
-  const { prefix, path } = stripToValidPrefix(trimmed);
+  const { prefix, path } = stripToValidPrefix(trimmed, expectedPrefix);
 
   if (prefix) {
     // For step nodes with filePath, reconstruct as step:flowSlug:filePath:stepSlug.

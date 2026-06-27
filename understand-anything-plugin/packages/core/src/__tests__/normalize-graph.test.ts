@@ -47,6 +47,22 @@ describe("normalizeNodeId", () => {
     expect(normalizeNodeId(once, { type: "endpoint" })).toBe(once);
   });
 
+  it("strips a project-name prefix that collides with a reserved word", () => {
+    // Regression: when the project name is itself a reserved word ("service")
+    // and the node's real prefix follows ("file"), the spurious outer prefix
+    // must be dropped so the canonical "file:src/foo.ts" form is used — not
+    // left as "service:file:src/foo.ts", which would dangle edges that
+    // reference the canonical ID.
+    expect(
+      normalizeNodeId("service:file:src/foo.ts", { type: "file" }),
+    ).toBe("file:src/foo.ts");
+  });
+
+  it("is idempotent when a reserved-word project prefix is stripped", () => {
+    const once = normalizeNodeId("service:file:src/foo.ts", { type: "file" });
+    expect(normalizeNodeId(once, { type: "file" })).toBe(once);
+  });
+
   it("strips project-name prefix when valid prefix follows", () => {
     expect(
       normalizeNodeId("my-project:file:src/foo.ts", { type: "file" }),
