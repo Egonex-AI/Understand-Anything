@@ -470,6 +470,48 @@ describe("normalizeBatchOutput", () => {
     expect(result.edges[0].source).toBe("file:src/bare.ts");
     expect(result.edges[0].target).toBe("file:src/target.ts");
   });
+
+  it("repairs an edge endpoint whose project prefix collides with a reserved word", () => {
+    // Regression: an edge endpoint "service:file:src/foo.ts" refers to the
+    // canonical node "file:src/foo.ts", but inferTypeFromId reads the spurious
+    // reserved-word project prefix "service" as the type. The fallback must
+    // still resolve it to the existing node rather than drop the edge.
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "file:src/foo.ts",
+          type: "file",
+          name: "foo.ts",
+          filePath: "src/foo.ts",
+          summary: "Target",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/bar.ts",
+          type: "file",
+          name: "bar.ts",
+          filePath: "src/bar.ts",
+          summary: "Source",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "file:src/bar.ts",
+          target: "service:file:src/foo.ts",
+          type: "imports",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0].target).toBe("file:src/foo.ts");
+    expect(result.stats.danglingEdgesDropped).toBe(0);
+  });
 });
 
 describe("normalizeBatchOutput integration", () => {

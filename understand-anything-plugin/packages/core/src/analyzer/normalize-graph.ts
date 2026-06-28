@@ -212,6 +212,40 @@ function inferTypeFromId(id: string): string {
 }
 
 /**
+ * Best-effort repair of an edge endpoint that matches no node ID.
+ *
+ * Tries the prefix-inferred type first (preserving the common case), then
+ * each subsequent leading reserved-word segment as a candidate type. This
+ * recovers a reserved-word project prefix — e.g. an edge endpoint
+ * `service:file:src/foo.ts` pointing at the canonical node `file:src/foo.ts`,
+ * where `inferTypeFromId` would treat the spurious `service` as the type and
+ * fail to strip it, leaving the edge dangling. Returns the original id
+ * unchanged when nothing resolves to an existing node.
+ */
+function resolveEdgeEndpoint(id: string, validNodeIds: Set<string>): string {
+  const candidateTypes: string[] = [inferTypeFromId(id)];
+
+  // Add each leading valid-prefix segment's type as an additional candidate,
+  // so a spurious outer reserved word can be skipped in favour of the real one.
+  let rest = id;
+  while (true) {
+    const colonIdx = rest.indexOf(":");
+    if (colonIdx <= 0) break;
+    const segment = rest.slice(0, colonIdx);
+    if (!(segment in PREFIX_TO_TYPE)) break;
+    const type = PREFIX_TO_TYPE[segment];
+    if (!candidateTypes.includes(type)) candidateTypes.push(type);
+    rest = rest.slice(colonIdx + 1);
+  }
+
+  for (const type of candidateTypes) {
+    const normalized = normalizeNodeId(id, { type });
+    if (validNodeIds.has(normalized)) return normalized;
+  }
+  return id;
+}
+
+/**
  * Normalizes a merged batch output: fixes node IDs and numeric complexity,
  * rewrites edge references, deduplicates nodes and edges, and drops dangling edges.
  *
@@ -300,18 +334,14 @@ export function normalizeBatchOutput(data: {
     let newSource = idMap.get(oldSource) ?? oldSource;
     let newTarget = idMap.get(oldTarget) ?? oldTarget;
 
-    // Fallback: if endpoint not found in idMap, normalize it directly
-    // (handles cross-variant malformed IDs between nodes and edges).
-    // Try the edge's implied type first (from prefix), then fall back to "file".
+    // Fallback: if an endpoint isn't found in idMap, repair it directly
+    // (handles cross-variant malformed IDs between nodes and edges, including
+    // reserved-word project prefixes that inferTypeFromId alone can't resolve).
     if (!validNodeIds.has(newSource)) {
-      const inferredType = inferTypeFromId(newSource);
-      const normalized = normalizeNodeId(newSource, { type: inferredType });
-      if (validNodeIds.has(normalized)) newSource = normalized;
+      newSource = resolveEdgeEndpoint(newSource, validNodeIds);
     }
     if (!validNodeIds.has(newTarget)) {
-      const inferredType = inferTypeFromId(newTarget);
-      const normalized = normalizeNodeId(newTarget, { type: inferredType });
-      if (validNodeIds.has(normalized)) newTarget = normalized;
+      newTarget = resolveEdgeEndpoint(newTarget, validNodeIds);
     }
 
     if (newSource !== oldSource || newTarget !== oldTarget) {
