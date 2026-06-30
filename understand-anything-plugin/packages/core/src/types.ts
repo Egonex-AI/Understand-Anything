@@ -168,8 +168,23 @@ export interface ReferenceResolution {
 // Plugin interfaces
 export interface StructuralAnalysis {
   functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string }>;
-  classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
-  imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
+  classes: Array<{
+    name: string;
+    lineRange: [number, number];
+    methods: string[];
+    properties: string[];
+    /** Ancestor class names (e.g. Pascal `class(TParent)`, Java `extends X`). Optional for backward compat. */
+    parents?: string[];
+    /** Implemented interface names (e.g. Pascal extra ancestor typerefs, Java `implements X, Y`). Optional. */
+    interfaces?: string[];
+  }>;
+  imports: Array<{
+    source: string;
+    specifiers: string[];
+    lineNumber: number;
+    /** For languages with section-scoped imports (Pascal interface/implementation). Optional, ignored by other languages. */
+    section?: "interface" | "implementation";
+  }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;
   // Non-code structural data (all optional for backward compat)
   sections?: SectionInfo[];

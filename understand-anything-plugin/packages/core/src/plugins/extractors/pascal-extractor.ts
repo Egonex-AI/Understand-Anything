@@ -181,12 +181,15 @@ function collectInterfaceDeclProcs(root: TreeSitterNode, out: TreeSitterNode[]):
 }
 
 /**
- * Extract all declUses nodes from a root.
+ * Extract all declUses nodes from a root, tagged with their section.
  */
-function collectDeclUses(root: TreeSitterNode, out: TreeSitterNode[]): void {
+function collectDeclUses(
+  root: TreeSitterNode,
+  out: { node: TreeSitterNode; section: "interface" | "implementation" | undefined }[],
+): void {
   function walk(node: TreeSitterNode): void {
     if (node.type === "declUses") {
-      out.push(node);
+      out.push({ node, section: getDeclSection(node) });
     }
     for (let i = 0; i < node.childCount; i++) {
       const child = node.child(i);
@@ -194,6 +197,19 @@ function collectDeclUses(root: TreeSitterNode, out: TreeSitterNode[]): void {
     }
   }
   walk(root);
+}
+
+/**
+ * Determine which Pascal section (interface/implementation) a node lives in.
+ */
+function getDeclSection(node: TreeSitterNode): "interface" | "implementation" | undefined {
+  let n: TreeSitterNode | null = node.parent;
+  while (n) {
+    if (n.type === "interface") return "interface";
+    if (n.type === "implementation") return "implementation";
+    n = n.parent;
+  }
+  return undefined;
 }
 
 /**
@@ -269,9 +285,24 @@ export class PascalExtractor implements LanguageExtractor {
 
       const classBody = findChild(declType, "declClass") ?? findChild(declType, "declIntf");
       if (!classBody) continue;
+      const isInterfaceDecl = classBody.type === "declIntf";
 
       const methods: string[] = [];
       const properties: string[] = [];
+      const ancestorRefs: string[] = [];
+
+      // Ancestor typerefs appear as direct children of the class/interface body
+      // before any member declarations. Convention: for declClass, the first
+      // typeref is the parent class and remaining are implemented interfaces;
+      // for declIntf, all typerefs are parent interfaces.
+      for (let i = 0; i < classBody.childCount; i++) {
+        const m = classBody.child(i);
+        if (!m) continue;
+        if (m.type === "typeref") {
+          const id = findChild(m, "identifier");
+          if (id) ancestorRefs.push(id.text);
+        }
+      }
 
       // Methods: declProc nodes inside the class body
       const methodDecls = findChildren(classBody, "declProc");
@@ -302,11 +333,16 @@ export class PascalExtractor implements LanguageExtractor {
         }
       }
 
+      const parents: string[] = isInterfaceDecl ? ancestorRefs : ancestorRefs.slice(0, 1);
+      const interfaces: string[] = isInterfaceDecl ? [] : ancestorRefs.slice(1);
+
       classes.push({
         name: className,
         lineRange: [declType.startPosition.row + 1, declType.endPosition.row + 1],
         methods,
         properties,
+        ...(parents.length ? { parents } : {}),
+        ...(interfaces.length ? { interfaces } : {}),
       });
 
       if (isInInterfaceSection(declType)) {
@@ -329,10 +365,10 @@ export class PascalExtractor implements LanguageExtractor {
     }
 
     // -- Imports: declUses nodes --
-    const usesNodes: TreeSitterNode[] = [];
+    const usesNodes: { node: TreeSitterNode; section: "interface" | "implementation" | undefined }[] = [];
     collectDeclUses(rootNode, usesNodes);
 
-    for (const usesNode of usesNodes) {
+    for (const { node: usesNode, section } of usesNodes) {
       const moduleNames = findChildren(usesNode, "moduleName");
       for (const mod of moduleNames) {
         const fullName = extractModuleName(mod);
@@ -342,6 +378,7 @@ export class PascalExtractor implements LanguageExtractor {
           source: fullName,
           specifiers: [parts[parts.length - 1]],
           lineNumber: mod.startPosition.row + 1,
+          ...(section ? { section } : {}),
         });
       }
     }
