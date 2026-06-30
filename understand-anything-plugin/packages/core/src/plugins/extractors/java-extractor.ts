@@ -3,6 +3,37 @@ import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
+ * Walk a Java `superclass` / `super_interfaces` / `extends_interfaces` node
+ * and return the type names it references. Handles `type_identifier`,
+ * `generic_type` (e.g. `List<String>`), and nested type_list wrappers.
+ */
+function extractTypeRefs(node: TreeSitterNode | null): string[] {
+  if (!node) return [];
+  const refs: string[] = [];
+  const collect = (n: TreeSitterNode) => {
+    for (let i = 0; i < n.childCount; i++) {
+      const c = n.child(i);
+      if (!c) continue;
+      if (c.type === "type_identifier" || c.type === "scoped_type_identifier") {
+        refs.push(c.text);
+      } else if (c.type === "generic_type") {
+        const inner = findChild(c, "type_identifier");
+        refs.push(inner ? inner.text : c.text);
+      } else if (
+        c.type === "type_list" ||
+        c.type === "interface_type_list" ||
+        c.type === "extends_interfaces" ||
+        c.type === "super_interfaces"
+      ) {
+        collect(c);
+      }
+    }
+  };
+  collect(node);
+  return refs;
+}
+
+/**
  * Extract parameter names from a Java `formal_parameters` node.
  *
  * Each `formal_parameter` child has a `name` field (identifier) and a `type` field.
@@ -248,6 +279,10 @@ export class JavaExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // `class Foo extends Bar implements I1, I2 { ... }`
+    const parents = extractTypeRefs(node.childForFieldName("superclass"));
+    const interfaces = extractTypeRefs(node.childForFieldName("interfaces"));
+
     const body = node.childForFieldName("body");
     if (body) {
       this.extractClassBodyMembers(
@@ -267,6 +302,8 @@ export class JavaExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
     });
 
     if (hasModifier(node, "public")) {
@@ -288,6 +325,9 @@ export class JavaExtractor implements LanguageExtractor {
 
     const methods: string[] = [];
     const properties: string[] = [];
+
+    // `interface IExtended extends IBase1, IBase2` — interface inheritance lands in `parents`.
+    const parents = extractTypeRefs(findChild(node, "extends_interfaces"));
 
     const body = node.childForFieldName("body");
     if (body) {
@@ -321,6 +361,7 @@ export class JavaExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
     });
 
     if (hasModifier(node, "public")) {

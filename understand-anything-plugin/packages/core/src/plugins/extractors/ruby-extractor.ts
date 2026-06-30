@@ -312,9 +312,41 @@ export class RubyExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // Ruby `class Foo < Bar` — superclass child holds the parent.
+    // Module mixins (`include Mod`, `prepend Mod`, `extend Mod`) inside the
+    // body promote methods at runtime, analogous to interfaces.
+    const parents: string[] = [];
+    const interfaces: string[] = [];
+    const superclassNode = node.childForFieldName("superclass");
+    if (superclassNode) {
+      const ref =
+        findChild(superclassNode, "constant") ??
+        findChild(superclassNode, "scope_resolution") ??
+        superclassNode;
+      const txt = ref.text.replace(/^<\s*/, "");
+      if (txt && txt !== "<") parents.push(txt);
+    }
+
     const body = node.childForFieldName("body");
     if (body) {
       this.extractClassBody(body, methods, properties, functions);
+      for (let i = 0; i < body.childCount; i++) {
+        const stmt = body.child(i);
+        if (!stmt) continue;
+        if (stmt.type !== "call" && stmt.type !== "method_call") continue;
+        const receiver = stmt.childForFieldName("method");
+        const name2 = receiver?.text;
+        if (name2 !== "include" && name2 !== "prepend" && name2 !== "extend") continue;
+        const args = stmt.childForFieldName("arguments");
+        if (!args) continue;
+        for (let j = 0; j < args.childCount; j++) {
+          const a = args.child(j);
+          if (!a) continue;
+          if (a.type === "constant" || a.type === "scope_resolution") {
+            interfaces.push(a.text);
+          }
+        }
+      }
     }
 
     classes.push({
@@ -325,6 +357,8 @@ export class RubyExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
     });
   }
 
