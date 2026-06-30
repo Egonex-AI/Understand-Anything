@@ -105,10 +105,28 @@ function getServicePaths(system) {
   return paths;
 }
 
+/** 检测目录是否为 git 仓库 */
+function isGitRepo(dir) {
+  try {
+    execSync('git rev-parse --git-dir', {
+      cwd: dir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe']
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const ROOT_IS_GIT = isGitRepo(PROJECT_ROOT);
+
 /**
  * 通过 git diff 检测哪些服务自上次分析以来有代码变更。
  * 对比依据：每个服务的 meta.json 中记录的 gitCommitHash 与当前 HEAD。
  * 无 meta.json、无 hash、或 diff 失败的服务均视为"有变更"，确保不遗漏。
+ *
+ * 支持两种项目结构：
+ *   1. 根目录是 git 仓库（monorepo）→ 从根目录执行 git diff
+ *   2. 根目录非 git 仓库，每个服务是独立仓库 → 在服务目录内执行 git diff
  */
 function getChangedServices(servicePaths) {
   const changed = [];
@@ -126,7 +144,9 @@ function getChangedServices(servicePaths) {
     let lastHash;
     try {
       const meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
-      lastHash = meta.gitCommitHash;
+      lastHash = (MODE === 'reextract')
+        ? (meta.reextractCommitHash || meta.gitCommitHash)
+        : meta.gitCommitHash;
     } catch {
       changed.push(svcPath);
       continue;
@@ -137,46 +157,121 @@ function getChangedServices(servicePaths) {
       continue;
     }
 
-    // 仅检查该服务子目录下的文件变更，避免跨服务误判
     try {
-      const diff = execSync(
-        `git diff --name-only ${lastHash}..HEAD -- ${svcPath}/`,
-        { cwd: PROJECT_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
-      ).trim();
+      let diff;
+      if (ROOT_IS_GIT) {
+        diff = execSync(
+          `git diff --name-only ${lastHash}..HEAD -- ${svcPath}/`,
+          { cwd: PROJECT_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+        ).trim();
+      } else {
+        diff = execSync(
+          `git diff --name-only ${lastHash}..HEAD`,
+          { cwd: fullPath, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
+        ).trim();
+      }
 
       if (diff.length > 0) {
         changed.push(svcPath);
       }
     } catch {
-      // diff 命令失败（如 hash 已不在历史中）→ 保守策略，视为有变更
       changed.push(svcPath);
     }
   }
   return changed;
 }
 
-/** 拉取最新代码。使用 --ff-only 避免自动 merge 产生冲突。 */
-function gitPull() {
+/**
+ * 拉取最新代码。使用 --ff-only 避免自动 merge 产生冲突。
+ *
+ * 支持两种项目结构：
+ *   1. 根目录是 git 仓库 → 在根目录执行 git pull（含 submodule）
+ *   2. 根目录非 git 仓库 → 逐个服务目录执行 git pull
+ */
+function gitPull(servicePaths) {
   log('Pulling latest code...');
-  try {
-    const out = execSync('git pull --ff-only', {
-      cwd: PROJECT_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe']
-    });
-    log(out.trim());
-  } catch (e) {
-    log(`WARNING: git pull failed: ${e.message}`);
-  }
 
-  // 如果项目使用 git submodule 管理子仓库，同步更新
-  if (existsSync(join(PROJECT_ROOT, '.gitmodules'))) {
+  if (ROOT_IS_GIT) {
     try {
-      execSync('git submodule update --remote --merge', {
+      const out = execSync('git pull --ff-only', {
         cwd: PROJECT_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe']
       });
-    } catch { /* 子模块更新失败不阻断主流程 */ }
+      log(out.trim());
+    } catch (e) {
+      log(`WARNING: git pull failed: ${e.message}`);
+    }
+
+    if (existsSync(join(PROJECT_ROOT, '.gitmodules'))) {
+      try {
+        execSync('git submodule update --remote --merge', {
+          cwd: PROJECT_ROOT, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe']
+        });
+      } catch { /* 子模块更新失败不阻断主流程 */ }
+    }
+  } else {
+    let pulled = 0, failed = 0, skippedNonGit = 0;
+    for (const svcPath of servicePaths) {
+      const fullPath = join(PROJECT_ROOT, svcPath);
+      if (!isGitRepo(fullPath)) {
+        skippedNonGit++;
+        continue;
+      }
+      try {
+        const out = execSync('git pull --ff-only', {
+          cwd: fullPath, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe']
+        }).trim();
+        pulled++;
+        if (!out.includes('Already up to date')) {
+          log(`  ${svcPath}: ${out.split('\n').pop()}`);
+        }
+      } catch (e) {
+        failed++;
+        log(`  WARNING: ${svcPath}: git pull failed (${e.message.split('\n')[0]})`);
+      }
+    }
+    log(`Pull complete: ${pulled} ok, ${failed} failed, ${skippedNonGit} non-git skipped`);
   }
 }
 
+
+/**
+ * reextract 成功后更新 meta.json 的 reextractCommitHash，
+ * 避免后续 reextract 运行重复检测已处理的服务。
+ *
+ * 使用独立字段 `reextractCommitHash` 而非 `gitCommitHash`，
+ * 确保不影响 understand skill 的 KG 增量更新判断逻辑
+ * （understand skill Phase 0 使用 gitCommitHash 判断 KG 是否需要更新）。
+ */
+function updateMetaCommitHash(svcPath) {
+  const fullPath = join(PROJECT_ROOT, svcPath);
+  const metaPath = join(fullPath, '.understand-anything/meta.json');
+  const gitDir = ROOT_IS_GIT ? PROJECT_ROOT : fullPath;
+
+  let currentHash;
+  try {
+    currentHash = execSync('git rev-parse HEAD', {
+      cwd: gitDir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe']
+    }).trim();
+  } catch {
+    log(`  WARNING: cannot get HEAD for ${svcPath}, meta.json not updated`);
+    return;
+  }
+
+  let meta = {};
+  if (existsSync(metaPath)) {
+    try {
+      meta = JSON.parse(readFileSync(metaPath, 'utf-8'));
+    } catch { /* 损坏的 meta.json → 重建 */ }
+  }
+
+  meta.reextractCommitHash = currentHash;
+  meta.reextractAt = new Date().toISOString();
+  if (!meta.version) meta.version = '1.0.0';
+
+  mkdirSync(dirname(metaPath), { recursive: true });
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2) + '\n');
+  log(`  meta.json updated (reextractHash: ${currentHash.slice(0, 12)})`);
+}
 
 /**
  * 通过 AI CLI 调用 understand-anything skill。
@@ -344,11 +439,14 @@ async function runOnce() {
   const failures = [];
   let skipped = 0;
 
-  if (DO_PULL) gitPull();
-
   const system = readSystemJson();
   const allServices = getServicePaths(system);
   log(`Services: ${allServices.length} total`);
+  if (!ROOT_IS_GIT) {
+    log('Note: root is not a git repo, using per-service git operations');
+  }
+
+  if (DO_PULL) gitPull(allServices);
 
   const changed = FORCE ? allServices : getChangedServices(allServices);
   if (FORCE) {
@@ -411,6 +509,7 @@ async function runOnce() {
               log(`WARNING: source index build failed for ${svcPath} (non-critical)`);
             }
           }
+          updateMetaCommitHash(svcPath);
         } else {
           failed++;
           log(`WARNING: reextract failed for ${svcPath}`);

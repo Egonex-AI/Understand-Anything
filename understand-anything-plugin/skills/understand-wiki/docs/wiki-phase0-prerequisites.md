@@ -457,24 +457,9 @@ done
 
 Commit hashes are read from `project.gitCommitHash` in each graph (or `meta.generatedFromCommit` / `.understand-anything/meta.json` as fallback). Compared with `git -C "$SERVICE_ROOT" rev-parse HEAD`.
 
-### Step 5b — Save DG Snapshot (for incremental diff)
-
-Before upstream triggers modify the DG, save a snapshot for later comparison:
-
-```bash
-DG_PATH="$SERVICE_UA/domain-graph.json"
-DG_SNAPSHOT="$SERVICE_UA/wiki/domain-graph.snapshot.json"
-
-if [ -f "$DG_PATH" ] && [ -f "$SERVICE_UA/wiki/meta.json" ]; then
-  mkdir -p "$SERVICE_UA/wiki"
-  cp "$DG_PATH" "$DG_SNAPSHOT"
-  echo "[understand-wiki] DG snapshot saved for incremental diff."
-else
-  echo "[understand-wiki] No existing wiki — will run full generation."
-fi
-```
-
 ### Step 6 — Wiki State Check + Incremental Decision
+
+**Snapshot lifecycle:** The DG snapshot (`wiki/domain-graph.snapshot.json`) is saved by Phase 2 AFTER successful assembly. It captures the DG that was used to generate the current wiki, serving as the baseline for the NEXT incremental run. Do NOT save a snapshot before running the diff — that would overwrite the baseline and cause self-comparison (always 0 changes).
 
 ```bash
 SKILL_DIR="$PLUGIN_ROOT/skills/understand-wiki"

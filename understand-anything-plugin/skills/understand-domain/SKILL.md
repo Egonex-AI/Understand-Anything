@@ -274,18 +274,30 @@ This phase uses different strategies depending on Path:
    The strategy file defines: entry point types, edge types to trace, domain splitting heuristics, and output format conventions for that platform.
 
 2. Read the `domain-flow-extractor` agent prompt from `$PLUGIN_ROOT/agents/domain-flow-extractor.md`
-3. **Domain-level incremental detection:** For each domain in `domain-discovery.json`, compute a content fingerprint of the domain's KG subset (`intermediate/domain-<name>.json`). Store fingerprints in `$PROJECT_ROOT/.understand-anything/intermediate/domain-fingerprints.json`. Compare against the previous run's fingerprints (if file exists). Domains with unchanged fingerprints are eligible for skip.
-4. **Before dispatching**, unless `--full` was passed, detect already-extracted domains by checking if `intermediate/flows-<name>.json` exists, is non-empty, and contains **valid JSON with a non-empty `flows` array**. Skip domains that pass all three checks (this enables automatic resume when a previous run was interrupted). If `--full` was passed, re-extract all domains (checkpoint and `flows-*.json` files were deleted in Phase 1). If an output file exists but contains invalid JSON (e.g. truncated from a crash), or the `flows` array is empty/missing, treat it as incomplete and re-process. If all domains are complete, skip directly to Phase 4d.
-5. **Filter documentation-only domains:** Before dispatching, skip any domain whose `modules` are all documentation paths (e.g. `docs/`, `doc/`, `docs/PROCESS/`). Documentation modules do not contain business logic and cannot produce meaningful flows. The merge script also filters them as a safety net.
-6. For each remaining domain in `domain-discovery.json`:
+3. **Domain-level incremental detection (script-backed):** Run the fingerprint check script to determine which domains need extraction:
+   ```bash
+   python3 "$PLUGIN_ROOT/skills/understand-domain/compute_domain_fingerprints.py" "$PROJECT_ROOT" --check
+   # Or with --full to force all:
+   python3 "$PLUGIN_ROOT/skills/understand-domain/compute_domain_fingerprints.py" "$PROJECT_ROOT" --check --full
+   ```
+   The script computes SHA-256 fingerprints of each `intermediate/domain-<name>.json` file, compares against the previous run's fingerprints stored in `intermediate/domain-fingerprints.json`, and checks if valid `flows-<name>.json` files exist. It outputs JSON to stdout with:
+   - `to_extract`: domain short names that need extraction (changed fingerprint, missing/invalid flows, or new domain)
+   - `skipped`: domain short names that can be skipped (unchanged fingerprint + valid flows)
+   - `doc_only_skipped`: documentation-only domains excluded
+   If `--full` is passed, all non-doc domains are listed in `to_extract` regardless of fingerprints.
+   If all domains are skipped (empty `to_extract`), skip directly to fingerprint save.
+4. For each domain in the `to_extract` list:
    - Read `intermediate/domain-<name>.json` as context
    - **Include the loaded platform strategy** as additional context for the subagent
    - Dispatch a subagent with the `domain-flow-extractor` prompt + domain KG subset + platform strategy
    - The agent writes to `intermediate/flows-<name>.json`
-7. Run up to **10 subagents concurrently**
-8. If a domain's flow extraction fails, retry once. If it fails again, skip that domain and continue with others.
-9. **Update fingerprints:** After all extractions complete, write the current fingerprints to `domain-fingerprints.json` for future incremental comparisons.
-10. Wait for all to complete.
+5. Run up to **10 subagents concurrently**
+6. If a domain's flow extraction fails, retry once. If it fails again, skip that domain and continue with others.
+7. **Save fingerprints:** After all extractions complete, save current fingerprints for future incremental comparisons:
+   ```bash
+   python3 "$PLUGIN_ROOT/skills/understand-domain/compute_domain_fingerprints.py" "$PROJECT_ROOT" --save
+   ```
+8. Wait for all to complete.
 
 #### Phase 4d: Merge
 

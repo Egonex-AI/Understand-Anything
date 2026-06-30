@@ -189,6 +189,22 @@ python3 "$SKILL_DIR/assemble-wiki.py" \
 - Generates `meta.json` with content hashes, quality metrics, and validation warnings
 - Reports copy/skip counts and quality grade
 
+#### Post-Assembly: Save DG Snapshot for Next Incremental Run
+
+**CRITICAL — After successful assembly, save the current domain-graph as snapshot:**
+
+```bash
+DG_PATH="$SERVICE_ROOT/.understand-anything/domain-graph.json"
+DG_SNAPSHOT="$SERVICE_ROOT/.understand-anything/wiki/domain-graph.snapshot.json"
+
+if [ -f "$DG_PATH" ]; then
+  cp "$DG_PATH" "$DG_SNAPSHOT"
+  echo "[understand-wiki] DG snapshot saved for next incremental run."
+fi
+```
+
+This snapshot captures the DG that was used to generate THIS wiki. On the next run, Phase 0 Step 6 compares this snapshot against the (possibly updated) current DG to detect domain-level changes. The snapshot is NOT saved before the diff — saving it before comparison would overwrite the previous baseline, causing self-comparison (always 0 changes).
+
 ### Incremental Path
 
 When running in incremental mode (only dirty domains regenerated):

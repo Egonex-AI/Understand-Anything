@@ -70,15 +70,13 @@ if [ "$INCREMENTAL" = true ] && [ -n "$DIRTY_DOMAINS" ]; then
   fi
   
   # Phase 2 will handle meta.json generation via assemble-wiki.py
-  
-  # Cleanup snapshot
-  rm -f "$DG_SNAPSHOT"
+  # NOTE: Do NOT rm the DG snapshot here — Phase 2 will overwrite it with the current DG after assembly
   
 elif [ "$INCREMENTAL" = true ] && [ -z "$DIRTY_DOMAINS" ]; then
   # --- No changes: only update commit hash via assembly ---
   # No domain changes — Phase 2 (assemble-wiki.py) will update commit hash in final wiki/meta.json
   echo "[understand-wiki] No wiki pages need regeneration. Running Phase 2 for commit hash update."
-  rm -f "$DG_SNAPSHOT"
+  # NOTE: Do NOT rm the DG snapshot here — Phase 2 will overwrite it after assembly
   
 else
   # --- Full Generation Path ---

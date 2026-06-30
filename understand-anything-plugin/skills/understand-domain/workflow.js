@@ -68,14 +68,27 @@ const DISCOVERY_SCHEMA = {
   },
 }
 
+const INCREMENTAL_CHECK_SCHEMA = {
+  type: 'object',
+  required: ['toExtract', 'skippedCount', 'docOnlyCount'],
+  properties: {
+    toExtract:    { type: 'array', items: { type: 'string' } },
+    skippedCount: { type: 'number' },
+    docOnlyCount: { type: 'number' },
+    skippedDomains: { type: 'array', items: { type: 'string' } },
+  },
+}
+
 const EXTRACTION_SCHEMA = {
   type: 'object',
   required: ['extractedCount', 'skippedCount', 'failedCount'],
   properties: {
-    extractedCount: { type: 'number' },
-    skippedCount:   { type: 'number' },
-    failedCount:    { type: 'number' },
-    errors:         { type: 'array', items: { type: 'string' } },
+    extractedCount:   { type: 'number' },
+    skippedCount:     { type: 'number' },
+    failedCount:      { type: 'number' },
+    extractedDomains: { type: 'array', items: { type: 'string' } },
+    failedDomains:    { type: 'array', items: { type: 'string' } },
+    errors:           { type: 'array', items: { type: 'string' } },
   },
 }
 
@@ -384,14 +397,48 @@ phase('Extraction')
 
 const platformType = detect.platformType || 'backend'
 
-const extractionResult = await agent(
-  `Extract domain flows for all discovered domains.
+// Step 1: Run deterministic fingerprint check to decide which domains need extraction
+const incrementalCheck = await agent(
+  `Run incremental fingerprint check to determine which domains need flow extraction.
+
+Project root: ${preflight.projectRoot}
+Skill dir: ${preflight.skillDir}
+Full: ${preflight.full}
+
+Run the fingerprint check script:
+\`python3 "${preflight.skillDir}/compute_domain_fingerprints.py" "${preflight.projectRoot}" --check${preflight.full ? ' --full' : ''}\`
+
+The script outputs JSON to stdout with:
+- to_extract: list of domain short names that need extraction
+- skipped: list of domain short names that can be skipped (unchanged fingerprint + valid flows)
+- doc_only_skipped: list of documentation-only domains skipped
+
+Read the JSON output and return:
+- toExtract: the to_extract array
+- skippedCount: length of skipped array
+- docOnlyCount: length of doc_only_skipped array
+- skippedDomains: the skipped array`,
+  { schema: INCREMENTAL_CHECK_SCHEMA, phase: 'Extraction', label: 'incremental-check' }
+)
+
+log(`Incremental check: ${incrementalCheck.toExtract.length} to extract, ${incrementalCheck.skippedCount} skipped, ${incrementalCheck.docOnlyCount} doc-only skipped`)
+if (incrementalCheck.skippedDomains?.length > 0) {
+  log(`Skipped (unchanged): ${incrementalCheck.skippedDomains.join(', ')}`)
+}
+
+// Step 2: Extract flows only for domains that need it
+let extractionResult = { extractedCount: 0, skippedCount: incrementalCheck.skippedCount, failedCount: 0 }
+
+if (incrementalCheck.toExtract.length > 0) {
+  const domainsToExtract = incrementalCheck.toExtract.join(', ')
+
+  extractionResult = await agent(
+    `Extract domain flows for the following domains ONLY: [${domainsToExtract}]
 
 Project root: ${preflight.projectRoot}
 Plugin root: ${preflight.pluginRoot}
 Skill dir: ${preflight.skillDir}
 Platform type: ${platformType}
-Full: ${preflight.full}
 
 Use the domain-flow-extractor agent definition at: ${preflight.pluginRoot}/agents/domain-flow-extractor.md
 
@@ -401,21 +448,47 @@ Load platform-specific strategy:
 - mobile-client → ${preflight.skillDir}/platforms/mobile-flow.md
 - fullstack → load both backend-flow.md and frontend-flow.md
 
-Read ${preflight.projectRoot}/.understand-anything/intermediate/domain-discovery.json to get the domain list.
+IMPORTANT: Only extract these specific domains: [${domainsToExtract}]
+All other domains have been determined to be unchanged and already have valid flows.
 
-For each domain:
-1. Check if ${preflight.projectRoot}/.understand-anything/intermediate/flows-<name>.json already exists with valid JSON and non-empty flows array (unless --full)
-2. Skip documentation-only domains (docs/, doc/, script/, docker/)
-3. Read intermediate/domain-<name>.json as context
-4. Dispatch domain-flow-extractor agent with domain KG subset + platform strategy
-5. Agent writes to intermediate/flows-<name>.json
+For each domain in [${domainsToExtract}]:
+1. Read intermediate/domain-<name>.json as context
+2. Dispatch domain-flow-extractor agent with domain KG subset + platform strategy
+3. Agent writes to intermediate/flows-<name>.json
 
 Run up to 10 subagents concurrently.
 Retry once on failure. Skip domain if fails twice.
 
-Return: extractedCount, skippedCount, failedCount, errors`,
-  { schema: EXTRACTION_SCHEMA, phase: 'Extraction', label: 'extraction' }
-)
+Return: extractedCount, skippedCount (should be ${incrementalCheck.skippedCount}), failedCount, extractedDomains (list of successfully extracted domain short names), failedDomains (list of failed domain short names), errors`,
+    { schema: EXTRACTION_SCHEMA, phase: 'Extraction', label: 'extraction' }
+  )
+} else {
+  log('All domains unchanged — skipping flow extraction entirely')
+}
+
+// Step 3: Save fingerprints only for successfully processed domains (extracted + skipped)
+const successDomains = [
+  ...(incrementalCheck.skippedDomains || []),
+  ...(extractionResult.extractedDomains || incrementalCheck.toExtract),
+]
+const failedSet = new Set(extractionResult.failedDomains || [])
+const domainsToSave = successDomains.filter(d => !failedSet.has(d)).join(',')
+
+if (domainsToSave) {
+  await agent(
+    `Save updated domain fingerprints after extraction.
+
+Skill dir: ${preflight.skillDir}
+Project root: ${preflight.projectRoot}
+
+Run: \`python3 "${preflight.skillDir}/compute_domain_fingerprints.py" "${preflight.projectRoot}" --save --domains "${domainsToSave}"\`
+
+This saves fingerprints only for successfully processed domains, merging with existing fingerprints.
+Failed domains are excluded so the next run will re-extract them.
+Report when complete.`,
+    { phase: 'Extraction', label: 'save-fingerprints' }
+  )
+}
 
 log(`Phase 4c complete. Extracted: ${extractionResult.extractedCount}, Skipped: ${extractionResult.skippedCount}, Failed: ${extractionResult.failedCount}`)
 
