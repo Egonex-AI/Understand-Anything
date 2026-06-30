@@ -1013,12 +1013,15 @@ def main() -> None:
         sys.exit(1)
 
     # Discover batch files, sorted by numeric index (not lexicographic)
-    batch_files = sorted(
-        intermediate_dir.glob("batch-*.json"),
-        key=lambda p: int(re.search(r"batch-(\d+)", p.stem).group(1))
-        if re.search(r"batch-(\d+)", p.stem)
-        else 0,
-    )
+    def _batch_sort_key(p):
+        # batch-existing.json (the pruned prior graph on incremental updates) must
+        # load FIRST so fresh per-file batches override it during dedup.
+        if p.name == "batch-existing.json":
+            return -1
+        m = re.search(r"batch-(\d+)", p.stem)
+        return int(m.group(1)) if m else 0
+
+    batch_files = sorted(intermediate_dir.glob("batch-*.json"), key=_batch_sort_key)
     if not batch_files:
         print("Error: no batch-*.json files found in intermediate/", file=sys.stderr)
         sys.exit(1)
@@ -1033,6 +1036,14 @@ def main() -> None:
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
     for f in batch_files:
+        # batch-existing.json carries the pruned prior graph on incremental updates
+        # (written by the /understand incremental path, SKILL.md Phase 2). It has no
+        # numeric index, so the strict pattern below would classify it "unrecognized"
+        # and DROP every retained node/edge - collapsing the graph to only the changed
+        # files. Recognize it explicitly so the incremental path actually works.
+        if f.name == "batch-existing.json":
+            by_batch[-1].append((f.name, None))
+            continue
         m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
         if m:
             by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
