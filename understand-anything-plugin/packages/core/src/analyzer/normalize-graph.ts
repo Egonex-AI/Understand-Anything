@@ -214,32 +214,41 @@ function inferTypeFromId(id: string): string {
 /**
  * Best-effort repair of an edge endpoint that matches no node ID.
  *
- * Tries the prefix-inferred type first (preserving the common case), then
- * each subsequent leading reserved-word segment as a candidate type. This
- * recovers a reserved-word project prefix — e.g. an edge endpoint
- * `service:file:src/foo.ts` pointing at the canonical node `file:src/foo.ts`,
- * where `inferTypeFromId` would treat the spurious `service` as the type and
- * fail to strip it, leaving the edge dangling. Returns the original id
- * unchanged when nothing resolves to an existing node.
+ * Tries the prefix-inferred type against the full id first (preserving the
+ * common case), then peels each leading reserved-word segment and normalizes
+ * from the suffix that begins at it. This recovers a reserved-word project
+ * prefix — e.g. an edge endpoint `service:file:src/foo.ts` pointing at the
+ * canonical node `file:src/foo.ts`, where `inferTypeFromId` would treat the
+ * spurious `service` as the type and fail to strip it. Normalizing from the
+ * candidate segment (rather than always from the full id) also handles a
+ * *chain* of reserved prefixes, e.g. `service:endpoint:file:src/foo.ts`, where
+ * `stripToValidPrefix` can't collapse the run for the `file` candidate and
+ * every full-id attempt would otherwise leave the edge dangling. Returns the
+ * original id unchanged when nothing resolves to an existing node.
  */
 function resolveEdgeEndpoint(id: string, validNodeIds: Set<string>): string {
-  const candidateTypes: string[] = [inferTypeFromId(id)];
+  // Each candidate pairs a node type with the id suffix to normalize from.
+  // The first preserves the common case (inferred type, full id); each peeled
+  // segment then offers its real prefix and the substring that starts there.
+  const candidates: { type: string; fromId: string }[] = [
+    { type: inferTypeFromId(id), fromId: id },
+  ];
 
-  // Add each leading valid-prefix segment's type as an additional candidate,
-  // so a spurious outer reserved word can be skipped in favour of the real one.
   let rest = id;
   while (true) {
     const colonIdx = rest.indexOf(":");
     if (colonIdx <= 0) break;
     const segment = rest.slice(0, colonIdx);
     if (!(segment in PREFIX_TO_TYPE)) break;
-    const type = PREFIX_TO_TYPE[segment];
-    if (!candidateTypes.includes(type)) candidateTypes.push(type);
     rest = rest.slice(colonIdx + 1);
+    const type = PREFIX_TO_TYPE[segment];
+    if (!candidates.some((c) => c.type === type && c.fromId === rest)) {
+      candidates.push({ type, fromId: rest });
+    }
   }
 
-  for (const type of candidateTypes) {
-    const normalized = normalizeNodeId(id, { type });
+  for (const { type, fromId } of candidates) {
+    const normalized = normalizeNodeId(fromId, { type });
     if (validNodeIds.has(normalized)) return normalized;
   }
   return id;

@@ -512,6 +512,49 @@ describe("normalizeBatchOutput", () => {
     expect(result.edges[0].target).toBe("file:src/foo.ts");
     expect(result.stats.danglingEdgesDropped).toBe(0);
   });
+
+  it("repairs an edge endpoint with a chain of reserved-word prefixes", () => {
+    // Regression: an edge endpoint "service:endpoint:file:src/foo.ts" carries
+    // more than one reserved prefix before the real "file" prefix. Normalizing
+    // the full id for each candidate type can't collapse the run, so the repair
+    // must normalize from the candidate prefix segment to resolve it to the
+    // canonical node "file:src/foo.ts" rather than drop the edge.
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "file:src/foo.ts",
+          type: "file",
+          name: "foo.ts",
+          filePath: "src/foo.ts",
+          summary: "Target",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/bar.ts",
+          type: "file",
+          name: "bar.ts",
+          filePath: "src/bar.ts",
+          summary: "Source",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "file:src/bar.ts",
+          target: "service:endpoint:file:src/foo.ts",
+          type: "imports",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0].target).toBe("file:src/foo.ts");
+    expect(result.stats.danglingEdgesDropped).toBe(0);
+  });
 });
 
 describe("normalizeBatchOutput integration", () => {
