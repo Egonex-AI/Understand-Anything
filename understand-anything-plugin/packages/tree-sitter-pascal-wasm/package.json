@@ -1,0 +1,9 @@
+{
+  "name": "@understand-anything/tree-sitter-pascal-wasm",
+  "version": "0.11.0",
+  "type": "module",
+  "description": "Vendored tree-sitter-pascal WASM grammar (v0.11.0) for use with web-tree-sitter@^0.26.",
+  "main": "tree-sitter-pascal.wasm",
+  "files": ["tree-sitter-pascal.wasm"],
+  "license": "MIT"
+}

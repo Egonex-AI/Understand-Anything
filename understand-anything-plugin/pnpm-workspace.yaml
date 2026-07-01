@@ -13,4 +13,4 @@ allowBuilds:
   tree-sitter-ruby: true
   tree-sitter-rust: true
   tree-sitter-typescript: true
-  tree-sitter-pascal: true
+  '@tree-sitter-grammars/tree-sitter-kotlin': true
