@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "node -e \"console.log('skill tests live at <repo-root>/tests/skill — run via root \\`pnpm test\\`')\""
+    "test": "node -e \"console.log('skill tests live at <repo-root>/tests/skill — run via root \`pnpm test\`')\""
   },
   "dependencies": {
     "@understand-anything/core": "workspace:*",
@@ -16,6 +16,6 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.1.0"
+    "vitest": "^3.2.0"
   }
 }
