@@ -256,7 +256,7 @@ Using the script's structural data and file categories, create edges:
 |---|---|---|---|
 | `contains` | File contains a function or class node you created (use for ALL function/class nodes) | `1.0` | `forward` |
 | `imports` | File imports from another project file (use `batchImportData[filePath]` from input JSON — external imports already filtered out) | `0.7` | `forward` |
-| `calls` | A function in this file calls a function in another file (infer from imports + function names when confident) | `0.8` | `forward` |
+| `calls` | A function in this file calls a function in another file. **Primary source: the `callGraph` array in the script output** (deterministic `{caller, callee, lineNumber}` pairs) — do not ignore it. For each entry whose `callee` resolves to a function/method of a file in `batchImportData[filePath]` or `neighborMap`, emit a `calls` edge (this file → that file). Skip callees that are standard-library/external symbols (e.g. `std::…`, `printf`, `typeid`) — they can't become project edges. Also infer from imports + function names when confident. | `0.8` | `forward` |
 | `inherits` | A class extends another class in the project | `0.9` | `forward` |
 | `implements` | A class implements an interface in the project | `0.9` | `forward` |
 | `exports` | File exports a function or class node you created (only for exported items — use IN ADDITION to `contains`, not instead of it) | `0.8` | `forward` |
