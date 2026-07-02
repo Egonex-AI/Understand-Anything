@@ -10,7 +10,7 @@ In batch mode, Phase 1 dispatches one sub-agent per service. Each sub-agent runs
 2. Phase 1: wiki-worker dispatch (this section, single-service path)
 3. Phase 2: assembly (`assemble-wiki.py`)
 
-**Dispatch one sub-agent per service** (up to 3 concurrently). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
+**Dispatch one sub-agent per service** (up to 10 concurrently). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md).
 
 > Read the skill definition at `$PLUGIN_ROOT/skills/understand-wiki/SKILL.md` and follow its instructions.
 >
@@ -168,7 +168,7 @@ for DOMAIN_ID in $(echo $DOMAIN_IDS); do
 done
 ```
 
-**Dispatch `wiki-worker` subagents in parallel** (up to **5 concurrently**). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md). For each domain, use the same prompt template as [Incremental Dispatch](#incremental-dispatch--per-domain-worker-prompt) with the domain-scoped `$FILTERED_KG`.
+**Dispatch `wiki-worker` subagents in parallel** (up to **10 concurrently**). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md). For each domain, use the same prompt template as [Incremental Dispatch](#incremental-dispatch--per-domain-worker-prompt) with the domain-scoped `$FILTERED_KG`.
 
 If a domain's wiki-worker fails, retry once. On second failure, skip that domain and continue.
 
@@ -198,7 +198,7 @@ If intermediate output is verified, proceed to **Phase 2** (deterministic assemb
 
 ### Batch Mode
 
-For each service in `$SERVICES_TO_GENERATE`, **MUST dispatch wiki-worker agents in parallel** (up to **5 concurrently**). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md). Use the same per-domain dispatch prompt template as [Incremental Dispatch](#incremental-dispatch--per-domain-worker-prompt), passing the service's own `$SERVICE_ROOT`, `$SERVICE_NAME`, KG, and DG.
+For each service in `$SERVICES_TO_GENERATE`, **MUST dispatch wiki-worker agents in parallel** (up to **10 concurrently**). See [Dispatch Protocol](../../../docs/DISPATCH-PROTOCOL.md). Use the same per-domain dispatch prompt template as [Incremental Dispatch](#incremental-dispatch--per-domain-worker-prompt), passing the service's own `$SERVICE_ROOT`, `$SERVICE_NAME`, KG, and DG.
 
 Progress reporting:
 > `Generating Wiki for service 1/N: order-service...`

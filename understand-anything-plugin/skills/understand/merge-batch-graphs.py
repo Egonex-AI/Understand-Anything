@@ -2538,6 +2538,41 @@ def main() -> None:
     # (validate-artifact.mjs) don't report "degraded: no provenance".
     _stamp_project_provenance(assembled, project_root)
 
+    # ── Final normalization: enforce required fields on all nodes/edges ──
+    # LLM batch results may omit optional-with-default fields. The dashboard
+    # reports these as warnings. Fix them here so the written graph is clean.
+    _EDGE_WEIGHT_MAP = {
+        "contains": 1.0,
+        "inherits": 0.9, "implements": 0.9,
+        "calls": 0.8, "exports": 0.8, "defines_schema": 0.8,
+        "imports": 0.7, "deploys": 0.7, "migrates": 0.7,
+        "consumes_api": 0.7, "navigates_to": 0.7,
+        "depends_on": 0.6, "configures": 0.6, "triggers": 0.6,
+        "tested_by": 0.5, "documents": 0.5, "provisions": 0.5,
+        "serves": 0.5, "routes": 0.5,
+    }
+    nodes_fixed_name = 0
+    nodes_fixed_tags = 0
+    edges_fixed_weight = 0
+    for node in assembled.get("nodes", []):
+        if not node.get("name"):
+            nid = node.get("id", "")
+            node["name"] = nid.split(":")[-1] if ":" in nid else nid
+            nodes_fixed_name += 1
+        if "tags" not in node or not isinstance(node.get("tags"), list):
+            node["tags"] = []
+            nodes_fixed_tags += 1
+    for edge in assembled.get("edges", []):
+        if "weight" not in edge:
+            edge["weight"] = _EDGE_WEIGHT_MAP.get(edge.get("type", ""), 0.5)
+            edges_fixed_weight += 1
+    if nodes_fixed_name or nodes_fixed_tags or edges_fixed_weight:
+        report.append("")
+        report.append(
+            f"Post-merge normalization: fixed {nodes_fixed_name} nodes missing name, "
+            f"{nodes_fixed_tags} missing tags, {edges_fixed_weight} edges missing weight"
+        )
+
     # Write output
     output_path = intermediate_dir / "assembled-graph.json"
     output_path.write_text(json.dumps(assembled, indent=2, ensure_ascii=False), encoding="utf-8")

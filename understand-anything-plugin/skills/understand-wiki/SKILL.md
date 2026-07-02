@@ -105,7 +105,7 @@ Resolve execution mode, plugin root, language/RPC config, and service list.
 
 **Single-service mode:** Dispatch `wiki-worker` agents (incremental per-domain or full), verify output.
 
-**Batch mode:** Dispatch one sub-agent per service. Each sub-agent runs the complete single-service flow (Phase 0 prerequisite check → Phase 1 wiki-worker → Phase 2 assembly) in an isolated context. The sub-agent reads this SKILL.md and follows the single-service path. Up to 3 sub-agents run concurrently.
+**Batch mode:** Dispatch one sub-agent per service. Each sub-agent runs the complete single-service flow (Phase 0 prerequisite check → Phase 1 wiki-worker → Phase 2 assembly) in an isolated context. The sub-agent reads this SKILL.md and follows the single-service path. Up to 10 sub-agents run concurrently.
 
 **Detailed implementation:** See [Phase 1 — Service Wiki Generation](docs/wiki-phase1-generation.md) (includes [Partial Failure Policy](docs/wiki-phase1-generation.md#partial-failure-policy))
 

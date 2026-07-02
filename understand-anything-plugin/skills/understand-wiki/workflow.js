@@ -482,7 +482,7 @@ Service overview dirty: ${dgResult.serviceOverviewDirty || false}
 \`python3 "${setup.skillDir}/generate_service_overview.py" "${svcRoot}"\`
 Produces intermediate/wiki/service.json with name, techStack, modules, entryPoints from KG.
 
-**Step 3 — Dispatch wiki-workers per domain** (up to 5 concurrently)
+**Step 3 — Dispatch wiki-workers per domain** (up to 10 concurrently)
 For each domain ID in domainsToGenerate:
   a. Build domain-scoped KG:
      \`python3 "${setup.skillDir}/wiki_kg_filter.py" "${svcRoot}/.understand-anything/knowledge-graph.json" "${svcRoot}/.understand-anything/domain-graph.json" <domainId> --max-nodes=200\`
