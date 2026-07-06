@@ -126,6 +126,69 @@ def _format_business_features(data: dict) -> str:
     return "\n".join(lines)
 
 
+def _knowledge_trace_node_line(node: dict) -> str:
+    name = node.get("name", node.get("id", "?"))
+    ntype = node.get("type", "?")
+    summary = node.get("summary", "")
+    wiki_path = node.get("filePath", "-")
+    source_path = node.get("sourcePath") or node.get("knowledgeMeta", {}).get("sourcePath") or "-"
+    node_id = node.get("id", "?")
+    lines = [f"- **{name}** ({ntype})"]
+    lines.append(f"  - Summary: {summary or '-'}")
+    lines.append(f"  - Wiki: `{wiki_path}`")
+    lines.append(f"  - Source: `{source_path}`")
+    lines.append(f"  - Node: `{node_id}`")
+    snippet = node.get("contentSnippet")
+    if snippet:
+        lines.append(f"  - Snippet: {snippet}")
+    return "\n".join(lines)
+
+
+def _append_knowledge_trace_sections(lines: list[str], data: dict, heading: str) -> None:
+    service = data.get("service")
+    if data.get("error"):
+        lines.append(f"> **PRD context warning:** {data['error']}")
+        candidates = data.get("candidates", [])
+        if candidates:
+            lines.append(f"> Candidates: {', '.join(candidates)}")
+        lines.append("")
+
+    sections = [
+        ("PRD Matches", data.get("matches", [])),
+        ("Related", (data.get("related") or {}).get("related", []) + (data.get("related") or {}).get("categorized_under", [])),
+        ("Cited Sources", data.get("citedSources", [])),
+        ("Test Coverage", data.get("coverage", [])),
+    ]
+    for title, nodes in sections:
+        lines.append(f"{heading} {title}")
+        if nodes:
+            for node in nodes:
+                lines.append(_knowledge_trace_node_line(node))
+        else:
+            lines.append("_None._")
+        lines.append("")
+
+    lines.append(f"{heading} Next Reads")
+    next_reads = data.get("nextReads", [])
+    if next_reads:
+        for node in next_reads:
+            node_id = node.get("id", "?")
+            if service:
+                lines.append(f"- `python3 ua_query.py knowledge read --service {service} --node \"{node_id}\"`")
+            else:
+                lines.append(f"- Node: `{node_id}`")
+            if node.get("filePath"):
+                lines.append(f"  - Wiki: `{node['filePath']}`")
+    else:
+        lines.append("_None._")
+
+
+def _format_knowledge_trace(data: dict) -> str:
+    lines = [f"# Knowledge Trace: {data.get('query', '?')}", ""]
+    _append_knowledge_trace_sections(lines, data, "##")
+    return "\n".join(lines)
+
+
 def _format_markdown(data: Any) -> str:
     if isinstance(data, dict) and data.get("kind") == "knowledge-coverage":
         req = data.get("requirement") or {}
@@ -138,6 +201,9 @@ def _format_markdown(data: Any) -> str:
         else:
             lines.append("No deterministic testcase coverage found.")
         return "\n".join(lines)
+
+    if isinstance(data, dict) and data.get("kind") == "knowledge-trace":
+        return _format_knowledge_trace(data)
 
     if isinstance(data, dict) and data.get("kind") == "knowledge-search":
         lines = [f"# Knowledge Search: {data.get('query', '?')}", f"Service: {data.get('service', '?')}", ""]
@@ -311,7 +377,11 @@ def _format_markdown(data: Any) -> str:
 
         # PRD Knowledge Context
         prd = data.get("prdContext", [])
-        if prd:
+        if isinstance(prd, dict) and prd.get("kind") == "knowledge-trace":
+            lines.append("## PRD Context")
+            _append_knowledge_trace_sections(lines, prd, "###")
+            lines.append("")
+        elif prd:
             lines.append(f"## PRD Context ({len(prd)} matches)")
             for p in prd[:5]:
                 ptype = _short_type_name(p.get("type", "?"))

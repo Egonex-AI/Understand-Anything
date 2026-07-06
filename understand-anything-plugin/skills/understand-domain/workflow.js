@@ -411,7 +411,7 @@ Run the fingerprint check script:
 The script outputs JSON to stdout with:
 - to_extract: list of domain short names that need extraction
 - skipped: list of domain short names that can be skipped (unchanged fingerprint + valid flows)
-- doc_only_skipped: list of documentation-only domains skipped
+- doc_only_skipped: list of documentation-only domains skipped (for example domains whose files are only under docs/ or other documentation paths)
 
 Read the JSON output and return:
 - toExtract: the to_extract array

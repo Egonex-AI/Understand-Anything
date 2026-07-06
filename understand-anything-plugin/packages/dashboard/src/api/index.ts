@@ -7,10 +7,12 @@ import { handleSourceRequest } from "./handlers/source"
 import { handleBusinessRequest } from "./handlers/business"
 import { handleSearchRequest } from "./handlers/search"
 import { handleStructureRequest } from "./handlers/structure"
+import { handleKnowledgeTraceRequest } from "./handlers/knowledge"
 
 const HANDLERS = [
   handleServicesRequest,
   handleSearchRequest,
+  handleKnowledgeTraceRequest,
   handleGraphQueryRequest,
   handleBusinessRequest,
   handleWikiRequest,

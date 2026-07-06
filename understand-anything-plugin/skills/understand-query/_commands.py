@@ -33,6 +33,45 @@ def _make_trace_args(**overrides: Any) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
+def _fetch_compact_prd_context(
+    args: argparse.Namespace, query: str, limit: int, read: bool
+) -> dict | list:
+    def warning(error: str, candidates: list[str] | None = None) -> dict:
+        payload: dict[str, Any] = {
+            "kind": "knowledge-trace",
+            "service": None,
+            "query": query,
+            "matches": [],
+            "related": {},
+            "coverage": [],
+            "citedSources": [],
+            "nextReads": [],
+            "error": error,
+        }
+        if candidates:
+            payload["candidates"] = candidates
+        return payload
+
+    try:
+        knowledge_svcs = _helpers._discover_knowledge_services(args.server)
+    except RuntimeError as exc:
+        return warning(f"Knowledge service discovery failed: {exc}")
+    if not knowledge_svcs:
+        return warning("No knowledge service found. Run system graph generation after /understand-knowledge.")
+    if len(knowledge_svcs) > 1:
+        return warning(
+            "Multiple knowledge services found. Pass --service to knowledge trace for explicit PRD context.",
+            knowledge_svcs,
+        )
+    params = {"service": knowledge_svcs[0], "q": query, "limit": str(limit), "depth": "1"}
+    if read:
+        params["read"] = "1"
+    try:
+        return _helpers.fetch_json(args.server, "/api/knowledge/trace", params)
+    except RuntimeError as exc:
+        return warning(f"Knowledge trace unavailable: {exc}", knowledge_svcs)
+
+
 def _cmd_kg_file_summary(args: argparse.Namespace) -> Any:
     try:
         graph_data = _helpers.fetch_json(args.server, "/api/graph", {
@@ -183,6 +222,19 @@ def cmd_knowledge(args: argparse.Namespace) -> Any:
             offset=args.offset,
         )
         return {"kind": "knowledge-search", "service": service, "query": args.query, "results": results}
+
+    if action == "trace":
+        params: dict[str, str] = {
+            "service": service,
+            "q": args.query,
+            "limit": str(args.limit),
+            "depth": str(args.depth),
+        }
+        if args.type:
+            params["type"] = args.type
+        if args.read:
+            params["read"] = "1"
+        return _helpers.fetch_json(args.server, "/api/knowledge/trace", params)
 
     if action == "node":
         data = _helpers.fetch_json(args.server, "/api/graph", {
@@ -994,33 +1046,9 @@ def cmd_ask(args: argparse.Namespace) -> Any:
         return result
 
     # Step 2b: PRD Knowledge Context
-    prd_context: list[dict] = []
-    try:
-        knowledge_svcs = _helpers._discover_knowledge_services(args.server)
-        if knowledge_svcs:
-            prd_parts = [p.strip() for p in query.split(",") if p.strip() and len(p.strip()) <= 20]
-            prd_q = " ".join(prd_parts[:3]) if prd_parts else query.split(",")[0][:20]
-            seen_ids: set[str] = set()
-            for ksvc in knowledge_svcs:
-                try:
-                    prd_hits = _search_api(
-                        args.server, prd_q, service=ksvc, scope="kg", limit=5, type=None,
-                    )
-                    for hit in prd_hits:
-                        nid = hit.get("id", "")
-                        if nid and nid in seen_ids:
-                            continue
-                        seen_ids.add(nid)
-                        prd_context.append(hit)
-                        if len(prd_context) >= 5:
-                            break
-                except RuntimeError:
-                    continue
-                if len(prd_context) >= 5:
-                    break
-    except RuntimeError:
-        pass
-    result["prdContext"] = prd_context
+    result["prdContext"] = _fetch_compact_prd_context(
+        args, query, getattr(args, "limit", 5), getattr(args, "knowledge_read", False)
+    )
 
     # Step 3: Trace (KG search + neighbors + source)
     trace_args = _make_trace_args(

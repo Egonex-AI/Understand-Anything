@@ -151,6 +151,16 @@ export class KgIndex {
         const sourcePath = metaString("sourcePath")
         const sourceType = metaString("sourceType")
         const profile = metaString("profile")
+        const markdownLinkText = Array.isArray(meta?.markdownLinks)
+          ? meta.markdownLinks
+            .flatMap((link: unknown) => {
+              if (link === null || typeof link !== "object") return []
+              const label = (link as { label?: unknown }).label
+              const target = (link as { target?: unknown }).target
+              return [label, target].filter((value): value is string => typeof value === "string")
+            })
+            .join(" ")
+          : ""
         const knowledgeText = [
           metaString("content"),
           detail,
@@ -159,6 +169,7 @@ export class KgIndex {
           version,
           sourcePath,
           sourceType,
+          markdownLinkText,
         ].filter(Boolean).join(" ")
         const contentSnippet = stripFrontMatter(metaString("content")).slice(0, 500)
 

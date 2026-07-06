@@ -113,9 +113,18 @@ python3 ua_query.py --format md knowledge search "跨房间 PK" --service amar-p
 python3 ua_query.py knowledge search "PK 测试" --service amar-prd --type testcase
 python3 ua_query.py knowledge node "requirement:summaries/房间-2025-10-v2.25.0-跨房间PK" --service amar-prd
 python3 ua_query.py --format md knowledge coverage "requirement:summaries/房间-2025-10-v2.25.0-跨房间PK" --service amar-prd
+python3 ua_query.py --format md knowledge trace "跨房间 PK" --service amar-prd --type requirement
+python3 ua_query.py knowledge trace "PK 测试" --service amar-prd --depth 2
+python3 ua_query.py --format md ask --query "跨房间 PK" --depth full --knowledge-read
 python3 ua_query.py knowledge read --node "requirement:summaries/房间-2025-10-v2.25.0-跨房间PK" --service amar-prd
 python3 ua_query.py --format md knowledge read --node "article:concepts/Room,requirement:summaries/PK优化" --service amar-prd
 ```
+
+### `knowledge trace` — Compact PRD/wiki context
+
+`knowledge trace` returns compact PRD/wiki context for agent consumption: matched nodes, grouped related edges, cited raw sources, deterministic testcase coverage, and next-read commands. By default it returns summaries plus paths, not full `knowledgeMeta.content`.
+
+Use `knowledge trace --read` or `ask --knowledge-read` when the trace needs inline evidence snippets. These flags still return bounded snippets only; use `knowledge read` when complete article content is required.
 
 ### `knowledge read` — Read full content of knowledge nodes
 
