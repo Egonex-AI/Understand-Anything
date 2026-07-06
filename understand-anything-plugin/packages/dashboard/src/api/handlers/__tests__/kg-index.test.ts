@@ -338,6 +338,38 @@ describe("KgIndex", () => {
       expect(results.results[0].id).toBe("requirement:room-pk")
       expect(results.results[0].service).toBe("amar-prd")
     })
+
+    it("indexes knowledge markdown link labels and targets", () => {
+      const graph = {
+        version: "1.0.0",
+        project: { name: "test", languages: [], frameworks: [], description: "", analyzedAt: "", gitCommitHash: "" },
+        layers: [],
+        tour: [],
+        nodes: [
+          {
+            id: "requirement:1",
+            type: "requirement",
+            name: "需求",
+            summary: "普通摘要",
+            tags: [],
+            complexity: "simple",
+            knowledgeMeta: {
+              markdownLinks: [
+                { label: "跨房间PK", target: "../summaries/room-pk.md", fragment: null },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      }
+
+      const index = KgIndex.create(graph as never, "amar-prd")
+      const labelResult = index.search({ q: "跨房间PK", limit: 5 })
+      const targetResult = index.search({ q: "summaries room pk", limit: 5 })
+
+      expect(labelResult.results[0]?.id).toBe("requirement:1")
+      expect(targetResult.results[0]?.id).toBe("requirement:1")
+    })
   })
 
   describe("cache", () => {

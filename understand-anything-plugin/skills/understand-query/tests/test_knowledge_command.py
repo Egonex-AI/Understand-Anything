@@ -28,6 +28,7 @@ def _args(**overrides):
         "depth": 1,
         "limit": 20,
         "offset": 0,
+        "read": False,
         "format": "json",
     }
     defaults.update(overrides)
@@ -50,6 +51,25 @@ def test_parse_knowledge_search_args():
     assert args.query == "跨房间 PK"
     assert args.type == "requirement"
     assert args.service == "amar-prd"
+
+
+def test_parse_knowledge_trace_args():
+    args = parse_args([
+        "knowledge", "trace", "跨房间 PK",
+        "--service", "amar-prd",
+        "--type", "requirement",
+        "--depth", "2",
+        "--read",
+    ])
+
+    assert args.command == "knowledge"
+    assert args.knowledge_action == "trace"
+    assert args.query == "跨房间 PK"
+    assert args.service == "amar-prd"
+    assert args.type == "requirement"
+    assert args.limit == 5
+    assert args.depth == 2
+    assert args.read is True
 
 
 @patch("_commands._search_api")
@@ -115,6 +135,47 @@ def test_knowledge_search_auto_resolves_single_service(mock_search, mock_resolve
         type=None,
         offset=0,
     )
+
+
+@patch("_commands._resolve_knowledge_service")
+@patch("_commands._helpers.fetch_json")
+def test_knowledge_trace_calls_api_with_compact_defaults(mock_fetch, mock_resolve):
+    mock_resolve.return_value = "amar-prd"
+    mock_fetch.return_value = {
+        "kind": "knowledge-trace",
+        "service": "amar-prd",
+        "query": "跨房间 PK",
+        "matches": [],
+        "related": {},
+        "coverage": [],
+        "citedSources": [],
+        "nextReads": [],
+        "limits": {"contentIncluded": False},
+    }
+
+    result = cmd_knowledge(_args(
+        knowledge_action="trace",
+        query="跨房间 PK",
+        type="requirement",
+        depth=2,
+        limit=3,
+        read=True,
+    ))
+
+    mock_resolve.assert_called_once_with("http://localhost:3001", "amar-prd")
+    mock_fetch.assert_called_once_with(
+        "http://localhost:3001",
+        "/api/knowledge/trace",
+        {
+            "service": "amar-prd",
+            "q": "跨房间 PK",
+            "limit": "3",
+            "depth": "2",
+            "type": "requirement",
+            "read": "1",
+        },
+    )
+    assert result["kind"] == "knowledge-trace"
 
 
 @patch("_commands._helpers.fetch_json")

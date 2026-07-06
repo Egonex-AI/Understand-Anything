@@ -84,6 +84,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     knowledge_read.add_argument("--node", required=True, help="Node ID(s), comma-separated (max 10)")
     knowledge_read.add_argument("--service")
 
+    knowledge_trace = knowledge_sub.add_parser("trace", help="Trace compact knowledge context")
+    knowledge_trace.add_argument("query")
+    knowledge_trace.add_argument("--service")
+    knowledge_trace.add_argument("--type", choices=["requirement", "testcase", "source", "article", "topic", "entity", "claim"])
+    knowledge_trace.add_argument("--limit", type=int, default=5)
+    knowledge_trace.add_argument("--depth", type=int, default=1)
+    knowledge_trace.add_argument("--read", action="store_true")
+
     domain = sub.add_parser("domain", help="Domain graph queries")
     domain.add_argument("--service")
     domain.add_argument("--domain")
@@ -150,6 +158,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ask.add_argument("--platform", help="Platform filter (android, ios, flutter)")
     ask.add_argument("--limit", type=int, default=5, help="Max matched nodes")
     ask.add_argument("--fusion", choices=["none", "rrf"], default="rrf", help="Search fusion strategy")
+    ask.add_argument("--knowledge-read", action="store_true", help="Include bounded PRD knowledge snippets")
 
     struct = sub.add_parser("structure", help="Code structure: signatures, annotations, types")
     struct.add_argument("--grep", help="Full-text search across all source code in the service")
