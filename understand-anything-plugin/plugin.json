@@ -1,0 +1,20 @@
+{
+  "name": "understand-anything",
+  "description": "AI-powered codebase understanding — analyze, visualize, and explain any project",
+  "version": "2.7.5",
+  "author": {
+    "name": "Lum1104"
+  },
+  "homepage": "https://github.com/Lum1104/Understand-Anything",
+  "repository": "https://github.com/Lum1104/Understand-Anything",
+  "license": "MIT",
+  "keywords": [
+    "codebase-analysis",
+    "knowledge-graph",
+    "architecture",
+    "onboarding",
+    "dashboard"
+  ],
+  "skills": "./skills/",
+  "agents": "./agents/"
+}

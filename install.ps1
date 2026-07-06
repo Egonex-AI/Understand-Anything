@@ -26,14 +26,15 @@ $RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
 
-# Platform table — Target = skills directory; Style = "per-skill" | "folder"
+# Platform table — Target = install directory; Style = "per-skill" | "folder" | "plugin-root"
 $Platforms = [ordered]@{
     gemini      = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     opencode    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     openclaw    = @{ Target = (Join-Path $HOME '.openclaw\skills');           Style = 'folder' }
-    antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
+    antigravity = @{ Target = (Join-Path $HOME '.gemini\config\plugins');     Style = 'plugin-root' }
+    'antigravity-legacy' = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
     vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
     hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder' }
     cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
@@ -152,6 +153,12 @@ function Link-Skills([string]$Target, [string]$Style) {
             New-Junction $link $root
             Write-Host "  ✓ $link → $root"
         }
+        'plugin-root' {
+            $link = Join-Path $Target 'understand-anything-plugin'
+            $src = Join-Path $RepoDir 'understand-anything-plugin'
+            New-Junction $link $src
+            Write-Host "  ✓ $link → $src"
+        }
         default { Write-Error "Unknown style: $Style" }
     }
 }
@@ -179,6 +186,9 @@ function Unlink-Skills([string]$Target, [string]$Style) {
         }
         'folder' {
             Remove-Reparse (Join-Path $Target 'understand-anything') | Out-Null
+        }
+        'plugin-root' {
+            Remove-Reparse (Join-Path $Target 'understand-anything-plugin') | Out-Null
         }
     }
 }
