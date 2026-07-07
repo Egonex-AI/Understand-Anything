@@ -570,6 +570,120 @@ describe('compute-batches.mjs — merge-small', () => {
   });
 });
 
+describe('compute-batches.mjs — knownCrossBatchNodeIds (issue #303)', () => {
+  let projectRoot;
+  let batches;
+
+  beforeEach(() => {
+    projectRoot = setupProject('scan-result-known-cross-batch-ids.json');
+    const result = runScript(projectRoot);
+    expect(result.status).toBe(0);
+    batches = readBatches(projectRoot);
+  });
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('every batch carries a knownCrossBatchNodeIds string array', () => {
+    expect(batches.batches.length).toBeGreaterThan(1);
+    for (const b of batches.batches) {
+      expect(Array.isArray(b.knownCrossBatchNodeIds)).toBe(true);
+      for (const id of b.knownCrossBatchNodeIds) {
+        expect(typeof id).toBe('string');
+        // Canonical `<prefix>:<path>` form.
+        expect(id).toMatch(/^[a-z]+:.+/);
+      }
+    }
+  });
+
+  it('knownCrossBatchNodeIds excludes IDs from the batch\'s own files', () => {
+    for (const b of batches.batches) {
+      const ownPaths = new Set(b.files.map(f => f.path));
+      for (const id of b.knownCrossBatchNodeIds) {
+        // Extract `<path>` from `<prefix>:<path>` (path itself may contain
+        // slashes but not the first colon).
+        const path = id.slice(id.indexOf(':') + 1);
+        expect(ownPaths.has(path)).toBe(false);
+      }
+    }
+  });
+
+  it('knownCrossBatchNodeIds use the correct prefix per fileCategory', () => {
+    // Find the code batch (the TS clique survives merge-small as a 3-file
+    // mergeable=true batch, so it stays standalone).
+    const codeBatch = batches.batches.find(b =>
+      b.files.some(f => f.path === 'src/index.ts'));
+    expect(codeBatch).toBeDefined();
+
+    // From the code batch's perspective, the cross-batch IDs must include
+    // the other files with their CATEGORY-CORRECT prefixes — never `file:`
+    // for a doc/config/infra path. This is the exact bug described in #303.
+    const ids = codeBatch.knownCrossBatchNodeIds;
+    expect(ids).toContain('document:README.md');
+    expect(ids).toContain('document:CLAUDE.md');
+    expect(ids).toContain('document:docs/getting-started.md');
+    expect(ids).toContain('config:tsconfig.json');
+    expect(ids).toContain('service:Dockerfile');
+    expect(ids).toContain('service:docker-compose.yml');
+    expect(ids).toContain('pipeline:.github/workflows/ci.yml');
+    expect(ids).toContain('pipeline:.github/workflows/deploy.yml');
+
+    // The bug: under the old code, a doc/config batch referencing CLAUDE.md
+    // would fall back to `file:CLAUDE.md`. Assert that prefix never appears
+    // for a known doc path.
+    expect(ids).not.toContain('file:README.md');
+    expect(ids).not.toContain('file:CLAUDE.md');
+    expect(ids).not.toContain('file:docs/getting-started.md');
+    expect(ids).not.toContain('file:Dockerfile');
+    expect(ids).not.toContain('file:tsconfig.json');
+    expect(ids).not.toContain('file:.github/workflows/ci.yml');
+  });
+
+  it('docs batch sees code files with file: prefix and infra/config files with their own', () => {
+    // Find a batch owning a docs file (could be standalone or merged with
+    // other non-code files via Group E / merge-small).
+    const docsBatch = batches.batches.find(b =>
+      b.files.some(f => f.path === 'README.md'));
+    expect(docsBatch).toBeDefined();
+
+    const ids = docsBatch.knownCrossBatchNodeIds;
+    // The TS code clique lives in another batch — it must be referenced
+    // with the file: prefix.
+    expect(ids).toContain('file:src/index.ts');
+    expect(ids).toContain('file:src/server.ts');
+    expect(ids).toContain('file:src/router.ts');
+  });
+
+  it('knownCrossBatchNodeIds is sorted deterministically', () => {
+    for (const b of batches.batches) {
+      const sorted = [...b.knownCrossBatchNodeIds].sort();
+      expect(b.knownCrossBatchNodeIds).toEqual(sorted);
+    }
+  });
+
+  it('union of own-file IDs + knownCrossBatchNodeIds covers every file in the project', () => {
+    // For any batch, every other file in the project must be reachable via
+    // its knownCrossBatchNodeIds (modulo this batch's own files). This is
+    // the invariant the file-analyzer relies on when deciding whether to
+    // drop an edge ("not in the list → not in the graph").
+    const allPaths = new Set();
+    for (const b of batches.batches) {
+      for (const f of b.files) allPaths.add(f.path);
+    }
+    for (const b of batches.batches) {
+      const ownPaths = new Set(b.files.map(f => f.path));
+      const crossPaths = new Set(
+        b.knownCrossBatchNodeIds.map(id => id.slice(id.indexOf(':') + 1)),
+      );
+      for (const p of allPaths) {
+        const reachable = ownPaths.has(p) || crossPaths.has(p);
+        expect(reachable, `batch ${b.batchIndex} cannot reach ${p}`).toBe(true);
+      }
+    }
+  });
+});
+
 describe('compute-batches.mjs — --changed-files', () => {
   let root;
 

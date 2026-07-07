@@ -226,6 +226,131 @@ function buildBatchOfMap(allBatches) {
   return m;
 }
 
+// ---------------------------------------------------------------------------
+// File → canonical node-ID prefix. Mirrors:
+//   1. file-analyzer.md "Node type mapping by fileCategory" (which is the
+//      contract the file-analyzer subagent emits node IDs under).
+//   2. merge-batch-graphs.py TYPE_TO_PREFIX (the merge step that normalizes
+//      whatever the agent produced).
+//
+// The file-level node ID for a file is `<prefix>:<path>` (e.g.
+// `file:src/index.ts`, `document:README.md`). We pre-compute the full ID
+// for every file at dispatch time so doc/config batches that reference
+// sibling files in OTHER batches can use the correct prefix instead of
+// guessing `file:<path>` and emitting a dangling edge (see issue #303).
+//
+// `code` / `script` / `markup` collapse to `file:` — file-analyzer.md's
+// table specifies `script` and `markup` as `file` type. `infra` and `data`
+// fan out by path heuristics that mirror buildNonCodeBatches' Group A-D
+// classification and the file-analyzer's "Choosing between infra/data
+// sub-types" guidance.
+// ---------------------------------------------------------------------------
+
+const _baseOf = p => p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+
+/**
+ * Return the canonical node-ID prefix for a file based on its category and
+ * path. The returned prefix matches what `file-analyzer.md` instructs the
+ * subagent to emit for the file-level node:
+ *
+ *   - code|script|markup → "file"
+ *   - config             → "config"
+ *   - docs               → "document"
+ *   - infra              → "service" | "pipeline" | "resource"
+ *   - data               → "table"   | "schema"   | "endpoint"
+ *
+ * For infra/data, the subtype is picked from the path (Dockerfile,
+ * .github/workflows/, *.tf, etc.) to match the file-analyzer's per-file
+ * subtype rules. When no specific subtype matches, falls back to the
+ * "most common" prefix for that category (`service` for infra, `table`
+ * for data) so dispatch never emits a path with no prefix.
+ *
+ * Defensive: an unknown fileCategory falls through to `file`, mirroring
+ * the merge script's "unknown type defaults to file" behavior — it's
+ * better to emit a slightly-wrong prefix the merge step will surface as
+ * a dangling edge than to omit the file from knownCrossBatchNodeIds
+ * entirely (which would also produce a dangling edge but with no recovery
+ * signal).
+ */
+function nodePrefixForFile(file) {
+  const cat = file.fileCategory;
+  if (cat === 'code' || cat === 'script' || cat === 'markup') return 'file';
+  if (cat === 'config') return 'config';
+  if (cat === 'docs') return 'document';
+
+  const path = file.path;
+  const base = _baseOf(path);
+
+  if (cat === 'infra') {
+    // Pipeline (CI/CD): .github/workflows/*, .gitlab-ci.yml, .circleci/*,
+    // Jenkinsfile, *.yml under k8s/kubernetes paths stay `service` below.
+    if (path.startsWith('.github/workflows/')) return 'pipeline';
+    if (path === '.gitlab-ci.yml') return 'pipeline';
+    if (path.startsWith('.circleci/')) return 'pipeline';
+    if (base === 'Jenkinsfile') return 'pipeline';
+    // Resource (IaC): Terraform, Vagrant.
+    if (path.endsWith('.tf') || path.endsWith('.tfvars')) return 'resource';
+    if (base === 'Vagrantfile') return 'resource';
+    // Service (containers / K8s): Dockerfile, docker-compose, .dockerignore,
+    // anything under k8s/kubernetes/, *.k8s.yml. This is the default for
+    // unmatched infra files (e.g. Makefile, Procfile) — those rarely
+    // become cross-batch edge targets so the small mis-classification
+    // risk is bounded.
+    return 'service';
+  }
+
+  if (cat === 'data') {
+    // Endpoint: OpenAPI/Swagger spec files.
+    if (/(^|\/)(openapi|swagger)\.(ya?ml|json)$/i.test(path)) return 'endpoint';
+    // Schema: GraphQL, Protobuf, Prisma.
+    if (path.endsWith('.graphql') || path.endsWith('.gql')) return 'schema';
+    if (path.endsWith('.proto')) return 'schema';
+    if (path.endsWith('.prisma')) return 'schema';
+    // Table: SQL is the file-analyzer default for the data category.
+    return 'table';
+  }
+
+  // Unknown / unexpected category — fall through to file. The
+  // merge-batch-graphs.py TYPE_TO_PREFIX has the same fallback.
+  return 'file';
+}
+
+/**
+ * Compute, for each batch, the flat array of canonical node IDs
+ * (`<prefix>:<path>`) that belong to ALL OTHER batches. Injected into the
+ * file-analyzer dispatch so doc/test/config batches referencing sibling
+ * files outside their own batch can emit edges with the correct prefix
+ * instead of falling back to `file:<guess-path>`. See issue #303.
+ *
+ * Returns Map<batchIndex, string[]> where the array is sorted for
+ * deterministic output.
+ */
+function buildKnownCrossBatchNodeIds(allBatches) {
+  // Pre-compute every file's full node ID once.
+  const idOf = new Map();
+  for (const b of allBatches) {
+    for (const f of b.files) {
+      idOf.set(f.path, `${nodePrefixForFile(f)}:${f.path}`);
+    }
+  }
+
+  const result = new Map();
+  for (const b of allBatches) {
+    const own = new Set(b.files.map(f => f.path));
+    const others = [];
+    for (const other of allBatches) {
+      if (other.batchIndex === b.batchIndex) continue;
+      for (const f of other.files) {
+        if (own.has(f.path)) continue;  // defensive — paths should be unique
+        others.push(idOf.get(f.path));
+      }
+    }
+    others.sort();
+    result.set(b.batchIndex, others);
+  }
+  return result;
+}
+
 /**
  * Returns Map<path, communityId> via Louvain. May throw — caller must catch
  * and fall back if it does. Honors UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW=1
@@ -480,6 +605,12 @@ async function main() {
 
   const MAX_NEIGHBORS = 50;
 
+  // Pre-compute per-batch knownCrossBatchNodeIds — the canonical
+  // `<prefix>:<path>` IDs for every file owned by OTHER batches. Injected
+  // into file-analyzer dispatch so cross-batch edges land on the right
+  // prefix (`document:CLAUDE.md`, not `file:CLAUDE.md`). See issue #303.
+  const knownCrossBatchByIndex = buildKnownCrossBatchNodeIds(mergedBareBatches);
+
   // Second-pass: enrich each batch with batchImportData + neighborMap
   const batches = mergedBareBatches.map(b => {
     const batchPaths = new Set(b.files.map(f => f.path));
@@ -523,7 +654,13 @@ async function main() {
 
       if (kept.length) neighborMap[f.path] = kept;
     }
-    return { batchIndex: b.batchIndex, files: b.files, batchImportData, neighborMap };
+    return {
+      batchIndex: b.batchIndex,
+      files: b.files,
+      batchImportData,
+      neighborMap,
+      knownCrossBatchNodeIds: knownCrossBatchByIndex.get(b.batchIndex) || [],
+    };
   });
 
   let finalBatches = batches;
