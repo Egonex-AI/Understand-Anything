@@ -299,6 +299,43 @@ class LinkTestsTests(unittest.TestCase):
         # Test node is not tagged with "tested"
         self.assertNotIn("tested", nodes_by_id["file:src/foo.test.ts"]["tags"])
 
+    def test_python_src_package_layout_pairs_by_unique_basename(self) -> None:
+        nodes_by_id = {
+            "file:zone2-charts/src/zone2_charts/chart_renderer.py": _file_node(
+                "zone2-charts/src/zone2_charts/chart_renderer.py"
+            ),
+            "file:zone2-charts/tests/test_chart_renderer.py": _file_node(
+                "zone2-charts/tests/test_chart_renderer.py"
+            ),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (1, 0, 1, 0))
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(
+            edges[0]["source"],
+            "file:zone2-charts/src/zone2_charts/chart_renderer.py",
+        )
+        self.assertEqual(
+            edges[0]["target"],
+            "file:zone2-charts/tests/test_chart_renderer.py",
+        )
+
+    def test_basename_fallback_skips_ambiguous_production_matches(self) -> None:
+        nodes_by_id = {
+            "file:pkg-a/src/pkg_a/client.py": _file_node("pkg-a/src/pkg_a/client.py"),
+            "file:pkg-b/src/pkg_b/client.py": _file_node("pkg-b/src/pkg_b/client.py"),
+            "file:tests/test_client.py": _file_node("tests/test_client.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 0, 0, 0))
+        self.assertEqual(edges, [])
+
     def test_no_production_counterpart_no_edge(self) -> None:
         nodes_by_id = {
             "file:src/foo.test.ts": _file_node("src/foo.test.ts"),
