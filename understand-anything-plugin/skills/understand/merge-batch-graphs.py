@@ -1012,30 +1012,49 @@ def main() -> None:
         print(f"Error: {intermediate_dir} does not exist", file=sys.stderr)
         sys.exit(1)
 
-    # Discover batch files, sorted by numeric index (not lexicographic)
-    batch_files = sorted(
-        intermediate_dir.glob("batch-*.json"),
-        key=lambda p: int(re.search(r"batch-(\d+)", p.stem).group(1))
-        if re.search(r"batch-(\d+)", p.stem)
-        else 0,
-    )
+    # Discover batch files, sorted deterministically:
+    #   1. `batch-existing.json` (incremental update payload) sorts first
+    #      with a synthetic index of -1, so pruned baseline nodes/edges are
+    #      seen before any freshly-analyzed batch. Combined with Step 5's
+    #      "keep last" dedup, this means a fresh batch always wins over the
+    #      existing-graph copy of the same node ID (incremental re-analysis
+    #      semantics).
+    #   2. Numeric batches sort by their integer index.
+    #   3. Per-batch parts (`batch-<N>-part-<K>.json`) are tied with their
+    #      sibling parts at the same index and fall back to lexicographic
+    #      order on the filename — stable enough for the dedup step that
+    #      runs downstream.
+    def _batch_sort_key(p: Path) -> tuple[int, str]:
+        m = re.match(r"batch-(\d+|existing)(?:-part-(\d+))?\.json", p.name)
+        if m is None:
+            return (sys.maxsize, p.name)  # unrecognized — sort last (will be rejected below)
+        idx_str = m.group(1)
+        idx = -1 if idx_str == "existing" else int(idx_str)
+        return (idx, p.name)
+
+    batch_files = sorted(intermediate_dir.glob("batch-*.json"), key=_batch_sort_key)
     if not batch_files:
         print("Error: no batch-*.json files found in intermediate/", file=sys.stderr)
         sys.exit(1)
 
     # Group by logical batch index so the report distinguishes single-batch
     # files from multi-part file-analyzer outputs. Files that don't match the
-    # `batch-<N>.json` / `batch-<N>-part-<K>.json` pattern (e.g. fused
-    # `batch-fused-8-13.json`, range `batch-8-13.json`) would otherwise be
-    # silently dropped during load — flag them loudly instead so the user
-    # can fix the file-analyzer agent.
+    # `batch-<N>.json` / `batch-<N>-part-<K>.json` / `batch-existing.json`
+    # pattern (e.g. fused `batch-fused-8-13.json`, range `batch-8-13.json`)
+    # would otherwise be silently dropped during load. We now fail loudly
+    # and exit non-zero so this kind of silent data loss is impossible
+    # (see #292).
     from collections import defaultdict as _dd
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
     for f in batch_files:
-        m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
+        m = re.match(r"batch-(\d+|existing)(?:-part-(\d+))?\.json", f.name)
         if m:
-            by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
+            idx_str = m.group(1)
+            # Use -1 as the logical index for `batch-existing.json` so it
+            # groups separately from numeric batches in `by_batch`.
+            idx = -1 if idx_str == "existing" else int(idx_str)
+            by_batch[idx].append((f.name, int(m.group(2)) if m.group(2) else None))
         else:
             unrecognized_batch_files.append(f.name)
 
@@ -1046,13 +1065,21 @@ def main() -> None:
             if len(unrecognized_batch_files) > 5
             else ""
         )
+        # Hard error (was: silent drop with stderr warning that callers
+        # often missed, see #292). Failing loud means a misnamed file —
+        # including the previously-broken `batch-existing.json` path that
+        # SKILL.md instructs incremental updates to write — can never
+        # silently strip ~70% of the graph again.
         print(
-            f"Warning: merge-batch-graphs: {len(unrecognized_batch_files)} "
-            f"batch file(s) with unrecognized filenames will be DROPPED — "
+            f"Error: merge-batch-graphs: {len(unrecognized_batch_files)} "
+            f"batch file(s) with unrecognized filenames would be DROPPED — "
             f"files: {preview}{suffix} — fix the file-analyzer agent to use "
-            f"only batch-<N>.json or batch-<N>-part-<K>.json patterns",
+            f"only batch-<N>.json, batch-<N>-part-<K>.json, or "
+            f"batch-existing.json patterns. Refusing to produce a "
+            f"partial merged graph.",
             file=sys.stderr,
         )
+        sys.exit(1)
 
     logical_count = len(by_batch)
     multi_part = sum(1 for entries in by_batch.values() if len(entries) > 1)
@@ -1084,13 +1111,10 @@ def main() -> None:
             print(f"Warning: merge: {msg}", file=sys.stderr)
             missing_part_warnings.append(msg)
 
-    # Load batches — skip unrecognized filenames so they don't pollute the
-    # merged graph with content the agent labeled incorrectly.
-    unrecognized_set = set(unrecognized_batch_files)
+    # Load batches. We're past the unrecognized-filename check (which now
+    # hard-exits), so every file here matches the recognized pattern.
     batches: list[dict[str, Any]] = []
     for f in batch_files:
-        if f.name in unrecognized_set:
-            continue
         batch = load_batch(f)
         if batch is not None:
             batches.append(batch)
@@ -1105,11 +1129,14 @@ def main() -> None:
     # Merge and normalize
     assembled, report = merge_and_normalize(batches)
 
-    # Surface missing multi-part files to the phase report (parallel to
-    # unrecognized-filename handling below). Stderr lines emitted during
-    # batch discovery get buried under per-batch load output — re-emitting
-    # via the report list ensures the Phase 4 review and final summary see
-    # the data-loss signal.
+    # Surface missing multi-part files to the phase report. Stderr lines
+    # emitted during batch discovery get buried under per-batch load output —
+    # re-emitting via the report list ensures the Phase 4 review and final
+    # summary see the data-loss signal.
+    #
+    # (Unrecognized-filename drops used to be surfaced here too. They now
+    # hard-exit before this point — see #292 — so there's nothing left to
+    # surface.)
     if missing_part_warnings:
         report.append("")
         report.append(
@@ -1118,24 +1145,6 @@ def main() -> None:
         )
         for w in missing_part_warnings:
             report.append(f"  - {w}")
-
-    # Surface unrecognized-filename drops to the phase report so the
-    # downstream review step sees them, not just stderr.
-    if unrecognized_batch_files:
-        preview = ", ".join(unrecognized_batch_files[:5])
-        suffix = (
-            f" (+{len(unrecognized_batch_files) - 5} more)"
-            if len(unrecognized_batch_files) > 5
-            else ""
-        )
-        report.append("")
-        report.append(
-            f"Warning: dropped {len(unrecognized_batch_files)} batch file(s) "
-            f"with unrecognized filenames — files: {preview}{suffix} — "
-            f"fix the file-analyzer agent to use only batch-<N>.json or "
-            f"batch-<N>-part-<K>.json patterns (every node/edge in these "
-            f"files was excluded from the final graph)"
-        )
 
     # Recover any imports edges file-analyzer batches dropped despite
     # `batchImportData` containing them. The project-scanner's importMap
