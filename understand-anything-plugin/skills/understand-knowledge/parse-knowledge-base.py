@@ -23,6 +23,11 @@ from pathlib import Path
 # Regex patterns
 # ---------------------------------------------------------------------------
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
+# CommonMark inline links to local .md pages: [label](path/to/page.md[#anchor]).
+# Excludes images (leading "!"); external URLs / absolute paths are filtered in
+# resolve_mdlink. Wikis rendered on GitHub/GitLab use this form instead of
+# [[wikilinks]], which those renderers do not support.
+MDLINK_RE = re.compile(r"(?<!!)\[[^\]]*\]\(\s*([^)\s]+?\.md)(?:#[^)]*)?\s*\)")
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 CODE_BLOCK_RE = re.compile(r"```(\w*)")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
@@ -97,6 +102,11 @@ def extract_wikilinks(text: str) -> list[dict]:
     return links
 
 
+def extract_mdlinks(text: str) -> list[str]:
+    """Extract CommonMark links that point at local .md pages: [label](page.md)."""
+    return [m.group(1).strip() for m in MDLINK_RE.finditer(text)]
+
+
 def extract_headings(text: str) -> list[dict]:
     """Extract all markdown headings with level and text."""
     return [
@@ -168,7 +178,11 @@ def extract_h1(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def parse_index(index_path: Path) -> list[dict]:
-    """Parse index.md to extract categories from ## headings and their wikilinks."""
+    """Parse index.md to extract categories from ## headings and their links.
+
+    Collects both [[wikilink]] names and CommonMark [label](page.md) paths so
+    index files that use either link style populate categories.
+    """
     if not index_path.is_file():
         return []
     text = index_path.read_text(encoding="utf-8", errors="replace")
@@ -186,10 +200,12 @@ def parse_index(index_path: Path) -> list[dict]:
             categories.append(current_category)
             continue
 
-        # Collect wikilinks under current section
+        # Collect both [[wikilinks]] and [label](page.md) links under the section
         if current_category:
             for wl in WIKILINK_RE.finditer(line):
                 current_category["articles"].append(wl.group(1).strip())
+            for ml in MDLINK_RE.finditer(line):
+                current_category["articles"].append(ml.group(1).strip())
 
     return categories
 
@@ -275,6 +291,44 @@ def resolve_wikilink(target: str, name_map: dict[str, str], node_ids: set[str] |
     return None
 
 
+def resolve_mdlink(link: str, source_rel: Path, node_ids: set[str]) -> str | None:
+    """Resolve a CommonMark [..](page.md) link to an article node ID.
+
+    The target is a filesystem path relative to the linking file. It is
+    normalised against the source file's directory and matched to a known
+    article ID. External URLs, mailto, and absolute paths are ignored.
+    """
+    target = link.split("#", 1)[0].strip()
+    if not target or "://" in target or target.startswith(("/", "mailto:")):
+        return None
+    if not target.lower().endswith(".md"):
+        return None
+    # Normalise the path (resolve ./ and ../) relative to the source directory.
+    parts: list[str] = []
+    for part in (source_rel.parent / target).parts:
+        if part in (".", ""):
+            continue
+        if part == "..":
+            if parts:
+                parts.pop()
+            continue
+        parts.append(part)
+    if not parts:
+        return None
+    stem = Path(*parts).with_suffix("").as_posix()
+    candidate = f"article:{stem}"
+    return candidate if candidate in node_ids else None
+
+
+def resolve_index_target(
+    target: str, name_map: dict[str, str], node_ids: set[str], index_rel: Path
+) -> str | None:
+    """Resolve an index category target that may be a wikilink name or md path."""
+    if target.lower().endswith(".md"):
+        return resolve_mdlink(target, index_rel, node_ids)
+    return resolve_wikilink(target, name_map, node_ids)
+
+
 def parse_wiki(root: Path) -> dict:
     """Parse a Karpathy-pattern wiki and produce the scan manifest."""
     detection = detect_format(root)
@@ -301,11 +355,11 @@ def parse_wiki(root: Path) -> dict:
     categories = parse_index(index_path)
     log_entries = parse_log(log_path)
 
-    # Build category lookup: wikilink target → category name
-    category_lookup: dict[str, str] = {}
-    for cat in categories:
-        for article_target in cat["articles"]:
-            category_lookup[article_target.lower()] = cat["name"]
+    # index location relative to the wiki root, for resolving md-link targets
+    try:
+        index_rel = index_path.relative_to(wiki_root)
+    except ValueError:
+        index_rel = Path(index_path.name)
 
     # --- Pre-compute article IDs (for edge resolution validation) ---
     # Only skip infra files at the wiki root level, not in subdirectories
@@ -319,11 +373,23 @@ def parse_wiki(root: Path) -> dict:
             continue
         article_ids.add(f"article:{stem}")
 
+    # Build category lookup: link target -> category name. Keyed by the raw
+    # target (legacy [[wikilink]] names) and, when the target resolves to a
+    # known article, by that article's stem (covers [label](page.md) links).
+    category_lookup: dict[str, str] = {}
+    for cat in categories:
+        for article_target in cat["articles"]:
+            category_lookup[article_target.lower()] = cat["name"]
+            resolved = resolve_index_target(article_target, name_map, article_ids, index_rel)
+            if resolved:
+                category_lookup[resolved[len("article:"):].lower()] = cat["name"]
+
     # --- Build article nodes ---
     nodes = []
     edges = []
     warnings = []
-    stats = {"articles": 0, "sources": 0, "topics": 0, "wikilinks": 0, "unresolved": 0}
+    stats = {"articles": 0, "sources": 0, "topics": 0,
+             "wikilinks": 0, "mdlinks": 0, "unresolved": 0}
 
     for md_file in sorted(wiki_root.rglob("*.md")):
         rel = md_file.relative_to(wiki_root)
@@ -338,6 +404,7 @@ def parse_wiki(root: Path) -> dict:
         h1 = extract_h1(text)
         frontmatter = extract_frontmatter(text)
         wikilinks = extract_wikilinks(text)
+        mdlinks = extract_mdlinks(text)
         headings = extract_headings(text)
         code_langs = extract_code_blocks(text)
         summary = extract_first_paragraph(text)
@@ -361,11 +428,11 @@ def parse_wiki(root: Path) -> dict:
             tag_set.update(t.strip() for t in fm_tags.split(",") if t.strip())
         tags = sorted(tag_set)
 
-        # Complexity from wikilink density
-        wl_count = len(wikilinks)
-        if wl_count > 15:
+        # Complexity from link density (wikilinks + markdown page links)
+        link_count = len(wikilinks) + len(mdlinks)
+        if link_count > 15:
             complexity = "complex"
-        elif wl_count > 5:
+        elif link_count > 5:
             complexity = "moderate"
         else:
             complexity = "simple"
@@ -381,17 +448,41 @@ def parse_wiki(root: Path) -> dict:
             "complexity": complexity,
             "knowledgeMeta": {
                 "wikilinks": [wl["target"] for wl in wikilinks],
+                "mdlinks": mdlinks,
                 **({"category": category} if category else {}),
                 "content": text[:3000],  # First 3000 chars for LLM analysis
             },
         })
         stats["articles"] += 1
-        stats["wikilinks"] += wl_count
+        stats["wikilinks"] += len(wikilinks)
+        stats["mdlinks"] += len(mdlinks)
 
-        # Build edges from wikilinks (resolve against known article IDs)
+        # Build edges from links (resolve against known article IDs). A page
+        # may reference the same target via both styles — emit one edge each.
+        linked: set[str] = set()
         for wl in wikilinks:
             target_id = resolve_wikilink(wl["target"], name_map, article_ids)
             if target_id and target_id != node_id:
+                if target_id not in linked:
+                    linked.add(target_id)
+                    edges.append({
+                        "source": node_id,
+                        "target": target_id,
+                        "type": "related",
+                        "direction": "forward",
+                        "weight": 0.7,
+                    })
+            elif not target_id:
+                warnings.append(f"Unresolved wikilink: [[{wl['target']}]] in {rel}")
+                stats["unresolved"] += 1
+
+        # Markdown page links. Unresolved targets (README, raw files, external
+        # repos) are common and intentional, so they are not counted as
+        # unresolved warnings the way dangling wikilinks are.
+        for ml in mdlinks:
+            target_id = resolve_mdlink(ml, rel, article_ids)
+            if target_id and target_id != node_id and target_id not in linked:
+                linked.add(target_id)
                 edges.append({
                     "source": node_id,
                     "target": target_id,
@@ -399,9 +490,6 @@ def parse_wiki(root: Path) -> dict:
                     "direction": "forward",
                     "weight": 0.7,
                 })
-            elif not target_id:
-                warnings.append(f"Unresolved wikilink: [[{wl['target']}]] in {rel}")
-                stats["unresolved"] += 1
 
     # --- Build topic nodes from index.md categories ---
     for cat in categories:
@@ -418,7 +506,7 @@ def parse_wiki(root: Path) -> dict:
 
         # categorized_under edges (only resolve to known article nodes)
         for article_target in cat["articles"]:
-            article_id = resolve_wikilink(article_target, name_map, article_ids)
+            article_id = resolve_index_target(article_target, name_map, article_ids, index_rel)
             if article_id:
                 edges.append({
                     "source": article_id,
@@ -500,7 +588,8 @@ def main():
     # Report to stderr
     s = manifest["stats"]
     print(f"[parse] Karpathy wiki: {s['articles']} articles, {s['sources']} sources, "
-          f"{s['topics']} topics, {s['wikilinks']} wikilinks "
+          f"{s['topics']} topics, {s['wikilinks']} wikilinks, "
+          f"{s.get('mdlinks', 0)} md-links "
           f"({s['unresolved']} unresolved)", file=sys.stderr)
     print(f"[parse] Output: {out_path}", file=sys.stderr)
 
