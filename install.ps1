@@ -29,6 +29,7 @@ $PluginLink = Join-Path $HOME '.understand-anything-plugin'
 # Platform table — Target = skills directory; Style = "per-skill" | "folder"
 $Platforms = [ordered]@{
     gemini      = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
+    claude      = @{ Target = (Join-Path $HOME '.claude\skills');             Style = 'per-skill' }
     codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     opencode    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
@@ -234,7 +235,10 @@ function Cmd-Install([string]$Id) {
 
     Write-Host "`n✓ Installed Understand-Anything for $Id"
     Write-Host '  Restart your CLI or IDE to pick up the skills.'
-    if ($Id -eq 'vscode') {
+    if ($Id -eq 'claude') {
+        Write-Host "`n  Tip: Claude Code can also natively discover the plugin by opening this repo"
+        Write-Host '       directly (it reads .claude-plugin/plugin.json), no symlinks needed.'
+    } elseif ($Id -eq 'vscode') {
         Write-Host "`n  Tip: VS Code can also auto-discover the plugin by opening this repo"
         Write-Host '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.'
     }

@@ -29,6 +29,7 @@ PLUGIN_LINK="$HOME/.understand-anything-plugin"
 platforms_table() {
   cat <<EOF
 gemini|$HOME/.agents/skills|per-skill
+claude|$HOME/.claude/skills|per-skill
 codex|$HOME/.agents/skills|per-skill
 opencode|$HOME/.agents/skills|per-skill
 pi|$HOME/.agents/skills|per-skill
@@ -222,7 +223,10 @@ KIROEOF
 
   printf '\n✓ Installed Understand-Anything for %s\n' "$id"
   printf '  Restart your CLI or IDE to pick up the skills.\n'
-  if [[ "$id" == "vscode" ]]; then
+  if [[ "$id" == "claude" ]]; then
+    printf '\n  Tip: Claude Code can also natively discover the plugin by opening this repo\n'
+    printf '       directly (it reads .claude-plugin/plugin.json), no symlinks needed.\n'
+  elif [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'
     printf '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.\n'
   fi
