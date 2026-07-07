@@ -998,6 +998,30 @@ def recover_imports_from_scan(
     return recovered, lines
 
 
+# ── Batch filename parsing ────────────────────────────────────────────────
+
+# Recognised batch filenames: numeric (batch-<N>.json), multi-part
+# (batch-<N>-part-<K>.json), or the "existing" baseline written by the
+# incremental flow (batch-existing.json, see SKILL.md "Incremental update").
+# The "existing" baseline sorts BEFORE numeric batches so its pruned-graph
+# nodes/edges merge first and later numeric batches can override them.
+_BATCH_FILENAME_RE = re.compile(r"batch-(\d+|existing)(?:-part-(\d+))?\.json")
+
+
+def _batch_sort_key(p: Path) -> tuple[int, int]:
+    m = _BATCH_FILENAME_RE.match(p.name)
+    if not m:
+        return (10**9, 0)  # unrecognised → end of list (still flagged & dropped)
+    primary = -1 if m.group(1) == "existing" else int(m.group(1))
+    secondary = int(m.group(2)) if m.group(2) else 0
+    return (primary, secondary)
+
+
+def _batch_label(idx: int) -> str:
+    """Format a logical batch key for user-facing messages."""
+    return "existing" if idx == -1 else str(idx)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1012,12 +1036,12 @@ def main() -> None:
         print(f"Error: {intermediate_dir} does not exist", file=sys.stderr)
         sys.exit(1)
 
-    # Discover batch files, sorted by numeric index (not lexicographic)
+    # Discover batch files, sorted: "existing" baseline first (logical key -1),
+    # then numeric ascending; multi-part files (batch-<N>-part-<K>.json)
+    # interleave by (N, K) via _batch_sort_key.
     batch_files = sorted(
         intermediate_dir.glob("batch-*.json"),
-        key=lambda p: int(re.search(r"batch-(\d+)", p.stem).group(1))
-        if re.search(r"batch-(\d+)", p.stem)
-        else 0,
+        key=_batch_sort_key,
     )
     if not batch_files:
         print("Error: no batch-*.json files found in intermediate/", file=sys.stderr)
@@ -1033,9 +1057,12 @@ def main() -> None:
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
     for f in batch_files:
-        m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
+        m = _BATCH_FILENAME_RE.match(f.name)
         if m:
-            by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
+            # Mirror _batch_sort_key: "existing" → logical key -1 so it sorts
+            # first and merges before any numeric batch can override it.
+            key = -1 if m.group(1) == "existing" else int(m.group(1))
+            by_batch[key].append((f.name, int(m.group(2)) if m.group(2) else None))
         else:
             unrecognized_batch_files.append(f.name)
 
@@ -1050,7 +1077,7 @@ def main() -> None:
             f"Warning: merge-batch-graphs: {len(unrecognized_batch_files)} "
             f"batch file(s) with unrecognized filenames will be DROPPED — "
             f"files: {preview}{suffix} — fix the file-analyzer agent to use "
-            f"only batch-<N>.json or batch-<N>-part-<K>.json patterns",
+            f"only batch-<N>.json / batch-<N>-part-<K>.json / batch-existing.json patterns",
             file=sys.stderr,
         )
 
@@ -1077,7 +1104,7 @@ def main() -> None:
         missing = sorted(expected - present)
         if missing:
             msg = (
-                f"batch {idx} has parts {sorted(present)} but "
+                f"batch {_batch_label(idx)} has parts {sorted(present)} but "
                 f"missing part {missing} — possible truncated write — "
                 f"affected nodes/edges may be lost"
             )
@@ -1132,9 +1159,9 @@ def main() -> None:
         report.append(
             f"Warning: dropped {len(unrecognized_batch_files)} batch file(s) "
             f"with unrecognized filenames — files: {preview}{suffix} — "
-            f"fix the file-analyzer agent to use only batch-<N>.json or "
-            f"batch-<N>-part-<K>.json patterns (every node/edge in these "
-            f"files was excluded from the final graph)"
+            f"fix the file-analyzer agent to use only batch-<N>.json / "
+            f"batch-<N>-part-<K>.json / batch-existing.json patterns "
+            f"(every node/edge in these files was excluded from the final graph)"
         )
 
     # Recover any imports edges file-analyzer batches dropped despite

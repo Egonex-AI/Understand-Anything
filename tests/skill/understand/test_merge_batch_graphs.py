@@ -1183,5 +1183,124 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         self.assertNotIn("file:src/y.ts", node_ids)
 
 
+# ── Issue #292: batch-existing.json baseline recognition ──────────────────
+
+
+class TestBatchExistingBaseline(unittest.TestCase):
+    """Incremental flow writes pruned baseline as `batch-existing.json`
+    (see SKILL.md "Incremental update"). The merge regex must accept this
+    literal alongside `batch-<N>.json` / `batch-<N>-part-<K>.json`, otherwise
+    every baseline node/edge is silently dropped (Issue #292)."""
+
+    def setUp(self) -> None:
+        import tempfile
+        self.tmp = Path(tempfile.mkdtemp(prefix="ua-mbg-existing-"))
+        self.intermediate = self.tmp / ".understand-anything" / "intermediate"
+        self.intermediate.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write_batch(self, name: str, nodes: list, edges: list) -> None:
+        import json as _j
+        (self.intermediate / name).write_text(
+            _j.dumps({"nodes": nodes, "edges": edges}),
+            encoding="utf-8",
+        )
+
+    def _run_merge(self) -> tuple[int, str, dict]:
+        import subprocess
+        import json as _j
+        result = subprocess.run(
+            ["python3", str(_MODULE_PATH), str(self.tmp)],
+            capture_output=True, text=True,
+        )
+        out_path = self.intermediate / "assembled-graph.json"
+        assembled = _j.loads(out_path.read_text()) if out_path.exists() else {}
+        return result.returncode, result.stderr, assembled
+
+    def test_existing_baseline_plus_numeric_batch(self) -> None:
+        # T1: batch-0.json (2 fresh) + batch-existing.json (5 baseline, 3 edges)
+        # → all 7 nodes and 3 edges merged; no unrecognized warning.
+        self._write_batch(
+            "batch-0.json",
+            [_file_node("src/new1.ts"), _file_node("src/new2.ts")],
+            [],
+        )
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node(f"src/keep{i}.ts") for i in range(1, 6)],
+            [
+                {"source": "file:src/keep1.ts", "target": "file:src/keep2.ts",
+                 "type": "imports", "direction": "forward", "weight": 0.7},
+                {"source": "file:src/keep2.ts", "target": "file:src/keep3.ts",
+                 "type": "imports", "direction": "forward", "weight": 0.7},
+                {"source": "file:src/keep4.ts", "target": "file:src/keep5.ts",
+                 "type": "imports", "direction": "forward", "weight": 0.7},
+            ],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0)
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        expected = {f"file:src/keep{i}.ts" for i in range(1, 6)} | {
+            "file:src/new1.ts", "file:src/new2.ts",
+        }
+        self.assertEqual(node_ids, expected)
+        self.assertEqual(len(assembled["edges"]), 3)
+        self.assertNotIn("unrecognized filenames", stderr)
+
+    def test_only_existing_baseline(self) -> None:
+        # T2: only batch-existing.json present (e.g. incremental run with no
+        # newly analysed files) — must still load and emit baseline.
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node(f"src/keep{i}.ts") for i in range(1, 6)],
+            [],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0)
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertEqual(
+            node_ids,
+            {f"file:src/keep{i}.ts" for i in range(1, 6)},
+        )
+        self.assertNotIn("unrecognized filenames", stderr)
+
+    def test_existing_baseline_with_multi_part_numeric(self) -> None:
+        # T3: existing baseline + a multi-part numeric batch. Both must be
+        # recognised; parts under one logical batch interleave correctly.
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node("src/keep.ts")],
+            [],
+        )
+        self._write_batch(
+            "batch-0-part-1.json", [_file_node("src/a.ts")], [],
+        )
+        self._write_batch(
+            "batch-0-part-2.json", [_file_node("src/b.ts")], [],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0)
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertEqual(
+            node_ids,
+            {"file:src/keep.ts", "file:src/a.ts", "file:src/b.ts"},
+        )
+        self.assertNotIn("unrecognized filenames", stderr)
+
+    def test_numeric_only_baseline_unchanged(self) -> None:
+        # T4 regression guard: with no `existing` file present, the existing
+        # numeric-only behaviour is unchanged — both batches load, no warning.
+        self._write_batch("batch-0.json", [_file_node("src/a.ts")], [])
+        self._write_batch("batch-1.json", [_file_node("src/b.ts")], [])
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0)
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertEqual(node_ids, {"file:src/a.ts", "file:src/b.ts"})
+        self.assertNotIn("unrecognized filenames", stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
