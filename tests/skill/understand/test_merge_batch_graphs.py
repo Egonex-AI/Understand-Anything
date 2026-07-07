@@ -1183,5 +1183,137 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         self.assertNotIn("file:src/y.ts", node_ids)
 
 
+class CrossPrefixEdgeReconciliationTests(unittest.TestCase):
+    """Regression tests for #341 — `merge-batch-graphs.py` was silently
+    dropping valid edges whose endpoint pointed at a non-code node under
+    a `file:` prefix instead of the node's actual canonical prefix
+    (`config:`, `table:`, etc.). The fix re-prefixes such endpoints to
+    match the existing node IDs before the dangling-edge sweep runs.
+    """
+
+    def test_imports_edge_to_json_data_file_is_reconciled(self) -> None:
+        # Reproduces the original report:
+        #   file:src/syllable-data.js -> file:data/syllables/general.json
+        # where the JSON node landed under config:data/syllables/general.json.
+        batch = {
+            "nodes": [
+                _file_node("src/syllable-data.js"),
+                {
+                    "id": "config:data/syllables/general.json",
+                    "type": "config",
+                    "name": "general.json",
+                    "filePath": "data/syllables/general.json",
+                    "complexity": "simple",
+                },
+            ],
+            "edges": [
+                {
+                    "source": "file:src/syllable-data.js",
+                    "target": "file:data/syllables/general.json",
+                    "type": "imports",
+                },
+            ],
+        }
+        assembled, _report = mbg.merge_and_normalize([batch])
+        edges = assembled["edges"]
+        self.assertEqual(len(edges), 1, "edge must survive after reconciliation")
+        self.assertEqual(edges[0]["source"], "file:src/syllable-data.js")
+        # Target now points at the canonical config: node
+        self.assertEqual(edges[0]["target"], "config:data/syllables/general.json")
+
+    def test_migrates_edge_to_sql_migration_file_is_reconciled(self) -> None:
+        # Second case from the report: `migrates` edge from a JS seed script
+        # to a SQL migration file. SQL files normalize under `table:`.
+        batch = {
+            "nodes": [
+                _file_node("worker/seed/load-syllables.js"),
+                {
+                    "id": "table:worker/migrations/0002_seed_syllables.sql",
+                    "type": "table",
+                    "name": "0002_seed_syllables.sql",
+                    "filePath": "worker/migrations/0002_seed_syllables.sql",
+                    "complexity": "simple",
+                },
+            ],
+            "edges": [
+                {
+                    "source": "file:worker/seed/load-syllables.js",
+                    "target": "file:worker/migrations/0002_seed_syllables.sql",
+                    "type": "migrates",
+                },
+            ],
+        }
+        assembled, _report = mbg.merge_and_normalize([batch])
+        edges = assembled["edges"]
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["target"], "table:worker/migrations/0002_seed_syllables.sql")
+
+    def test_configures_edge_with_already_canonical_prefix_is_unchanged(self) -> None:
+        # Edge already points at canonical IDs - reconciliation is a no-op.
+        batch = {
+            "nodes": [
+                {"id": "config:package.json", "type": "config", "name": "package.json", "filePath": "package.json", "complexity": "simple"},
+                {"id": "config:vitest.config.js", "type": "config", "name": "vitest.config.js", "filePath": "vitest.config.js", "complexity": "simple"},
+            ],
+            "edges": [
+                {"source": "config:package.json", "target": "config:vitest.config.js", "type": "configures"},
+            ],
+        }
+        assembled, _report = mbg.merge_and_normalize([batch])
+        self.assertEqual(len(assembled["edges"]), 1)
+        self.assertEqual(assembled["edges"][0]["source"], "config:package.json")
+        self.assertEqual(assembled["edges"][0]["target"], "config:vitest.config.js")
+
+    def test_endpoint_without_canonical_target_still_drops(self) -> None:
+        # An edge to a path nothing in the graph knows about should still be
+        # dropped - reconciliation can't invent a node.
+        batch = {
+            "nodes": [_file_node("src/a.js")],
+            "edges": [
+                {"source": "file:src/a.js", "target": "file:nonexistent.json", "type": "imports"},
+            ],
+        }
+        assembled, _report = mbg.merge_and_normalize([batch])
+        self.assertEqual(len(assembled["edges"]), 0, "edge with no matching node anywhere must still drop")
+
+    def test_function_class_three_part_ids_are_skipped_safely(self) -> None:
+        # Reconciliation must skip 3-part IDs (`function:path:name`) so it
+        # doesn't accidentally pick up the wrong function when two share a path.
+        batch = {
+            "nodes": [
+                {"id": "function:src/utils.ts:helperA", "type": "function", "name": "helperA", "filePath": "src/utils.ts", "complexity": "simple"},
+                {"id": "function:src/utils.ts:helperB", "type": "function", "name": "helperB", "filePath": "src/utils.ts", "complexity": "simple"},
+                _file_node("src/main.ts"),
+            ],
+            "edges": [
+                {"source": "function:src/utils.ts:helperA", "target": "function:src/utils.ts:helperB", "type": "calls"},
+            ],
+        }
+        assembled, _report = mbg.merge_and_normalize([batch])
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertIn("function:src/utils.ts:helperA", node_ids)
+        self.assertIn("function:src/utils.ts:helperB", node_ids)
+        # Edge survives unchanged
+        self.assertEqual(len(assembled["edges"]), 1)
+        self.assertEqual(assembled["edges"][0]["target"], "function:src/utils.ts:helperB")
+
+    def test_report_surfaces_reconciliation_count(self) -> None:
+        # When at least one edge is reconciled, the human-readable report
+        # should mention it so the maintainer sees the fix happening rather
+        # than silently rewriting state.
+        batch = {
+            "nodes": [
+                _file_node("src/a.js"),
+                {"id": "config:data/x.json", "type": "config", "name": "x.json", "filePath": "data/x.json", "complexity": "simple"},
+            ],
+            "edges": [
+                {"source": "file:src/a.js", "target": "file:data/x.json", "type": "imports"},
+            ],
+        }
+        _assembled, report = mbg.merge_and_normalize([batch])
+        report_text = "\n".join(report)
+        self.assertIn("re-prefixed", report_text)
+
+
 if __name__ == "__main__":
     unittest.main()
