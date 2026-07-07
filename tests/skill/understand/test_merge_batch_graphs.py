@@ -1183,5 +1183,87 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         self.assertNotIn("file:src/y.ts", node_ids)
 
 
+class CrossBatchEdgeRecoveryTests(unittest.TestCase):
+    """When an agent emits a bare target ID (e.g., `_shared/audit_log.py`) from
+    a `file:`-prefixed source, the merge step should auto-prefix the target
+    if exactly one known node matches. Without this, the edge gets dropped
+    as "missing target" and real LLM-discovered relationships are lost.
+    """
+
+    def _make_batch(
+        self,
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        return {"nodes": nodes, "edges": edges}
+
+    def test_bare_target_with_unique_match_is_recovered(self) -> None:
+        """Bare target matching exactly one known node's suffix gets prefixed."""
+        batch1 = self._make_batch(
+            nodes=[_file_node("pipeline.py")],
+            edges=[{
+                "source": "file:pipeline.py",
+                # Bare target — no prefix. Real-world bug pattern from LLM.
+                "target": "_shared/audit_log.py",
+                "type": "depends_on",
+            }],
+        )
+        batch2 = self._make_batch(
+            nodes=[_file_node("_shared/audit_log.py")],
+            edges=[],
+        )
+        graph, _report = mbg.merge_and_normalize([batch1, batch2])
+        edges = graph["edges"]
+        # The edge should be present, with target rewritten to canonical form
+        targets = [e["target"] for e in edges if e["source"] == "file:pipeline.py"]
+        self.assertIn(
+            "file:_shared/audit_log.py",
+            targets,
+            f"Expected cross-batch edge recovery; got edges: {edges}",
+        )
+
+    def test_bare_target_with_basename_only_is_recovered(self) -> None:
+        """Bare basename (no path) matching exactly one suffix is also recovered."""
+        batch1 = self._make_batch(
+            nodes=[_file_node("cli.py")],
+            edges=[{
+                "source": "file:cli.py",
+                # Just the basename — no directory either
+                "target": "audit_log.py",
+                "type": "calls",
+            }],
+        )
+        batch2 = self._make_batch(
+            nodes=[_file_node("_shared/audit_log.py")],
+            edges=[],
+        )
+        graph, _report = mbg.merge_and_normalize([batch1, batch2])
+        targets = [e["target"] for e in graph["edges"] if e["source"] == "file:cli.py"]
+        self.assertIn("file:_shared/audit_log.py", targets)
+
+    def test_bare_target_with_ambiguous_match_is_dropped(self) -> None:
+        """When the bare target matches >1 node, recovery is unsafe; drop as before."""
+        batch1 = self._make_batch(
+            nodes=[_file_node("a.py")],
+            edges=[{
+                "source": "file:a.py",
+                "target": "utils.py",  # ambiguous
+                "type": "depends_on",
+            }],
+        )
+        batch2 = self._make_batch(
+            nodes=[
+                _file_node("module_a/utils.py"),
+                _file_node("module_b/utils.py"),
+            ],
+            edges=[],
+        )
+        graph, _report = mbg.merge_and_normalize([batch1, batch2])
+        targets = [e["target"] for e in graph["edges"] if e["source"] == "file:a.py"]
+        # Neither candidate should be selected — ambiguous matches do not recover
+        self.assertNotIn("file:module_a/utils.py", targets)
+        self.assertNotIn("file:module_b/utils.py", targets)
+
+
 if __name__ == "__main__":
     unittest.main()
