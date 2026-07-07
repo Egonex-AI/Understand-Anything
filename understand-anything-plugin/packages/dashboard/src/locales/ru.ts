@@ -179,6 +179,7 @@ export const ru = {
     closeExpanded: "Закрыть расширенный просмотрщик кода",
     closeViewer: "Закрыть просмотрщик кода",
     sourceUnavailable: "Исходный код недоступен",
+    resolvingAnnotations: "Разрешение аннотаций...",
   },
   customNode: {
     tested: "Покрыт тестами",

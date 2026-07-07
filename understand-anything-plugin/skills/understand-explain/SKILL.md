@@ -56,3 +56,26 @@ The knowledge graph JSON has this structure:
    - Data flow (inputs → processing → outputs — from source code)
    - Explain clearly, assuming the reader may not know the programming language
    - Highlight any patterns, idioms, or complexity worth understanding
+
+8. **Optional on-demand code guide annotations**:
+   - If the user asks for inline guidance, annotated code, comments between source lines, or a guided reading experience in the dashboard, update a scoped JSON file under `.understand-anything/guide-annotations/`, not `knowledge-graph.json`.
+   - Do not annotate the whole graph. Keep this lazy and scoped to what the user asked to read.
+   - Prefer mirroring the source path and node name, for example `.understand-anything/guide-annotations/src/example.ts/save.json`, using this shape:
+     ```json
+     {
+       "version": 1,
+       "nodeId": "function:src/example.ts:save",
+       "filePath": "src/example.ts",
+       "annotations": [
+         {
+           "line": 104,
+           "anchor": "const nextProgram = assembly.program;",
+           "text": "This line starts the save flow by reading the current editor state."
+         }
+       ]
+     }
+     ```
+   - `nodeId` should be the exact graph node id being annotated. Set `nodeId` and `filePath` at the top level for single-node files, or per annotation only when a file intentionally contains notes for multiple nodes. `line` is a 1-based line number in `filePath`; the dashboard renders the annotation before that source line without changing the source file.
+   - Include `anchor` whenever possible, using a short stable snippet from the source line. This lets the dashboard reattach the annotation if edits move the code to a different line. If the same anchor appears multiple times, add optional `before` and `after` snippets from nearby lines to disambiguate.
+   - `text` should be 1-2 concise, source-grounded sentences. Prefer explaining intent, data flow, or side effects at that point in the code.
+   - Do not put pseudo-code, walkthrough prose, or inline reading notes in `languageNotes`; that field is only for language-specific concepts and idioms.

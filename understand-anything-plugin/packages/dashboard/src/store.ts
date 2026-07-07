@@ -8,6 +8,7 @@ import type {
   TourStep,
 } from "@understand-anything/core/types";
 import type { ReactFlowInstance } from "@xyflow/react";
+import type { GuideAnnotationInput } from "./utils/guideAnnotations";
 
 export type Persona = "non-technical" | "junior" | "experienced";
 export type NavigationLevel = "overview" | "layer-detail";
@@ -16,6 +17,10 @@ export type Complexity = "simple" | "moderate" | "complex";
 export type EdgeCategory = "structural" | "behavioral" | "data-flow" | "dependencies" | "semantic" | "infrastructure" | "domain" | "knowledge";
 export type ViewMode = "structural" | "domain" | "knowledge";
 export type DetailLevel = "file" | "class";
+export type GuideAnnotationRecord = GuideAnnotationInput & {
+  nodeId: string;
+  filePath?: string;
+};
 
 export interface FilterState {
   nodeTypes: Set<NodeType>;
@@ -80,17 +85,52 @@ function buildGraphIndexes(graph: KnowledgeGraph): {
   for (const node of graph.nodes) nodesById.set(node.id, node);
   const nodeIdToLayerId = new Map<string, string>();
   const nodeIdToLayerIds = new Map<string, Set<string>>();
+  const addNodeLayer = (nodeId: string, layerId: string) => {
+    if (!nodeIdToLayerId.has(nodeId)) nodeIdToLayerId.set(nodeId, layerId);
+    let set = nodeIdToLayerIds.get(nodeId);
+    if (!set) {
+      set = new Set<string>();
+      nodeIdToLayerIds.set(nodeId, set);
+    }
+    set.add(layerId);
+  };
+
   for (const layer of graph.layers) {
     for (const nid of layer.nodeIds) {
-      if (!nodeIdToLayerId.has(nid)) nodeIdToLayerId.set(nid, layer.id);
-      let set = nodeIdToLayerIds.get(nid);
-      if (!set) {
-        set = new Set<string>();
-        nodeIdToLayerIds.set(nid, set);
-      }
-      set.add(layer.id);
+      addNodeLayer(nid, layer.id);
     }
   }
+
+  // Function/class nodes are often represented as children of a file node but
+  // not listed directly in layer.nodeIds. Inherit the file's layer so search,
+  // sidebar links, and Focus can navigate into the correct layer detail view.
+  for (const edge of graph.edges) {
+    if (edge.type !== "contains") continue;
+    const sourceLayerIds = nodeIdToLayerIds.get(edge.source);
+    if (!sourceLayerIds) continue;
+    for (const layerId of sourceLayerIds) addNodeLayer(edge.target, layerId);
+  }
+
+  const filePathToLayerIds = new Map<string, Set<string>>();
+  for (const node of graph.nodes) {
+    if (!node.filePath) continue;
+    const layerIds = nodeIdToLayerIds.get(node.id);
+    if (!layerIds) continue;
+    let set = filePathToLayerIds.get(node.filePath);
+    if (!set) {
+      set = new Set<string>();
+      filePathToLayerIds.set(node.filePath, set);
+    }
+    for (const layerId of layerIds) set.add(layerId);
+  }
+
+  for (const node of graph.nodes) {
+    if (!node.filePath || nodeIdToLayerIds.has(node.id)) continue;
+    const layerIds = filePathToLayerIds.get(node.filePath);
+    if (!layerIds) continue;
+    for (const layerId of layerIds) addNodeLayer(node.id, layerId);
+  }
+
   return { nodesById, nodeIdToLayerId, nodeIdToLayerIds };
 }
 
@@ -99,6 +139,7 @@ const MAX_HISTORY = 50;
 
 interface DashboardStore {
   graph: KnowledgeGraph | null;
+  guideAnnotationsByNodeId: Map<string, GuideAnnotationRecord[]>;
   /** id → node lookup, rebuilt by setGraph. Empty before any graph loads. */
   nodesById: Map<string, GraphNode>;
   /** id → layer id (first-matching-layer wins), rebuilt by setGraph. Empty before any graph loads. */
@@ -119,6 +160,7 @@ interface DashboardStore {
   codeViewerOpen: boolean;
   codeViewerNodeId: string | null;
   codeViewerExpanded: boolean;
+  codeViewerOpenRequest: number;
 
   tourActive: boolean;
   currentTourStep: number;
@@ -155,6 +197,7 @@ interface DashboardStore {
   toggleShowFunctionsInClassView: () => void;
 
   setGraph: (graph: KnowledgeGraph) => void;
+  setGuideAnnotations: (annotations: GuideAnnotationRecord[]) => void;
   selectNode: (nodeId: string | null) => void;
   navigateToNode: (nodeId: string) => void;
   navigateToNodeInLayer: (nodeId: string) => void;
@@ -288,6 +331,7 @@ function layerResetIfChanged(
 
 export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   graph: null,
+  guideAnnotationsByNodeId: new Map<string, GuideAnnotationRecord[]>(),
   nodesById: new Map<string, GraphNode>(),
   nodeIdToLayerId: new Map<string, string>(),
   nodeIdToLayerIds: new Map<string, Set<string>>(),
@@ -302,6 +346,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
+  codeViewerOpenRequest: 0,
 
   tourActive: false,
   currentTourStep: 0,
@@ -391,6 +436,18 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       stage1Tick: 0,
       layoutIssues: [],
     });
+  },
+  setGuideAnnotations: (annotations) => {
+    const guideAnnotationsByNodeId = new Map<string, GuideAnnotationRecord[]>();
+    for (const annotation of annotations) {
+      const list = guideAnnotationsByNodeId.get(annotation.nodeId) ?? [];
+      list.push(annotation);
+      guideAnnotationsByNodeId.set(annotation.nodeId, list);
+    }
+    for (const list of guideAnnotationsByNodeId.values()) {
+      list.sort((left, right) => left.line - right.line);
+    }
+    set({ guideAnnotationsByNodeId });
   },
 
   selectNode: (nodeId) => {
@@ -554,7 +611,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     }),
 
   openCodeViewer: (nodeId) =>
-    set({ codeViewerOpen: true, codeViewerNodeId: nodeId, codeViewerExpanded: false }),
+    set((state) => ({
+      codeViewerOpen: true,
+      codeViewerNodeId: nodeId,
+      codeViewerExpanded: false,
+      codeViewerOpenRequest: state.codeViewerOpenRequest + 1,
+    })),
   closeCodeViewer: () =>
     set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false }),
   expandCodeViewer: () => set({ codeViewerExpanded: true }),

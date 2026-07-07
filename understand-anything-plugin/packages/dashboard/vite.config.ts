@@ -23,6 +23,17 @@ function graphFileCandidates(fileName: string): string[] {
   ];
 }
 
+function guideAnnotationDirCandidates(): string[] {
+  const graphDir = process.env.GRAPH_DIR;
+  return [
+    ...(graphDir
+      ? [path.resolve(graphDir, ".understand-anything/guide-annotations")]
+      : []),
+    path.resolve(process.cwd(), ".understand-anything/guide-annotations"),
+    path.resolve(process.cwd(), "../../../.understand-anything/guide-annotations"),
+  ];
+}
+
 function findGraphFile(fileName: string): string | null {
   return graphFileCandidates(fileName).find((candidate) => fs.existsSync(candidate)) ?? null;
 }
@@ -103,8 +114,78 @@ function detectLanguage(filePath: string): string {
 
 function sendJson(res: import("http").ServerResponse, statusCode: number, payload: unknown) {
   res.statusCode = statusCode;
-  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.end(JSON.stringify(payload));
+}
+
+function collectJsonFiles(root: string): string[] {
+  const files: string[] = [];
+  if (!fs.existsSync(root)) return files;
+  const stat = fs.statSync(root);
+  if (!stat.isDirectory()) return files;
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    const fullPath = path.join(root, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectJsonFiles(fullPath));
+    } else if (entry.isFile() && entry.name.endsWith(".json")) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function normalizeGuideAnnotation(entry: unknown, defaults: { nodeId?: string; filePath?: string }) {
+  if (!entry || typeof entry !== "object") return null;
+  const record = entry as Record<string, unknown>;
+  const nodeId = typeof record.nodeId === "string" ? record.nodeId : defaults.nodeId;
+  const filePath = typeof record.filePath === "string" ? record.filePath : defaults.filePath;
+  if (!nodeId || typeof record.line !== "number" || !Number.isInteger(record.line) || record.line <= 0) {
+    return null;
+  }
+  if (typeof record.text !== "string") return null;
+  return {
+    nodeId,
+    ...(filePath ? { filePath } : {}),
+    line: record.line,
+    text: record.text,
+    ...(typeof record.anchor === "string" ? { anchor: record.anchor } : {}),
+    ...(typeof record.before === "string" ? { before: record.before } : {}),
+    ...(typeof record.after === "string" ? { after: record.after } : {}),
+    ...(typeof record.stale === "boolean" ? { stale: record.stale } : {}),
+  };
+}
+
+function readGuideAnnotations() {
+  const annotations: unknown[] = [];
+  const legacyFiles = graphFileCandidates("guide-annotations.json").filter((candidate) =>
+    fs.existsSync(candidate),
+  );
+  for (const candidate of legacyFiles) {
+    const raw = JSON.parse(fs.readFileSync(candidate, "utf-8")) as { annotations?: unknown[] };
+    for (const entry of raw.annotations ?? []) {
+      const normalized = normalizeGuideAnnotation(entry, {});
+      if (normalized) annotations.push(normalized);
+    }
+  }
+
+  for (const dir of guideAnnotationDirCandidates()) {
+    for (const file of collectJsonFiles(dir)) {
+      const raw = JSON.parse(fs.readFileSync(file, "utf-8")) as {
+        nodeId?: string;
+        filePath?: string;
+        annotations?: unknown[];
+      };
+      for (const entry of raw.annotations ?? []) {
+        const normalized = normalizeGuideAnnotation(entry, {
+          nodeId: raw.nodeId,
+          filePath: raw.filePath,
+        });
+        if (normalized) annotations.push(normalized);
+      }
+    }
+  }
+
+  return { version: 1, annotations };
 }
 
 function rejectFileRequest(message: string, statusCode = 400) {
@@ -250,6 +331,7 @@ export default defineConfig({
           const isProtectedEndpoint =
             pathname === "/knowledge-graph.json" ||
             pathname === "/domain-graph.json" ||
+            pathname === "/guide-annotations.json" ||
             pathname === "/diff-overlay.json" ||
             pathname === "/meta.json" ||
             pathname === "/config.json" ||
@@ -288,6 +370,16 @@ export default defineConfig({
               }
             }
             sendJson(res, 200, { autoUpdate: false, outputLanguage: "en" });
+            return;
+          }
+
+          if (pathname === "/guide-annotations.json") {
+            try {
+              sendJson(res, 200, readGuideAnnotations());
+            } catch (err) {
+              console.error("[understand-anything] Failed to read guide annotations:", err);
+              sendJson(res, 500, { error: "Failed to read guide annotations" });
+            }
             return;
           }
 

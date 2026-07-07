@@ -20,6 +20,31 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
 
 ---
 
+## On-Demand Guide Annotations
+
+`/understand` MUST NOT populate guide annotations during normal full or incremental analysis, and MUST NOT write reading notes into `knowledge-graph.json`. Inline reading notes are intentionally lazy: they are reserved for later deep-reading flows where a user asks an agent to annotate a specific file, function, class, or small set of nodes.
+
+When such a request happens outside `/understand`, an agent may create or update one or more scoped JSON files under `.understand-anything/guide-annotations/` with only the requested node(s). Prefer mirroring the source path and node name, for example `.understand-anything/guide-annotations/src/example.ts/save.json`:
+
+```json
+{
+  "version": 1,
+  "nodeId": "function:src/example.ts:save",
+  "filePath": "src/example.ts",
+  "annotations": [
+    {
+      "line": 104,
+      "anchor": "const nextProgram = assembly.program;",
+      "text": "Short source-grounded explanation rendered before this source line."
+    }
+  ]
+}
+```
+
+Each `line` is a 1-based source line in `filePath`; the dashboard renders the annotation before that line without modifying the source file. A guide annotation file may set `nodeId` and `filePath` once at the top level, or per annotation when a file intentionally contains notes for multiple nodes. Include `anchor` whenever possible, using a short stable snippet from the source line so the dashboard can reattach the note if the file changes and line numbers drift. Optional `before` and `after` snippets may be included when the anchor text appears multiple times. Do not store walkthroughs or pseudo-code in `languageNotes`; that field is only for language-specific concepts and idioms.
+
+---
+
 ## Progress Reporting
 
 Throughout execution, report progress to the user at each phase transition and during batch processing. This keeps users informed on large codebases where analysis can take a long time.

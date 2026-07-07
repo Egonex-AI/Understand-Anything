@@ -78,6 +78,27 @@ Tours are guided walkthroughs with sequential steps. Each step has:
 - `nodeIds` (string array) — 1-5 node IDs to highlight
 - `languageLesson` (string, optional) — language-specific educational note
 
+### On-Demand Guide Annotations
+
+Projects may optionally include lazy guide annotation sidecar files under `.understand-anything/guide-annotations/`, used by the dashboard's Code view to show explanatory comments between original source lines. Prefer scoped files that mirror the source path and node name, for example `.understand-anything/guide-annotations/src/example.ts/save.json`:
+
+```json
+{
+  "version": 1,
+  "nodeId": "function:src/example.ts:save",
+  "filePath": "src/example.ts",
+  "annotations": [
+    {
+      "line": 104,
+      "anchor": "const nextProgram = assembly.program;",
+      "text": "This line starts the save flow by reading the current editor state."
+    }
+  ]
+}
+```
+
+Use this only when the user asks for inline code guidance, annotated reading, or source comments for a specific file/function/class. Update only the requested node(s), keep each note concise and grounded in the actual source, and use 1-based line numbers from `filePath`. A guide annotation file may set `nodeId` and `filePath` once at the top level, or per annotation when a file intentionally contains notes for multiple nodes. Include `anchor` whenever possible, using a short stable snippet from the source line so notes can survive line-number drift; add optional `before` and `after` snippets when the anchor is ambiguous. Do not generate annotations for the whole graph, do not write them into `knowledge-graph.json`, and do not store pseudo-code or walkthrough notes in `languageNotes`.
+
 ### Domain Graph Specifics
 
 The domain graph (`domain-graph.json`) uses a three-level hierarchy:
