@@ -17,5 +17,22 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "tree-sitter-c",
+      "tree-sitter-c-sharp",
+      "tree-sitter-cpp",
+      "tree-sitter-go",
+      "tree-sitter-java",
+      "tree-sitter-javascript",
+      "tree-sitter-php",
+      "tree-sitter-python",
+      "tree-sitter-ruby",
+      "tree-sitter-rust",
+      "tree-sitter-typescript"
+    ]
   }
 }
