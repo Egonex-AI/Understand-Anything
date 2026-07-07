@@ -101,5 +101,15 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 ## Notes
 
 - The dashboard auto-opens in the default browser via `--open`
-- If port 5173 is already in use, Vite will pick the next available port
+- The dashboard binds to port **5173** by default. If that port is taken
+  (very common — every other Vite project defaults to it too), the dev
+  server will **fail loudly** with `Port 5173 is already in use` instead
+  of silently falling back to the next free port and serving the wrong
+  app at the URL you just printed.
+
+  Override the port via the `UNDERSTAND_DASHBOARD_PORT` environment
+  variable, e.g.:
+  ```bash
+  UNDERSTAND_DASHBOARD_PORT=5180 GRAPH_DIR=<project-dir> npx vite --host 127.0.0.1
+  ```
 - The `GRAPH_DIR` environment variable tells the dashboard where to find the knowledge graph
