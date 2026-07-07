@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 41 built-in language configs", () => {
+    it("registers all 42 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(41);
+      expect(all.length).toBe(42);
     });
 
     it("maps all expected extensions", () => {
@@ -72,6 +72,8 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".h")?.id).toBe("c");
       expect(registry.getByExtension(".lua")?.id).toBe("lua");
       expect(registry.getByExtension(".js")?.id).toBe("javascript");
+      expect(registry.getByExtension(".m")?.id).toBe("objective-c");
+      expect(registry.getByExtension(".mm")?.id).toBe("objective-c");
     });
 
     it("registers Swift with tree-sitter grammar metadata", () => {
