@@ -49,76 +49,9 @@ Determine whether to run a full analysis or incremental update.
      - Verify the resolved path exists and is a directory (run `test -d <path>`). If it does not exist or is not a directory, report an error to the user and **STOP**.
      - Set `PROJECT_ROOT` to the resolved absolute path.
    - If no directory path argument is found, set `PROJECT_ROOT` to the current working directory.
-   - **Worktree redirect.** If `PROJECT_ROOT` is inside a git worktree (not the main checkout), redirect output to the main repository root. Worktrees managed by Claude Code are ephemeral — `.understand-anything/` written there is destroyed when the session ends, taking the knowledge graph with it (issue #133). Detect a worktree by comparing `git rev-parse --git-dir` against `git rev-parse --git-common-dir`; in a normal checkout or submodule they resolve to the same path, in a worktree they differ and the parent of `--git-common-dir` is the main repo root.
+   - **Worktree redirect.** If `PROJECT_ROOT` is inside a git worktree (not the main checkout), redirect output to the main repository root. Worktrees managed by Claude Code are ephemeral — `.understand-anything/` written there is destroyed when the session ends, taking the knowledge graph with it (issue #133). See `recipes/worktree-redirect.md` for the detection bash snippet. Set `UNDERSTAND_NO_WORKTREE_REDIRECT=1` if you intentionally want a per-worktree graph (rare).
 
-     ```bash
-     COMMON_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-common-dir 2>/dev/null)
-     GIT_DIR=$(git -C "$PROJECT_ROOT" rev-parse --git-dir 2>/dev/null)
-     if [ -n "$COMMON_DIR" ] && [ -n "$GIT_DIR" ]; then
-       COMMON_ABS=$(cd "$PROJECT_ROOT" && cd "$COMMON_DIR" 2>/dev/null && pwd -P)
-       GIT_ABS=$(cd "$PROJECT_ROOT" && cd "$GIT_DIR" 2>/dev/null && pwd -P)
-       if [ -n "$COMMON_ABS" ] && [ "$COMMON_ABS" != "$GIT_ABS" ]; then
-         MAIN_ROOT=$(dirname "$COMMON_ABS")
-         if [ -d "$MAIN_ROOT" ] && [ "${UNDERSTAND_NO_WORKTREE_REDIRECT:-0}" != "1" ]; then
-           echo "[understand] Detected git worktree at $PROJECT_ROOT"
-           echo "[understand] Redirecting output to main repo root: $MAIN_ROOT"
-           echo "[understand] (Set UNDERSTAND_NO_WORKTREE_REDIRECT=1 to keep PROJECT_ROOT as the worktree.)"
-           PROJECT_ROOT="$MAIN_ROOT"
-         fi
-       fi
-     fi
-     ```
-
-     Set `UNDERSTAND_NO_WORKTREE_REDIRECT=1` if you intentionally want a per-worktree graph (rare — most users want the redirect).
-1.5. **Ensure the plugin is built.** Later phases invoke Node scripts that import `@understand-anything/core`. On a fresh install `packages/core/dist/` does not exist yet — build once.
-
-   **Important:** do **not** assume the plugin root is simply two directories above the skill path string. In many installations `~/.agents/skills/understand` is a symlink into the real plugin checkout. Prefer runtime-provided plugin roots first (for Claude), then fall back to universal symlinks, skill symlink resolution, and common clone-based install paths.
-
-   Resolve the plugin root like this:
-
-   ```bash
-   SKILL_REAL=$(realpath ~/.agents/skills/understand 2>/dev/null || readlink -f ~/.agents/skills/understand 2>/dev/null || echo "")
-   SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-   COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand 2>/dev/null || readlink -f ~/.copilot/skills/understand 2>/dev/null || echo "")
-   COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-
-   PLUGIN_ROOT=""
-   for candidate in \
-     "${CLAUDE_PLUGIN_ROOT}" \
-     "$HOME/.understand-anything-plugin" \
-     "$SELF_RELATIVE" \
-     "$COPILOT_SELF_RELATIVE" \
-     "$HOME/.codex/understand-anything/understand-anything-plugin" \
-     "$HOME/.opencode/understand-anything/understand-anything-plugin" \
-     "$HOME/.pi/understand-anything/understand-anything-plugin" \
-     "$HOME/understand-anything/understand-anything-plugin"; do
-     if [ -n "$candidate" ] && [ -f "$candidate/package.json" ] && [ -f "$candidate/pnpm-workspace.yaml" ]; then
-       PLUGIN_ROOT="$candidate"
-       break
-     fi
-   done
-
-   if [ -z "$PLUGIN_ROOT" ]; then
-     echo "Error: Cannot find the understand-anything plugin root."
-     echo "Checked:"
-     echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
-     echo "  - $HOME/.understand-anything-plugin"
-     echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand>}"
-     echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand>}"
-     echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/understand-anything/understand-anything-plugin"
-     echo "Make sure the plugin is installed correctly."
-     exit 1
-   fi
-
-   if [ ! -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
-     cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
-   fi
-   ```
-
-   If `pnpm` is missing, report to the user: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
+1.5. **Ensure the plugin is built.** Later phases invoke Node scripts that import `@understand-anything/core`. On a fresh install `packages/core/dist/` does not exist yet — build once. See `recipes/plugin-root-resolution.md` for the full bash snippet that resolves `PLUGIN_ROOT` across install locations (CLAUDE_PLUGIN_ROOT, universal symlinks, copilot, codex, opencode, pi, clone-based) and runs the one-time `pnpm install + pnpm --filter @understand-anything/core build`. If `pnpm` is missing, report: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
 
 2. Get the current git commit hash:
    ```bash
@@ -344,29 +277,7 @@ Include the script's warnings in `$PHASE_WARNINGS` for the reviewer.
 
 ### Incremental update path
 
-Write the changed-files list (one path per line) to a temp file:
-```bash
-git diff <lastCommitHash>..HEAD --name-only > $PROJECT_ROOT/.understand-anything/tmp/changed-files.txt
-```
-
-Run compute-batches with `--changed-files`:
-```bash
-node <SKILL_DIR>/compute-batches.mjs $PROJECT_ROOT \
-  --changed-files=$PROJECT_ROOT/.understand-anything/tmp/changed-files.txt
-```
-
-This produces a `batches.json` that contains only batches with changed files, but neighborMap entries still reference unchanged files (with their full-graph batchIndex) so cross-batch edges remain emittable.
-
-Then dispatch file-analyzer subagents per the same template as the full path.
-
-After batches complete:
-1. Remove old nodes whose `filePath` matches any changed file from the existing graph
-2. Remove old edges whose `source` or `target` references a removed node
-3. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory
-4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
-   ```bash
-   python <SKILL_DIR>/merge-batch-graphs.py $PROJECT_ROOT
-   ```
+See `recipes/incremental-update.md` for the full procedure. In short: write changed files to `tmp/changed-files.txt`, re-run `compute-batches.mjs` with `--changed-files`, dispatch file-analyzers using the same template as the full path, then prune nodes/edges referencing changed files into `batch-existing.json` and re-run `merge-batch-graphs.py`.
 
 ---
 
@@ -452,20 +363,7 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 4. **Convert file paths:** If `nodeIds` entries are raw file paths without a known prefix (`file:`, `config:`, `document:`, `service:`, `pipeline:`, `table:`, `schema:`, `resource:`, `endpoint:`), convert them to `file:<relative-path>`.
 5. **Drop dangling refs:** Remove any `nodeIds` entries that do not exist in the merged node set.
 
-Each element of the final `layers` array MUST have this shape:
-
-```json
-[
-  {
-    "id": "layer:<kebab-case-name>",
-    "name": "<layer name>",
-    "description": "<what belongs in this layer>",
-    "nodeIds": ["file:src/App.tsx", "config:tsconfig.json", "document:README.md"]
-  }
-]
-```
-
-All four fields (`id`, `name`, `description`, `nodeIds`) are required.
+Each element of the final `layers` array MUST have the `layers[*]` shape documented in `reference/output-shapes.md` (required fields: `id`, `name`, `description`, `nodeIds`).
 
 **For incremental updates:** Always re-run architecture analysis on the full merged node set, since layer assignments may shift when files change.
 
@@ -530,26 +428,7 @@ After the subagent completes, read `$PROJECT_ROOT/.understand-anything/intermedi
 4. **Drop dangling refs:** Remove any `nodeIds` entries that do not exist in the merged node set.
 5. **Sort** by `order` before saving.
 
-Each element of the final `tour` array MUST have this shape:
-
-```json
-[
-  {
-    "order": 1,
-    "title": "Project Overview",
-    "description": "Start with the README to understand the project's purpose and architecture.",
-    "nodeIds": ["document:README.md"]
-  },
-  {
-    "order": 2,
-    "title": "Application Entry Point",
-    "description": "This step explains how the frontend boots and mounts.",
-    "nodeIds": ["file:src/main.tsx", "file:src/App.tsx"]
-  }
-]
-```
-
-Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `languageLesson` when present.
+Each element of the final `tour` array MUST have the `tour[*]` shape documented in `reference/output-shapes.md` (required fields: `order`, `title`, `description`, `nodeIds`; preserve optional `languageLesson` when present).
 
 ---
 
@@ -557,25 +436,7 @@ Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `
 
 Report to the user: `[Phase 6/7] Validating knowledge graph...`
 
-Assemble the full KnowledgeGraph JSON object:
-
-```json
-{
-  "version": "1.0.0",
-  "project": {
-    "name": "<projectName>",
-    "languages": ["<languages>"],
-    "frameworks": ["<frameworks>"],
-    "description": "<projectDescription>",
-    "analyzedAt": "<ISO 8601 timestamp>",
-    "gitCommitHash": "<commit hash from Phase 0>"
-  },
-  "nodes": [<all nodes from assembled-graph.json after Phase 3 review>],
-  "edges": [<all edges from assembled-graph.json after Phase 3 review>],
-  "layers": [<layers from Phase 4>],
-  "tour": [<steps from Phase 5>]
-}
-```
+Assemble the full KnowledgeGraph JSON object — see the assembled-graph shape in `reference/output-shapes.md`.
 
 1. Before writing the assembled graph, validate that:
    - `layers` is an array of objects with these required fields: `id`, `name`, `description`, `nodeIds`
@@ -594,109 +455,21 @@ Assemble the full KnowledgeGraph JSON object:
 
 #### Default path (no `--review`): inline deterministic validation
 
-Write the following Node.js script to `$PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs`:
+Write the Node.js validator from `recipes/inline-validator.md` to `$PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs`, then execute it:
 
-```javascript
-#!/usr/bin/env node
-const fs = require('fs');
-const graphPath = process.argv[2];
-const outputPath = process.argv[3];
-try {
-  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
-  const issues = [], warnings = [];
-  if (!Array.isArray(graph.nodes)) { issues.push('graph.nodes is missing or not an array'); graph.nodes = []; }
-  if (!Array.isArray(graph.edges)) { issues.push('graph.edges is missing or not an array'); graph.edges = []; }
-  const nodeIds = new Set();
-  const seen = new Map();
-  graph.nodes.forEach((n, i) => {
-    if (!n.id) { issues.push(`Node[${i}] missing id`); return; }
-    if (!n.type) issues.push(`Node[${i}] '${n.id}' missing type`);
-    if (!n.name) issues.push(`Node[${i}] '${n.id}' missing name`);
-    if (!n.summary) issues.push(`Node[${i}] '${n.id}' missing summary`);
-    if (!n.tags || !n.tags.length) issues.push(`Node[${i}] '${n.id}' missing tags`);
-    if (seen.has(n.id)) issues.push(`Duplicate node ID '${n.id}' at indices ${seen.get(n.id)} and ${i}`);
-    else seen.set(n.id, i);
-    nodeIds.add(n.id);
-  });
-  graph.edges.forEach((e, i) => {
-    if (!nodeIds.has(e.source)) issues.push(`Edge[${i}] source '${e.source}' not found`);
-    if (!nodeIds.has(e.target)) issues.push(`Edge[${i}] target '${e.target}' not found`);
-  });
-  const fileLevelTypes = new Set(['file', 'config', 'document', 'service', 'pipeline', 'table', 'schema', 'resource', 'endpoint']);
-  const fileNodes = graph.nodes.filter(n => fileLevelTypes.has(n.type)).map(n => n.id);
-  const assigned = new Map();
-  if (!Array.isArray(graph.layers)) { if (graph.layers) warnings.push('graph.layers is not an array'); graph.layers = []; }
-  if (!Array.isArray(graph.tour)) { if (graph.tour) warnings.push('graph.tour is not an array'); graph.tour = []; }
-  graph.layers.forEach(layer => {
-    (layer.nodeIds || []).forEach(id => {
-      if (!nodeIds.has(id)) issues.push(`Layer '${layer.id}' refs missing node '${id}'`);
-      if (assigned.has(id)) issues.push(`Node '${id}' appears in multiple layers`);
-      assigned.set(id, layer.id);
-    });
-  });
-  fileNodes.forEach(id => {
-    if (!assigned.has(id)) issues.push(`File node '${id}' not in any layer`);
-  });
-  graph.tour.forEach((step, i) => {
-    (step.nodeIds || []).forEach(id => {
-      if (!nodeIds.has(id)) issues.push(`Tour step[${i}] refs missing node '${id}'`);
-    });
-  });
-  const withEdges = new Set([
-    ...graph.edges.map(e => e.source),
-    ...graph.edges.map(e => e.target)
-  ]);
-  graph.nodes.forEach(n => {
-    if (!withEdges.has(n.id)) warnings.push(`Node '${n.id}' has no edges (orphan)`);
-  });
-  const stats = {
-    totalNodes: graph.nodes.length,
-    totalEdges: graph.edges.length,
-    totalLayers: graph.layers.length,
-    tourSteps: graph.tour.length,
-    nodeTypes: graph.nodes.reduce((a, n) => { a[n.type] = (a[n.type]||0)+1; return a; }, {}),
-    edgeTypes: graph.edges.reduce((a, e) => { a[e.type] = (a[e.type]||0)+1; return a; }, {})
-  };
-  fs.writeFileSync(outputPath, JSON.stringify({ issues, warnings, stats }, null, 2));
-  process.exit(0);
-} catch (err) { process.stderr.write(err.message + '\n'); process.exit(1); }
-```
-
-Execute it:
 ```bash
 node $PROJECT_ROOT/.understand-anything/tmp/ua-inline-validate.cjs \
   "$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json" \
   "$PROJECT_ROOT/.understand-anything/intermediate/review.json"
 ```
 
-If the script exits non-zero, read stderr, fix the script, and retry once.
+The script validates required node fields (id, type, name, summary, tags), checks edge endpoints exist, ensures every file-level node is in exactly one layer, flags orphan nodes as warnings, and writes `{issues, warnings, stats}` to the output path. If it exits non-zero, read stderr, fix the script, and retry once.
 
 ---
 
 #### `--review` path: full LLM reviewer
 
-If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent as follows:
-
-Dispatch a subagent using the `graph-reviewer` agent definition (at `agents/graph-reviewer.md`). Append the following additional context:
-
-> **Additional context from main session:**
->
-> Phase 1 scan results (file inventory):
-> ```json
-> [list of {path, sizeLines} from scan-result.json]
-> ```
->
-> Phase warnings/errors accumulated during analysis:
-> - [list any batch failures, skipped files, or warnings from Phases 2-5]
->
-> Cross-validate: every file in the scan inventory should have a corresponding node in the graph (node types may vary: `file:`, `config:`, `document:`, `service:`, `pipeline:`, `table:`, `schema:`, `resource:`, `endpoint:`). Flag any missing files. Also flag any graph nodes whose `filePath` doesn't appear in the scan inventory.
-
-Pass these parameters in the dispatch prompt:
-
-> Validate the knowledge graph at `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`.
-> Project root: `$PROJECT_ROOT`
-> Read the file and validate it for completeness and correctness.
-> Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/review.json`
+If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent. See `recipes/llm-review-path.md` for the full additional-context block (Phase 1 scan inventory, accumulated warnings, cross-validation instructions) and the dispatch prompt. The reviewer writes its report to `$PROJECT_ROOT/.understand-anything/intermediate/review.json` — the same path the default path uses.
 
 ---
 
@@ -721,28 +494,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 1. Write the final knowledge graph to `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`.
 
-2. **Generate structural fingerprints baseline.** This creates the basis for future automatic incremental updates and **must succeed before `meta.json` is written** — otherwise auto-update sees a fresh commit hash with no fingerprints to compare against, classifies every file as STRUCTURAL, and escalates to `FULL_UPDATE` on every subsequent commit (issue #152).
-
-   Write the input file:
-   ```bash
-   cat > $PROJECT_ROOT/.understand-anything/intermediate/fingerprint-input.json <<EOF
-   {
-     "projectRoot": "$PROJECT_ROOT",
-     "sourceFilePaths": [<all source file paths from Phase 1, as JSON array>],
-     "gitCommitHash": "<current commit hash>"
-   }
-   EOF
-   ```
-
-   Then invoke the bundled script (located next to this SKILL.md):
-   ```bash
-   node <SKILL_DIR>/build-fingerprints.mjs \
-     $PROJECT_ROOT/.understand-anything/intermediate/fingerprint-input.json
-   ```
-
-   The script uses `TreeSitterPlugin + PluginRegistry` exactly like `extract-structure.mjs`, so the baseline matches the comparison logic used during auto-updates.
-
-   **If the script exits non-zero or stdout does not include `Fingerprints baseline:`, abort Phase 7 and report the error. Do NOT proceed to step 3 (writing `meta.json`).**
+2. **Generate structural fingerprints baseline.** Run the procedure in `recipes/fingerprints-baseline.md`. It writes `intermediate/fingerprint-input.json` and invokes `build-fingerprints.mjs`. **Must succeed before `meta.json` is written** (issue #152) — abort Phase 7 if the script exits non-zero or stdout does not include `Fingerprints baseline:`.
 
 3. Write metadata to `$PROJECT_ROOT/.understand-anything/meta.json` (only after step 2 succeeded):
    ```json
@@ -754,21 +506,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
    }
    ```
 
-4. Clean up intermediate files, **preserving `scan-result.json`** so future incremental runs can skip Phase 1 SCAN (see issue #293). We `mv` scratch dirs into a timestamped `.trash-*` instead of `rm -rf`ing them directly — this avoids tripping destructive-action gates on hardened hosts (e.g. freshness-window checks) that flag deleting directories created moments earlier (see issue #301). The delayed-purge step in Phase 0 reclaims the space once the trash is older than 7 days.
-   ```bash
-   # Preserve scan-result.json — Phase 1's deterministic file inventory.
-   # Future incremental runs (Phase 2 compute-batches.mjs --changed-files=…)
-   # need this inventory; without it, Phase 1 must re-dispatch and pay ~157k
-   # tokens / ~158s per incremental run.
-   TRASH="$PROJECT_ROOT/.understand-anything/.trash-$(date +%s)"
-   mkdir -p "$TRASH"
-   INTER="$PROJECT_ROOT/.understand-anything/intermediate"
-   if [ -d "$INTER" ]; then
-     # Move every entry except scan-result.json into the trash dir.
-     find "$INTER" -mindepth 1 -maxdepth 1 -not -name 'scan-result.json' -exec mv {} "$TRASH/" \; 2>/dev/null || true
-   fi
-   mv "$PROJECT_ROOT/.understand-anything/tmp" "$TRASH/" 2>/dev/null || true
-   ```
+4. Clean up intermediate files, **preserving `scan-result.json`** so future incremental runs can skip Phase 1 SCAN (see issue #293). We `mv` scratch dirs into a timestamped `.trash-*` instead of `rm -rf`ing them directly — this avoids tripping destructive-action gates on hardened hosts (e.g. freshness-window checks) that flag deleting directories created moments earlier (see issue #301). The delayed-purge step in Phase 0 reclaims the space once the trash is older than 7 days. See `recipes/intermediate-cleanup.md` for the cleanup bash snippet.
 
 5. Report a summary to the user containing:
    - Project name and description
@@ -798,41 +536,4 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 ## Reference: KnowledgeGraph Schema
 
-### Node Types (13 total)
-| Type | Description | ID Convention |
-|---|---|---|
-| `file` | Source code file | `file:<relative-path>` |
-| `function` | Function or method | `function:<relative-path>:<name>` |
-| `class` | Class, interface, or type | `class:<relative-path>:<name>` |
-| `module` | Logical module or package | `module:<name>` |
-| `concept` | Abstract concept or pattern | `concept:<name>` |
-| `config` | Configuration file (YAML, JSON, TOML, env) | `config:<relative-path>` |
-| `document` | Documentation file (Markdown, RST, TXT) | `document:<relative-path>` |
-| `service` | Deployable service definition (Dockerfile, K8s) | `service:<relative-path>` |
-| `table` | Database table or migration | `table:<relative-path>:<table-name>` |
-| `endpoint` | API endpoint or route definition | `endpoint:<relative-path>:<endpoint-name>` |
-| `pipeline` | CI/CD pipeline configuration | `pipeline:<relative-path>` |
-| `schema` | Schema definition (GraphQL, Protobuf, Prisma) | `schema:<relative-path>` |
-| `resource` | Infrastructure resource (Terraform, CloudFormation) | `resource:<relative-path>` |
-
-### Edge Types (26 total)
-| Category | Types |
-|---|---|
-| Structural | `imports`, `exports`, `contains`, `inherits`, `implements` |
-| Behavioral | `calls`, `subscribes`, `publishes`, `middleware` |
-| Data flow | `reads_from`, `writes_to`, `transforms`, `validates` |
-| Dependencies | `depends_on`, `tested_by`, `configures` |
-| Semantic | `related`, `similar_to` |
-| Infrastructure | `deploys`, `serves`, `provisions`, `triggers` |
-| Schema/Data | `migrates`, `documents`, `routes`, `defines_schema` |
-
-### Edge Weight Conventions
-| Edge Type | Weight |
-|---|---|
-| `contains` | 1.0 |
-| `inherits`, `implements` | 0.9 |
-| `calls`, `exports`, `defines_schema` | 0.8 |
-| `imports`, `deploys`, `migrates` | 0.7 |
-| `depends_on`, `configures`, `triggers` | 0.6 |
-| `tested_by`, `documents`, `provisions`, `serves`, `routes` | 0.5 |
-| All others | 0.5 (default) |
+See `reference/knowledge-graph-schema.md` for the full tables — node types (13), edge types (26 across structural/behavioral/data flow/dependencies/semantic/infrastructure/schema categories), and edge weight conventions.
