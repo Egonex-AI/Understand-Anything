@@ -26,12 +26,18 @@ $RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
 
-# Platform table — Target = skills directory; Style = "per-skill" | "folder"
+# Platform table — Target = skills directory; Style = "per-skill" | "folder";
+# ExtraPluginLink = optional second plugin-root junction. The skills' SKILL.md
+# resolves the plugin root via a fallback chain that includes vendor-specific
+# locations (e.g. $HOME/.codex/understand-anything/understand-anything-plugin)
+# in addition to the universal $HOME/.understand-anything-plugin. Hosts that do
+# not auto-traverse the universal junction on Windows (issue #340) still find
+# the plugin via this vendor-specific path.
 $Platforms = [ordered]@{
     gemini      = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    opencode    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
+    codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; ExtraPluginLink = (Join-Path $HOME '.codex\understand-anything\understand-anything-plugin') }
+    opencode    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; ExtraPluginLink = (Join-Path $HOME '.opencode\understand-anything\understand-anything-plugin') }
+    pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; ExtraPluginLink = (Join-Path $HOME '.pi\understand-anything\understand-anything-plugin') }
     openclaw    = @{ Target = (Join-Path $HOME '.openclaw\skills');           Style = 'folder' }
     antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
     vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
@@ -198,6 +204,25 @@ function ConvertTo-FileUri([string]$Path) {
     return 'file:///' + ($Path -replace '\\', '/')
 }
 
+function Link-Extra-Plugin-Root([string]$LinkPath) {
+    # Mirror the universal plugin junction at a vendor-specific path that the
+    # SKILL.md fallback chain already probes (e.g.
+    # $HOME/.codex/understand-anything/understand-anything-plugin). This makes
+    # the plugin discoverable to hosts whose Windows runtime does not auto-
+    # traverse the universal $HOME/.understand-anything-plugin junction (see
+    # issue #340).
+    if (-not $LinkPath) { return }
+    if (Test-Path $LinkPath) {
+        Write-Host "  • $LinkPath already exists, leaving as-is"
+        return
+    }
+    $parent = Split-Path -Parent $LinkPath
+    if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
+    $src = Join-Path $RepoDir 'understand-anything-plugin'
+    New-Item -ItemType Junction -Path $LinkPath -Target $src | Out-Null
+    Write-Host "  ✓ $LinkPath → $src"
+}
+
 function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
     Clone-Or-Update
@@ -205,6 +230,10 @@ function Cmd-Install([string]$Id) {
     Link-Skills $cfg.Target $cfg.Style
     Write-Host '→ Linking universal plugin root'
     Link-Plugin-Root
+    if ($cfg.Contains('ExtraPluginLink') -and $cfg.ExtraPluginLink) {
+        Write-Host "→ Linking vendor-specific plugin root for $Id"
+        Link-Extra-Plugin-Root $cfg.ExtraPluginLink
+    }
 
     if ($Id -eq 'kiro') {
         Write-Host '→ Creating Kiro agent configuration'
@@ -256,6 +285,11 @@ function Cmd-Uninstall([string]$Id) {
     }
     if (Remove-Reparse $PluginLink) {
         Write-Host "  ✓ removed $PluginLink"
+    }
+    if ($cfg.Contains('ExtraPluginLink') -and $cfg.ExtraPluginLink) {
+        if (Remove-Reparse $cfg.ExtraPluginLink) {
+            Write-Host "  ✓ removed $($cfg.ExtraPluginLink)"
+        }
     }
     if (Test-Path $RepoDir) {
         Write-Host "`nThe checkout at $RepoDir was kept (other platforms may still use it)."
