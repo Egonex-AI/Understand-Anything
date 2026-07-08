@@ -1183,5 +1183,89 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         self.assertNotIn("file:src/y.ts", node_ids)
 
 
+# ── Incremental update: batch-existing.json (#292) ────────────────────────
+
+
+class TestIncrementalExistingBatch(unittest.TestCase):
+    """Regression test for #292.
+
+    During an incremental update the skill writes the pruned existing-graph
+    payload as `batch-existing.json` alongside freshly-analyzed `batch-<N>.json`
+    files. Before the fix, `batch-existing.json` failed the `\\d+`-only filename
+    match -> was bucketed as "unrecognized" -> silently dropped at load, losing
+    ~75% of nodes on every incremental run. It must now be recognized, loaded,
+    and merged like any other batch.
+    """
+
+    def setUp(self) -> None:
+        import tempfile
+        self.tmp = Path(tempfile.mkdtemp(prefix="ua-mbg-existing-"))
+        self.intermediate = self.tmp / ".understand-anything" / "intermediate"
+        self.intermediate.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self) -> None:
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write_batch(self, name: str, nodes: list, edges: list) -> None:
+        import json as _j
+        (self.intermediate / name).write_text(
+            _j.dumps({"nodes": nodes, "edges": edges}),
+            encoding="utf-8",
+        )
+
+    def _run_merge(self) -> tuple[int, str, dict]:
+        import subprocess
+        import json as _j
+        result = subprocess.run(
+            ["python3", str(_MODULE_PATH), str(self.tmp)],
+            capture_output=True, text=True,
+        )
+        out_path = self.intermediate / "assembled-graph.json"
+        assembled = _j.loads(out_path.read_text()) if out_path.exists() else {}
+        return result.returncode, result.stderr, assembled
+
+    def test_batch_existing_is_merged_not_dropped(self) -> None:
+        # batch-existing.json = the unchanged-file nodes carried over from the
+        # previous full scan; batch-0.json = the freshly-analyzed changed files.
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node("src/unchanged-a.ts"), _file_node("src/unchanged-b.ts")],
+            [],
+        )
+        self._write_batch(
+            "batch-0.json",
+            [_file_node("src/changed-c.ts")],
+            [],
+        )
+        rc, stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0)
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        # The whole point of #292: existing nodes survive the merge.
+        self.assertEqual(
+            node_ids,
+            {
+                "file:src/unchanged-a.ts",
+                "file:src/unchanged-b.ts",
+                "file:src/changed-c.ts",
+            },
+        )
+        # And batch-existing.json must NOT be reported as an unrecognized drop.
+        self.assertNotIn("unrecognized filenames", stderr)
+
+    def test_batch_existing_alone_still_merges(self) -> None:
+        # Defensive: batch-existing.json on its own must still produce a valid
+        # graph rather than erroring with "no valid batch files loaded".
+        self._write_batch(
+            "batch-existing.json",
+            [_file_node("src/only.ts")],
+            [],
+        )
+        rc, _stderr, assembled = self._run_merge()
+        self.assertEqual(rc, 0)
+        node_ids = {n["id"] for n in assembled["nodes"]}
+        self.assertEqual(node_ids, {"file:src/only.ts"})
+
+
 if __name__ == "__main__":
     unittest.main()
