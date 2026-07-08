@@ -111,7 +111,13 @@ Dispatch `article-analyzer` subagents to extract implicit knowledge:
 
 5. Clean up intermediate files:
    ```
-   rm -rf <TARGET_DIR>/.understand-anything/intermediate
+   python3 - <<'PY'
+from pathlib import Path
+import shutil
+root = Path("<TARGET_DIR>/.understand-anything/intermediate")
+if root.is_dir() and root.name == "intermediate" and root.parent.name == ".understand-anything":
+    shutil.rmtree(root)
+PY
    ```
 
 6. Report summary to the user:

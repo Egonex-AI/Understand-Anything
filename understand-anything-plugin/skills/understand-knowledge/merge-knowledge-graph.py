@@ -66,6 +66,46 @@ EDGE_TYPE_ALIASES = {
 }
 
 
+def read_git_hash(root: Path) -> str:
+    """Read a Git commit hash directly from .git metadata.
+
+    This avoids spawning a subprocess just to populate optional graph metadata.
+    Worktree `.git` files that point at a common gitdir are supported.
+    """
+    git_dir = root / ".git"
+    if git_dir.is_file():
+        try:
+            text = git_dir.read_text(encoding="utf-8", errors="ignore").strip()
+        except OSError:
+            return ""
+        prefix = "gitdir: "
+        if not text.startswith(prefix):
+            return ""
+        git_dir = (root / text[len(prefix):]).resolve()
+    if not git_dir.is_dir():
+        return ""
+
+    try:
+        head = (git_dir / "HEAD").read_text(encoding="utf-8", errors="ignore").strip()
+    except OSError:
+        return ""
+
+    if len(head) == 40 and all(c in "0123456789abcdefABCDEF" for c in head):
+        return head
+
+    ref_prefix = "ref: "
+    if not head.startswith(ref_prefix):
+        return ""
+    ref_path = git_dir / head[len(ref_prefix):]
+    try:
+        value = ref_path.read_text(encoding="utf-8", errors="ignore").strip()
+    except OSError:
+        return ""
+    if len(value) == 40 and all(c in "0123456789abcdefABCDEF" for c in value):
+        return value
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Normalization
 # ---------------------------------------------------------------------------
@@ -349,17 +389,10 @@ def merge(root: Path) -> dict:
         "tour": tour,
     }
 
-    # Try to get git commit hash
-    try:
-        import subprocess
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True, text=True, cwd=str(root), timeout=5
-        )
-        if result.returncode == 0:
-            graph["project"]["gitCommitHash"] = result.stdout.strip()
-    except (OSError, subprocess.TimeoutExpired):
-        pass
+    # Try to get git commit hash without invoking external commands.
+    git_hash = read_git_hash(root)
+    if git_hash:
+        graph["project"]["gitCommitHash"] = git_hash
 
     # Write output
     out_path = intermediate / "assembled-graph.json"
