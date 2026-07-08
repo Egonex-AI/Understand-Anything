@@ -12,6 +12,24 @@ import crypto from "crypto";
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
+// Allow users running the dashboard behind a domain / reverse proxy (e.g. on a
+// remote VM) to whitelist the hosting host(s). Vite blocks requests whose Host
+// header is not localhost/an IP unless the host is in `server.allowedHosts`,
+// which otherwise surfaces as "Blocked request. This host is not allowed." (#485).
+// Set UNDERSTAND_ALLOWED_HOSTS to a comma-separated list, or to `all`/`true`/`*`
+// to disable the check entirely. Unset (the default) keeps Vite's strict
+// localhost-only behaviour.
+function parseAllowedHosts(): true | string[] | undefined {
+  const raw = process.env.UNDERSTAND_ALLOWED_HOSTS?.trim();
+  if (!raw) return undefined;
+  if (raw === "all" || raw === "true" || raw === "*") return true;
+  const hosts = raw
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+  return hosts.length > 0 ? hosts : undefined;
+}
+
 function graphFileCandidates(fileName: string): string[] {
   const graphDir = process.env.GRAPH_DIR;
   return [
@@ -184,9 +202,12 @@ export default defineConfig({
 
   // FIX 1 — bind only to localhost, not 0.0.0.0
   // This blocks access from any other device on the same LAN / WiFi.
+  // Override the bind address with UNDERSTAND_HOST (e.g. 0.0.0.0) when serving
+  // from a remote VM, and whitelist the public host via UNDERSTAND_ALLOWED_HOSTS.
   server: {
-    host: "127.0.0.1",
+    host: process.env.UNDERSTAND_HOST || "127.0.0.1",
     port: 5173,
+    allowedHosts: parseAllowedHosts(),
     open: `/?token=${ACCESS_TOKEN}`,
   },
 

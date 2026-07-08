@@ -77,21 +77,57 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    cd <plugin-root> && pnpm --filter @understand-anything/core build
    ```
 
-5. Start the Vite dev server pointing at the project's knowledge graph:
+5. **Detect whether this is a remote / headless session.** A localhost-only bind
+   (the default) cannot be reached from the user's browser when Vite runs on a
+   different machine, and Vite rejects domain-name `Host` headers with
+   `Blocked request. This host ("…") is not allowed.` Check for a remote session:
+   ```bash
+   [ -n "$SSH_CONNECTION" ] || [ -n "$SSH_TTY" ] || [ -n "$SSH_CLIENT" ] && echo remote || echo local
+   ```
+   - If the result is `local`, skip to step 6 and launch with defaults.
+   - If the result is `remote`, **ask the user** which host they will open the
+     dashboard from, e.g.:
+     ```
+     It looks like you're running on a remote machine. Which hostname or IP
+     will you open the dashboard from in your browser?
+     (e.g. mybox.example.com or 203.0.113.5 — press enter to keep localhost-only)
+     ```
+     Remember their answer as `<remote-host>`. If they skip / press enter, treat
+     this as a local session and launch with defaults.
+
+6. Start the Vite dev server pointing at the project's knowledge graph.
+
+   **Local session** (default — binds to localhost only):
    ```bash
    cd <dashboard-dir> && GRAPH_DIR=<project-dir> npx vite --host 127.0.0.1
    ```
+
+   **Remote session** (user provided `<remote-host>` in step 5):
+   ```bash
+   cd <dashboard-dir> && GRAPH_DIR=<project-dir> \
+     UNDERSTAND_HOST=0.0.0.0 \
+     UNDERSTAND_ALLOWED_HOSTS=<remote-host> \
+     npx vite
+   ```
+   `UNDERSTAND_HOST=0.0.0.0` accepts connections from outside localhost, and
+   `UNDERSTAND_ALLOWED_HOSTS` whitelists the `Host` header so Vite stops blocking
+   it. The one-time access token still gates every data endpoint.
+
    Run this in the background so the user can continue working.
 
-6. **Capture the access token URL from the server output.** The Vite server prints a line like:
+7. **Capture the access token URL from the server output.** The Vite server prints a line like:
    ```
    🔑  Dashboard URL: http://127.0.0.1:<PORT>?token=<TOKEN>
    ```
-   Extract the full URL including the `?token=` parameter. The token is required to access the knowledge graph data — without it the dashboard will show an "Access Token Required" gate.
+   Extract the `?token=` value — it is required to access the knowledge graph
+   data; without it the dashboard shows an "Access Token Required" gate. The
+   printed line always shows `127.0.0.1`; for a remote session substitute
+   `<remote-host>` for the host portion when reporting the URL.
 
-7. Report to the user, including the full tokenized URL:
+8. Report to the user, including the full tokenized URL (use `<remote-host>`
+   instead of `127.0.0.1` for a remote session):
    ```
-   Dashboard started at http://127.0.0.1:<PORT>?token=<TOKEN>
+   Dashboard started at http://<host>:<PORT>?token=<TOKEN>
    Viewing: <project-dir>/.understand-anything/knowledge-graph.json
 
    The dashboard is running in the background. Press Ctrl+C in the terminal to stop it.
@@ -103,3 +139,19 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 - The dashboard auto-opens in the default browser via `--open`
 - If port 5173 is already in use, Vite will pick the next available port
 - The `GRAPH_DIR` environment variable tells the dashboard where to find the knowledge graph
+
+### Serving from a remote VM
+
+By default the dev server binds to `127.0.0.1` and Vite rejects requests whose `Host` header is a domain name with `Blocked request. This host ("example.com") is not allowed.` To serve the dashboard from a remote machine accessed via a domain or public IP, set these environment variables before launching Vite:
+
+```bash
+GRAPH_DIR=<project-dir> \
+UNDERSTAND_HOST=0.0.0.0 \
+UNDERSTAND_ALLOWED_HOSTS=example.com,example1.com \
+npx vite
+```
+
+- `UNDERSTAND_HOST` — bind address (use `0.0.0.0` to accept connections from outside localhost). Equivalent to `--host`.
+- `UNDERSTAND_ALLOWED_HOSTS` — comma-separated list of allowed `Host` headers. Use `all` (or `true`/`*`) to disable the check entirely. Leave unset to keep the strict localhost-only default.
+
+The one-time access token is still required, so only people with the tokenized URL can read the knowledge graph.
