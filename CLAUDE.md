@@ -54,6 +54,14 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 ## Scripts
 - `scripts/generate-large-graph.mjs` — Generates a fake knowledge graph for performance testing (e.g. large-graph layout). Writes to `.understand-anything/knowledge-graph.json`. Usage: `node scripts/generate-large-graph.mjs [nodeCount]` (default: 3000 nodes). Not part of the production pipeline.
 
+## Self-Knowledge Graph (Dogfooding)
+This repo eats its own dog food: it keeps a committed Understand Anything graph of itself under `.understand-anything/`.
+- **Committed artifacts:** `knowledge-graph.json` (structural), `domain-graph.json` (business-flow view), `meta.json`, `fingerprints.json`, `config.json`, `.understandignore`. Per the README's *Share the Graph with Your Team* guidance, only `intermediate/`, `diff-overlay.json`, `tmp/`, and `.trash-*/` are gitignored (local scratch).
+- **Freshness:** `config.json` has `"autoUpdate": true`. The plugin's bundled hooks (`understand-anything-plugin/hooks/hooks.json`) drive `hooks/auto-update-prompt.md` — a post-commit (PostToolUse on `git commit`) trigger and a SessionStart staleness check — to incrementally patch the graph (zero LLM tokens when changes are cosmetic). The graph is regenerated only for committers who have the plugin installed; otherwise re-run `/understand` before a release.
+- **The domain graph is NOT auto-refreshed.** The hook patches only `knowledge-graph.json` (+ `meta.json`, `fingerprints.json`); `domain-graph.json` is derived from the knowledge graph and has no incremental path. **Every commit that meaningfully changes structure should regenerate both: run `/understand` (or let the hook run), then `/understand-domain`, and commit the refreshed `domain-graph.json`.** Cosmetic commits need neither.
+- **CI guard:** `scripts/check-graph.mjs` (wired into `.github/workflows/ci.yml`) is deterministic and spends zero LLM tokens. It (a) schema-validates both committed graphs (**blocking**), (b) warns when the source tree has drifted structurally from `fingerprints.json` (**advisory**), and (c) warns when `domain-graph.json`'s `project.gitCommitHash` no longer matches `meta.json`'s — i.e. the domain view is behind the knowledge graph (**advisory**). Pass `--strict` to make the advisory checks blocking. Regeneration itself is an LLM task and deliberately stays off the PR path — handled by the local post-commit hook or a manual run.
+- **Regenerate manually:** `/understand --full` (then `/understand-domain` to refresh the domain view). View with `/understand-dashboard`.
+
 ## Versioning
 When pushing to remote, bump the version in **all five** of these files (keep them in sync):
 - `understand-anything-plugin/package.json` → `"version"` field

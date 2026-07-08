@@ -108,6 +108,17 @@ Then open a Pull Request on GitHub with:
 - Link to related issues (if any)
 - Screenshots (for UI changes)
 
+### 6. Keep the Knowledge Graph Fresh
+
+This repo dogfoods Understand Anything: a committed graph of itself lives in `.understand-anything/` (`knowledge-graph.json`, `domain-graph.json`, `meta.json`, `fingerprints.json`, `config.json`). It powers onboarding and the live demo, so keep it in sync with your code changes.
+
+- **Every meaningful commit should refresh the graph.** If your commit adds/removes files, functions, classes, or imports (a *structural* change), regenerate before opening the PR; cosmetic-only commits (formatting, comments, internal logic) need nothing.
+- **Auto-update is enabled** (`.understand-anything/config.json` → `"autoUpdate": true`). If you have the plugin installed, a post-commit hook incrementally patches **`knowledge-graph.json`** after structural changes — zero tokens on cosmetic commits. No plugin? Re-run `/understand` (incremental) or `/understand --full` manually.
+- **The domain graph is not auto-refreshed — do it yourself.** The hook only touches the knowledge graph. After a structural change, also run **`/understand-domain`** and commit the refreshed `domain-graph.json`, so the business-flow view tracks the knowledge graph on every meaningful commit.
+- **CI tells you if you forgot.** `scripts/check-graph.mjs` (in CI) schema-validates both graphs and posts an advisory warning when the source tree has drifted from `fingerprints.json` or when the domain graph is behind the knowledge graph. Heed the warning and regenerate.
+- **Don't hand-edit** the JSON artifacts; regenerate them. Only `.understand-anything/intermediate/`, `tmp/`, `.trash-*/`, and `diff-overlay.json` are local scratch (gitignored) — everything else is committed.
+- See the README's *Share the Graph with Your Team* section for the rationale and git-lfs guidance for large graphs.
+
 ## 🧪 Testing Guidelines
 
 ### Writing Tests

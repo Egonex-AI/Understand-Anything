@@ -1,6 +1,9 @@
 node_modules
 dist
-.understand-anything
+.understand-anything/intermediate/
+.understand-anything/diff-overlay.json
+.understand-anything/tmp/
+.understand-anything/.trash-*/
 *.tsbuildinfo
 .DS_Store
 .env
