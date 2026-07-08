@@ -48,12 +48,6 @@ export {
   parseTourGenerationResponse,
   generateHeuristicTour,
 } from "./analyzer/tour-generator.js";
-export {
-  buildLanguageLessonPrompt,
-  parseLanguageLessonResponse,
-  detectLanguageConcepts,
-  type LanguageLessonResult,
-} from "./analyzer/language-lesson.js";
 export { PluginRegistry } from "./plugins/registry.js";
 export {
   LanguageRegistry,
@@ -77,11 +71,6 @@ export {
   type PluginEntry,
 } from "./plugins/discovery.js";
 export {
-  SemanticSearchEngine,
-  cosineSimilarity,
-  type SemanticSearchOptions,
-} from "./embedding-search.js";
-export {
   extractFileFingerprint,
   compareFingerprints,
   analyzeChanges,
@@ -96,10 +85,6 @@ export {
   type FileChangeResult,
   type ChangeAnalysis,
 } from "./fingerprint.js";
-export {
-  classifyUpdate,
-  type UpdateDecision,
-} from "./change-classifier.js";
 // Non-code parsers
 export {
   MarkdownParser,

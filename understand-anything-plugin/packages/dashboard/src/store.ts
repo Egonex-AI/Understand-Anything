@@ -536,8 +536,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       set({ searchQuery: query, searchResults: [] });
       return;
     }
-    // Currently both modes use the same fuzzy engine
-    // When embeddings are available, "semantic" mode will use SemanticSearchEngine
+    // Both search modes use the same fuzzy engine.
     void mode;
     const searchResults = engine.search(query);
     set({ searchQuery: query, searchResults });
