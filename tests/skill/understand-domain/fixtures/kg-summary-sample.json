@@ -1,0 +1,12 @@
+{
+  "project": {"name": "test-svc"},
+  "stats": {"totalNodes": 2, "totalEdges": 0},
+  "modules": [
+    {"path": "src/intimacy", "nodeCount": 1, "typeBreakdown": {}, "tags": ["intimacy"], "summaries": [], "files": []}
+  ],
+  "keyNodes": [
+    {"id": "function:src/intimacy/calc.py::score", "name": "score", "summary": "", "tags": [], "module": "src/intimacy"}
+  ],
+  "crossModuleEdges": [],
+  "layers": []
+}

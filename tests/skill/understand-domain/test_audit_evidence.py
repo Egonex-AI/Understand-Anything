@@ -69,3 +69,89 @@ def test_is_verb_like_name_passes_noun_domains():
     assert is_verb_like_name("亲密关系") is False
     assert is_verb_like_name("VIP体系") is False
     assert is_verb_like_name("亲密度") is False
+
+
+import json
+
+
+def _load_json_fixture(name):
+    return json.loads(_read_fixture(name))
+
+
+# 意图：6 类 evidence warning 各自被抓到（matched_subdomains_invalid /
+# matched_subdomains_empty_no_reason / matched_terms_empty / key_nodes_not_in_kg /
+# domain_name_verb_like / evidence_missing）。若任一类被移除，认领质量失去兜底。
+def test_audit_evidence_warnings():
+    from audit_domain_discovery import audit_domain_discovery
+    discovery = _load_json_fixture("domain-discovery-sample.json")
+    summary = _load_json_fixture("kg-summary-sample.json")
+    terms_md = _read_fixture("business-terms-sample.md")
+
+    result = audit_domain_discovery(discovery, summary, terms_md)
+    warning_types = {w["type"] for w in result["warnings"]}
+
+    # domain:fabricated 触发：matched_subdomains_invalid（"不存在的二级域"不在清单）
+    assert "matched_subdomains_invalid" in warning_types
+    # domain:fabricated 不触发 matched_subdomains_empty_no_reason（matchedSubDomains 非空），改由 domain:unknown 触发
+    # domain:unknown 触发：matched_subdomains_empty_no_reason（matchedSubDomains 缺失=空 + 无 evidence.reason）
+    assert "matched_subdomains_empty_no_reason" in warning_types
+    # domain:fabricated 触发：matched_terms_empty（matchedTerms 空 + matchedSubDomains 非空，不防双重惩戒）
+    assert "matched_terms_empty" in warning_types
+    # domain:fabricated 触发：key_nodes_not_in_kg（"function:made/up.py::fake" 不在 keyNode id 集合）
+    assert "key_nodes_not_in_kg" in warning_types
+    # domain:fabricated 触发：domain_name_verb_like（"关系召回" 命中"召回"词根）
+    assert "domain_name_verb_like" in warning_types
+    # domain:unknown 触发：evidence_missing（整个 evidence 对象缺失）
+    assert "evidence_missing" in warning_types
+
+    assert result["shouldRefine"] is True
+
+
+# 意图：防双重惩戒——matchedSubDomains 留空（无 PRD 对应）时不再判 matched_terms_empty。
+# domain:unknown 的 matchedSubDomains 缺失（空），matchedTerms 也缺失（空），但只应报
+# matched_subdomains_empty_no_reason + evidence_missing，不报 matched_terms_empty。
+def test_audit_no_double_penalty_for_empty_attribution():
+    from audit_domain_discovery import audit_domain_discovery
+    discovery = _load_json_fixture("domain-discovery-sample.json")
+    summary = _load_json_fixture("kg-summary-sample.json")
+    terms_md = _read_fixture("business-terms-sample.md")
+
+    result = audit_domain_discovery(discovery, summary, terms_md)
+    unknown_warnings = [w for w in result["warnings"] if w["domain"] == "domain:unknown"]
+    types_for_unknown = {w["type"] for w in unknown_warnings}
+
+    assert "matched_terms_empty" not in types_for_unknown
+    assert "matched_subdomains_empty_no_reason" in types_for_unknown
+
+
+# 意图：terms_md=None（降级场景）时跳过 matchedSubDomains 校验不崩（spec §6.2/T10）。
+def test_audit_no_terms_md_skips_subdomain_validation():
+    from audit_domain_discovery import audit_domain_discovery
+    discovery = _load_json_fixture("domain-discovery-sample.json")
+    summary = _load_json_fixture("kg-summary-sample.json")
+
+    result = audit_domain_discovery(discovery, summary, terms_md=None)
+    warning_types = {w["type"] for w in result["warnings"]}
+
+    # 降级：不报 matched_subdomains_invalid（无清单可比）
+    assert "matched_subdomains_invalid" not in warning_types
+    # 但 key_nodes_not_in_kg / domain_name_verb_like / evidence_missing 仍报（不依赖术语库）
+    assert "key_nodes_not_in_kg" in warning_types
+    assert "domain_name_verb_like" in warning_types
+    assert "evidence_missing" in warning_types
+
+
+# 意图：keyNodes 全 not_in_kg 时额外提示格式可能不匹配（spec §6.4/T11），
+# 区分"agent 编造路径"与"格式不匹配"。
+def test_audit_keynodes_format_mismatch_hint():
+    from audit_domain_discovery import audit_domain_discovery
+    discovery = _load_json_fixture("domain-discovery-sample.json")
+    summary = _load_json_fixture("kg-summary-sample.json")
+    terms_md = _read_fixture("business-terms-sample.md")
+
+    result = audit_domain_discovery(discovery, summary, terms_md)
+    fabricated_warnings = [w for w in result["warnings"]
+                           if w["domain"] == "domain:fabricated" and w["type"] == "key_nodes_not_in_kg"]
+    assert len(fabricated_warnings) == 1
+    # domain:fabricated 的 keyNodes 全部不在 KG（1/1 都不在），应带格式提示
+    assert fabricated_warnings[0].get("possibleFormatMismatch") is True

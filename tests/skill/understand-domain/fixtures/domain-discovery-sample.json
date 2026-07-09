@@ -1,0 +1,39 @@
+{
+  "domains": [
+    {
+      "id": "domain:intimacy",
+      "name": "亲密关系",
+      "summary": "...",
+      "tags": ["intimacy"],
+      "modules": ["src/intimacy"],
+      "matchedSubDomains": ["亲密关系"],
+      "matchedTerms": ["亲密度", "关系等级"],
+      "evidence": {
+        "keyNodes": ["function:src/intimacy/calc.py::score"],
+        "modules": ["intimacy-core"],
+        "reason": "亲密度计算模块对应二级域亲密关系"
+      }
+    },
+    {
+      "id": "domain:fabricated",
+      "name": "关系召回",
+      "summary": "...",
+      "tags": [],
+      "modules": [],
+      "matchedSubDomains": ["不存在的二级域"],
+      "matchedTerms": [],
+      "evidence": {
+        "keyNodes": ["function:made/up.py::fake"],
+        "modules": [],
+        "reason": ""
+      }
+    },
+    {
+      "id": "domain:unknown",
+      "name": "神秘域",
+      "summary": "...",
+      "tags": [],
+      "modules": []
+    }
+  ]
+}

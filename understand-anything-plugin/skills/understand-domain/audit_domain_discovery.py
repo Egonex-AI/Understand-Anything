@@ -89,19 +89,27 @@ def _tag_overlap(tags_a: set[str], tags_b: set[str]) -> float:
 def audit_domain_discovery(
     discovery: dict[str, Any],
     summary: dict[str, Any],
+    terms_md: str | None = None,
 ) -> dict[str, Any]:
-    """Audit domain discovery for potential over-merging."""
+    """Audit domain discovery for potential over-merging + evidence validity.
+
+    Args:
+        discovery: domain-discovery.json content
+        summary: kg-summary.json content
+        terms_md: optional terms markdown text. When None (degraded path),
+            subdomain-validation warnings are skipped (spec §6.2).
+    """
     warnings: list[dict] = []
     domains = discovery.get("domains", [])
     modules = summary.get("modules", [])
     key_nodes = summary.get("keyNodes", [])
 
+    # ── existing entity_diversity + tag_divergence checks (unchanged) ──────
     # Build module -> keyNodes mapping
     mod_keynodes: dict[str, list[dict]] = defaultdict(list)
     for kn in key_nodes:
         mod_keynodes[kn["module"]].append(kn)
 
-    # Check each domain for entity noun diversity
     for domain in domains:
         domain_id = domain["id"]
         domain_modules = domain.get("modules", [])
@@ -128,7 +136,6 @@ def audit_domain_discovery(
                 "modulesByEntity": {n: sorted(m) for n, m in noun_to_modules.items()},
             })
 
-    # Check pairwise tag overlap between modules in the same domain
     for domain in domains:
         domain_id = domain["id"]
         domain_modules = domain.get("modules", [])
@@ -157,8 +164,105 @@ def audit_domain_discovery(
                         "overlap": round(overlap, 3),
                     })
 
+    # ── evidence checks (new, spec §6.1) ───────────────────────────────────
+    # NOTE on validation-capability asymmetry (spec §6.3): matchedSubDomains
+    # can be validated for existence (headings are stable); matchedTerms only
+    # for non-emptiness (tables are brittle, not parsed). This is intentional.
+    subdomain_set = extract_subdomains(terms_md) if terms_md else None
+    keynode_id_set = extract_keynode_ids(summary)
+
+    for domain in domains:
+        domain_id = domain["id"]
+        name = domain.get("name", "")
+        matched_sub = domain.get("matchedSubDomains", [])
+        matched_terms = domain.get("matchedTerms", [])
+        evidence = domain.get("evidence")
+
+        # reason 在 evidence 缺失时视为空（无 evidence 自然无 reason）
+        reason = evidence.get("reason", "") if evidence else ""
+        key_nodes_claimed = evidence.get("keyNodes", []) if evidence else []
+
+        # matched_subdomains_empty_no_reason: 留空但 reason 未说明
+        # 须在 evidence_missing 的 continue 之前执行，否则无 evidence 的 domain 会跳过此检查
+        if (not matched_sub) and not reason:
+            warnings.append({
+                "type": "matched_subdomains_empty_no_reason",
+                "domain": domain_id,
+                "message": (
+                    f"Domain '{domain_id}' has empty matchedSubDomains but "
+                    f"evidence.reason does not explain the absence."
+                ),
+            })
+
+        # evidence_missing: 整个 evidence 对象缺失
+        if evidence is None:
+            warnings.append({
+                "type": "evidence_missing",
+                "domain": domain_id,
+                "message": f"Domain '{domain_id}' has no evidence object.",
+            })
+            # 无 evidence 时后续字段校验无意义，跳过本 domain 的剩余 evidence 检查
+            continue
+
+        # 防双重惩戒 (spec §6.5): matchedSubDomains 留空时不判 matched_terms_empty
+        if matched_sub and not matched_terms:
+            warnings.append({
+                "type": "matched_terms_empty",
+                "domain": domain_id,
+                "message": (
+                    f"Domain '{domain_id}' has matchedSubDomains but empty "
+                    f"matchedTerms — possible missed recognition."
+                ),
+            })
+
+        # matched_subdomains_invalid: 含清单外的名（仅 terms_md 存在时校验）
+        if subdomain_set is not None:
+            invalid = [s for s in matched_sub if s not in subdomain_set]
+            if invalid:
+                warnings.append({
+                    "type": "matched_subdomains_invalid",
+                    "domain": domain_id,
+                    "message": (
+                        f"Domain '{domain_id}' matchedSubDomains not in terms "
+                        f"glossary: {invalid}."
+                    ),
+                    "invalid": invalid,
+                })
+
+        # key_nodes_not_in_kg: 路径在 KG 不存在
+        if key_nodes_claimed:
+            not_in_kg = [k for k in key_nodes_claimed if k not in keynode_id_set]
+            if not_in_kg:
+                all_mismatched = (len(not_in_kg) == len(key_nodes_claimed))
+                warnings.append({
+                    "type": "key_nodes_not_in_kg",
+                    "domain": domain_id,
+                    "message": (
+                        f"Domain '{domain_id}' evidence.keyNodes not in KG: {not_in_kg}."
+                        + (" All keyNodes missing — possible format mismatch, check agent prompt contract."
+                           if all_mismatched else "")
+                    ),
+                    "notInKg": not_in_kg,
+                    "possibleFormatMismatch": all_mismatched,
+                })
+
+        # domain_name_verb_like: domain.name 疑似动词
+        if name and is_verb_like_name(name):
+            warnings.append({
+                "type": "domain_name_verb_like",
+                "domain": domain_id,
+                "message": (
+                    f"Domain '{domain_id}' name '{name}' looks like a verb/action, "
+                    f"not a domain. Review."
+                ),
+            })
+
     should_refine = any(
-        w["type"] in ("entity_diversity", "tag_divergence") for w in warnings
+        w["type"] in ("entity_diversity", "tag_divergence",
+                      "evidence_missing", "matched_subdomains_empty_no_reason",
+                      "matched_terms_empty", "matched_subdomains_invalid",
+                      "key_nodes_not_in_kg", "domain_name_verb_like")
+        for w in warnings
     )
 
     return {
