@@ -41,6 +41,32 @@ def extract_subdomains(terms_md: str) -> set[str]:
     return subdomains
 
 
+# 动作词根表（spec §6.2）——不追求完备，只兜底明显误用。domain.name 命中即 warning。
+_DOMAIN_VERB_ROOTS = frozenset({
+    "召回", "升级", "触发", "计算", "提交", "查询", "下发", "推送",
+    "创建", "更新", "删除", "发送", "接收", "处理", "校验", "刷新",
+})
+
+
+def extract_keynode_ids(summary: dict[str, Any]) -> set[str]:
+    """Extract the set of keyNode ids from a kg-summary.
+
+    evidence.keyNodes hold keyNode ids (not paths — kg-summary keyNodes have no
+    node-level path field, only id/name/module; see spec 偏差说明 #2). This set
+    is the validation anchor for keyNodes existence (spec §6.4).
+    """
+    return {kn["id"] for kn in summary.get("keyNodes", []) if "id" in kn}
+
+
+def is_verb_like_name(name: str) -> bool:
+    """Heuristic: does domain.name look like a verb/action rather than a domain?
+
+    Catches obvious misuses (domain.name should not be an action). Not exhaustive
+    (spec §6.2, §9 known limitation) — soft guard, human reviews reason field.
+    """
+    return any(root in name for root in _DOMAIN_VERB_ROOTS)
+
+
 def _extract_entity_nouns(names: list[str]) -> set[str]:
     """Extract core entity nouns from node names by stripping common verb prefixes."""
     nouns: set[str] = set()

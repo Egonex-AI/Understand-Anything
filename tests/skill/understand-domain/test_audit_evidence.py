@@ -35,3 +35,37 @@ def test_extract_subdomains_ignores_level1_headings():
     assert extract_subdomains(md) == {"亲密关系", "VIP体系"}
     assert "关系社交" not in extract_subdomains(md)
     assert "权益激励" not in extract_subdomains(md)
+
+
+# 意图：keyNode id 集合是 evidence.keyNodes 校验锚点。kg-summary 的 keyNode 只有 id/name/module，
+# 无节点级 path（spec 偏差说明 #2），故用 id。
+def test_extract_keynode_ids_returns_id_set():
+    from audit_domain_discovery import extract_keynode_ids
+    summary = {
+        "keyNodes": [
+            {"id": "function:src/order/calc.py::score", "name": "score", "module": "src/order"},
+            {"id": "class:src/order/Repo.py", "name": "Repo", "module": "src/order"},
+        ]
+    }
+    assert extract_keynode_ids(summary) == {"function:src/order/calc.py::score", "class:src/order/Repo.py"}
+
+
+def test_extract_keynode_ids_empty_when_no_keynodes():
+    from audit_domain_discovery import extract_keynode_ids
+    assert extract_keynode_ids({}) == set()
+    assert extract_keynode_ids({"keyNodes": []}) == set()
+
+
+# 意图：domain.name 不该是动词/动作（动作不是域）。词根表不追求完备，只兜底明显误用。
+def test_is_verb_like_name_catches_obvious_verbs():
+    from audit_domain_discovery import is_verb_like_name
+    assert is_verb_like_name("亲密关系召回") is True
+    assert is_verb_like_name("关系升级") is True
+    assert is_verb_like_name("触发奖励") is True
+
+
+def test_is_verb_like_name_passes_noun_domains():
+    from audit_domain_discovery import is_verb_like_name
+    assert is_verb_like_name("亲密关系") is False
+    assert is_verb_like_name("VIP体系") is False
+    assert is_verb_like_name("亲密度") is False
