@@ -216,7 +216,7 @@ def audit_domain_discovery(
             })
 
         # matched_subdomains_invalid: 含清单外的名（仅 terms_md 存在时校验）
-        if subdomain_set is not None:
+        if subdomain_set:  # None or empty set both skip — spec §8.1
             invalid = [s for s in matched_sub if s not in subdomain_set]
             if invalid:
                 warnings.append({

@@ -265,3 +265,24 @@ class TestAuditMainTermsLoading(unittest.TestCase):
             rc = mod.main(project_root)
         self.assertEqual(rc, 0)
         self.assertIn("businessTermsPath", err.getvalue())  # 响亮报错含路径信息
+
+
+# 意图：spec §8.1 — 术语库 md 有内容但无 ### 标题时，audit 跳过 matchedSubDomains 校验
+# （空二级域清单不可靠，靠人审 reason）。不应把所有 matchedSubDomains 判为 invalid。
+def test_audit_no_headings_skips_subdomain_validation():
+    from audit_domain_discovery import audit_domain_discovery
+    discovery = {
+        "domains": [{
+            "id": "domain:x", "name": "某域", "modules": [],
+            "matchedSubDomains": ["任意二级域"], "matchedTerms": ["某术语"],
+            "evidence": {"keyNodes": [], "modules": ["m"], "reason": "说明"}
+        }]
+    }
+    summary = {"keyNodes": [], "modules": []}
+    # md 有内容但无 ### 标题
+    terms_md = "纯正文没有标题\n| 列1 | 列2 |\n|---|---|\n| a | b |\n"
+
+    result = audit_domain_discovery(discovery, summary, terms_md)
+    warning_types = {w["type"] for w in result["warnings"]}
+
+    assert "matched_subdomains_invalid" not in warning_types  # 空清单时跳过，不误报
