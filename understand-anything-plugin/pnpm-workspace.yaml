@@ -9,6 +9,7 @@ allowBuilds:
   tree-sitter-go: true
   tree-sitter-java: true
   tree-sitter-javascript: true
+  tree-sitter-objc: true
   tree-sitter-php: true
   tree-sitter-python: true
   tree-sitter-ruby: true

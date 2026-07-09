@@ -121,6 +121,8 @@ const LANGUAGE_BY_EXT = Object.freeze({
   '.kts': 'kotlin',
   '.cs': 'csharp',
   '.swift': 'swift',
+  '.m': 'objective-c',
+  '.mm': 'objective-c',
   '.lua': 'lua',
   // Ruby / PHP
   '.rb': 'ruby',
