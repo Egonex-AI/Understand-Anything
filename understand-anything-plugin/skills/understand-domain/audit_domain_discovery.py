@@ -275,12 +275,56 @@ def audit_domain_discovery(
     }
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        print("Usage: python audit_domain_discovery.py <project-root>", file=sys.stderr)
-        return 1
+def _load_terms_md(project_root: Path) -> str | None:
+    """Load terms glossary markdown for evidence validation.
 
-    project_root = Path(sys.argv[1])
+    Path is read from config.json's businessTermsPath, resolved relative to
+    config.json's own location (spec §3). Returns None (degraded) when:
+    - field missing (silent, normal)
+    - file not found (loud error)
+    Never raises — degradation must not block the main flow (spec §3 降级语义).
+    """
+    config_path = project_root / ".understand-anything" / "config.json"
+    if not config_path.exists():
+        return None
+    try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    rel = config.get("businessTermsPath", "")
+    if not rel:
+        return None  # field missing → silent degradation
+
+    terms_path = (config_path.parent / rel).resolve()
+    if not terms_path.exists():
+        print(
+            f"[audit-domain] businessTermsPath configured but file not found: "
+            f"{terms_path}. Degraded — skipping subdomain validation.",
+            file=sys.stderr,
+        )
+        return None  # loud degradation
+
+    try:
+        return terms_path.read_text(encoding="utf-8")
+    except OSError:
+        print(
+            f"[audit-domain] businessTermsPath file unreadable: {terms_path}. "
+            f"Degraded — skipping subdomain validation.",
+            file=sys.stderr,
+        )
+        return None
+
+
+def main(project_root: str | Path | None = None) -> int:
+    """Entry point. Accepts project_root as arg (for tests) or from sys.argv (CLI)."""
+    if project_root is None:
+        if len(sys.argv) < 2:
+            print("Usage: python audit_domain_discovery.py <project-root>", file=sys.stderr)
+            return 1
+        project_root = sys.argv[1]
+
+    project_root = Path(project_root)
     inter_dir = project_root / ".understand-anything" / "intermediate"
 
     discovery_path = inter_dir / "domain-discovery.json"
@@ -295,8 +339,9 @@ def main() -> int:
 
     discovery = json.loads(discovery_path.read_text(encoding="utf-8"))
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    terms_md = _load_terms_md(project_root)
 
-    result = audit_domain_discovery(discovery, summary)
+    result = audit_domain_discovery(discovery, summary, terms_md)
 
     out_path = inter_dir / "domain-audit.json"
     out_path.write_text(

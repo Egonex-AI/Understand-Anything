@@ -155,3 +155,113 @@ def test_audit_keynodes_format_mismatch_hint():
     assert len(fabricated_warnings) == 1
     # domain:fabricated 的 keyNodes 全部不在 KG（1/1 都不在），应带格式提示
     assert fabricated_warnings[0].get("possibleFormatMismatch") is True
+
+
+import tempfile
+import unittest
+
+
+def _write_tree(root, files: dict):
+    """Write {relpath: content} into root dir."""
+    from pathlib import Path
+    for rel, content in files.items():
+        p = Path(root) / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+
+
+# 意图：main() 必须从 config.json 读 businessTermsPath，相对 config.json 位置解析术语库 md，
+# 传给 audit 函数。这是 Phase 0 加载流程在 audit 侧的等价（audit 独立跑时也要拿到术语库）。
+# 若 main 不读 config 或路径解析基准错，evidence warning 不会产出（降级）。
+class TestAuditMainTermsLoading(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="ua-audit-main-")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_main_loads_terms_md_from_config(self):
+        import audit_domain_discovery as mod
+        inter = "src/svc/.understand-anything/intermediate"
+        _write_tree(self.tmp, {
+            # config.json 在 .understand-anything/ 下
+            "src/svc/.understand-anything/config.json": json.dumps({
+                "businessTermsPath": "../../../terms.md"
+            }, ensure_ascii=False),
+            # 术语库在 config.json 上溯三级（.understand-anything → svc → src → tmp）
+            "terms.md": "## 关系社交\n### 亲密关系\n| 术语 | 含义 |\n|---|---|\n| 亲密度 | 数值 |\n",
+            f"{inter}/domain-discovery.json": json.dumps({
+                "domains": [{
+                    "id": "domain:intimacy", "name": "关系召回",
+                    "modules": [], "matchedSubDomains": ["不存在的"],
+                    "matchedTerms": [], "evidence": {"keyNodes": [], "modules": [], "reason": ""}
+                }]
+            }, ensure_ascii=False),
+            f"{inter}/kg-summary.json": json.dumps({"keyNodes": [], "modules": []}),
+        })
+        project_root = f"{self.tmp}/src/svc"
+
+        rc = mod.main(project_root)
+
+        self.assertEqual(rc, 0)
+        audit_out = json.loads(
+            (Path(self.tmp) / "src/svc/.understand-anything/intermediate/domain-audit.json")
+            .read_text(encoding="utf-8")
+        )
+        types = {w["type"] for w in audit_out["warnings"]}
+        # 术语库加载成功 → matched_subdomains_invalid 触发（"不存在的"不在清单）
+        self.assertIn("matched_subdomains_invalid", types)
+        self.assertIn("domain_name_verb_like", types)  # "关系召回"
+
+    # 意图：businessTermsPath 缺失时 main 不崩，terms_md=None 降级，不报 subdomain 类 warning。
+    def test_main_degrades_when_no_business_terms_path(self):
+        import audit_domain_discovery as mod
+        inter = "src/svc2/.understand-anything/intermediate"
+        _write_tree(self.tmp, {
+            "src/svc2/.understand-anything/config.json": json.dumps({}),
+            f"{inter}/domain-discovery.json": json.dumps({
+                "domains": [{"id": "domain:x", "name": "关系召回", "modules": [],
+                             "matchedSubDomains": ["不存在的"], "matchedTerms": [],
+                             "evidence": {"keyNodes": [], "modules": [], "reason": ""}}]
+            }, ensure_ascii=False),
+            f"{inter}/kg-summary.json": json.dumps({"keyNodes": [], "modules": []}),
+        })
+        project_root = f"{self.tmp}/src/svc2"
+
+        rc = mod.main(project_root)
+        self.assertEqual(rc, 0)
+        audit_out = json.loads(
+            (Path(self.tmp) / "src/svc2/.understand-anything/intermediate/domain-audit.json")
+            .read_text(encoding="utf-8")
+        )
+        types = {w["type"] for w in audit_out["warnings"]}
+        # 降级：无 subdomain 校验
+        self.assertNotIn("matched_subdomains_invalid", types)
+        # 但 verb_like 仍报（不依赖术语库）
+        self.assertIn("domain_name_verb_like", types)
+
+    # 意图：businessTermsPath 配了但文件不存在 → 响亮报错（stderr）+ 降级。
+    def test_main_degrades_loudly_when_terms_file_missing(self):
+        import audit_domain_discovery as mod
+        import io
+        import contextlib
+        inter = "src/svc3/.understand-anything/intermediate"
+        _write_tree(self.tmp, {
+            "src/svc3/.understand-anything/config.json": json.dumps({
+                "businessTermsPath": "../../../no-such.md"
+            }),
+            f"{inter}/domain-discovery.json": json.dumps({
+                "domains": [{"id": "domain:x", "name": "VIP体系", "modules": [],
+                             "matchedSubDomains": [], "matchedTerms": [],
+                             "evidence": {"keyNodes": [], "modules": [], "reason": "无对应"}}]
+            }, ensure_ascii=False),
+            f"{inter}/kg-summary.json": json.dumps({"keyNodes": [], "modules": []}),
+        })
+        project_root = f"{self.tmp}/src/svc3"
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = mod.main(project_root)
+        self.assertEqual(rc, 0)
+        self.assertIn("businessTermsPath", err.getvalue())  # 响亮报错含路径信息
