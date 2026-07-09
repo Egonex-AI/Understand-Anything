@@ -13,10 +13,17 @@ You are a business domain identification expert. Your job is to analyze a conden
 
 You will receive a `kg-summary.json` containing:
 - **modules**: Module-level aggregations with node counts, tags, summaries, and file lists
-- **keyNodes**: Important nodes (endpoints, services, pipelines) with full details
+- **keyNodes**: Important nodes (endpoints, services, pipelines) with full details (id, name, module)
 - **crossModuleEdges**: Relationships between modules with types and sample descriptions
 - **layers**: Architectural layer assignments
 - **project**: Project metadata
+
+**Optional — Business Terms Glossary (PRD terminology).** If provided, you will also receive the raw markdown of an external PRD business terms glossary. Structure:
+- `## 一级域` headings (top-level domain, navigation only — not the alignment unit)
+- `### 二级域` headings (sub-domain — the attribution guardrail layer)
+- a terms table under each sub-domain (term / definition / usage / source — you read this, no program parses it)
+
+The glossary is the authoritative business view for naming alignment. Code (kg-summary) remains the source of truth for domain boundaries — the glossary does not force domain boundaries, only aligns names and records attribution.
 
 ## Task
 
@@ -40,6 +47,13 @@ Identify 3-8 business domains. For each domain, determine which modules belong t
     - Each feature module typically contains: screens/pages + related components + feature-specific state + feature-specific API calls
     - **Shared layers are NOT separate domains**: `components/`, `utils/`, `hooks/`, `services/`, `store/` that serve multiple features are cross-cutting concerns, not independent domains. Assign shared modules to the domain they most closely serve, or mark as `utility` if truly generic.
     - **Navigation as domain boundary signal**: If two screen groups have NO navigation edges between them (users can't navigate from one to the other without going through a hub), they are likely different domains.
+13. **Terms glossary alignment (when glossary provided).** When a PRD terms glossary is injected, align domain naming to it:
+    - **Code is authoritative for boundaries**: domain partitioning still comes from kg-summary code clustering. The glossary does NOT force you to invent domains that the code doesn't support.
+    - **No fixed alignment layer**: choose the layer (sub-domain `###` heading or individual term) that best matches the actual scope of the code domain. A large code domain covering most terms under a sub-domain → align to the sub-domain name. A small code domain covering one or two terms → align to the term name.
+    - **domain.name priority**: prefer business terminology from the glossary over generic names. Do NOT use verb/action terms (e.g. "亲密关系召回") as domain.name — those are actions, not domains.
+    - **Sparse recognition**: the glossary may contain concepts the current service doesn't implement. Recognize only what the code actually implements; do not force-fit.
+    - **No-claim also recorded**: if a code domain has no glossary correspondence, still name it by code semantics, leave `matchedSubDomains` empty, and explain in `evidence.reason` ("glossary has no correspondence, named by code semantics").
+    - **Anti-PRD-pollution**: the glossary is for naming alignment and attribution annotation ONLY. Do NOT conjure a domain just to match a glossary concept when the code has only scattered, sub-domain-level implementation under it. Such scattered implementation may be noted in an adjacent domain's `evidence.reason` but does not form its own domain.
 
 ## Split/Merge Decision Process
 
@@ -63,18 +77,37 @@ Write JSON to: `<project-root>/.understand-anything/intermediate/domain-discover
   "domains": [
     {
       "id": "domain:<kebab-case-name>",
-      "name": "<Human Readable Domain Name>",
+      "name": "<Human Readable Domain Name — prefer glossary business terminology>",
       "summary": "<2-3 sentences about what this domain handles>",
       "tags": ["<relevant-tags>"],
       "entities": ["<key domain objects>"],
       "businessRules": ["<important constraints/invariants>"],
       "crossDomainInteractions": ["<how this domain interacts with others>"],
       "modules": ["src/order", "src/cart"],
-      "nodePatterns": ["Order", "Cart"]
+      "nodePatterns": ["Order", "Cart"],
+      "matchedSubDomains": ["<glossary sub-domain names this domain belongs to>"],
+      "matchedTerms": ["<glossary term names this domain claims>"],
+      "evidence": {
+        "keyNodes": ["<keyNode id from kg-summary, verbatim — supports the claim>"],
+        "modules": ["<module names supporting the claim>"],
+        "reason": "<natural-language reasoning: why this code domain maps to these glossary terms / sub-domains; or why glossary has no correspondence>"
+      }
     }
   ]
 }
 ```
+
+### `matchedSubDomains` / `matchedTerms` / `evidence` fields (when glossary provided)
+
+Every domain MUST carry these fields (uniform structure — including domains with no glossary match, where `matchedSubDomains` and `matchedTerms` are empty arrays and `evidence.reason` explains the absence). The audit script validates them:
+
+- `matchedSubDomains[]` — sub-domain names (from `###` headings) this domain belongs to. Audit checks these are in the glossary's sub-domain set.
+- `matchedTerms[]` — individual term names (from the terms table) this domain claims. Audit checks non-empty (when matchedSubDomains is non-empty).
+- `evidence.keyNodes[]` — **keyNode `id` values from kg-summary, verbatim** (not paths — kg-summary keyNodes have `id`/`name`/`module`, no node-level path). Audit checks these ids exist in kg-summary's keyNodes.
+- `evidence.modules[]` — module names supporting the claim. Audit checks non-empty.
+- `evidence.reason` — natural-language recognition reasoning. Audit checks non-empty; correctness is human-reviewed.
+
+When the glossary is NOT provided (degraded path), these fields are omitted — the audit skips evidence validation.
 
 ### `nodePatterns` field (important for monolithic modules)
 
