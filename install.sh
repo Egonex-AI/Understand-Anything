@@ -9,23 +9,34 @@
 #   ./install.sh --help
 #
 # Curl-pipe usage:
+<<<<<<< HEAD
+#   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
+#   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s forgecode
+=======
 #   curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
 #   curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
+>>>>>>> main
 #
 # Environment:
 #   UA_REPO_URL  Override clone URL (default: official GitHub repo)
+#   UA_REPO_REF  Optional git ref to checkout after clone/update (branch/tag/commit)
 #   UA_DIR       Override clone destination (default: $HOME/.understand-anything/repo)
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+
 REPO_URL="${UA_REPO_URL:-https://github.com/Egonex-AI/Understand-Anything.git}"
+REPO_REF="${UA_REPO_REF:-}"
 REPO_DIR="${UA_DIR:-$HOME/.understand-anything/repo}"
 PLUGIN_LINK="$HOME/.understand-anything-plugin"
 
 # Platform table — id|skills-target-dir|style
-# style "per-skill": one symlink per skill into the target dir
-# style "folder":    one symlink for the whole skills/ dir into the target,
-#                    named "understand-anything"
+# style "per-skill":       one symlink per skill into the target dir
+# style "copy-per-skill":  one physical copy per skill into the target dir (used when symlinked directories are not discoverable)
+# style "folder":          one symlink for the whole skills/ dir into the target,
+#                          named "understand-anything"
 platforms_table() {
   cat <<EOF
 gemini|$HOME/.agents/skills|per-skill
@@ -40,6 +51,7 @@ hermes|$HOME/.hermes/skills|folder
 cline|$HOME/.cline/skills|folder
 kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
+forgecode|AUTO|copy-per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
 EOF
@@ -57,6 +69,41 @@ resolve_platform() {
     exit 1
   fi
   printf '%s\n' "$row"
+}
+
+forgecode_base_dir() {
+  # ForgeCode base-path resolution:
+  # 1) $FORGE_CONFIG when set
+  # 2) $FORGE_HOME when set
+  # 3) ~/forge (default on macOS/Linux)
+  # 4) ~/.forge (fallback for older installs)
+  if [[ -n "${FORGE_CONFIG:-}" ]]; then
+    printf '%s\n' "$FORGE_CONFIG"
+  elif [[ -n "${FORGE_HOME:-}" ]]; then
+    printf '%s\n' "$FORGE_HOME"
+  elif [[ -d "$HOME/forge" ]]; then
+    printf '%s\n' "$HOME/forge"
+  elif [[ -d "$HOME/.forge" ]]; then
+    printf '%s\n' "$HOME/.forge"
+  else
+    # Prefer ForgeCode's documented default.
+    printf '%s\n' "$HOME/forge"
+  fi
+}
+
+resolve_target_dir() {
+  local id="$1" target="$2"
+
+  case "$id" in
+    forgecode)
+      local base
+      base="$(forgecode_base_dir)"
+      printf '%s\n' "$base/skills"
+      ;;
+    *)
+      printf '%s\n' "$target"
+      ;;
+  esac
 }
 
 prompt_platform() {
@@ -93,15 +140,33 @@ prompt_platform() {
 clone_or_update() {
   if [[ -d "$REPO_DIR/.git" ]]; then
     printf -- '→ Updating existing checkout at %s\n' "$REPO_DIR"
-    git -C "$REPO_DIR" pull --ff-only
+    if [[ -n "${UA_REPO_URL:-}" ]]; then
+      git -C "$REPO_DIR" remote set-url origin "$REPO_URL"
+    fi
+    git -C "$REPO_DIR" fetch --all --prune
   else
     printf -- '→ Cloning %s → %s\n' "$REPO_URL" "$REPO_DIR"
     mkdir -p "$(dirname "$REPO_DIR")"
     git clone "$REPO_URL" "$REPO_DIR"
   fi
+
+  if [[ -n "${REPO_REF:-}" ]]; then
+    printf -- '→ Checking out %s\n' "$REPO_REF"
+    if ! git -C "$REPO_DIR" checkout -q "$REPO_REF"; then
+      # Common case: remote branch name. Create a local branch tracking origin.
+      git -C "$REPO_DIR" checkout -q -B "$REPO_REF" "origin/$REPO_REF"
+    fi
+  fi
+
+  # If we're on a branch, keep it fast-forwarded.
+  if git -C "$REPO_DIR" symbolic-ref -q HEAD >/dev/null; then
+    git -C "$REPO_DIR" pull --ff-only
+  fi
 }
 
 skills_root() { printf '%s\n' "$REPO_DIR/understand-anything-plugin/skills"; }
+commands_root() { printf '%s\n' "$REPO_DIR/understand-anything-plugin/commands"; }
+forgecode_agents_root() { printf '%s\n' "$REPO_DIR/understand-anything-plugin/forgecode/agents"; }
 
 list_skills() {
   local root
@@ -114,6 +179,62 @@ list_skills() {
   for d in "$root"/*/; do
     [[ -d "$d" ]] || continue
     basename "$d"
+  done
+}
+
+list_commands() {
+  local root
+  root="$(commands_root)"
+  if [[ ! -d "$root" ]]; then
+    printf 'Commands directory not found: %s\n' "$root" >&2
+    exit 1
+  fi
+
+  local files=("$root"/*.md)
+  if (( ${#files[@]} == 1 )) && [[ "${files[0]}" == "$root/*.md" ]]; then
+    # When nullglob is off and there are no matches, bash keeps the literal.
+    files=()
+  fi
+
+  local f
+  for f in "${files[@]}"; do
+    [[ -f "$f" ]] || continue
+    basename "$f"
+  done
+}
+
+list_forgecode_agents() {
+  local root
+  root="$(forgecode_agents_root)"
+  if [[ ! -d "$root" ]]; then
+    printf 'ForgeCode agents directory not found: %s\n' "$root" >&2
+    exit 1
+  fi
+
+  local files=("$root"/*.md)
+  if (( ${#files[@]} == 1 )) && [[ "${files[0]}" == "$root/*.md" ]]; then
+    files=()
+  fi
+
+  local f
+  for f in "${files[@]}"; do
+    [[ -f "$f" ]] || continue
+    basename "$f"
+  done
+}
+
+list_md_files_in_dir() {
+  local root="$1"
+
+  local files=("$root"/*.md)
+  if (( ${#files[@]} == 1 )) && [[ "${files[0]}" == "$root/*.md" ]]; then
+    files=()
+  fi
+
+  local f
+  for f in "${files[@]}"; do
+    [[ -f "$f" ]] || continue
+    basename "$f"
   done
 }
 
@@ -130,6 +251,14 @@ link_skills() {
         printf '  ✓ %s → %s\n' "$target/$skill" "$root/$skill"
       done < <(list_skills)
       ;;
+    copy-per-skill)
+      local skill
+      while IFS= read -r skill; do
+        rm -rf "$target/$skill"
+        cp -R "$root/$skill" "$target/$skill"
+        printf '  ✓ %s ← %s\n' "$target/$skill" "$root/$skill"
+      done < <(list_skills)
+      ;;
     folder)
       ln -sfn "$root" "$target/understand-anything"
       printf '  ✓ %s → %s\n' "$target/understand-anything" "$root"
@@ -143,6 +272,8 @@ link_skills() {
 
 unlink_skills() {
   local target="$1" style="$2"
+  local root
+  root="$(skills_root)"
   [[ -d "$target" ]] || return 0
   case "$style" in
     per-skill)
@@ -163,6 +294,22 @@ unlink_skills() {
         done
       fi
       ;;
+    copy-per-skill)
+      if [[ -d "$(skills_root)" ]]; then
+        local skill
+        while IFS= read -r skill; do
+          if [[ -d "$target/$skill" ]]; then
+            if [[ -f "$target/$skill/SKILL.md" ]] && cmp -s "$target/$skill/SKILL.md" "$root/$skill/SKILL.md"; then
+              rm -rf "$target/$skill"
+            else
+              printf '  • Refusing to remove %s (SKILL.md differs from current checkout)\n' "$target/$skill" >&2
+            fi
+          fi
+        done < <(list_skills)
+      else
+        printf '  • Skills checkout not found; remove copied skill directories manually under: %s\n' "$target" >&2
+      fi
+      ;;
     folder)
       [[ -L "$target/understand-anything" ]] && rm -f "$target/understand-anything"
       ;;
@@ -178,16 +325,142 @@ link_plugin_root() {
   fi
 }
 
+install_forgecode_commands() {
+  local base target root
+  base="$(forgecode_base_dir)"
+  target="$base/commands"
+  root="$(commands_root)"
+
+  if [[ ! -d "$root" ]]; then
+    local local_root
+    local_root="$SCRIPT_DIR/understand-anything-plugin/commands"
+    if [[ -d "$local_root" ]]; then
+      root="$local_root"
+    else
+      printf '  • ForgeCode commands not found in checkout: %s\n' "$root" >&2
+      return 0
+    fi
+  fi
+
+  mkdir -p "$target"
+
+  local cmd
+  while IFS= read -r cmd; do
+    cp -f "$root/$cmd" "$target/$cmd"
+    printf '  ✓ %s ← %s\n' "$target/$cmd" "$root/$cmd"
+  done < <(list_md_files_in_dir "$root")
+}
+
+uninstall_forgecode_commands() {
+  local base target root
+  base="$(forgecode_base_dir)"
+  target="$base/commands"
+  root="$(commands_root)"
+
+  [[ -d "$target" ]] || return 0
+  if [[ ! -d "$root" ]]; then
+    local local_root
+    local_root="$SCRIPT_DIR/understand-anything-plugin/commands"
+    if [[ -d "$local_root" ]]; then
+      root="$local_root"
+    else
+      printf '  • Commands checkout not found; remove copied command files manually under: %s\n' "$target" >&2
+      return 0
+    fi
+  fi
+
+  local cmd
+  while IFS= read -r cmd; do
+    if [[ -f "$target/$cmd" ]]; then
+      if cmp -s "$target/$cmd" "$root/$cmd"; then
+        rm -f "$target/$cmd"
+      else
+        printf '  • Refusing to remove %s (differs from current checkout)\n' "$target/$cmd" >&2
+      fi
+    fi
+  done < <(list_md_files_in_dir "$root")
+}
+
+install_forgecode_agents() {
+  local base target root
+  base="$(forgecode_base_dir)"
+  target="$base/agents"
+  root="$(forgecode_agents_root)"
+
+  if [[ ! -d "$root" ]]; then
+    local local_root
+    local_root="$SCRIPT_DIR/understand-anything-plugin/forgecode/agents"
+    if [[ -d "$local_root" ]]; then
+      root="$local_root"
+    else
+      printf '  • ForgeCode agents not found in checkout: %s\n' "$root" >&2
+      return 0
+    fi
+  fi
+
+  mkdir -p "$target"
+
+  local agent
+  while IFS= read -r agent; do
+    cp -f "$root/$agent" "$target/$agent"
+    printf '  ✓ %s ← %s\n' "$target/$agent" "$root/$agent"
+  done < <(list_md_files_in_dir "$root")
+}
+
+uninstall_forgecode_agents() {
+  local base target root
+  base="$(forgecode_base_dir)"
+  target="$base/agents"
+  root="$(forgecode_agents_root)"
+
+  [[ -d "$target" ]] || return 0
+  if [[ ! -d "$root" ]]; then
+    local local_root
+    local_root="$SCRIPT_DIR/understand-anything-plugin/forgecode/agents"
+    if [[ -d "$local_root" ]]; then
+      root="$local_root"
+    else
+      printf '  • Agents checkout not found; remove copied agent files manually under: %s\n' "$target" >&2
+      return 0
+    fi
+  fi
+
+  local agent
+  while IFS= read -r agent; do
+    if [[ -f "$target/$agent" ]]; then
+      if cmp -s "$target/$agent" "$root/$agent"; then
+        rm -f "$target/$agent"
+      else
+        printf '  • Refusing to remove %s (differs from current checkout)\n' "$target/$agent" >&2
+      fi
+    fi
+  done < <(list_md_files_in_dir "$root")
+}
+
 cmd_install() {
   local id="$1"
   local row target style
   row="$(resolve_platform "$id")"
   target="$(printf '%s\n' "$row" | cut -d'|' -f2)"
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
+  target="$(resolve_target_dir "$id" "$target")"
 
   clone_or_update
-  printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
-  link_skills "$target" "$style"
+
+  if [[ "$id" == "forgecode" ]]; then
+    printf -- '→ Skipping ForgeCode skill installation (commands are the entrypoints)\n'
+  else
+    printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
+    link_skills "$target" "$style"
+  fi
+
+  if [[ "$id" == "forgecode" ]]; then
+    printf -- '→ Installing ForgeCode commands\n'
+    install_forgecode_commands
+    printf -- '→ Installing ForgeCode agents\n'
+    install_forgecode_agents
+  fi
+
   printf -- '→ Linking universal plugin root\n'
   link_plugin_root
 
@@ -221,7 +494,13 @@ KIROEOF
   fi
 
   printf '\n✓ Installed Understand-Anything for %s\n' "$id"
-  printf '  Restart your CLI or IDE to pick up the skills.\n'
+  if [[ "$id" == "forgecode" ]]; then
+    printf '  Restart ForgeCode to pick up commands and agents.\n'
+    printf '  Note: ForgeCode files are physical copies, not symlinks.\n'
+    printf '  Run  ./install.sh --update  after upstream changes to refresh them.\n'
+  else
+    printf '  Restart your CLI or IDE to pick up the skills.\n'
+  fi
   if [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'
     printf '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.\n'
@@ -237,7 +516,20 @@ cmd_uninstall() {
   row="$(resolve_platform "$id")"
   target="$(printf '%s\n' "$row" | cut -d'|' -f2)"
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
+  target="$(resolve_target_dir "$id" "$target")"
 
+  if [[ "$id" == "forgecode" ]]; then
+    printf -- '→ Removing ForgeCode commands and agents\n'
+  else
+    printf -- '→ Removing skill links for %s\n' "$id"
+    unlink_skills "$target" "$style"
+  fi
+
+  if [[ "$id" == "forgecode" ]]; then
+    printf -- '→ Removing ForgeCode command files\n'
+    uninstall_forgecode_commands
+    printf -- '→ Removing ForgeCode agent files\n'
+    uninstall_forgecode_agents
   printf -- '→ Removing skill links for %s\n' "$id"
   unlink_skills "$target" "$style"
   if [[ "$id" == "kiro" && -f "$HOME/.kiro/agents/understand.json" ]]; then
@@ -261,6 +553,19 @@ cmd_update() {
   fi
   git -C "$REPO_DIR" pull --ff-only
   printf '✓ Updated.\n'
+
+  # Symlinked platforms pick up the new content automatically because their
+  # installed files are symlinks into REPO_DIR.  ForgeCode uses physical copies
+  # (copy-per-skill) so a git pull alone leaves stale files on disk.
+  # Re-copy commands and agents whenever a ForgeCode install is detected.
+  local base
+  base="$(forgecode_base_dir)"
+  if [[ -d "$base/commands" || -d "$base/agents" ]]; then
+    printf -- '→ Refreshing ForgeCode copies (copy-per-skill)\n'
+    install_forgecode_commands
+    install_forgecode_agents
+    printf '  Restart ForgeCode to pick up the updated commands and agents.\n'
+  fi
 }
 
 usage() {
@@ -269,7 +574,8 @@ Understand-Anything installer
 
 Usage:
   install.sh [<platform>]            Install for <platform> (or prompt if omitted)
-  install.sh --update                Pull latest changes (skills update through symlinks)
+  install.sh --update                Pull latest changes (symlinked platforms update
+                                   automatically; ForgeCode copies are also re-installed)
   install.sh --uninstall <platform>  Remove links for <platform>
   install.sh --help
 
@@ -278,6 +584,7 @@ $(platform_ids | sed 's/^/  - /')
 
 Environment:
   UA_REPO_URL  Override clone URL (default: official repo)
+  UA_REPO_REF  Optional git ref to checkout after clone/update
   UA_DIR       Override clone destination (default: \$HOME/.understand-anything/repo)
 USAGE
 }
