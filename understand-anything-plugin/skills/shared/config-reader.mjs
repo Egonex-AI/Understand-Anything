@@ -8,6 +8,7 @@ export const CONFIG_DEFAULTS = {
   rpcAnnotations: [],
   apiBaseUrl: '',
   protocolType: 'rest',
+  businessTermsPath: '',
 };
 
 /**
