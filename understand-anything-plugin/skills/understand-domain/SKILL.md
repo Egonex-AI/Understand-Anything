@@ -117,6 +117,34 @@ fi
 
 Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases.
 
+**Load business terms glossary (optional).** Read `businessTermsPath` from `$PROJECT_ROOT/.understand-anything/config.json` and load the terms markdown for injection into domain-discoverer (spec §3).
+
+```bash
+TERMS_MD=""
+CONFIG_FILE="$PROJECT_ROOT/.understand-anything/config.json"
+if [ -f "$CONFIG_FILE" ]; then
+  REL_PATH=$(python3 -c "
+import json, sys
+try:
+    c = json.load(open(sys.argv[1], encoding='utf-8'))
+    print(c.get('businessTermsPath', ''))
+except Exception:
+    print('')
+" "$CONFIG_FILE")
+  if [ -n "$REL_PATH" ]; then
+    TERMS_FILE="$(cd "$(dirname "$CONFIG_FILE")" && pwd)/$REL_PATH"
+    if [ -f "$TERMS_FILE" ]; then
+      TERMS_MD=$(cat "$TERMS_FILE")
+      echo "[understand-domain] Loaded business terms glossary: $TERMS_FILE"
+    else
+      echo "[understand-domain] businessTermsPath configured but file not found: $TERMS_FILE. Degraded — no glossary injection." >&2
+    fi
+  fi
+fi
+```
+
+`$TERMS_MD` is empty when: field missing (silent), file not found (loud error to stderr), or config unreadable. Empty → domain-discoverer runs without glossary (original logic, spec §3 降级语义).
+
 ### Phase 1: Detect Existing Graph
 
 1. If `--full` was passed, delete cached domain intermediates to force fresh generation:
@@ -208,7 +236,19 @@ This phase uses different strategies depending on Path:
 
 1. **Checkpoint detection:** Unless `--full` was passed (checkpoints deleted in Phase 1), check if `$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery-checkpoint.json` exists and contains valid JSON with `_checkpoint.status == "complete"`. If so, read `domain-discovery.json` and skip to Phase 4a-audit.
 2. Read the `domain-discoverer` agent prompt from `$PLUGIN_ROOT/agents/domain-discoverer.md`
-3. Dispatch a subagent with the `domain-discoverer` prompt + `kg-summary.json` content as context
+3. Dispatch a subagent with the `domain-discoverer` prompt + `kg-summary.json` content as context. If `$TERMS_MD` is non-empty, append the glossary markdown to the agent context with this preamble:
+
+   ```
+   ## Business Terms Glossary (PRD authoritative business view)
+
+   The following is the project's PRD business terms glossary. Use it to align domain naming and record attribution (see Rule 13 in your instructions). Code (kg-summary) remains authoritative for domain boundaries — the glossary aligns names and records attribution only.
+
+   <terms-glossary>
+   $TERMS_MD
+   </terms-glossary>
+   ```
+
+   If `$TERMS_MD` is empty, do not mention the glossary — the agent runs its original logic and omits matchedSubDomains/matchedTerms/evidence fields.
 4. The agent writes to `$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery.json`
 5. Read the discovery output. If 0 domains found, report error and stop.
 6. **Write checkpoint:**
@@ -245,6 +285,8 @@ This phase uses different strategies depending on Path:
    {JSON array of warnings from domain-audit.json}
    </audit-warnings>
    ```
+
+   If `$TERMS_MD` is non-empty, also append the glossary markdown (same preamble as Phase 4a step 3) so refine produces the same evidence structure.
 4. **Backup current discovery before overwriting:**
    ```bash
    cp "$PROJECT_ROOT/.understand-anything/intermediate/domain-discovery.json" \
