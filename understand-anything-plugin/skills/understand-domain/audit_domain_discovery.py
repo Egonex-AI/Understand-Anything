@@ -24,6 +24,23 @@ _VERB_PREFIXES = frozenset({
 })
 
 
+def extract_subdomains(terms_md: str) -> set[str]:
+    """Extract second-level domain names from a terms markdown by scanning `### ` headings.
+
+    Only the heading layer is parsed — table contents are never touched (table
+    parsing is brittle; see spec §2 '分工'). The subdomain set is the program
+    validation anchor for matchedSubDomains (spec §6.2).
+    """
+    subdomains: set[str] = set()
+    for line in terms_md.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("### "):
+            name = stripped[4:].strip()
+            if name:
+                subdomains.add(name)
+    return subdomains
+
+
 def _extract_entity_nouns(names: list[str]) -> set[str]:
     """Extract core entity nouns from node names by stripping common verb prefixes."""
     nouns: set[str] = set()
