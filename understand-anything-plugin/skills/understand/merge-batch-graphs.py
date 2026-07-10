@@ -17,6 +17,8 @@ Input/output live under the project's data dir (`.ua/`, or legacy
     Output: <ua-dir>/intermediate/assembled-graph.json
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
