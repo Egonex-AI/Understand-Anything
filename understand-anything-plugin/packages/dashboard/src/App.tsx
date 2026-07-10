@@ -207,7 +207,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setDomainGraph]);
 
   return (
-    <I18nProvider language={outputLanguage ?? "en"}>
+    <I18nProvider language={outputLanguage ?? "en"} onLanguageChange={setOutputLanguage}>
       <ThemeProvider metaTheme={metaTheme}>
         <DashboardContent
           accessToken={accessToken}
@@ -246,6 +246,12 @@ function DashboardContent({
   const toggleShowFunctionsInClassView = useDashboardStore((s) => s.toggleShowFunctionsInClassView);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("info");
+  const sidebarPosition = useDashboardStore((s) => s.sidebarPosition);
+  const setSidebarPosition = useDashboardStore((s) => s.setSidebarPosition);
+  const sidebarCollapsed = useDashboardStore((s) => s.sidebarCollapsed);
+  const toggleSidebarCollapsed = useDashboardStore((s) => s.toggleSidebarCollapsed);
+  const nodeHistory = useDashboardStore((s) => s.nodeHistory);
+  const goBackNode = useDashboardStore((s) => s.goBackNode);
   const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding);
   const dismissOnboarding = useCallback((remember: boolean) => {
     if (remember && typeof window !== "undefined") {
@@ -420,6 +426,41 @@ function DashboardContent({
             {tab === "info" ? t.sidebar.info : t.sidebar.files}
           </button>
         ))}
+        {/* Sidebar position & collapse controls */}
+        <div className="flex items-center gap-1 ml-1">
+          <button
+            type="button"
+            onClick={() => setSidebarPosition(sidebarPosition === "right" ? "left" : "right")}
+            className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
+            title={sidebarPosition === "right" ? t.sidebar.moveLeft : t.sidebar.moveRight}
+          >
+            {sidebarPosition === "right" ? (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7M4 12h16" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M20 12H4" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
+            title={t.sidebar.collapse}
+          >
+            {sidebarPosition === "right" ? (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
         {sidebarTab === "files" ? <FileExplorer /> : infoSidebarContent}
@@ -635,6 +676,38 @@ function DashboardContent({
 
       {/* Main content: Graph + Sidebar */}
       <div className="flex-1 flex min-h-0 relative">
+        {/* Sidebar on the left side */}
+        {sidebarPosition === "left" && !sidebarCollapsed && (
+          <aside className="w-[260px] md:w-[300px] lg:w-[360px] shrink-0 bg-surface border-r border-border-subtle overflow-auto">
+            {sidebarContent}
+          </aside>
+        )}
+        {/* Collapsed sidebar edge button */}
+        {sidebarCollapsed && sidebarPosition === "left" && (
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            className="absolute top-0 left-0 z-10 h-full w-6 bg-surface border-r border-border-subtle flex items-center justify-center hover:bg-elevated transition-colors"
+            title={t.sidebar.expand}
+          >
+            <svg className="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+        {sidebarCollapsed && sidebarPosition === "right" && (
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            className="absolute top-0 right-0 z-10 h-full w-6 bg-surface border-l border-border-subtle flex items-center justify-center hover:bg-elevated transition-colors"
+            title={t.sidebar.expand}
+          >
+            <svg className="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
         {/* Graph area */}
         <div className="flex-1 min-w-0 min-h-0 relative">
           {viewMode === "knowledge" ? (
@@ -649,10 +722,12 @@ function DashboardContent({
           </div>
         </div>
 
-        {/* Right sidebar — telescopes at narrower widths */}
-        <aside className="w-[260px] md:w-[300px] lg:w-[360px] shrink-0 bg-surface border-l border-border-subtle overflow-auto">
-          {sidebarContent}
-        </aside>
+        {/* Sidebar on the right side */}
+        {sidebarPosition === "right" && !sidebarCollapsed && (
+          <aside className="w-[260px] md:w-[300px] lg:w-[360px] shrink-0 bg-surface border-l border-border-subtle overflow-auto">
+            {sidebarContent}
+          </aside>
+        )}
 
         {/* Code viewer slide-up overlay (collapsed state) */}
         {codeViewerOpen && !codeViewerExpanded && (

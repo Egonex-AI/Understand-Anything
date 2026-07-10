@@ -21,6 +21,7 @@ export const zhTW = {
     pressKeyboard: "按 ? 查看鍵盤快捷鍵",
     path: "路徑",
     theme: "主題",
+    language: "語言",
   },
   projectOverview: {
     nodes: "節點",
@@ -81,6 +82,10 @@ export const zhTW = {
   sidebar: {
     info: "資訊",
     files: "檔案",
+    moveLeft: "側邊欄移至左側",
+    moveRight: "側邊欄移至右側",
+    collapse: "收起側邊欄",
+    expand: "展開側邊欄",
   },
   mobile: {
     graph: "圖谱",
@@ -179,6 +184,7 @@ export const zhTW = {
     closeExpanded: "關閉展開的程式碼檢視器",
     closeViewer: "關閉程式碼檢視器",
     sourceUnavailable: "原始碼不可用",
+    goBack: "返回",
   },
   customNode: {
     tested: "已測試",

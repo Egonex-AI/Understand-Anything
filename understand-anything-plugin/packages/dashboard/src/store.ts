@@ -237,6 +237,12 @@ interface DashboardStore {
   layoutIssues: GraphIssue[];
   appendLayoutIssues: (issues: GraphIssue[]) => void;
   clearLayoutIssues: () => void;
+
+  // Sidebar position & collapse
+  sidebarPosition: "left" | "right";
+  setSidebarPosition: (pos: "left" | "right") => void;
+  sidebarCollapsed: boolean;
+  toggleSidebarCollapsed: () => void;
 }
 
 function getSortedTour(graph: KnowledgeGraph): TourStep[] {
@@ -792,5 +798,10 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       return { layoutIssues: [...state.layoutIssues, ...fresh] };
     }),
   clearLayoutIssues: () => set({ layoutIssues: [] }),
+
+  sidebarPosition: "right",
+  setSidebarPosition: (pos) => set({ sidebarPosition: pos }),
+  sidebarCollapsed: false,
+  toggleSidebarCollapsed: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 }));
 

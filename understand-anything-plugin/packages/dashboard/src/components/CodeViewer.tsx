@@ -67,6 +67,9 @@ export default function CodeViewer({
   const viewMode = useDashboardStore((s) => s.viewMode);
   const codeViewerNodeId = useDashboardStore((s) => s.codeViewerNodeId);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
+  const nodeHistory = useDashboardStore((s) => s.nodeHistory);
+  const goBackNode = useDashboardStore((s) => s.goBackNode);
+  const openCodeViewer = useDashboardStore((s) => s.openCodeViewer);
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
   // Files tab always builds its tree from the structural graph, so a node ID opened from
   // there may not exist in the active (domain) graph — fall back to the structural graph.
@@ -167,6 +170,24 @@ export default function CodeViewer({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Go back button — navigate to previous node in history */}
+          {nodeHistory.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                goBackNode();
+                const prevId = nodeHistory[nodeHistory.length - 1];
+                openCodeViewer(prevId);
+              }}
+              className="text-text-muted hover:text-accent transition-colors"
+              title={t.codeViewer.goBack}
+              aria-label={t.codeViewer.goBack}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
           {onExpand && (
             <button
               type="button"

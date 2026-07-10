@@ -21,6 +21,7 @@ export const ru = {
     pressKeyboard: "Нажмите ? для горячих клавиш",
     path: "Путь",
     theme: "Тема",
+    language: "Язык",
   },
   projectOverview: {
     nodes: "Узлы",
@@ -81,6 +82,10 @@ export const ru = {
   sidebar: {
     info: "Информация",
     files: "Файлы",
+    moveLeft: "Переместить влево",
+    moveRight: "Переместить вправо",
+    collapse: "Свернуть",
+    expand: "Развернуть",
   },
   mobile: {
     graph: "Граф",
@@ -179,6 +184,7 @@ export const ru = {
     closeExpanded: "Закрыть расширенный просмотрщик кода",
     closeViewer: "Закрыть просмотрщик кода",
     sourceUnavailable: "Исходный код недоступен",
+    goBack: "Назад",
   },
   customNode: {
     tested: "Покрыт тестами",
