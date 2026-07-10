@@ -66,6 +66,20 @@ The merge script combines what each batch produced independently. Batches don't 
 - If an edge is missing between two file nodes that should be connected, add it with `type: "imports"`, `direction: "forward"`, `weight: 0.7`.
 - Do NOT add speculative edges — only add edges that are backed by `$IMPORT_MAP` data.
 
+### Step 3b — Canonicalize `specifies` edges
+
+A `specifies` edge links a normative spec `document` → the code node it governs.
+The merge script already canonicalizes direction and drops broken pairs, but if
+you spot uncanonicalized variants, fix them:
+
+- A `specified_by` edge (or a `specifies` edge pointing `code → document`) is
+  inverted — rewrite it as `document → code`, `type: "specifies"`,
+  `direction: "forward"`.
+- Drop `specifies` edges where both endpoints are documents or both are code —
+  they have no recoverable meaning.
+- Do NOT invent `specifies` edges. Only the file-analyzer (which read the doc)
+  can judge which code a spec governs.
+
 ### Step 4 — Write results
 
 1. Apply all fixes directly to `assembled-graph.json`.

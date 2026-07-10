@@ -244,6 +244,7 @@ export const ru = {
     depends_on: { forward: "зависит от", backward: "является зависимостью" },
     tested_by: { forward: "тестируется", backward: "тестирует" },
     configures: { forward: "конфигурирует", backward: "конфигурируется" },
+    specifies: { forward: "специфицирует", backward: "специфицируется" },
     related: { forward: "связан с", backward: "связан с" },
     similar_to: { forward: "похож на", backward: "похож на" },
     deploys: { forward: "разворачивает", backward: "разворачивается" },

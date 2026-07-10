@@ -81,10 +81,16 @@ Using `allEdges`, compute cross-category relationships:
   ```
   config -> file: 5 (configures)
   document -> file: 3 (documents)
+  document -> file: 2 (specifies)
   service -> file: 2 (deploys)
   pipeline -> file: 1 (triggers)
   schema -> file: 2 (defines_schema)
   ```
+
+  > `specifies` edges (a normative spec document → the code it governs) are
+  > informational context only. A spec frequently spans multiple layers, so do
+  > **not** let `specifies` edges pull files into a "spec" layer or otherwise
+  > reshape layer boundaries — assign files to layers by their own role.
 
 **E. Inter-Group Import Frequency**
 

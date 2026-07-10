@@ -129,17 +129,17 @@ describe("Extended types", () => {
     expect(check).toBe("file");
   });
 
-  it("accepts all 26 edge types", () => {
+  it("accepts all 27 edge types", () => {
     const edgeTypes: EdgeType[] = [
       "imports", "exports", "contains", "inherits", "implements",
       "calls", "subscribes", "publishes", "middleware",
       "reads_from", "writes_to", "transforms", "validates",
-      "depends_on", "tested_by", "configures",
+      "depends_on", "tested_by", "configures", "specifies",
       "related", "similar_to",
       "deploys", "serves", "migrates", "documents",
       "provisions", "routes", "defines_schema", "triggers",
     ];
-    expect(edgeTypes).toHaveLength(26);
+    expect(edgeTypes).toHaveLength(27);
   });
 
   it("StructuralAnalysis has optional non-code fields", () => {

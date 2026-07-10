@@ -53,14 +53,14 @@ Both graph types share the same top-level shape:
 | `flow` | `flow:<kebab-case-name>` | Business flow/process (domain graph only) |
 | `step` | `step:<flow-name>:<step-name>` | Business step (domain graph only) |
 
-### Edge Types (29 total in 7 categories)
+### Edge Types (30 total in 7 categories)
 
 | Category | Types |
 |---|---|
 | Structural | `imports`, `exports`, `contains`, `inherits`, `implements` |
 | Behavioral | `calls`, `subscribes`, `publishes`, `middleware` |
 | Data flow | `reads_from`, `writes_to`, `transforms`, `validates` |
-| Dependencies | `depends_on`, `tested_by`, `configures` |
+| Dependencies | `depends_on`, `tested_by`, `configures`, `specifies` |
 | Semantic | `related`, `similar_to` |
 | Infrastructure | `deploys`, `serves`, `provisions`, `triggers`, `migrates`, `documents`, `routes`, `defines_schema` |
 | Domain | `contains_flow`, `flow_step`, `cross_domain` |

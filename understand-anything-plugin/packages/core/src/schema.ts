@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-// Edge types (35 values across 8 categories)
+// Edge types (36 values across 8 categories)
 export const EdgeTypeSchema = z.enum([
   "imports", "exports", "contains", "inherits", "implements",  // Structural
   "calls", "subscribes", "publishes", "middleware",             // Behavioral
   "reads_from", "writes_to", "transforms", "validates",        // Data flow
-  "depends_on", "tested_by", "configures",                     // Dependencies
+  "depends_on", "tested_by", "configures", "specifies",        // Dependencies
   "related", "similar_to",                                      // Semantic
   "deploys", "serves", "provisions", "triggers",               // Infrastructure
   "migrates", "documents", "routes", "defines_schema",         // Schema/Data
@@ -92,6 +92,11 @@ export const EDGE_TYPE_ALIASES: Record<string, string> = {
   // Non-code aliases
   describes: "documents",
   documented_by: "documents",
+  // Note: `specified_by` inverts direction (code → spec); the merge-step spec
+  // linker rewrites it to canonical `specifies` (spec → code). Aliasing the
+  // type here keeps validator-side normalization consistent.
+  specified_by: "specifies",
+  specification_of: "specifies",
   creates: "provisions",
   exposes: "serves",
   listens: "serves",

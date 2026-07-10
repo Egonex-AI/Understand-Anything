@@ -244,6 +244,7 @@ edgeLabels: {
     depends_on: { forward: "종속", backward: "종속됨" },
     tested_by: { forward: "테스트됨", backward: "테스트" },
     configures: { forward: "설정", backward: "설정됨" },
+    specifies: { forward: "명세함", backward: "명세됨" },
     related: { forward: "관련", backward: "관련" },
     similar_to: { forward: "유사", backward: "유사" },
     deploys: { forward: "배포", backward: "배포됨" },

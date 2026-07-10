@@ -233,6 +233,24 @@ describe("schema validation", () => {
     expect(result.data!.edges[0].type).toBe("depends_on");
   });
 
+  it('accepts the "specifies" edge type', () => {
+    const graph = structuredClone(validGraph);
+    (graph.edges[0] as any).type = "specifies";
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.edges[0].type).toBe("specifies");
+  });
+
+  it('normalizes "specified_by" edge type to "specifies"', () => {
+    const graph = structuredClone(validGraph);
+    (graph.edges[0] as any).type = "specified_by";
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.edges[0].type).toBe("specifies");
+  });
+
   it('drops "tests" edge type — direction-inverting alias is unsafe', () => {
     const graph = structuredClone(validGraph);
     (graph.edges[0] as any).type = "tests";
