@@ -16,6 +16,7 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
+  - `--hybrid` — Route extraction phases (project-scanner, file-analyzer batches) to a local Gemma model via Ollama instead of Claude subagents (~4-5× lower Claude API cost). Requires Ollama running with a compatible model (default: `gemma4:26b-a4b`). Configure via `OLLAMA_HOST`, `OLLAMA_MODEL`, `HYBRID_TIMEOUT` environment variables. Architecture-analysis phases (architecture-analyzer, tour-builder, domain-analyzer) still run on Claude. See `hybrid_runner.py` in the skill directory for details.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
 
 ---
@@ -138,6 +139,14 @@ Determine whether to run a full analysis or incremental update.
     - If `--no-auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": false}` to `$PROJECT_ROOT/.understand-anything/config.json`
     - These flags only set the config — analysis proceeds normally regardless.
 
+3.55. **Hybrid mode configuration:**
+    - If `--hybrid` is in `$ARGUMENTS`: set `HYBRID_MODE=true`
+    - Verify Ollama is reachable: `curl -s --max-time 10 "${OLLAMA_HOST:-http://localhost:11434}/api/tags" > /dev/null 2>&1`
+      - If the check fails: warn the user ("Ollama not reachable at ${OLLAMA_HOST:-http://localhost:11434}. Falling back to standard Claude subagents.") and set `HYBRID_MODE=false`
+    - If `HYBRID_MODE=true`, report to the user: "Hybrid mode enabled — extraction phases will use ${OLLAMA_MODEL:-gemma4:26b-a4b} via Ollama"
+    - If `HYBRID_MODE=false` (default), proceed with standard subagent dispatch as normal.
+    - Store `SKILL_DIR` as the directory containing this SKILL.md file (needed for `hybrid_runner.py` path in later phases).
+
  3.6. **Language configuration:**
     - Parse `$ARGUMENTS` for `--language <lang>` flag. If found, extract the language code.
     - **Language code normalization:** Map friendly names to ISO codes:
@@ -218,6 +227,8 @@ Set up and verify the `.understandignore` file before scanning.
 
 Report to the user: `[Phase 1/7] Scanning project files...`
 
+**Note on hybrid mode for Phase 1:** Dispatch the `project-scanner` subagent normally regardless of `HYBRID_MODE`. The project-scanner's LLM contribution is a single 1-2 sentence description (negligible token cost), and its Phase 1 is a Node.js discovery script that the subagent writes dynamically — too complex to replicate outside the subagent. The `--hybrid` flag only affects Phase 2 (file-analyzer batches), which is where ~80% of total token cost lives.
+
 Dispatch a subagent using the `project-scanner` agent definition (at `agents/project-scanner.md`). Append the following additional context:
 
 > **Additional context from main session:**
@@ -283,6 +294,43 @@ If the script exits non-zero, the failure is hard — relay the full stderr to t
 Load `.understand-anything/intermediate/batches.json` (produced by Phase 1.5). Iterate the `batches[]` array.
 
 Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
+
+Before dispatching each batch, construct `batchImportData` from `$IMPORT_MAP`:
+```json
+batchImportData = {}
+for each file in this batch:
+  batchImportData[file.path] = $IMPORT_MAP[file.path] ?? []
+```
+
+**If `HYBRID_MODE=true`:**
+
+For each batch, write a batch input JSON file and invoke `hybrid_runner.py analyze` instead of dispatching a Claude subagent. Run up to **5 in parallel** (using background processes):
+
+```bash
+# For each batch N (0-indexed):
+cat > $PROJECT_ROOT/.understand-anything/tmp/ua-hybrid-batch-input-<N>.json << 'ENDJSON'
+{
+  "projectName": "<projectName>",
+  "languages": <languages array>,
+  "batchFiles": [
+    {"path": "<path>", "language": "<language>", "sizeLines": <n>, "fileCategory": "<category>"},
+    ...
+  ],
+  "batchImportData": <batchImportData>
+}
+ENDJSON
+
+python3 "$SKILL_DIR/hybrid_runner.py" analyze \
+  --project-root "$PROJECT_ROOT" \
+  --skill-dir "$SKILL_DIR" \
+  --batch-index <N> \
+  --batch-input "$PROJECT_ROOT/.understand-anything/tmp/ua-hybrid-batch-input-<N>.json" \
+  > "$PROJECT_ROOT/.understand-anything/tmp/ua-hybrid-batch-<N>.log" 2>&1 &
+```
+
+Wait for all background processes to finish (`wait`), then check the logs for any errors. The `hybrid_runner.py` writes each batch to `$PROJECT_ROOT/.understand-anything/intermediate/batch-<N>.json` (same location as the Claude subagent path).
+
+**If `HYBRID_MODE=false` (default):**
 
 For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
 
