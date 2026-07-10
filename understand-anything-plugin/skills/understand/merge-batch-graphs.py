@@ -17,6 +17,8 @@ Input/output live under the project's data dir (`.ua/`, or legacy
     Output: <ua-dir>/intermediate/assembled-graph.json
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -1058,9 +1060,11 @@ def main() -> None:
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
     for f in batch_files:
-        m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
+        m = re.match(r"batch-(\d+|existing)(?:-part-(\d+))?\.json", f.name)
         if m:
-            by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
+            idx = m.group(1)
+            batch_key = int(idx) if idx.isdigit() else -1
+            by_batch[batch_key].append((f.name, int(m.group(2)) if m.group(2) else None))
         else:
             unrecognized_batch_files.append(f.name)
 
