@@ -42,6 +42,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    qoder       = @{ Target = (Join-Path $HOME '.qoder\skills');              Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -241,6 +242,10 @@ function Cmd-Install([string]$Id) {
     }
     if ($Id -eq 'kiro') {
         Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
+    }
+    if ($Id -eq 'qoder') {
+        Write-Host "`n  Tip: Qoder can also auto-discover the plugin by opening this repo"
+        Write-Host '       directly (it reads .qoder-plugin/plugin.json), no symlinks needed.'
     }
 }
 

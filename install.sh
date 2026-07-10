@@ -42,6 +42,7 @@ kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+qoder|$HOME/.qoder/skills|per-skill
 EOF
 }
 
@@ -228,6 +229,10 @@ KIROEOF
   fi
   if [[ "$id" == "kiro" ]]; then
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
+  fi
+  if [[ "$id" == "qoder" ]]; then
+    printf '\n  Tip: Qoder can also auto-discover the plugin by opening this repo\n'
+    printf '       directly (it reads .qoder-plugin/plugin.json), no symlinks needed.\n'
   fi
 }
 
