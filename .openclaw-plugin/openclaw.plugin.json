@@ -8,6 +8,15 @@
   "activation": {
     "onStartup": true
   },
+  "contracts": {
+    "tools": [
+      "understand_list_projects",
+      "understand_analyze_project",
+      "understand_status",
+      "understand_search",
+      "understand_get_node"
+    ]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
