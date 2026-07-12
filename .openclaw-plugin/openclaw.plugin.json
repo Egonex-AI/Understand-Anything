@@ -47,6 +47,11 @@
         "type": "array",
         "items": { "type": "string" },
         "description": "Absolute paths to projects this plugin is allowed to analyze/serve. Analysis and dashboard routes only operate on directories listed here; when empty or unset the plugin activates but every tool reports an empty project list."
+      },
+      "allowAddProject": {
+        "type": "boolean",
+        "description": "Let the dashboard's 'Add a project' form register new projects at runtime — by GitHub URL (shallow-cloned into ~/.local/share/understand-anything-plugin/clones) or an existing local path — without editing config or restarting the gateway. Off by default: the projects allowlist above is otherwise the only way to expand what this plugin can read/analyze/serve, and this setting relaxes that for anyone who can reach the dashboard route.",
+        "default": false
       }
     }
   },
@@ -66,6 +71,9 @@
     },
     "projects": {
       "label": "Allowed Project Paths"
+    },
+    "allowAddProject": {
+      "label": "Allow Adding Projects From the Dashboard"
     }
   }
 }

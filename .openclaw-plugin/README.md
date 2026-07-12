@@ -39,6 +39,13 @@ connected agent can call mid-conversation, plus a dashboard route.
   interactive server is an additive, separate script that happens to reuse
   its static assets.
 
+  Unanalyzed projects get an **"Understand this project" button** right on
+  this page — no need to go find the tool call. With `allowAddProject: true`
+  (see Install below), the picker also gets an **"Add a project"** form: paste
+  a `https://github.com/owner/repo` URL (shallow-cloned into
+  `~/.local/share/understand-anything-plugin/clones`) or an existing local
+  path, and it's added to the list and analysis starts immediately.
+
 ## How it works
 
 The pipeline (`src/pipeline.ts`) is built entirely on `@understand-anything/core`'s
@@ -62,6 +69,17 @@ distinct server from `understand-anything-viewer` (same static dashboard
 build + JSON API, reused read-only) that adds the `/ask.json` endpoint and
 injects a small vanilla-JS chat widget (`src/ask-widget.js`, no build step)
 into the served `index.html`.
+
+Project registration (`src/project-store.ts`) keeps config-declared projects
+(fixed, from `projects` below) and dynamically-added ones (persisted to
+`dynamic-projects.json` in the same state dir, so they survive a restart) in
+one combined, index-stable list — new entries only ever append. Adding a
+GitHub URL only recognizes an actual `https://github.com/...` or
+`git@github.com:...` URL (never a bare `owner/repo` shorthand, `file://`, or
+non-GitHub git URL — those could otherwise be used to smuggle an arbitrary
+local path or host into a "clone", defeating the projects allowlist this
+whole feature sits inside) and shells out to `git clone --depth 1` with a
+3-minute timeout.
 
 ## Install
 
@@ -87,7 +105,8 @@ Then in your `~/.openclaw/openclaw.json`:
           "model": "claude-sonnet-5",        // optional
           "concurrency": 5,                   // optional
           "maxFiles": 400,                    // optional
-          "anthropicApiKey": "sk-ant-..."    // optional; falls back to ANTHROPIC_API_KEY on the gateway process
+          "anthropicApiKey": "sk-ant-...",   // optional; falls back to ANTHROPIC_API_KEY on the gateway process
+          "allowAddProject": true             // optional, default false — lets the dashboard register new projects at runtime
         }
       }
     }
@@ -121,3 +140,11 @@ anything about the analyzed codebase and it answers grounded in the graph.
   endpoints (sent as `X-Ask-Token` instead of a query param, since it's a
   POST body, not a GET link) and only ever reads files already listed in the
   persisted knowledge graph, same as `/file-content.json`.
+- `allowAddProject` is **off by default** and worth understanding before
+  turning on: the `projects` allowlist is otherwise the *only* way to expand
+  what this plugin can read, run LLM calls against, or serve — a fixed list
+  the operator controls via config. Enabling it means anyone who can reach
+  the dashboard route can trigger analysis (file reads + LLM API cost) of any
+  local path on the host, or have it clone and analyze any public GitHub
+  repo. Reasonable for a personal/trusted-operator gateway; think twice
+  before enabling it anywhere the dashboard route isn't equally trusted.

@@ -199,21 +199,69 @@ function sendHtml(res: ServerResponse, status: number, html: string): void {
   res.end(html);
 }
 
-function pickerHtml(projects: string[]): string {
+function redirectToPicker(res: ServerResponse, error?: string): void {
+  const location = error ? `/understand-anything?error=${encodeURIComponent(error)}` : "/understand-anything";
+  res.writeHead(302, { Location: location });
+  res.end();
+}
+
+export interface PickerOptions {
+  getJobState: (root: string) => "running" | "done" | "error" | null;
+  canAddProject: boolean;
+  error?: string;
+}
+
+function pickerHtml(projects: string[], opts: PickerOptions): string {
+  let anyRunning = false;
   const items = projects
     .map((p, i) => {
       const analyzed = hasGraph(p);
-      const label = analyzed ? p : `${p} (not analyzed yet — call understand_analyze_project)`;
-      return analyzed
-        ? `<li><a href="/understand-anything/open?project=${i}">${escapeHtml(label)}</a></li>`
-        : `<li>${escapeHtml(label)}</li>`;
+      const jobState = opts.getJobState(p);
+      if (jobState === "running") anyRunning = true;
+
+      if (analyzed) {
+        return `<li><a href="/understand-anything/open?project=${i}">${escapeHtml(p)}</a>${
+          jobState === "running" ? " <em>(re-analyzing…)</em>" : ""
+        }</li>`;
+      }
+      if (jobState === "running") {
+        return `<li>${escapeHtml(p)} — <em>analyzing… (this page refreshes automatically)</em></li>`;
+      }
+      if (jobState === "error") {
+        return `<li>${escapeHtml(p)} — <span style="color:#c0392b">analysis failed</span>
+          <form method="POST" action="/understand-anything/analyze?project=${i}" style="display:inline">
+            <button type="submit">Retry analysis</button>
+          </form></li>`;
+      }
+      return `<li>${escapeHtml(p)}
+        <form method="POST" action="/understand-anything/analyze?project=${i}" style="display:inline">
+          <button type="submit">Understand this project</button>
+        </form></li>`;
     })
     .join("\n");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Understand Anything</title></head>
+
+  const addForm = opts.canAddProject
+    ? `<h2>Add a project</h2>
+<form method="POST" action="/understand-anything/add-project">
+  <input type="text" name="input" placeholder="https://github.com/owner/repo or /local/path" style="width: 400px;" required />
+  <button type="submit">Add &amp; understand</button>
+</form>
+<p style="color:#666; font-size: 0.9em;">GitHub URLs are shallow-cloned locally. Local paths must already exist on this machine.</p>`
+    : "";
+
+  const errorBanner = opts.error
+    ? `<p style="color:#c0392b; border: 1px solid #c0392b; padding: 8px 12px; border-radius: 6px;">${escapeHtml(opts.error)}</p>`
+    : "";
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Understand Anything</title>${
+    anyRunning ? `<meta http-equiv="refresh" content="5">` : ""
+  }</head>
 <body style="font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto;">
 <h1>Understand Anything</h1>
+${errorBanner}
 <p>Configured projects:</p>
 <ul>${items || "<li>No projects configured — set plugins.entries.understand-anything.config.projects</li>"}</ul>
+${addForm}
 </body></html>`;
 }
 
@@ -226,6 +274,35 @@ function pathFromUrl(url: string | undefined): { pathname: string; query: URLSea
   return { pathname: u.pathname, query: u.searchParams };
 }
 
+const MAX_FORM_BODY_BYTES = 8192;
+
+function readFormBody(req: IncomingMessage): Promise<URLSearchParams> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    let bytes = 0;
+    req.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > MAX_FORM_BODY_BYTES) {
+        reject(new Error("Request body too large"));
+        req.destroy();
+        return;
+      }
+      body += chunk.toString("utf8");
+    });
+    req.on("end", () => resolve(new URLSearchParams(body)));
+    req.on("error", reject);
+  });
+}
+
+export interface DashboardRouteOptions {
+  getProjects: () => string[];
+  getLlmOptions: () => InteractiveLlmOptions | null;
+  getJobState: (root: string) => "running" | "done" | "error" | null;
+  startAnalysis: (root: string) => { started: true } | { error: string };
+  /** null when runtime project addition is disabled (allowAddProject config flag is off). */
+  addProject: ((input: string) => Promise<{ root: string } | { error: string }>) | null;
+}
+
 export function registerDashboardRoutes(
   registerHttpRoute: (params: {
     path: string;
@@ -233,14 +310,22 @@ export function registerDashboardRoutes(
     auth: "gateway" | "plugin";
     match?: "exact" | "prefix";
   }) => void,
-  getProjects: () => string[],
   log: Logger,
-  getLlmOptions: () => InteractiveLlmOptions | null,
+  opts: DashboardRouteOptions,
 ): void {
   startIdleViewerSweep(log);
 
-  const servePicker = async (_req: IncomingMessage, res: ServerResponse) => {
-    sendHtml(res, 200, pickerHtml(getProjects()));
+  const servePicker = async (req: IncomingMessage, res: ServerResponse) => {
+    const { query } = pathFromUrl(req.url);
+    sendHtml(
+      res,
+      200,
+      pickerHtml(opts.getProjects(), {
+        getJobState: opts.getJobState,
+        canAddProject: opts.addProject !== null,
+        error: query.get("error") ?? undefined,
+      }),
+    );
   };
 
   registerHttpRoute({ path: "/understand-anything", auth: "plugin", match: "exact", handler: servePicker });
@@ -250,9 +335,34 @@ export function registerDashboardRoutes(
     match: "prefix",
     handler: async (req, res) => {
       const { pathname, query } = pathFromUrl(req.url);
+      const method = (req.method ?? "GET").toUpperCase();
+
+      if (pathname === "/understand-anything/analyze" && method === "POST") {
+        const projects = opts.getProjects();
+        const idx = Number(query.get("project"));
+        if (!Number.isInteger(idx) || idx < 0 || idx >= projects.length) {
+          return redirectToPicker(res, "Unknown project index.");
+        }
+        const result = opts.startAnalysis(projects[idx]);
+        return redirectToPicker(res, "error" in result ? result.error : undefined);
+      }
+
+      if (pathname === "/understand-anything/add-project" && method === "POST") {
+        if (!opts.addProject) return redirectToPicker(res, "Adding projects is disabled.");
+        try {
+          const form = await readFormBody(req);
+          const input = form.get("input") ?? "";
+          const result = await opts.addProject(input);
+          if ("error" in result) return redirectToPicker(res, result.error);
+          opts.startAnalysis(result.root); // add & understand in one step
+          return redirectToPicker(res);
+        } catch (err) {
+          return redirectToPicker(res, err instanceof Error ? err.message : String(err));
+        }
+      }
 
       if (pathname === "/understand-anything/open") {
-        const projects = getProjects();
+        const projects = opts.getProjects();
         if (!query.has("project")) {
           return sendHtml(res, 400, "<p>Missing required <code>project</code> query param. <a href=\"/understand-anything\">Back</a></p>");
         }
@@ -269,7 +379,7 @@ export function registerDashboardRoutes(
           );
         }
         try {
-          const viewer = await getOrStartViewer(projectRoot, log, getLlmOptions());
+          const viewer = await getOrStartViewer(projectRoot, log, opts.getLlmOptions());
           res.writeHead(302, { Location: `http://127.0.0.1:${viewer.port}/?token=${viewer.token}` });
           res.end();
         } catch (err) {

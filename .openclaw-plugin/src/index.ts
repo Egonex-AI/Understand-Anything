@@ -14,8 +14,7 @@
  */
 
 import { existsSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { Type } from "@sinclair/typebox";
 import {
   SearchEngine,
@@ -27,6 +26,7 @@ import {
 import { analyzeProject, type AnalyzeProjectResult } from "./pipeline.js";
 import { createLlmCaller, resolveAnthropicApiKey, type LlmCaller } from "./llm.js";
 import { registerDashboardRoutes, shutdownAllViewers, type InteractiveLlmOptions } from "./dashboard-route.js";
+import { ProjectStore, expandHome } from "./project-store.js";
 
 interface PluginApi {
   registerTool(def: {
@@ -55,6 +55,7 @@ interface UnderstandConfig {
   model?: string;
   concurrency?: number;
   maxFiles?: number;
+  allowAddProject?: boolean;
 }
 
 // ── Analysis job registry ───────────────────────────────────────────────────
@@ -74,10 +75,6 @@ interface AnalysisJob {
 const jobs = new Map<string, AnalysisJob>();
 
 const MAX_PROGRESS_LINES = 50;
-
-function expandHome(p: string): string {
-  return p === "~" || p.startsWith("~/") ? join(homedir(), p.slice(1)) : p;
-}
 
 function textResult(text: string): { content: Array<{ type: string; text: string }> } {
   return { content: [{ type: "text", text }] };
@@ -168,16 +165,18 @@ export function activate(api: PluginApi): void {
   const log = api.logger;
   const cfg = (api.pluginConfig ?? {}) as UnderstandConfig;
 
-  const projects: string[] = [];
+  const configProjects: string[] = [];
   for (const raw of cfg.projects ?? []) {
     const p = resolve(expandHome(raw));
-    if (!isAbsolute(p) || !existsSync(p) || !statSync(p).isDirectory()) {
+    if (!existsSync(p) || !statSync(p).isDirectory()) {
       log.warn(`[understand-anything] configured project is not an existing directory, skipping: ${raw}`);
       continue;
     }
-    projects.push(p);
+    configProjects.push(p);
   }
-  if (projects.length === 0) {
+
+  const store = new ProjectStore({ configProjects, allowAddProject: cfg.allowAddProject === true });
+  if (store.list().length === 0) {
     log.warn(
       "[understand-anything] no valid projects configured (plugins.entries.understand-anything.config.projects) — tools will report an empty project list.",
     );
@@ -187,8 +186,9 @@ export function activate(api: PluginApi): void {
   const defaultConcurrency = cfg.concurrency ?? 5;
   const defaultMaxFiles = cfg.maxFiles ?? 400;
 
-  /** Resolve a `project` tool param (absolute path, or index into the configured list). */
+  /** Resolve a `project` tool param (absolute path, or index into the current project list). */
   function resolveProject(param: unknown): { root: string } | { error: string } {
+    const projects = store.list();
     if (projects.length === 0) return { error: "No projects configured for the understand-anything plugin." };
     if (param === undefined || param === null || param === "") {
       if (projects.length === 1) return { root: projects[0] };
@@ -218,6 +218,52 @@ export function activate(api: PluginApi): void {
     return createLlmCaller(key, model);
   }
 
+  /**
+   * Starts (or reports already-running) analysis for a project. Shared by the
+   * understand_analyze_project tool and the dashboard's "Understand this
+   * project" button — one job-tracking path, not two.
+   */
+  function startAnalysis(root: string, opts: { concurrency?: number; maxFiles?: number } = {}): { started: true } | { error: string } {
+    const existing = jobs.get(root);
+    if (existing?.state === "running") {
+      return { error: `Analysis already running for ${root} (started ${existing.startedAt}).` };
+    }
+
+    const llm = makeLlmCaller();
+    if (typeof llm !== "function") return { error: llm.error };
+
+    const job: AnalysisJob = { state: "running", startedAt: new Date().toISOString(), progress: [] };
+    jobs.set(root, job);
+
+    const pushProgress = (message: string) => {
+      job.progress.push(`${new Date().toISOString()} ${message}`);
+      if (job.progress.length > MAX_PROGRESS_LINES) job.progress.splice(0, job.progress.length - MAX_PROGRESS_LINES);
+    };
+
+    void analyzeProject(root, llm, {
+      concurrency: opts.concurrency ?? defaultConcurrency,
+      maxFiles: opts.maxFiles ?? defaultMaxFiles,
+      onProgress: pushProgress,
+    })
+      .then((result) => {
+        job.state = "done";
+        job.finishedAt = new Date().toISOString();
+        job.result = result;
+        graphCache.delete(root); // force reload of the freshly-persisted graph
+        log.info(
+          `[understand-anything] analysis complete for ${root}: ${result.graph.nodes.length} nodes, ${result.graph.edges.length} edges (${result.filesAnalyzed} files).`,
+        );
+      })
+      .catch((err: unknown) => {
+        job.state = "error";
+        job.finishedAt = new Date().toISOString();
+        job.error = err instanceof Error ? err.message : String(err);
+        log.error(`[understand-anything] analysis failed for ${root}: ${job.error}`);
+      });
+
+    return { started: true };
+  }
+
   // ── Tools ────────────────────────────────────────────────────────────────
 
   api.registerTool({
@@ -226,7 +272,7 @@ export function activate(api: PluginApi): void {
       "List the projects configured for Understand-Anything, whether each has been analyzed (has a knowledge graph), and graph size if so.",
     parameters: Type.Object({}),
     async execute() {
-      const rows = projects.map((root, index) => {
+      const rows = store.list().map((root, index) => {
         const cached = graphFilePath(root) ? getGraph(root) : null;
         const meta = loadMeta(root);
         return {
@@ -263,47 +309,15 @@ export function activate(api: PluginApi): void {
     async execute(_id, params) {
       const resolved = resolveProject(params.project);
       if ("error" in resolved) return textResult(resolved.error);
-      const root = resolved.root;
 
-      const existing = jobs.get(root);
-      if (existing?.state === "running") {
-        return textResult(`Analysis already running for ${root} (started ${existing.startedAt}). Poll with understand_status.`);
-      }
-
-      const llm = makeLlmCaller();
-      if (typeof llm !== "function") return textResult(llm.error);
-
-      const job: AnalysisJob = { state: "running", startedAt: new Date().toISOString(), progress: [] };
-      jobs.set(root, job);
-
-      const pushProgress = (message: string) => {
-        job.progress.push(`${new Date().toISOString()} ${message}`);
-        if (job.progress.length > MAX_PROGRESS_LINES) job.progress.splice(0, job.progress.length - MAX_PROGRESS_LINES);
-      };
-
-      void analyzeProject(root, llm, {
-        concurrency: (params.concurrency as number | undefined) ?? defaultConcurrency,
-        maxFiles: (params.maxFiles as number | undefined) ?? defaultMaxFiles,
-        onProgress: pushProgress,
-      })
-        .then((result) => {
-          job.state = "done";
-          job.finishedAt = new Date().toISOString();
-          job.result = result;
-          graphCache.delete(root); // force reload of the freshly-persisted graph
-          log.info(
-            `[understand-anything] analysis complete for ${root}: ${result.graph.nodes.length} nodes, ${result.graph.edges.length} edges (${result.filesAnalyzed} files).`,
-          );
-        })
-        .catch((err: unknown) => {
-          job.state = "error";
-          job.finishedAt = new Date().toISOString();
-          job.error = err instanceof Error ? err.message : String(err);
-          log.error(`[understand-anything] analysis failed for ${root}: ${job.error}`);
-        });
+      const result = startAnalysis(resolved.root, {
+        concurrency: params.concurrency as number | undefined,
+        maxFiles: params.maxFiles as number | undefined,
+      });
+      if ("error" in result) return textResult(`${result.error} Poll with understand_status.`);
 
       return textResult(
-        `Analysis started for ${root} (model ${model}). This runs one LLM call per source file and may take a few minutes — poll with understand_status.`,
+        `Analysis started for ${resolved.root} (model ${model}). This runs one LLM call per source file and may take a few minutes — poll with understand_status.`,
       );
     },
   });
@@ -420,7 +434,13 @@ export function activate(api: PluginApi): void {
     return key ? { apiKey: key, model } : null;
   };
 
-  registerDashboardRoutes(api.registerHttpRoute.bind(api), () => projects, log, getLlmOptions);
+  registerDashboardRoutes(api.registerHttpRoute.bind(api), log, {
+    getProjects: () => store.list(),
+    getLlmOptions,
+    getJobState: (root) => jobs.get(root)?.state ?? null,
+    startAnalysis: (root) => startAnalysis(root),
+    addProject: store.canAddProject() ? (input: string) => store.addProject(input) : null,
+  });
 
   // Spawned understand-anything-viewer child processes otherwise accumulate
   // forever and become fully orphaned (unreachable, un-killable from this
@@ -428,6 +448,6 @@ export function activate(api: PluginApi): void {
   api.on?.("gateway_stop", () => shutdownAllViewers(log));
 
   log.info(
-    `[understand-anything] activated: ${projects.length} project(s), model ${model}, tools understand_list_projects/analyze_project/status/search/get_node, dashboard at /understand-anything.`,
+    `[understand-anything] activated: ${store.list().length} project(s), model ${model}, tools understand_list_projects/analyze_project/status/search/get_node, dashboard at /understand-anything.`,
   );
 }
