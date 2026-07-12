@@ -26,7 +26,7 @@ import {
 } from "@understand-anything/core";
 import { analyzeProject, type AnalyzeProjectResult } from "./pipeline.js";
 import { createLlmCaller, resolveAnthropicApiKey, type LlmCaller } from "./llm.js";
-import { registerDashboardRoutes, shutdownAllViewers } from "./dashboard-route.js";
+import { registerDashboardRoutes, shutdownAllViewers, type InteractiveLlmOptions } from "./dashboard-route.js";
 
 interface PluginApi {
   registerTool(def: {
@@ -411,7 +411,16 @@ export function activate(api: PluginApi): void {
 
   // ── Dashboard routes ─────────────────────────────────────────────────────
 
-  registerDashboardRoutes(api.registerHttpRoute.bind(api), () => projects, log);
+  // The dashboard serves a live Ask panel (interactive-server.ts) instead of
+  // the plain zero-LLM viewer whenever a key is actually resolvable — same
+  // resolution order the analysis pipeline uses, so "configure once, both
+  // features work" holds.
+  const getLlmOptions = (): InteractiveLlmOptions | null => {
+    const key = resolveAnthropicApiKey(cfg.anthropicApiKey);
+    return key ? { apiKey: key, model } : null;
+  };
+
+  registerDashboardRoutes(api.registerHttpRoute.bind(api), () => projects, log, getLlmOptions);
 
   // Spawned understand-anything-viewer child processes otherwise accumulate
   // forever and become fully orphaned (unreachable, un-killable from this

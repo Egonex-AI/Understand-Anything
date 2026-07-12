@@ -4,11 +4,20 @@ import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 interface Logger {
   info(...a: unknown[]): void;
   warn(...a: unknown[]): void;
   error(...a: unknown[]): void;
+}
+
+/** When set, the dashboard serves the interactive (LLM-backed Ask panel) server instead of the plain zero-LLM viewer. */
+export interface InteractiveLlmOptions {
+  apiKey: string;
+  model: string;
 }
 
 interface ViewerInstance {
@@ -45,7 +54,7 @@ function hasGraph(projectRoot: string): boolean {
   );
 }
 
-function startViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> {
+function startViewer(projectRoot: string, log: Logger, llmOptions: InteractiveLlmOptions | null): Promise<ViewerInstance> {
   const viewerBin = resolveViewerBinPath();
   const viewerDist = join(dirname(viewerBin), "..", "dist");
   if (!existsSync(join(viewerDist, "index.html"))) {
@@ -56,9 +65,21 @@ function startViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> 
     );
   }
 
+  // With an API key configured, serve the interactive server (adds a live
+  // Ask panel) instead of the plain zero-LLM viewer. Same static dashboard
+  // build and JSON API underneath — see interactive-server.ts's module doc.
+  const interactiveServerPath = join(HERE, "interactive-server.js");
+  const useInteractive = llmOptions !== null && existsSync(interactiveServerPath);
+  const command = useInteractive ? interactiveServerPath : viewerBin;
+  const commandArgs = useInteractive ? [projectRoot, "--port", "0"] : [projectRoot, "--port", "0", "--no-open"];
+  const label = useInteractive ? "interactive server" : "viewer";
+
   return new Promise((resolve, reject) => {
-    const proc = spawn(process.execPath, [viewerBin, projectRoot, "--port", "0", "--no-open"], {
+    const proc = spawn(process.execPath, [command, ...commandArgs], {
       stdio: ["ignore", "pipe", "pipe"],
+      env: useInteractive
+        ? { ...process.env, UNDERSTAND_ANTHROPIC_API_KEY: llmOptions!.apiKey, UNDERSTAND_MODEL: llmOptions!.model }
+        : process.env,
     });
 
     let settled = false;
@@ -67,7 +88,7 @@ function startViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> 
       settled = true;
       proc.kill();
       viewers.delete(projectRoot);
-      reject(new Error(`Timed out waiting for understand-anything-viewer to start for ${projectRoot}`));
+      reject(new Error(`Timed out waiting for the ${label} to start for ${projectRoot}`));
     }, START_TIMEOUT_MS);
 
     let buffer = "";
@@ -83,12 +104,12 @@ function startViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> 
           token: match[2],
           lastUsedAtMs: Date.now(),
         };
-        log.info(`[understand-anything] viewer started for ${projectRoot} on port ${instance.port}`);
+        log.info(`[understand-anything] ${label} started for ${projectRoot} on port ${instance.port}`);
         resolve(instance);
       }
     });
     proc.stderr.on("data", (chunk: Buffer) => {
-      log.warn(`[understand-anything] viewer stderr (${projectRoot}): ${chunk.toString().trim()}`);
+      log.warn(`[understand-anything] ${label} stderr (${projectRoot}): ${chunk.toString().trim()}`);
     });
     proc.on("exit", (code) => {
       // Only clear the map if this process is still the tracked one — an
@@ -104,7 +125,7 @@ function startViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> 
         settled = true;
         clearTimeout(timeout);
         viewers.delete(projectRoot);
-        reject(new Error(`understand-anything-viewer exited (code ${code}) before starting for ${projectRoot}`));
+        reject(new Error(`${label} exited (code ${code}) before starting for ${projectRoot}`));
       }
     });
     proc.on("error", (err) => {
@@ -118,7 +139,7 @@ function startViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> 
   });
 }
 
-async function getOrStartViewer(projectRoot: string, log: Logger): Promise<ViewerInstance> {
+async function getOrStartViewer(projectRoot: string, log: Logger, llmOptions: InteractiveLlmOptions | null): Promise<ViewerInstance> {
   const pending = viewers.get(projectRoot);
   if (pending) {
     try {
@@ -131,7 +152,7 @@ async function getOrStartViewer(projectRoot: string, log: Logger): Promise<Viewe
     }
   }
 
-  const startPromise = startViewer(projectRoot, log);
+  const startPromise = startViewer(projectRoot, log, llmOptions);
   viewers.set(projectRoot, startPromise);
   return startPromise;
 }
@@ -214,6 +235,7 @@ export function registerDashboardRoutes(
   }) => void,
   getProjects: () => string[],
   log: Logger,
+  getLlmOptions: () => InteractiveLlmOptions | null,
 ): void {
   startIdleViewerSweep(log);
 
@@ -247,7 +269,7 @@ export function registerDashboardRoutes(
           );
         }
         try {
-          const viewer = await getOrStartViewer(projectRoot, log);
+          const viewer = await getOrStartViewer(projectRoot, log, getLlmOptions());
           res.writeHead(302, { Location: `http://127.0.0.1:${viewer.port}/?token=${viewer.token}` });
           res.end();
         } catch (err) {

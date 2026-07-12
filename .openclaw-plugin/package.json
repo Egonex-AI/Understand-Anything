@@ -11,7 +11,7 @@
     ]
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/ask-widget.js dist/ask-widget.js",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "vitest run"
