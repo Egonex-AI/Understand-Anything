@@ -20,6 +20,7 @@ import {
   SearchEngine,
   loadGraph,
   loadMeta,
+  saveDiffOverlay,
   type KnowledgeGraph,
   type GraphNode,
 } from "@understand-anything/core";
@@ -27,6 +28,8 @@ import { analyzeProject, type AnalyzeProjectResult } from "./pipeline.js";
 import { createLlmCaller, resolveAnthropicApiKey, type LlmCaller } from "./llm.js";
 import { registerDashboardRoutes, shutdownAllViewers, type InteractiveLlmOptions } from "./dashboard-route.js";
 import { ProjectStore, expandHome } from "./project-store.js";
+import { getChangedFiles, generatePrWalkthrough } from "./pr-diff.js";
+import { upsertTour, makeTourId } from "./tour-store.js";
 
 interface PluginApi {
   registerTool(def: {
@@ -420,6 +423,67 @@ export function activate(api: PluginApi): void {
           incoming: incoming.map((e) => ({ ...e, sourceName: nameOf(e.source as string) })),
         },
       });
+    },
+  });
+
+  api.registerTool({
+    name: "understand_analyze_pr",
+    description:
+      "Understand what a pull request (or branch diff) changed against an already-analyzed project: maps changed files onto the " +
+      "knowledge graph, computes the 1-hop blast radius (what imports/calls the changed code, and what it imports/calls), and " +
+      "generates an LLM-narrated walkthrough of the change. Persists a diff-overlay for the dashboard's visual diff mode too.",
+    parameters: Type.Object({
+      project: Type.Optional(Type.String({ description: "Configured project path or index." })),
+      prNumber: Type.Optional(Type.Integer({ description: "A GitHub PR number to diff via `gh pr diff` (requires gh CLI + auth on the gateway host)." })),
+      baseBranch: Type.Optional(Type.String({ description: "Base branch to diff HEAD against (default: repo's detected default branch). Ignored if prNumber is set." })),
+    }),
+    async execute(_id, params) {
+      const resolved = resolveProject(params.project);
+      if ("error" in resolved) return textResult(resolved.error);
+      const root = resolved.root;
+
+      const cached = getGraph(root);
+      if (!cached) return textResult(`No knowledge graph for ${root} yet — run understand_analyze_project first.`);
+
+      const llm = makeLlmCaller();
+      if (typeof llm !== "function") return textResult(llm.error);
+
+      try {
+        const { changedFiles, baseBranch: resolvedSource } = await getChangedFiles(root, {
+          prNumber: params.prNumber as number | undefined,
+          baseBranch: params.baseBranch as string | undefined,
+        });
+        if (changedFiles.length === 0) {
+          return textResult(`No changed files found (source: ${resolvedSource}).`);
+        }
+
+        const result = await generatePrWalkthrough(cached.graph, changedFiles, resolvedSource, llm);
+        saveDiffOverlay(root, result.overlay);
+        if (result.error) {
+          return jsonResult({ error: result.error, overlay: result.overlay });
+        }
+
+        upsertTour(root, {
+          id: makeTourId("prWalkthrough"),
+          kind: "prWalkthrough",
+          title: `PR walkthrough: ${resolvedSource}`,
+          description: `Changed: ${changedFiles.slice(0, 5).join(", ")}${changedFiles.length > 5 ? "…" : ""}`,
+          createdAt: new Date().toISOString(),
+          steps: result.steps,
+          diffSource: resolvedSource,
+        });
+
+        return jsonResult({
+          diffSource: resolvedSource,
+          changedFiles,
+          changedNodeIds: result.overlay.changedNodeIds,
+          affectedNodeIds: result.overlay.affectedNodeIds,
+          tourSteps: result.steps,
+          dashboard: "/understand-anything",
+        });
+      } catch (err) {
+        return textResult(`Failed to analyze PR/diff: ${err instanceof Error ? err.message : String(err)}`);
+      }
     },
   });
 

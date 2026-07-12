@@ -1,9 +1,10 @@
 // Floating "Tours" widget — injected into the dashboard by interactive-server.ts,
-// alongside ask-widget.js. Lists/plays the auto-generated (module, code review)
-// and custom tours from GET /tours.json, and lets the user select node(s) in the
-// live React Flow canvas (read via MutationObserver on .react-flow__node.selected
-// — no changes to the dashboard's React source) plus a free-text prompt to
-// generate a new custom tour via POST /generate-tour.json.
+// alongside ask-widget.js. Lists/plays the auto-generated (module, code review),
+// custom, and PR-walkthrough tours from GET /tours.json, and lets the user select
+// node(s) in the live React Flow canvas (read via MutationObserver on
+// .react-flow__node.selected — no changes to the dashboard's React source) plus a
+// free-text prompt to generate a new custom tour via POST /generate-tour.json, or
+// a PR number/base branch to generate a diff walkthrough via POST /generate-pr-tour.json.
 (function () {
   "use strict";
 
@@ -34,6 +35,13 @@
     "color:#e6edf3;padding:8px 10px;font-size:13px;resize:none;font-family:inherit;margin-bottom:6px;}\n" +
     "#ua-tour-generate-btn{width:100%;background:#8957e5;color:#fff;border:none;border-radius:8px;padding:8px;cursor:pointer;font-size:13px;}\n" +
     "#ua-tour-generate-btn:disabled{opacity:.5;cursor:default;}\n" +
+    "#ua-pr-generate{border-top:1px solid #30363d;padding:10px 14px;}\n" +
+    "#ua-pr-generate h4{margin:0 0 6px;font-size:13px;}\n" +
+    "#ua-pr-generate p{margin:0 0 6px;font-size:11px;color:#8b949e;}\n" +
+    "#ua-pr-input{width:100%;box-sizing:border-box;background:#161b22;border:1px solid #30363d;border-radius:8px;" +
+    "color:#e6edf3;padding:8px 10px;font-size:13px;font-family:inherit;margin-bottom:6px;}\n" +
+    "#ua-pr-generate-btn{width:100%;background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:8px;cursor:pointer;font-size:13px;}\n" +
+    "#ua-pr-generate-btn:disabled{opacity:.5;cursor:default;}\n" +
     "#ua-tour-player{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;" +
     "background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.5);" +
     "padding:14px 18px;width:460px;max-width:calc(100vw - 48px);display:none;font-family:system-ui,-apple-system,sans-serif;}\n" +
@@ -174,6 +182,43 @@
       });
   }
 
+  // --- Generate PR/diff walkthrough ---
+  function generatePrTour() {
+    var input = document.getElementById("ua-pr-input");
+    var btn = document.getElementById("ua-pr-generate-btn");
+    var raw = input.value.trim();
+    if (!raw) return;
+    var isPrNumber = /^\d+$/.test(raw);
+    var body = isPrNumber ? { prNumber: Number(raw) } : { baseBranch: raw };
+
+    btn.disabled = true;
+    btn.textContent = "Generating…";
+
+    authedFetch("/generate-pr-tour.json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok) throw new Error(data.error || "Request failed");
+          return data;
+        });
+      })
+      .then(function (data) {
+        input.value = "";
+        renderTourList();
+        if (data.tour) playTour(data.tour);
+      })
+      .catch(function (err) {
+        alert("Could not generate PR walkthrough: " + err.message);
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Generate PR walkthrough";
+      });
+  }
+
   function init() {
     if (!TOKEN) return; // no token in URL — not a live session
 
@@ -195,9 +240,17 @@
       el("button", { id: "ua-tour-generate-btn" }, ["Generate custom tour"]),
     ]);
 
+    var prGenerate = el("div", { id: "ua-pr-generate" }, [
+      el("h4", {}, ["Generate a PR walkthrough"]),
+      el("p", {}, ["Enter a PR number, or a base branch to diff against HEAD (e.g. main)."]),
+      el("input", { id: "ua-pr-input", type: "text", placeholder: "42 or main" }),
+      el("button", { id: "ua-pr-generate-btn" }, ["Generate PR walkthrough"]),
+    ]);
+
     panel.appendChild(header);
     panel.appendChild(body);
     panel.appendChild(generate);
+    panel.appendChild(prGenerate);
     document.body.appendChild(fab);
     document.body.appendChild(panel);
 
@@ -223,6 +276,7 @@
     });
     header.querySelector("#ua-tours-close").addEventListener("click", function () { panel.classList.remove("open"); });
     document.getElementById("ua-tour-generate-btn").addEventListener("click", generateTour);
+    document.getElementById("ua-pr-generate-btn").addEventListener("click", generatePrTour);
 
     prevBtn.addEventListener("click", function () { if (currentStep > 0) { currentStep--; renderPlayerStep(); } });
     nextBtn.addEventListener("click", function () { if (currentTour && currentStep < currentTour.steps.length - 1) { currentStep++; renderPlayerStep(); } });

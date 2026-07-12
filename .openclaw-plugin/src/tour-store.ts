@@ -5,7 +5,10 @@ import type { TourStep } from "@understand-anything/core";
 const TOURS_FILE = "tours.json";
 const UA_DIR_CANDIDATES = [".understand-anything", ".ua"];
 
-export type TourKind = "module" | "codeReview" | "custom";
+export type TourKind = "module" | "codeReview" | "custom" | "prWalkthrough";
+
+/** Kinds that accumulate (one project can have many) rather than replace the previous tour of that kind. */
+const ACCUMULATING_KINDS: ReadonlySet<TourKind> = new Set(["custom", "prWalkthrough"]);
 
 export interface StoredTour {
   id: string;
@@ -16,6 +19,8 @@ export interface StoredTour {
   steps: TourStep[];
   /** The user's free-text request, for kind "custom" tours only. */
   prompt?: string;
+  /** Which base branch / PR this was generated from, for kind "prWalkthrough" only. */
+  diffSource?: string;
 }
 
 /**
@@ -52,10 +57,10 @@ function saveTours(projectRoot: string, tours: StoredTour[]): void {
   writeFileSync(toursFilePath(projectRoot), JSON.stringify({ tours }, null, 2), "utf-8");
 }
 
-/** Replaces any existing tour of the same kind (module/codeReview are singletons) or appends (custom tours accumulate). */
+/** Replaces any existing tour of the same kind (module/codeReview are singletons) or appends (custom/prWalkthrough tours accumulate). */
 export function upsertTour(projectRoot: string, tour: StoredTour): void {
   const existing = loadTours(projectRoot);
-  const next = tour.kind === "custom" ? [...existing, tour] : [...existing.filter((t) => t.kind !== tour.kind), tour];
+  const next = ACCUMULATING_KINDS.has(tour.kind) ? [...existing, tour] : [...existing.filter((t) => t.kind !== tour.kind), tour];
   saveTours(projectRoot, next);
 }
 

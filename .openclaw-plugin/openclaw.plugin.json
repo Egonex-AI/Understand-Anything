@@ -14,7 +14,8 @@
       "understand_analyze_project",
       "understand_status",
       "understand_search",
-      "understand_get_node"
+      "understand_get_node",
+      "understand_analyze_pr"
     ]
   },
   "configSchema": {

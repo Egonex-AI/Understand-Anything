@@ -19,6 +19,7 @@ connected agent can call mid-conversation, plus a dashboard route.
 | `understand_status` | Poll a running analysis job / inspect the persisted graph's metadata |
 | `understand_search` | Fuzzy-search graph nodes (names, tags, summaries) via `@understand-anything/core`'s SearchEngine |
 | `understand_get_node` | Full node detail + incoming/outgoing edges with neighbor names |
+| `understand_analyze_pr` | Resolve a PR's (or branch diff's) changed files, compute the blast radius against the persisted graph, and generate an LLM-narrated PR walkthrough tour |
 
 **HTTP routes** (mounted on the gateway):
 
@@ -58,7 +59,14 @@ connected agent can call mid-conversation, plus a dashboard route.
   **code-review walkthrough** ranking the highest-risk files by complexity
   and how central they are in the dependency graph. You can also select node(s)
   in the graph canvas and type a prompt to generate a **custom tour** scoped
-  to just what you picked (e.g. "walk me through the auth flow").
+  to just what you picked (e.g. "walk me through the auth flow"), or enter a
+  PR number or base branch to generate a **PR walkthrough**
+  (`POST /generate-pr-tour.json`, also callable directly as the
+  `understand_analyze_pr` tool): the changed files are resolved via `gh pr diff`
+  or `git diff <base>...HEAD` (falling back to uncommitted working-tree changes),
+  mapped onto the already-analyzed graph, and the LLM narrates the change plus
+  its 1-hop blast radius, grounded only in nodes actually in the diff or
+  directly touching it.
 
 ## How it works
 
@@ -93,6 +101,21 @@ same vanilla-JS/no-build-step pattern as the Ask widget. Selecting nodes for
 a custom tour reads the live React Flow selection via a `MutationObserver` on
 `.react-flow__node.selected` — zero patches to the dashboard's React source,
 the same non-invasive approach the whole interactive layer uses throughout.
+
+PR walkthroughs (`src/pr-diff.ts`) build on `@understand-anything/core`'s pure,
+deterministic `computeDiffOverlay` — no LLM involved in the blast-radius
+computation itself: changed files map onto file/function/class nodes sharing
+the same `filePath`, then a 1-hop edge walk (both directions) finds everything
+else the change touches. Only the resulting changed + affected node lists (not
+the whole graph) get passed to the LLM to narrate, and large diffs are capped
+(40 changed / 20 affected nodes shown per prompt) so the required output stays
+bounded regardless of how many files a diff touches — the model is told how
+many nodes were omitted and asked to summarize rather than enumerate. The
+result — a `DiffOverlay` plus generated tour steps — is persisted the same way
+as a custom tour (`kind: "prWalkthrough"` in `.ua/tours.json`, one entry per
+generation, unlike the singleton module/code-review kinds) and the overlay
+itself is saved to `.ua/diff-overlay.json`, formalizing the on-disk contract
+the `understand-diff` skill already documents.
 
 Project registration (`src/project-store.ts`) keeps config-declared projects
 (fixed, from `projects` below) and dynamically-added ones (persisted to

@@ -23,10 +23,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadGraph } from "@understand-anything/core";
+import { loadGraph, saveDiffOverlay } from "@understand-anything/core";
 import { askAboutProject } from "./ask.js";
 import { createLlmCaller } from "./llm.js";
 import { generateCustomTour } from "./custom-tour.js";
+import { getChangedFiles, generatePrWalkthrough } from "./pr-diff.js";
 import { loadTours, upsertTour, makeTourId } from "./tour-store.js";
 
 const require = createRequire(import.meta.url);
@@ -269,7 +270,7 @@ function readBody(req: IncomingMessage, maxBytes: number): Promise<string> {
   });
 }
 
-const TOKEN_VIA_HEADER = new Set(["/ask.json", "/generate-tour.json"]);
+const TOKEN_VIA_HEADER = new Set(["/ask.json", "/generate-tour.json", "/generate-pr-tour.json"]);
 const PROTECTED = new Set([
   "/knowledge-graph.json",
   "/domain-graph.json",
@@ -280,6 +281,7 @@ const PROTECTED = new Set([
   "/ask.json",
   "/tours.json",
   "/generate-tour.json",
+  "/generate-pr-tour.json",
 ]);
 
 const server = createServer((req, res) => {
@@ -358,6 +360,53 @@ const server = createServer((req, res) => {
         };
         upsertTour(projectRoot, tour);
         sendJson(res, 200, { tour });
+      } catch (err) {
+        sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
+    if (pathname === "/generate-pr-tour.json") {
+      if ((req.method ?? "GET").toUpperCase() !== "POST") {
+        sendJson(res, 405, { error: "POST required" });
+        return;
+      }
+      try {
+        const body = await readBody(req, 4096);
+        const parsed = JSON.parse(body || "{}") as { prNumber?: unknown; baseBranch?: unknown };
+        const prNumber = typeof parsed.prNumber === "number" ? parsed.prNumber : undefined;
+        const baseBranch = typeof parsed.baseBranch === "string" && parsed.baseBranch.trim() ? parsed.baseBranch.trim() : undefined;
+
+        const graph = loadGraph(projectRoot, { validate: false });
+        if (!graph) {
+          sendJson(res, 404, { error: "No knowledge graph found for this project." });
+          return;
+        }
+
+        const { changedFiles, baseBranch: resolvedSource } = await getChangedFiles(projectRoot, { prNumber, baseBranch });
+        if (changedFiles.length === 0) {
+          sendJson(res, 400, { error: `No changed files found (source: ${resolvedSource}).` });
+          return;
+        }
+
+        const result = await generatePrWalkthrough(graph, changedFiles, resolvedSource, llmCall);
+        saveDiffOverlay(projectRoot, result.overlay);
+        if (result.error) {
+          sendJson(res, 400, { error: result.error, overlay: result.overlay });
+          return;
+        }
+
+        const tour = {
+          id: makeTourId("prWalkthrough" as const),
+          kind: "prWalkthrough" as const,
+          title: `PR walkthrough: ${resolvedSource}`,
+          description: `Changed: ${changedFiles.slice(0, 5).join(", ")}${changedFiles.length > 5 ? "…" : ""}`,
+          createdAt: new Date().toISOString(),
+          steps: result.steps,
+          diffSource: resolvedSource,
+        };
+        upsertTour(projectRoot, tour);
+        sendJson(res, 200, { tour, overlay: result.overlay });
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }
