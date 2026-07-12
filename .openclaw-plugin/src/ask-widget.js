@@ -3,6 +3,10 @@
 // the page itself was loaded with (?token= in the URL). Vanilla JS/CSS, no
 // build step, so it stays independent of the dashboard's own React app and
 // its build pipeline.
+//
+// Grounds each question in whatever node(s) are currently selected in the
+// graph canvas, via the shared discovery in selection.js (window.uaSelection)
+// — the same mechanism the Tours widget uses for custom-tour scoping.
 (function () {
   "use strict";
 
@@ -33,7 +37,9 @@
     "padding:8px 10px;font-size:13px;resize:none;font-family:inherit;}\n" +
     "#ua-ask-send{background:#1f6feb;color:#fff;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:13px;}\n" +
     "#ua-ask-send:disabled{opacity:.5;cursor:default;}\n" +
-    "#ua-ask-empty{color:#8b949e;font-size:13px;padding:8px 0;}\n";
+    "#ua-ask-empty{color:#8b949e;font-size:13px;padding:8px 0;}\n" +
+    "#ua-ask-selection{font-size:11px;color:#8b949e;padding:6px 14px;border-top:1px solid #30363d;}\n" +
+    "#ua-ask-selection code{background:#21262d;padding:1px 4px;border-radius:4px;}\n";
 
   function el(tag, attrs, children) {
     var e = document.createElement(tag);
@@ -77,12 +83,14 @@
     var messages = el("div", { id: "ua-ask-messages" }, [
       el("div", { id: "ua-ask-empty" }, ["Ask a question about how this codebase works — grounded in the analyzed knowledge graph."]),
     ]);
+    var selectionBar = el("div", { id: "ua-ask-selection" }, ["Nothing selected in the graph — asking generally."]);
     var input = el("textarea", { id: "ua-ask-input", rows: "1", placeholder: "e.g. how does the request flow work?" });
     var sendBtn = el("button", { id: "ua-ask-send" }, ["Ask"]);
     var form = el("div", { id: "ua-ask-form" }, [input, sendBtn]);
 
     panel.appendChild(header);
     panel.appendChild(messages);
+    panel.appendChild(selectionBar);
     panel.appendChild(form);
     document.body.appendChild(fab);
     document.body.appendChild(panel);
@@ -94,6 +102,25 @@
     header.querySelector("#ua-ask-close").addEventListener("click", function () {
       panel.classList.remove("open");
     });
+
+    function renderSelectionBar(ids) {
+      selectionBar.textContent = "";
+      if (!ids.length) {
+        selectionBar.textContent = "Nothing selected in the graph — asking generally.";
+        return;
+      }
+      selectionBar.appendChild(document.createTextNode("Grounded in: "));
+      ids.slice(0, 4).forEach(function (id, i) {
+        if (i > 0) selectionBar.appendChild(document.createTextNode(", "));
+        selectionBar.appendChild(el("code", {}, [id]));
+      });
+      if (ids.length > 4) selectionBar.appendChild(document.createTextNode(" +" + (ids.length - 4) + " more"));
+    }
+
+    if (window.uaSelection) {
+      renderSelectionBar(window.uaSelection.get());
+      window.uaSelection.subscribe(renderSelectionBar);
+    }
 
     var asking = false;
     function ask() {
@@ -110,7 +137,10 @@
       fetch("/ask.json", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Ask-Token": TOKEN },
-        body: JSON.stringify({ question: question }),
+        body: JSON.stringify({
+          question: question,
+          selectedNodeIds: window.uaSelection ? window.uaSelection.get() : [],
+        }),
       })
         .then(function (res) {
           return res.json().then(function (data) {

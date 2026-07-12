@@ -92,6 +92,18 @@ build + JSON API, reused read-only) that adds the `/ask.json` endpoint and
 injects a small vanilla-JS chat widget (`src/ask-widget.js`, no build step)
 into the served `index.html`.
 
+Both the Ask and Tours widgets also ground on whatever node(s) are currently
+selected in the graph canvas — read once by a shared discovery script
+(`src/selection.js`, injected before either widget) via a `MutationObserver`
+on `.react-flow__node.selected`, no changes to the dashboard's React source.
+Ask always includes the current selection as primary context ahead of
+whatever `SearchEngine` matches from the question text, so asking a question
+while looking at a specific file answers about that file even if the question
+itself doesn't share vocabulary with it (previously Ask had no notion of
+selection at all, unlike custom-tour generation, which already scoped to it —
+this unifies both widgets on one selection source instead of each keeping its
+own).
+
 Tours (`src/tour-generation.ts`, `src/custom-tour.ts`, `src/tour-store.ts`) are
 persisted to a plugin-owned `.ua/tours.json` sidecar, not the graph itself —
 upstream's schema only has room for one tour (`graph.tour`), so module

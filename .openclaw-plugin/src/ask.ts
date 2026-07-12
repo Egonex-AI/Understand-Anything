@@ -48,11 +48,20 @@ function nodeContext(n: GraphNode): string {
  * this is what lets the dashboard's Ask panel work without re-scanning the
  * project on every question. Mirrors upstream's /understand-chat skill, just
  * reachable from the browser instead of a CLI.
+ *
+ * `selectedNodeIds` (from the dashboard's shared node-selection discovery —
+ * see selection.js) are always included as grounding context, ahead of and
+ * independent from whatever the free-text question happens to match via
+ * SearchEngine — otherwise a question asked while looking at a specific file
+ * silently ignores that the user is looking at it (see custom-tour's
+ * nodeIds-scoped generation, which already treats an explicit selection as
+ * authoritative; Ask previously had no equivalent).
  */
 export async function askAboutProject(
   projectRoot: string,
   question: string,
   llmCall: LlmCaller,
+  selectedNodeIds: string[] = [],
 ): Promise<AskResult> {
   const graph: KnowledgeGraph | null = loadGraph(projectRoot, { validate: false });
   if (!graph) {
@@ -62,16 +71,21 @@ export async function askAboutProject(
     };
   }
 
-  const engine = new SearchEngine(graph.nodes);
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  const matches = engine
+  const selectedNodes = selectedNodeIds
+    .map((id) => byId.get(id))
+    .filter((n): n is GraphNode => n !== undefined);
+  const selectedIdSet = new Set(selectedNodes.map((n) => n.id));
+
+  const engine = new SearchEngine(graph.nodes);
+  const searchMatches = engine
     .search(question, { limit: MAX_MATCHES })
     .map((r) => byId.get(r.nodeId))
-    .filter((n): n is GraphNode => n !== undefined);
+    .filter((n): n is GraphNode => n !== undefined && !selectedIdSet.has(n.id));
 
   const snippets: string[] = [];
   let snippetCount = 0;
-  for (const n of matches) {
+  for (const n of [...selectedNodes, ...searchMatches]) {
     if (snippetCount >= MAX_SNIPPET_FILES || !n.filePath) continue;
     const content = safeReadSnippet(projectRoot, n.filePath);
     if (content) {
@@ -85,15 +99,16 @@ Description: ${graph.project.description}
 Languages: ${graph.project.languages.join(", ")}
 Frameworks: ${graph.project.frameworks.join(", ")}
 
-Matched knowledge-graph nodes for this question:
-${matches.map(nodeContext).join("\n") || "(no strong matches — answer from project description alone if possible)"}
+${selectedNodes.length ? `The developer currently has these node(s) selected/focused in the dashboard — treat them as the primary subject of the question unless the question clearly points elsewhere:\n${selectedNodes.map(nodeContext).join("\n")}\n\n` : ""}Matched knowledge-graph nodes for this question:
+${searchMatches.map(nodeContext).join("\n") || (selectedNodes.length ? "(no additional strong matches beyond the selection above)" : "(no strong matches — answer from project description alone if possible)")}
 
 ${snippets.length ? `Source snippets:\n${snippets.join("\n\n")}\n\n` : ""}Question: ${question}`;
 
   const answer = await llmCall(ASK_SYSTEM_PROMPT, prompt, 1500);
 
+  const citedNodes = [...selectedNodes, ...searchMatches];
   return {
     answer,
-    citedNodes: matches.map((n) => ({ id: n.id, name: n.name, type: n.type, ...(n.filePath ? { filePath: n.filePath } : {}) })),
+    citedNodes: citedNodes.map((n) => ({ id: n.id, name: n.name, type: n.type, ...(n.filePath ? { filePath: n.filePath } : {}) })),
   };
 }

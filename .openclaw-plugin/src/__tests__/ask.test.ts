@@ -108,4 +108,44 @@ describe("askAboutProject", () => {
 
     expect(capturedPrompt).toContain("export function login");
   });
+
+  it("grounds the prompt in a selected node even when the question text doesn't match it", async () => {
+    const root = makeTmpProject();
+    mkdirSync(join(root, "src"));
+    writeFileSync(join(root, "src", "util.ts"), "export function pad(s: string) { return s; }\n");
+    saveGraph(root, makeGraph(root));
+
+    let capturedPrompt = "";
+    const stubLlm: LlmCaller = async (_sys, userContent) => {
+      capturedPrompt = userContent;
+      return "ok";
+    };
+
+    const result = await askAboutProject(root, "what does this do?", stubLlm, ["file:src/util.ts"]);
+
+    expect(capturedPrompt).toContain("currently has these node(s) selected/focused");
+    expect(capturedPrompt).toContain("Miscellaneous string/date helpers");
+    expect(capturedPrompt).toContain("export function pad");
+    expect(result.citedNodes.map((n) => n.id)).toContain("file:src/util.ts");
+  });
+
+  it("doesn't duplicate a node that's both selected and search-matched", async () => {
+    const root = makeTmpProject();
+    saveGraph(root, makeGraph(root));
+
+    const stubLlm: LlmCaller = async () => "ok";
+    const result = await askAboutProject(root, "authentication", stubLlm, ["file:src/auth.ts"]);
+
+    expect(result.citedNodes.filter((n) => n.id === "file:src/auth.ts")).toHaveLength(1);
+  });
+
+  it("ignores a selected node id that isn't in the graph", async () => {
+    const root = makeTmpProject();
+    saveGraph(root, makeGraph(root));
+
+    const stubLlm: LlmCaller = async () => "ok";
+    const result = await askAboutProject(root, "how does auth work?", stubLlm, ["file:does-not-exist.ts"]);
+
+    expect(result.citedNodes.map((n) => n.id)).not.toContain("file:does-not-exist.ts");
+  });
 });

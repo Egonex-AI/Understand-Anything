@@ -1,10 +1,10 @@
 // Floating "Tours" widget — injected into the dashboard by interactive-server.ts,
 // alongside ask-widget.js. Lists/plays the auto-generated (module, code review),
 // custom, and PR-walkthrough tours from GET /tours.json, and lets the user select
-// node(s) in the live React Flow canvas (read via MutationObserver on
-// .react-flow__node.selected — no changes to the dashboard's React source) plus a
-// free-text prompt to generate a new custom tour via POST /generate-tour.json, or
-// a PR number/base branch to generate a diff walkthrough via POST /generate-pr-tour.json.
+// node(s) in the live React Flow canvas — selection is read via the shared
+// discovery in selection.js (window.uaSelection), not a private observer here —
+// plus a free-text prompt to generate a new custom tour via POST /generate-tour.json,
+// or a PR number/base branch to generate a diff walkthrough via POST /generate-pr-tour.json.
 (function () {
   "use strict";
 
@@ -70,17 +70,18 @@
     return fetch(url, options);
   }
 
-  // --- Live selection tracking (read-only DOM observation, no React patch) ---
-  var selectedNodeIds = [];
-  function refreshSelection() {
-    var nodes = document.querySelectorAll(".react-flow__node.selected");
-    selectedNodeIds = Array.prototype.map.call(nodes, function (n) { return n.getAttribute("data-id"); }).filter(Boolean);
+  // --- Live selection tracking — reads the shared discovery in selection.js
+  // (window.uaSelection) instead of running its own MutationObserver; Ask uses
+  // the same source, so both widgets always agree on "what's selected".
+  function getSelectedNodeIds() {
+    return window.uaSelection ? window.uaSelection.get() : [];
+  }
+  function renderSelectionCount(ids) {
     var countEl = document.getElementById("ua-selection-count");
-    if (countEl) {
-      countEl.textContent = selectedNodeIds.length === 0
-        ? "No nodes selected in the graph — click one or more to scope a custom tour."
-        : selectedNodeIds.length + " node(s) selected: " + selectedNodeIds.slice(0, 3).join(", ") + (selectedNodeIds.length > 3 ? "…" : "");
-    }
+    if (!countEl) return;
+    countEl.textContent = ids.length === 0
+      ? "No nodes selected in the graph — click one or more to scope a custom tour."
+      : ids.length + " node(s) selected: " + ids.slice(0, 3).join(", ") + (ids.length > 3 ? "…" : "");
   }
 
   function highlightNodes(nodeIds) {
@@ -160,7 +161,7 @@
     authedFetch("/generate-tour.json", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodeIds: selectedNodeIds, prompt: prompt }),
+      body: JSON.stringify({ nodeIds: getSelectedNodeIds(), prompt: prompt }),
     })
       .then(function (res) {
         return res.json().then(function (data) {
@@ -282,12 +283,12 @@
     nextBtn.addEventListener("click", function () { if (currentTour && currentStep < currentTour.steps.length - 1) { currentStep++; renderPlayerStep(); } });
     closeBtn.addEventListener("click", closePlayer);
 
-    // Poll selection via MutationObserver on the whole document (React Flow
-    // toggles the "selected" class on node elements; class-attribute changes
-    // are what we watch for, cheaply, without touching the app's own code).
-    var observer = new MutationObserver(function () { refreshSelection(); });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["class"], subtree: true });
-    refreshSelection();
+    if (window.uaSelection) {
+      renderSelectionCount(window.uaSelection.get());
+      window.uaSelection.subscribe(renderSelectionCount);
+    } else {
+      renderSelectionCount([]);
+    }
   }
 
   if (document.readyState === "loading") {

@@ -215,7 +215,9 @@ const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm", ".woff": "font/woff", ".woff2": "font/woff2",
 };
 
-const WIDGET_SCRIPT_TAGS = `<script src="/ask-widget.js" defer></script><script src="/tours-widget.js" defer></script>`;
+const WIDGET_SCRIPT_TAGS =
+  `<script src="/selection.js" defer></script>` +
+  `<script src="/ask-widget.js" defer></script><script src="/tours-widget.js" defer></script>`;
 
 function serveIndexHtmlWithWidget(res: ServerResponse): void {
   const absolute = path.join(DIST_DIR, "index.html");
@@ -232,6 +234,7 @@ function serveLocalScript(res: ServerResponse, filename: string): void {
 }
 
 function serveStatic(res: ServerResponse, pathname: string): void {
+  if (pathname === "/selection.js") return serveLocalScript(res, "selection.js");
   if (pathname === "/ask-widget.js") return serveLocalScript(res, "ask-widget.js");
   if (pathname === "/tours-widget.js") return serveLocalScript(res, "tours-widget.js");
 
@@ -307,13 +310,16 @@ const server = createServer((req, res) => {
       }
       try {
         const body = await readBody(req, 8192);
-        const parsed = JSON.parse(body || "{}") as { question?: unknown };
+        const parsed = JSON.parse(body || "{}") as { question?: unknown; selectedNodeIds?: unknown };
         const question = typeof parsed.question === "string" ? parsed.question.trim() : "";
         if (!question) {
           sendJson(res, 400, { error: "Missing question" });
           return;
         }
-        const result = await askAboutProject(projectRoot, question, llmCall);
+        const selectedNodeIds = Array.isArray(parsed.selectedNodeIds)
+          ? parsed.selectedNodeIds.filter((n): n is string => typeof n === "string")
+          : [];
+        const result = await askAboutProject(projectRoot, question, llmCall, selectedNodeIds);
         sendJson(res, 200, result);
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });

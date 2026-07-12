@@ -11,7 +11,7 @@
     ]
   },
   "scripts": {
-    "build": "tsc && cp src/ask-widget.js dist/ask-widget.js && cp src/tours-widget.js dist/tours-widget.js",
+    "build": "tsc && cp src/selection.js dist/selection.js && cp src/ask-widget.js dist/ask-widget.js && cp src/tours-widget.js dist/tours-widget.js",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "vitest run"
