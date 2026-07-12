@@ -26,7 +26,7 @@ import {
 } from "@understand-anything/core";
 import { analyzeProject, type AnalyzeProjectResult } from "./pipeline.js";
 import { createLlmCaller, resolveAnthropicApiKey, type LlmCaller } from "./llm.js";
-import { registerDashboardRoutes } from "./dashboard-route.js";
+import { registerDashboardRoutes, shutdownAllViewers } from "./dashboard-route.js";
 
 interface PluginApi {
   registerTool(def: {
@@ -44,6 +44,7 @@ interface PluginApi {
     auth: "gateway" | "plugin";
     match?: "exact" | "prefix";
   }): void;
+  on?: (hookName: string, handler: (event: unknown, ctx: unknown) => unknown, opts?: { priority?: number }) => void;
   pluginConfig?: Record<string, unknown>;
   logger: { info(...a: unknown[]): void; warn(...a: unknown[]): void; error(...a: unknown[]): void };
 }
@@ -116,7 +117,18 @@ function getGraph(projectRoot: string): CachedGraph | null {
 
   // validate:false — serve whatever is on disk; the pipeline validated at save
   // time and upstream tooling (viewer) is similarly tolerant on read.
-  const graph = loadGraph(projectRoot, { validate: false });
+  //
+  // saveGraph (in @understand-anything/core) writes with a plain writeFileSync,
+  // not a temp-file+rename, and a background analyzeProject() job can call it
+  // at any moment while this route keeps serving reads. A read landing mid-write
+  // sees truncated JSON and throws — fall back to the previous cached graph
+  // (if any) rather than letting that propagate as an uncaught exception.
+  let graph: KnowledgeGraph | null;
+  try {
+    graph = loadGraph(projectRoot, { validate: false });
+  } catch {
+    return cached ?? null;
+  }
   if (!graph) return null;
   const entry: CachedGraph = { graph, mtimeMs, search: new SearchEngine(graph.nodes) };
   graphCache.set(projectRoot, entry);
@@ -125,6 +137,9 @@ function getGraph(projectRoot: string): CachedGraph | null {
 
 // ── Node formatting helpers ─────────────────────────────────────────────────
 
+// Graphs are loaded with { validate: false } (see getGraph), so a hand-edited
+// or legacy-schema knowledge-graph.json could be missing/renaming any field —
+// every access here is defensive rather than assuming the GraphNode shape.
 function nodeBrief(n: GraphNode): Record<string, unknown> {
   return {
     id: n.id,
@@ -132,7 +147,7 @@ function nodeBrief(n: GraphNode): Record<string, unknown> {
     name: n.name,
     ...(n.filePath ? { filePath: n.filePath } : {}),
     summary: n.summary,
-    ...(n.tags.length ? { tags: n.tags } : {}),
+    ...(Array.isArray(n.tags) && n.tags.length ? { tags: n.tags } : {}),
     complexity: n.complexity,
   };
 }
@@ -397,6 +412,11 @@ export function activate(api: PluginApi): void {
   // ── Dashboard routes ─────────────────────────────────────────────────────
 
   registerDashboardRoutes(api.registerHttpRoute.bind(api), () => projects, log);
+
+  // Spawned understand-anything-viewer child processes otherwise accumulate
+  // forever and become fully orphaned (unreachable, un-killable from this
+  // process) on the next plugin/gateway reload, since module state resets.
+  api.on?.("gateway_stop", () => shutdownAllViewers(log));
 
   log.info(
     `[understand-anything] activated: ${projects.length} project(s), model ${model}, tools understand_list_projects/analyze_project/status/search/get_node, dashboard at /understand-anything.`,

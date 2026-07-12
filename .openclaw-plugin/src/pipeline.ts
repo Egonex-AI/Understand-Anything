@@ -196,24 +196,23 @@ export async function analyzeProject(
     .slice(0, MAX_SAMPLE_FILES_FOR_SUMMARY)
     .map((r) => ({ path: r.rel, content: r.content.slice(0, 2000) }));
 
-  let projectDescription = "";
-  let frameworks: string[] = [];
-  let layers: Layer[] = [];
+  // Built once — GraphBuilder.build() is a pure, deterministic snapshot (stable
+  // string node IDs, no internal counters), but nodes/edges can run into the
+  // thousands, so building it twice was a needless double array-copy.
+  const graph = builder.build();
 
   try {
     const summaryPrompt = buildProjectSummaryPrompt(filesToAnalyze, sampleFiles);
     const summaryResponse = await llmCall(FILE_ANALYSIS_SYSTEM_PROMPT, summaryPrompt, 1500);
     const parsedSummary = parseProjectSummaryResponse(summaryResponse);
     if (parsedSummary) {
-      projectDescription = parsedSummary.description;
-      frameworks = parsedSummary.frameworks;
-
-      const graphPreview = builder.build();
-      layers = parsedSummary.layers.map((l, idx) => ({
+      graph.project.description = parsedSummary.description;
+      graph.project.frameworks = parsedSummary.frameworks;
+      graph.layers = parsedSummary.layers.map((l, idx): Layer => ({
         id: `layer:${idx}:${l.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
         name: l.name,
         description: l.description,
-        nodeIds: graphPreview.nodes
+        nodeIds: graph.nodes
           .filter((n) => n.filePath && matchesAnyPattern(n.filePath, l.filePatterns))
           .map((n) => n.id),
       }));
@@ -223,11 +222,6 @@ export async function analyzeProject(
   } catch (err) {
     warnings.push(`Project summary generation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
-
-  const graph = builder.build();
-  graph.project.description = projectDescription;
-  graph.project.frameworks = frameworks;
-  graph.layers = layers;
 
   const validation = validateGraph(graph);
   if (!validation.success) {
