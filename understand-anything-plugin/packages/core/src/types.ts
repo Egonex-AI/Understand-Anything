@@ -114,6 +114,20 @@ export interface KnowledgeGraph {
   tour: TourStep[];
 }
 
+// DiffOverlay — maps a set of changed files onto the knowledge graph so the
+// dashboard can highlight changed vs. affected (blast-radius) nodes. Matches
+// the shape the understand-diff skill already writes/reads at
+// <ua-dir>/diff-overlay.json (see skills/understand-diff/SKILL.md step 8) —
+// this type/persistence pair formalizes that existing on-disk contract.
+export interface DiffOverlay {
+  version: string;
+  baseBranch?: string;
+  generatedAt: string;
+  changedFiles: string[];
+  changedNodeIds: string[];
+  affectedNodeIds: string[];
+}
+
 // Theme configuration (for dashboard customization)
 export interface ThemeConfig {
   presetId: string;
