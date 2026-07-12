@@ -95,12 +95,18 @@ export function createLlmCaller(apiKey: string, model: string, requestTimeoutMs 
                 settleReject(new Error(`Anthropic API error: ${parsed.error.message ?? JSON.stringify(parsed.error)}`));
                 return;
               }
-              const text = parsed?.content?.[0]?.text;
-              if (typeof text !== "string") {
-                settleReject(new Error(`Unexpected Anthropic response shape: ${data.slice(0, 300)}`));
+              // content[0] is not reliably the text block — extended thinking
+              // (enabled by default on some models/accounts) puts a "thinking"
+              // block first, with the actual response in a later block. Find
+              // the first block that's actually type "text" instead of
+              // blindly indexing [0].
+              const blocks = Array.isArray(parsed?.content) ? parsed.content : [];
+              const textBlock = blocks.find((b: { type?: string; text?: unknown }) => b?.type === "text" && typeof b.text === "string");
+              if (!textBlock) {
+                settleReject(new Error(`Unexpected Anthropic response shape (no text block found): ${data.slice(0, 300)}`));
                 return;
               }
-              settleResolve(text);
+              settleResolve(textBlock.text as string);
             } catch (err) {
               settleReject(err instanceof Error ? err : new Error(String(err)));
             }

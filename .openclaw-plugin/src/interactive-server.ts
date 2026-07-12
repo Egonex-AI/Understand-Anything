@@ -23,8 +23,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadGraph } from "@understand-anything/core";
 import { askAboutProject } from "./ask.js";
 import { createLlmCaller } from "./llm.js";
+import { generateCustomTour } from "./custom-tour.js";
+import { loadTours, upsertTour, makeTourId } from "./tour-store.js";
 
 const require = createRequire(import.meta.url);
 const viewerPkgJson = require.resolve("understand-anything-viewer/package.json");
@@ -211,24 +214,25 @@ const CONTENT_TYPES: Record<string, string> = {
   ".wasm": "application/wasm", ".woff": "font/woff", ".woff2": "font/woff2",
 };
 
-const ASK_WIDGET_SCRIPT_TAG = `<script src="/ask-widget.js" defer></script>`;
+const WIDGET_SCRIPT_TAGS = `<script src="/ask-widget.js" defer></script><script src="/tours-widget.js" defer></script>`;
 
 function serveIndexHtmlWithWidget(res: ServerResponse): void {
   const absolute = path.join(DIST_DIR, "index.html");
   let html = fs.readFileSync(absolute, "utf8");
-  html = html.includes("</body>") ? html.replace("</body>", `${ASK_WIDGET_SCRIPT_TAG}</body>`) : html + ASK_WIDGET_SCRIPT_TAG;
+  html = html.includes("</body>") ? html.replace("</body>", `${WIDGET_SCRIPT_TAGS}</body>`) : html + WIDGET_SCRIPT_TAGS;
   res.setHeader("Content-Type", "text/html");
   res.end(html);
 }
 
-function serveAskWidgetJs(res: ServerResponse): void {
-  const absolute = path.join(HERE, "ask-widget.js");
+function serveLocalScript(res: ServerResponse, filename: string): void {
+  const absolute = path.join(HERE, filename);
   res.setHeader("Content-Type", "text/javascript");
   res.end(fs.readFileSync(absolute, "utf8"));
 }
 
 function serveStatic(res: ServerResponse, pathname: string): void {
-  if (pathname === "/ask-widget.js") return serveAskWidgetJs(res);
+  if (pathname === "/ask-widget.js") return serveLocalScript(res, "ask-widget.js");
+  if (pathname === "/tours-widget.js") return serveLocalScript(res, "tours-widget.js");
 
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const absolute = path.resolve(DIST_DIR, relative);
@@ -265,7 +269,18 @@ function readBody(req: IncomingMessage, maxBytes: number): Promise<string> {
   });
 }
 
-const PROTECTED = new Set(["/knowledge-graph.json", "/domain-graph.json", "/diff-overlay.json", "/meta.json", "/config.json", "/file-content.json", "/ask.json"]);
+const TOKEN_VIA_HEADER = new Set(["/ask.json", "/generate-tour.json"]);
+const PROTECTED = new Set([
+  "/knowledge-graph.json",
+  "/domain-graph.json",
+  "/diff-overlay.json",
+  "/meta.json",
+  "/config.json",
+  "/file-content.json",
+  "/ask.json",
+  "/tours.json",
+  "/generate-tour.json",
+]);
 
 const server = createServer((req, res) => {
   void (async () => {
@@ -277,7 +292,7 @@ const server = createServer((req, res) => {
       return;
     }
 
-    const token = pathname === "/ask.json" ? req.headers["x-ask-token"] : url.searchParams.get("token");
+    const token = TOKEN_VIA_HEADER.has(pathname) ? req.headers["x-ask-token"] : url.searchParams.get("token");
     if (token !== ACCESS_TOKEN) {
       sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
       return;
@@ -298,6 +313,51 @@ const server = createServer((req, res) => {
         }
         const result = await askAboutProject(projectRoot, question, llmCall);
         sendJson(res, 200, result);
+      } catch (err) {
+        sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
+      }
+      return;
+    }
+
+    if (pathname === "/tours.json") {
+      sendJson(res, 200, { tours: loadTours(projectRoot) });
+      return;
+    }
+
+    if (pathname === "/generate-tour.json") {
+      if ((req.method ?? "GET").toUpperCase() !== "POST") {
+        sendJson(res, 405, { error: "POST required" });
+        return;
+      }
+      try {
+        const body = await readBody(req, 16384);
+        const parsed = JSON.parse(body || "{}") as { nodeIds?: unknown; prompt?: unknown };
+        const nodeIds = Array.isArray(parsed.nodeIds) ? parsed.nodeIds.filter((n): n is string => typeof n === "string") : [];
+        const userPrompt = typeof parsed.prompt === "string" ? parsed.prompt : "";
+
+        const graph = loadGraph(projectRoot, { validate: false });
+        if (!graph) {
+          sendJson(res, 404, { error: "No knowledge graph found for this project." });
+          return;
+        }
+
+        const result = await generateCustomTour(graph, nodeIds, userPrompt, llmCall);
+        if (result.error) {
+          sendJson(res, 400, { error: result.error });
+          return;
+        }
+
+        const tour = {
+          id: makeTourId("custom" as const),
+          kind: "custom" as const,
+          title: userPrompt.slice(0, 80),
+          description: userPrompt,
+          createdAt: new Date().toISOString(),
+          steps: result.steps,
+          prompt: userPrompt,
+        };
+        upsertTour(projectRoot, tour);
+        sendJson(res, 200, { tour });
       } catch (err) {
         sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
       }

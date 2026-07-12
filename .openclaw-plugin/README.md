@@ -40,11 +40,25 @@ connected agent can call mid-conversation, plus a dashboard route.
   its static assets.
 
   Unanalyzed projects get an **"Understand this project" button** right on
-  this page — no need to go find the tool call. With `allowAddProject: true`
-  (see Install below), the picker also gets an **"Add a project"** form: paste
-  a `https://github.com/owner/repo` URL (shallow-cloned into
-  `~/.local/share/understand-anything-plugin/clones`) or an existing local
-  path, and it's added to the list and analysis starts immediately.
+  this page — no need to go find the tool call. Already-analyzed ones get a
+  **"Re-analyze"** button (analysis is always a full, fresh re-run — never
+  incremental — so this is also how you reset a project's tours/summaries to
+  whatever the pipeline currently produces as it improves). With
+  `allowAddProject: true` (see Install below), the picker also gets an
+  **"Add a project"** form: paste a `https://github.com/owner/repo` URL
+  (shallow-cloned into `~/.local/share/understand-anything-plugin/clones`) or
+  an existing local path, and it's added to the list and analysis starts
+  immediately.
+
+  With an API key configured, the dashboard also gets a **"Tours" panel**
+  (🧭 button): every analyzed project gets two tours automatically —
+  a free, deterministic **module walkthrough** (dependency order, also
+  synced into the standard `graph.tour` field so upstream's own Learn
+  persona/LearnPanel plays it with zero changes) and an LLM-narrated
+  **code-review walkthrough** ranking the highest-risk files by complexity
+  and how central they are in the dependency graph. You can also select node(s)
+  in the graph canvas and type a prompt to generate a **custom tour** scoped
+  to just what you picked (e.g. "walk me through the auth flow").
 
 ## How it works
 
@@ -69,6 +83,16 @@ distinct server from `understand-anything-viewer` (same static dashboard
 build + JSON API, reused read-only) that adds the `/ask.json` endpoint and
 injects a small vanilla-JS chat widget (`src/ask-widget.js`, no build step)
 into the served `index.html`.
+
+Tours (`src/tour-generation.ts`, `src/custom-tour.ts`, `src/tour-store.ts`) are
+persisted to a plugin-owned `.ua/tours.json` sidecar, not the graph itself —
+upstream's schema only has room for one tour (`graph.tour`), so module
+walkthroughs go there for compatibility while code-review and custom tours
+live alongside in `tours.json` and are played by `src/tours-widget.js`, the
+same vanilla-JS/no-build-step pattern as the Ask widget. Selecting nodes for
+a custom tour reads the live React Flow selection via a `MutationObserver` on
+`.react-flow__node.selected` — zero patches to the dashboard's React source,
+the same non-invasive approach the whole interactive layer uses throughout.
 
 Project registration (`src/project-store.ts`) keeps config-declared projects
 (fixed, from `projects` below) and dynamically-added ones (persisted to

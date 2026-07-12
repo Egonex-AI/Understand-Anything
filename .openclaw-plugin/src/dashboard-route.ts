@@ -220,9 +220,13 @@ function pickerHtml(projects: string[], opts: PickerOptions): string {
       if (jobState === "running") anyRunning = true;
 
       if (analyzed) {
-        return `<li><a href="/understand-anything/open?project=${i}">${escapeHtml(p)}</a>${
-          jobState === "running" ? " <em>(re-analyzing…)</em>" : ""
-        }</li>`;
+        if (jobState === "running") {
+          return `<li><a href="/understand-anything/open?project=${i}">${escapeHtml(p)}</a> <em>(re-analyzing…)</em></li>`;
+        }
+        return `<li><a href="/understand-anything/open?project=${i}">${escapeHtml(p)}</a>
+          <form method="POST" action="/understand-anything/analyze?project=${i}" style="display:inline">
+            <button type="submit" style="font-size: 0.85em;">Re-analyze</button>
+          </form></li>`;
       }
       if (jobState === "running") {
         return `<li>${escapeHtml(p)} — <em>analyzing… (this page refreshes automatically)</em></li>`;

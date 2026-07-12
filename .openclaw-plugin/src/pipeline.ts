@@ -20,6 +20,8 @@ import {
 import { walkProject } from "./walk.js";
 import { matchesAnyPattern } from "./glob-match.js";
 import { mapWithConcurrency, type LlmCaller } from "./llm.js";
+import { generateModuleTour, generateCodeReviewTour } from "./tour-generation.js";
+import { upsertTour, makeTourId } from "./tour-store.js";
 
 const MAX_FILE_BYTES = 1024 * 1024; // skip anything over 1MB — matches the viewer's own cap
 const MAX_SOURCE_CHARS_FOR_PROMPT = 12_000; // bound per-file prompt size/cost
@@ -223,6 +225,12 @@ export async function analyzeProject(
     warnings.push(`Project summary generation failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  // Module walkthrough is free (no LLM) and goes straight into graph.tour —
+  // the only tour field upstream's dashboard/Learn persona knows how to play,
+  // so this keeps that working with zero changes. Populated before
+  // validation so the schema check covers it too.
+  graph.tour = generateModuleTour(graph);
+
   const validation = validateGraph(graph);
   if (!validation.success) {
     warnings.push(`Graph failed schema validation: ${validation.fatal ?? "unknown error"}`);
@@ -238,6 +246,34 @@ export async function analyzeProject(
     version: "0.1.0",
     analyzedFiles: filesAnalyzed,
   });
+
+  upsertTour(projectRoot, {
+    id: makeTourId("module"),
+    kind: "module",
+    title: "Module walkthrough",
+    description: "Dependency-ordered tour through the codebase's modules, generated automatically at analysis time.",
+    createdAt: new Date().toISOString(),
+    steps: finalGraph.tour,
+  });
+
+  log("Generating code-review tour...");
+  try {
+    const reviewSteps = await generateCodeReviewTour(finalGraph, llmCall);
+    if (reviewSteps.length > 0) {
+      upsertTour(projectRoot, {
+        id: makeTourId("codeReview"),
+        kind: "codeReview",
+        title: "Code review walkthrough",
+        description: "Highest-risk files ranked by complexity and how central they are in the dependency graph.",
+        createdAt: new Date().toISOString(),
+        steps: reviewSteps,
+      });
+    } else {
+      warnings.push("Code-review tour skipped: no code nodes to rank.");
+    }
+  } catch (err) {
+    warnings.push(`Code-review tour generation failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   return {
     graph: finalGraph,
