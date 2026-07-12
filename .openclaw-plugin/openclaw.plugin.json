@@ -1,0 +1,62 @@
+{
+  "id": "understand-anything",
+  "name": "Understand Anything",
+  "version": "0.1.0",
+  "description": "Native OpenClaw gateway plugin for Understand-Anything: tree-sitter + LLM knowledge-graph pipeline running inside the gateway process, with a gateway-mounted dashboard and query tools — no Claude Code / Task-tool dispatch required.",
+  "author": "Egonex (https://github.com/Egonex-AI/Understand-Anything), OpenClaw port by Tank",
+  "main": "dist/index.js",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "anthropicApiKey": {
+        "type": "string",
+        "description": "Anthropic API key for the LLM enrichment phase. Falls back to the gateway's default anthropic:default auth profile when unset."
+      },
+      "model": {
+        "type": "string",
+        "description": "Anthropic model id used for file/project/layer/tour analysis calls.",
+        "default": "claude-sonnet-5"
+      },
+      "concurrency": {
+        "type": "number",
+        "description": "Max concurrent per-file LLM analysis calls during a project scan.",
+        "default": 5,
+        "minimum": 1,
+        "maximum": 20
+      },
+      "maxFiles": {
+        "type": "number",
+        "description": "Safety cap on how many recognized source files a single analysis run will send to the LLM (cost/runtime bound on large repos).",
+        "default": 400,
+        "minimum": 1
+      },
+      "projects": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Absolute paths to projects this plugin is allowed to analyze/serve. Analysis and dashboard routes only operate on directories listed here; when empty or unset the plugin activates but every tool reports an empty project list."
+      }
+    }
+  },
+  "uiHints": {
+    "anthropicApiKey": {
+      "label": "Anthropic API Key",
+      "secret": true
+    },
+    "model": {
+      "label": "Analysis Model"
+    },
+    "concurrency": {
+      "label": "Analysis Concurrency"
+    },
+    "maxFiles": {
+      "label": "Max Files Per Analysis Run"
+    },
+    "projects": {
+      "label": "Allowed Project Paths"
+    }
+  }
+}
