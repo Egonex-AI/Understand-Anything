@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      astro:
+        specifier: 6.4.6
+        version: 6.4.6(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(yaml@2.8.3)
     devDependencies:
       '@eslint/js':
         specifier: ^9.0.0
@@ -225,11 +229,17 @@ packages:
   '@astrojs/compiler@4.0.0':
     resolution: {integrity: sha512-eouss7G8ygdZqHuke033VMcVw5HTZUu+PXd/h06DGDUg/jt5btPYPqh66ENWw/mU78rBrf/oeC4oqoBwMtDMNA==}
 
+  '@astrojs/internal-helpers@0.10.0':
+    resolution: {integrity: sha512-Ry2R3VPeIN4uPCSA4xQc+e+vsJXkalKpEbDc07hV+a/o5Bs2N/s/uDcPJH/05L19DKh9tAy7e6JM3YZ6Cxfezw==}
+
   '@astrojs/internal-helpers@0.9.1':
     resolution: {integrity: sha512-1pWuARqYom/TzuU3+0ZugsTrKlUydWKuULmDqSMTuonY+9IRDUEGKX/8PXQ1nBxRq3w85uGtd9q9SXfqEldMIQ==}
 
   '@astrojs/markdown-remark@7.1.2':
     resolution: {integrity: sha512-caXZ4Dc2St2dW8luEg22GlP0gupLdztCTQE4EzZOxW1pqWXz9mbeJEuHUkgDYcKWW8tjIHkydYDhWLVoxJ327Q==}
+
+  '@astrojs/markdown-remark@7.2.0':
+    resolution: {integrity: sha512-+YxmVQu1Bd+MFfSzjq1rOJvD9+nIOJzz5YIIhdIH01RrxRkKbyKoEgyIqP3yv51MhzMDgd79QaPv+kCVPT8vHw==}
 
   '@astrojs/prism@4.0.2':
     resolution: {integrity: sha512-KTivpmnz6lDsC6o9H4+DNm2SrE/GHzw8cNAvEJwAvUT+eoaEnn/4NtbDNfRRaxaJHdp15gf+tfHAWiXR4wB3BA==}
@@ -1296,6 +1306,7 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -1402,6 +1413,11 @@ packages:
 
   astro@6.3.7:
     resolution: {integrity: sha512-zIeDRrI0qNgN1lcCjNqt6/IVCVej7VwSa326cO8uP9BOk1cg4QuffhLnOn2gCgWQr32/wxpSRFfXiLKHglu1Tw==}
+    engines: {node: '>=22.12.0', npm: '>=9.6.5', pnpm: '>=7.1.0'}
+    hasBin: true
+
+  astro@6.4.6:
+    resolution: {integrity: sha512-48OBTBKR9ctbf+DQxpOuxGl8ebfn59zTuNQMBzptmG/Mi/H8IdfMSbJgGuX1I/4U6g9yazG1p4BHlf4+2hWU4Q==}
     engines: {node: '>=22.12.0', npm: '>=9.6.5', pnpm: '>=7.1.0'}
     hasBin: true
 
@@ -1636,6 +1652,9 @@ packages:
 
   devalue@5.6.4:
     resolution: {integrity: sha512-Gp6rDldRsFh/7XuouDbxMH3Mx8GMCcgzIb1pDTvNyn8pZGQ22u+Wa+lGV9dQCltFQ7uVw0MhRyb8XDskNFOReA==}
+
+  devalue@5.8.1:
+    resolution: {integrity: sha512-4CXDYRBGqN+57wVJkuXBYmpAVUSg3L6JAQa/DFqm238G73E1wuyc/JhGQJzN7vUf/CMphYau2zXbfWzDR5aTEw==}
 
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
@@ -3367,6 +3386,17 @@ snapshots:
 
   '@astrojs/compiler@4.0.0': {}
 
+  '@astrojs/internal-helpers@0.10.0':
+    dependencies:
+      '@types/hast': 3.0.4
+      '@types/mdast': 4.0.4
+      js-yaml: 4.1.1
+      picomatch: 4.0.4
+      retext-smartypants: 6.2.0
+      shiki: 4.0.2
+      smol-toml: 1.6.0
+      unified: 11.0.5
+
   '@astrojs/internal-helpers@0.9.1':
     dependencies:
       picomatch: 4.0.4
@@ -3389,6 +3419,28 @@ snapshots:
       retext-smartypants: 6.2.0
       shiki: 4.0.2
       smol-toml: 1.6.0
+      unified: 11.0.5
+      unist-util-remove-position: 5.0.0
+      unist-util-visit: 5.1.0
+      unist-util-visit-parents: 6.0.2
+      vfile: 6.0.3
+    transitivePeerDependencies:
+      - supports-color
+
+  '@astrojs/markdown-remark@7.2.0':
+    dependencies:
+      '@astrojs/internal-helpers': 0.10.0
+      '@astrojs/prism': 4.0.2
+      github-slugger: 2.0.0
+      hast-util-from-html: 2.0.3
+      hast-util-to-text: 4.0.2
+      mdast-util-definitions: 6.0.0
+      rehype-raw: 7.0.0
+      rehype-stringify: 10.0.1
+      remark-gfm: 4.0.1
+      remark-parse: 11.0.0
+      remark-rehype: 11.1.2
+      remark-smartypants: 3.0.2
       unified: 11.0.5
       unist-util-remove-position: 5.0.0
       unist-util-visit: 5.1.0
@@ -4327,14 +4379,6 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@3.2.4(vite@7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))':
-    dependencies:
-      '@vitest/spy': 3.2.4
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
-
   '@vitest/mocker@3.2.4(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))':
     dependencies:
       '@vitest/spy': 3.2.4
@@ -4451,6 +4495,99 @@ snapshots:
       common-ancestor-path: 2.0.0
       cookie: 1.1.1
       devalue: 5.6.4
+      diff: 8.0.3
+      dset: 3.1.4
+      es-module-lexer: 2.0.0
+      esbuild: 0.27.4
+      flattie: 1.1.1
+      fontace: 0.4.1
+      get-tsconfig: 5.0.0-beta.4
+      github-slugger: 2.0.0
+      html-escaper: 3.0.3
+      http-cache-semantics: 4.2.0
+      js-yaml: 4.1.1
+      jsonc-parser: 3.3.1
+      magic-string: 0.30.21
+      magicast: 0.5.2
+      mrmime: 2.0.1
+      neotraverse: 0.6.18
+      obug: 2.1.1
+      p-limit: 7.3.0
+      p-queue: 9.1.0
+      package-manager-detector: 1.6.0
+      piccolore: 0.1.3
+      picomatch: 4.0.4
+      rehype: 13.0.2
+      semver: 7.7.4
+      shiki: 4.0.2
+      smol-toml: 1.6.0
+      svgo: 4.0.1
+      tinyclip: 0.1.12
+      tinyexec: 1.0.4
+      tinyglobby: 0.2.15
+      ultrahtml: 1.6.0
+      unifont: 0.7.4
+      unist-util-visit: 5.1.0
+      unstorage: 1.17.5
+      vfile: 6.0.3
+      vite: 7.3.3(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
+      vitefu: 1.1.2(vite@7.3.3(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))
+      xxhash-wasm: 1.1.0
+      yargs-parser: 22.0.0
+      zod: 4.3.6
+    optionalDependencies:
+      sharp: 0.34.5
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@netlify/blobs'
+      - '@planetscale/database'
+      - '@types/node'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/functions'
+      - '@vercel/kv'
+      - aws4fetch
+      - db0
+      - idb-keyval
+      - ioredis
+      - jiti
+      - less
+      - lightningcss
+      - rollup
+      - sass
+      - sass-embedded
+      - stylus
+      - sugarss
+      - supports-color
+      - terser
+      - tsx
+      - uploadthing
+      - yaml
+
+  astro@6.4.6(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(yaml@2.8.3):
+    dependencies:
+      '@astrojs/compiler': 4.0.0
+      '@astrojs/internal-helpers': 0.10.0
+      '@astrojs/markdown-remark': 7.2.0
+      '@astrojs/telemetry': 3.3.2
+      '@capsizecss/unpack': 4.0.0
+      '@clack/prompts': 1.1.0
+      '@oslojs/encoding': 1.1.0
+      '@rollup/pluginutils': 5.3.0(rollup@4.59.0)
+      aria-query: 5.3.2
+      axobject-query: 4.1.0
+      ci-info: 4.4.0
+      clsx: 2.1.1
+      common-ancestor-path: 2.0.0
+      cookie: 1.1.1
+      devalue: 5.8.1
       diff: 8.0.3
       dset: 3.1.4
       es-module-lexer: 2.0.0
@@ -4722,6 +4859,8 @@ snapshots:
   detect-libc@2.1.2: {}
 
   devalue@5.6.4: {}
+
+  devalue@5.8.1: {}
 
   devlop@1.1.0:
     dependencies:
@@ -6255,8 +6394,8 @@ snapshots:
 
   tinyglobby@0.2.15:
     dependencies:
-      fdir: 6.5.0(picomatch@4.0.3)
-      picomatch: 4.0.3
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
 
   tinypool@1.1.1: {}
 
@@ -6592,7 +6731,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.3.1(@types/node@22.19.15)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))
+      '@vitest/mocker': 3.2.4(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4
