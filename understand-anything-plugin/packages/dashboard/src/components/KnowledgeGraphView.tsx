@@ -101,6 +101,7 @@ function KnowledgeGraphViewInner() {
   const searchResultsRaw = useDashboardStore((s) => s.searchResults);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
+  const filters = useDashboardStore((s) => s.filters);
 
   const onNodeClick = useCallback(
     (nodeId: string) => selectNode(nodeId),
@@ -121,10 +122,32 @@ function KnowledgeGraphViewInner() {
   const filteredGraph = useMemo((): KnowledgeGraph | null => {
     if (!graph) return null;
 
+    // Build the "in selected layer (or neighbor of one)" allow-set if any layer is selected.
+    // Many entity/claim nodes aren't assigned to any layer in the manifest, so without
+    // the neighbor expansion picking a layer would strip them out and the picked layer's
+    // articles would look orphaned.
+    let layerAllowed: Set<string> | null = null;
+    if (filters.layerIds.size > 0) {
+      const inLayer = new Set<string>();
+      for (const layer of graph.layers) {
+        if (filters.layerIds.has(layer.id)) {
+          for (const id of layer.nodeIds) inLayer.add(id);
+        }
+      }
+      const expanded = new Set(inLayer);
+      for (const e of graph.edges) {
+        if (inLayer.has(e.source)) expanded.add(e.target);
+        if (inLayer.has(e.target)) expanded.add(e.source);
+      }
+      layerAllowed = expanded;
+    }
+
     const filteredNodes = graph.nodes.filter((n) => {
       if (["article", "entity", "topic", "claim", "source"].includes(n.type)) {
-        return nodeTypeFilters.knowledge !== false;
+        if (nodeTypeFilters.knowledge === false) return false;
       }
+      if (!filters.nodeTypes.has(n.type)) return false;
+      if (layerAllowed && !layerAllowed.has(n.id)) return false;
       return true;
     });
 
@@ -134,7 +157,7 @@ function KnowledgeGraphViewInner() {
     );
 
     return { ...graph, nodes: filteredNodes, edges: filteredEdges };
-  }, [graph, nodeTypeFilters]);
+  }, [graph, nodeTypeFilters, filters]);
 
   // Compute layout ONCE per graph/filter change — stable positions
   const { positionMap, edgeCounts } = useMemo(() => {
