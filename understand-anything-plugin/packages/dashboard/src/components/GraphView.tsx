@@ -53,6 +53,7 @@ import {
 import { deriveContainers } from "../utils/containers";
 import type { DerivedContainer } from "../utils/containers";
 import { computeLayerStats } from "../utils/layerStats";
+import { sanitizeFlowEdges } from "../utils/sanitizeFlowEdge";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -340,7 +341,10 @@ function useOverviewGraph() {
           useDashboardStore.getState().appendLayoutIssues(issues);
         }
         const positionedNodes = mergeElkPositions(baseNodes, positioned);
-        setOverview({ nodes: positionedNodes, edges: flowEdges });
+        // Strip null / "null" / undefined sourceHandle/targetHandle so React
+        // Flow falls back to the node's default handle instead of looping on
+        // an unresolvable handle id (issue #330).
+        setOverview({ nodes: positionedNodes, edges: sanitizeFlowEdges(flowEdges) });
         setLayoutStatus("ready");
       })
       .catch((err) => {
@@ -1284,20 +1288,34 @@ function useLayerDetailGraph() {
     // Compose: Stage 1 / inflated edges, plus portal edges (Stage 1 sources
     // them off container atoms — re-sourcing on expand is deferred).
     const base = [...expandedEdges, ...topo.portalEdges];
-    if (!selectedNodeId) return base;
+    const styled = !selectedNodeId
+      ? base
+      : base.map((edge) => {
+          const isSelectedEdge =
+            edge.source === selectedNodeId || edge.target === selectedNodeId;
+          // Don't restyle diff-impacted or portal edges
+          if ((edge.style as Record<string, unknown>)?.strokeDasharray) return edge;
 
-    // Apply selection-based edge styling on top of topology edges
-    return base.map((edge) => {
-      const isSelectedEdge = edge.source === selectedNodeId || edge.target === selectedNodeId;
-      // Don't restyle diff-impacted or portal edges
-      if ((edge.style as Record<string, unknown>)?.strokeDasharray) return edge;
-
-      if (isSelectedEdge) {
-        return { ...edge, animated: true, style: { stroke: "rgba(212,165,116,0.8)", strokeWidth: 2.5 }, labelStyle: { fill: "#d4a574", fontSize: 11, fontWeight: 600 } };
-      }
-      // Fade unrelated edges
-      return { ...edge, animated: false, style: { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 }, labelStyle: { fill: "rgba(163,151,135,0.2)", fontSize: 10 } };
-    });
+          if (isSelectedEdge) {
+            return {
+              ...edge,
+              animated: true,
+              style: { stroke: "rgba(212,165,116,0.8)", strokeWidth: 2.5 },
+              labelStyle: { fill: "#d4a574", fontSize: 11, fontWeight: 600 },
+            };
+          }
+          // Fade unrelated edges
+          return {
+            ...edge,
+            animated: false,
+            style: { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 },
+            labelStyle: { fill: "rgba(163,151,135,0.2)", fontSize: 10 },
+          };
+        });
+    // Strip null / "null" / undefined sourceHandle/targetHandle so React
+    // Flow falls back to the node's default handle instead of looping on
+    // an unresolvable handle id (issue #330).
+    return sanitizeFlowEdges(styled);
   }, [expandedEdges, topo.portalEdges, selectedNodeId]);
 
   // Expose container topology so the parent component can wire auto-expand

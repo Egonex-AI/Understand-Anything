@@ -14,6 +14,7 @@ import CustomNode from "./CustomNode";
 import type { CustomNodeData } from "./CustomNode";
 import { useDashboardStore } from "../store";
 import { applyForceLayout, NODE_WIDTH, NODE_HEIGHT } from "../utils/layout";
+import { sanitizeFlowEdges } from "../utils/sanitizeFlowEdge";
 import type { KnowledgeGraph } from "@understand-anything/core/types";
 
 const nodeTypes = {
@@ -232,7 +233,10 @@ function KnowledgeGraphViewInner() {
       };
     });
 
-    return { nodes: rfNodes, edges: rfEdges };
+    // Strip null / "null" / undefined sourceHandle/targetHandle so React
+    // Flow falls back to the node's default handle instead of looping on
+    // an unresolvable handle id (issue #330).
+    return { nodes: rfNodes, edges: sanitizeFlowEdges(rfEdges) };
   }, [filteredGraph, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts]);
 
   if (!graph) {

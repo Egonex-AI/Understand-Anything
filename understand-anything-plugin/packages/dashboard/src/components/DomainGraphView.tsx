@@ -20,6 +20,7 @@ import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { mergeElkPositions, nodesToElkInput } from "../utils/layout";
 import { applyElkLayout } from "../utils/elk-layout";
+import { sanitizeFlowEdges } from "../utils/sanitizeFlowEdge";
 import type { KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 const nodeTypes = {
@@ -206,7 +207,10 @@ function DomainGraphViewInner() {
         }
         setLayout({
           nodes: mergeElkPositions(nodesArray, positioned),
-          edges: edgesArray,
+          // Strip null / "null" / undefined sourceHandle/targetHandle so
+          // React Flow falls back to the node's default handle instead of
+          // looping on an unresolvable handle id (issue #330).
+          edges: sanitizeFlowEdges(edgesArray),
         });
       })
       .catch((err) => {
