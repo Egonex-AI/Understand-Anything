@@ -228,7 +228,18 @@ cd "$HOME\.understand-anything\repo"
 # macOS / Linux — replace v2.9.0 with the release you want
 TAG=v2.9.0
 curl -fsSLO "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/${TAG}/install.sh"
-curl -fsSL  "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/${TAG}/SHA256SUMS" | sha256sum --ignore-missing -c -
+curl -fsSL  "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/${TAG}/SHA256SUMS" -o SHA256SUMS
+# Stock macOS ships `shasum` (not GNU `sha256sum`), so check for either.
+EXPECTED=$(grep 'install\.sh$' SHA256SUMS | awk '{print $1}')
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL=$(sha256sum install.sh | awk '{print $1}')
+else
+  ACTUAL=$(shasum -a 256 install.sh | awk '{print $1}')
+fi
+if [ "$EXPECTED" != "$ACTUAL" ]; then
+  echo "SHA256 mismatch — refusing to run installer" >&2
+  exit 1
+fi
 bash ./install.sh codex
 ```
 

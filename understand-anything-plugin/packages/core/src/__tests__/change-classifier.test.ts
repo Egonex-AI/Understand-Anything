@@ -153,8 +153,15 @@ describe("classifyUpdate", () => {
       deletedFiles: ["src/removed.ts"],
     });
 
-    const decision = classifyUpdate(analysis, 50);
+    // src/ already exists in the project (via allKnownFiles), so this doesn't
+    // read as a directory change and actually falls through to PARTIAL_UPDATE
+    // — omitting allKnownFiles here previously made every new/deleted file
+    // look like a brand-new directory, silently exercising the
+    // ARCHITECTURE_UPDATE branch instead of the one this test claims to cover.
+    const allKnownFiles = ["src/modified.ts", "src/removed.ts", "lib/util.ts"];
+    const decision = classifyUpdate(analysis, 50, allKnownFiles);
 
+    expect(decision.action).toBe("PARTIAL_UPDATE");
     expect(decision.filesToReanalyze).toContain("src/modified.ts");
     expect(decision.filesToReanalyze).toContain("src/added.ts");
     // Deleted files must be carried through so the consumer (auto-update-prompt.md's

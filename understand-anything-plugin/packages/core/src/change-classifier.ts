@@ -79,7 +79,7 @@ export function classifyUpdate(
   // Localized structural changes — partial update
   return {
     action: "PARTIAL_UPDATE",
-    filesToReanalyze: [...structurallyChangedFiles, ...newFiles],
+    filesToReanalyze: [...structurallyChangedFiles, ...newFiles, ...deletedFiles],
     rerunArchitecture: false,
     rerunTour: false,
     reason: `${structuralCount} file(s) have structural changes: ${summarizeChanges(analysis)}`,
