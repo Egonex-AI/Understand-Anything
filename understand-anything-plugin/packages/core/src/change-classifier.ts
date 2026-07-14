@@ -54,7 +54,7 @@ export function classifyUpdate(
           : ">50% of project";
     return {
       action: "FULL_UPDATE",
-      filesToReanalyze: [...structurallyChangedFiles, ...newFiles],
+      filesToReanalyze: [...structurallyChangedFiles, ...newFiles, ...deletedFiles],
       rerunArchitecture: true,
       rerunTour: true,
       reason: `${structuralCount} files have structural changes (${thresholdReason}) — full rebuild recommended`,
@@ -67,7 +67,7 @@ export function classifyUpdate(
   if (hasDirectoryChanges || structuralCount > 10) {
     return {
       action: "ARCHITECTURE_UPDATE",
-      filesToReanalyze: [...structurallyChangedFiles, ...newFiles],
+      filesToReanalyze: [...structurallyChangedFiles, ...newFiles, ...deletedFiles],
       rerunArchitecture: true,
       rerunTour: true,
       reason: hasDirectoryChanges

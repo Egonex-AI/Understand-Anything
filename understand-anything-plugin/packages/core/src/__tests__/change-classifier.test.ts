@@ -146,7 +146,7 @@ describe("classifyUpdate", () => {
     expect(decision.action).toBe("FULL_UPDATE");
   });
 
-  it("includes new and structural files in filesToReanalyze for PARTIAL", () => {
+  it("includes new, structural, and deleted files in filesToReanalyze for PARTIAL", () => {
     const analysis = makeAnalysis({
       structurallyChangedFiles: ["src/modified.ts"],
       newFiles: ["src/added.ts"],
@@ -157,8 +157,11 @@ describe("classifyUpdate", () => {
 
     expect(decision.filesToReanalyze).toContain("src/modified.ts");
     expect(decision.filesToReanalyze).toContain("src/added.ts");
-    // Deleted files shouldn't be re-analyzed
-    expect(decision.filesToReanalyze).not.toContain("src/removed.ts");
+    // Deleted files must be carried through so the consumer (auto-update-prompt.md's
+    // Phase 2 graph merge and Phase 3 fingerprint patch) knows to remove their nodes
+    // and fingerprints — they're not re-analyzed, but their path still needs to flow
+    // through this list since there's no separate deleted-files channel.
+    expect(decision.filesToReanalyze).toContain("src/removed.ts");
   });
 
   it("handles empty analysis (no changes at all)", () => {

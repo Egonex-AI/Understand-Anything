@@ -129,7 +129,12 @@ function filterSourceFiles(files: string[]): string[] {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
-  const ua = join(args.projectDir, ".understand-anything");
+  // Legacy directory first — projects analyzed before the `.ua` rename keep
+  // their existing `.understand-anything/` data.
+  const ua = join(
+    args.projectDir,
+    existsSync(join(args.projectDir, ".understand-anything")) ? ".understand-anything" : ".ua",
+  );
   const fingerprintsPath = join(ua, "fingerprints.json");
   const metaPath = join(ua, "meta.json");
   const outputPath =

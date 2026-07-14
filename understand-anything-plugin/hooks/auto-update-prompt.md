@@ -37,21 +37,21 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
    mkdir -p "$UA_DIR/intermediate"
    ```
 
-9. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
+9. **Resolve `$PLUGIN_ROOT`.** Needed by Phase 1's binary invocation regardless of whether `.understandignore` exists — resolve it unconditionally here, not nested inside the ignore-exclusions step below.
+   - Use `$CLAUDE_PLUGIN_ROOT` if set (Claude Code's hook context sets this).
+   - Otherwise try `$HOME/.understand-anything-plugin`.
+   - Validate the chosen candidate by checking `$candidate/packages/core/dist/ignore-filter.js` exists.
+   - If neither resolves: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
 
-   Without this step, files in user-excluded paths (migrations, vendored code, tests) are counted as structural changes and can spuriously escalate the action to `FULL_UPDATE` even when the real change set is tiny.
+10. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
 
-   1. If neither `$UA_DIR/.understandignore` nor `$PROJECT_ROOT/.understandignore` exists, the step 7 extension filter is sufficient — skip to Phase 1.
+    Without this step, files in user-excluded paths (migrations, vendored code, tests) are counted as structural changes and can spuriously escalate the action to `FULL_UPDATE` even when the real change set is tiny.
 
-   2. Write the step 7 file list to `$UA_DIR/intermediate/changed-files-pre.json` as a JSON array of relative paths.
+    1. If neither `$UA_DIR/.understandignore` nor `$PROJECT_ROOT/.understandignore` exists, the step 7 extension filter is sufficient — skip to Phase 1.
 
-   3. Resolve `$PLUGIN_ROOT`:
-      - Use `$CLAUDE_PLUGIN_ROOT` if set (Claude Code's hook context sets this).
-      - Otherwise try `$HOME/.understand-anything-plugin`.
-      - Validate the chosen candidate by checking `$candidate/packages/core/dist/ignore-filter.js` exists.
-      - If neither resolves: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
+    2. Write the step 7 file list to `$UA_DIR/intermediate/changed-files-pre.json` as a JSON array of relative paths.
 
-   4. Write `$UA_DIR/intermediate/ignore-filter.mjs`:
+    3. Write `$UA_DIR/intermediate/ignore-filter.mjs`:
       ```javascript
       import { readFileSync, writeFileSync, existsSync } from 'node:fs';
       import { pathToFileURL } from 'node:url';
@@ -80,16 +80,16 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
       console.log(`.understandignore: kept ${kept.length}/${input.length} (removed ${removed})`);
       ```
 
-   5. Run it:
-      ```bash
-      node "$UA_DIR/intermediate/ignore-filter.mjs" \
-        "$PLUGIN_ROOT" \
-        "$UA_DIR/intermediate/changed-files-pre.json"
-      ```
+    4. Run it:
+       ```bash
+       node "$UA_DIR/intermediate/ignore-filter.mjs" \
+         "$PLUGIN_ROOT" \
+         "$UA_DIR/intermediate/changed-files-pre.json"
+       ```
 
-   6. Read `$UA_DIR/intermediate/changed-files.json`. Pass the `kept` array as the input file list for Phase 1's fingerprint-check script.
+    5. Read `$UA_DIR/intermediate/changed-files.json`. Pass the `kept` array as the input file list for Phase 1's fingerprint-check script.
 
-   7. If `kept.length === 0`: update `meta.json` with the new commit hash, report "All changed source files are in ignored paths. Metadata updated." and **STOP**.
+    6. If `kept.length === 0`: update `meta.json` with the new commit hash, report "All changed source files are in ignored paths. Metadata updated." and **STOP**.
 
 ---
 

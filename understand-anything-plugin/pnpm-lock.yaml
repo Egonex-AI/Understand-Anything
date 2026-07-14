@@ -187,6 +187,8 @@ importers:
 
   packages/tree-sitter-swift-wasm: {}
 
+  packages/viewer: {}
+
 packages:
 
   '@ampproject/remapping@2.3.0':

@@ -225,18 +225,18 @@ cd "$HOME\.understand-anything\repo"
 **Quick install (curl-piped from a tag, with SHA256 verification):**
 
 ```bash
-# macOS / Linux — replace v2.7.4 with the release you want
-TAG=v2.7.4
-curl -fsSLO "https://raw.githubusercontent.com/Lum1104/Understand-Anything/${TAG}/install.sh"
-curl -fsSL  "https://raw.githubusercontent.com/Lum1104/Understand-Anything/${TAG}/SHA256SUMS" | sha256sum --ignore-missing -c -
+# macOS / Linux — replace v2.9.0 with the release you want
+TAG=v2.9.0
+curl -fsSLO "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/${TAG}/install.sh"
+curl -fsSL  "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/${TAG}/SHA256SUMS" | sha256sum --ignore-missing -c -
 bash ./install.sh codex
 ```
 
 ```powershell
-# Windows — replace v2.7.4 with the release you want
-$Tag = 'v2.7.4'
-Invoke-WebRequest -UseBasicParsing -OutFile install.ps1 -Uri "https://raw.githubusercontent.com/Lum1104/Understand-Anything/$Tag/install.ps1"
-$expected = (Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/Lum1104/Understand-Anything/$Tag/SHA256SUMS").Content `
+# Windows — replace v2.9.0 with the release you want
+$Tag = 'v2.9.0'
+Invoke-WebRequest -UseBasicParsing -OutFile install.ps1 -Uri "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/$Tag/install.ps1"
+$expected = (Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/$Tag/SHA256SUMS").Content `
   | Select-String -Pattern '^\s*([0-9a-f]+)\s+install\.ps1' | ForEach-Object { $_.Matches[0].Groups[1].Value }
 $actual = (Get-FileHash -Algorithm SHA256 install.ps1).Hash.ToLower()
 if ($expected -ne $actual) { throw "SHA256 mismatch — refusing to run installer" }
