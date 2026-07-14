@@ -40,8 +40,9 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 9. **Resolve `$PLUGIN_ROOT`.** Needed by Phase 1's binary invocation regardless of whether `.understandignore` exists — resolve it unconditionally here, not nested inside the ignore-exclusions step below.
    - Use `$CLAUDE_PLUGIN_ROOT` if set (Claude Code's hook context sets this).
    - Otherwise try `$HOME/.understand-anything-plugin`.
-   - Validate the chosen candidate by checking `$candidate/packages/core/dist/ignore-filter.js` exists.
-   - If neither resolves: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
+   - Validate the chosen candidate by checking that **both** `$candidate/packages/core/dist/ignore-filter.js` **and** `$candidate/packages/core/dist/bin/fingerprint-check.js` exist. Checking only `ignore-filter.js` isn't enough — that file predates the fingerprint-check binary, so a plugin checkout built before this feature shipped would pass validation here and then fail when Phase 1 tries to invoke a binary that was never built.
+   - If either check fails on an otherwise-valid candidate: report "Plugin install at `<candidate>` is missing `dist/bin/fingerprint-check.js` — rebuild with `pnpm --filter @understand-anything/core build` (or reinstall the plugin), then re-run." and **STOP**.
+   - If neither candidate resolves at all: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
 
 10. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
 
