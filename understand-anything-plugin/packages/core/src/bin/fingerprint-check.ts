@@ -231,7 +231,14 @@ async function main(): Promise<void> {
   // Build registry + run analysis.
   const registry = await buildRegistry();
   const analysis: ChangeAnalysis = analyzeChanges(args.projectDir, kept, store, registry);
-  const decision = classifyUpdate(analysis, fileCount, Object.keys(store.files));
+  // Subtract this commit's deletions before handing the baseline to the classifier — otherwise
+  // detectDirectoryChanges() sees the very file being removed still counted in the "known files"
+  // set, so a directory's last file being deleted never registers as a directory change (the
+  // check `!existingDirs.has(dir)` is trivially false when the deleted file itself put `dir`
+  // in `existingDirs`).
+  const deletedSet = new Set(analysis.deletedFiles);
+  const remainingKnownFiles = Object.keys(store.files).filter((f) => !deletedSet.has(f));
+  const decision = classifyUpdate(analysis, fileCount, remainingKnownFiles);
 
   writeOutput(outputPath, { decision, analysis, kept, ignored });
   summarize(args, decision, analysis, kept, ignored);
