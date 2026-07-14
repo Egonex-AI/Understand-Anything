@@ -145,7 +145,9 @@ Only re-analyze files with structural changes. This is the **only** phase that c
 
 1. Read the existing knowledge graph from `$UA_DIR/knowledge-graph.json`.
 
-2. Batch the files from `filesToReanalyze` (from Phase 1). Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
+2. Filter `filesToReanalyze` to files that still exist on disk, then batch those. Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
+
+   `filesToReanalyze` deliberately includes deleted files too (Phase 1's classifier folds them in so step 5's merge below can remove their nodes) — but there's nothing on disk to dispatch a `file-analyzer` subagent to read for those, so exclude them from the batch here. They still need to stay in the full `filesToReanalyze` list used by step 5's merge and by Phase 3's fingerprint patch, which is why this filters the batch input rather than filtering the list itself.
 
 3. For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Append:
 
