@@ -46,8 +46,8 @@ function shouldShowOnboarding(): boolean {
   return window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1";
 }
 
-/** Resolve data file URL — in demo mode, use env var URLs; otherwise use local paths with token. */
-function dataUrl(fileName: string, token: string | null): string {
+/** Resolve data file URL — in demo mode, use env var URLs; otherwise a plain local path. */
+function dataUrl(fileName: string): string {
   if (DEMO_MODE) {
     const envMap: Record<string, string | undefined> = {
       "knowledge-graph.json": import.meta.env.VITE_GRAPH_URL,
@@ -61,8 +61,13 @@ function dataUrl(fileName: string, token: string | null): string {
     const base = import.meta.env.BASE_URL || "/";
     return `${base.endsWith("/") ? base : `${base}/`}${fileName}`;
   }
-  const path = `/${fileName}`;
-  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
+  return `/${fileName}`;
+}
+
+/** Auth header for a data request — keeps the token out of the access log,
+ * matching what TokenGate's own validation request already does. */
+function authHeaders(token: string | null): HeadersInit | undefined {
+  return token && token !== "__demo__" ? { "X-Access-Token": token } : undefined;
 }
 
 /**
@@ -117,13 +122,13 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const [outputLanguage, setOutputLanguage] = useState<string | undefined>();
 
   useEffect(() => {
-    fetch(dataUrl("meta.json", accessToken))
+    fetch(dataUrl("meta.json"), { headers: authHeaders(accessToken) })
       .then((r) => (r.ok ? r.json() : null))
       .then((meta) => {
         if (meta?.theme) setMetaTheme(meta.theme);
       })
       .catch(() => {});
-    fetch(dataUrl("config.json", accessToken))
+    fetch(dataUrl("config.json"), { headers: authHeaders(accessToken) })
       .then((r) => (r.ok ? r.json() : null))
       .then((config) => {
         if (config?.outputLanguage) setOutputLanguage(config.outputLanguage);
@@ -132,7 +137,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, []);
 
   useEffect(() => {
-    fetch(dataUrl("knowledge-graph.json", accessToken))
+    fetch(dataUrl("knowledge-graph.json"), { headers: authHeaders(accessToken) })
       .then((res) => res.json())
       .then((data: unknown) => {
         const result = validateGraph(data);
@@ -165,7 +170,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setGraph]);
 
   useEffect(() => {
-    fetch(dataUrl("diff-overlay.json", accessToken))
+    fetch(dataUrl("diff-overlay.json"), { headers: authHeaders(accessToken) })
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
@@ -189,7 +194,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setDiffOverlay]);
 
   useEffect(() => {
-    fetch(dataUrl("domain-graph.json", accessToken))
+    fetch(dataUrl("domain-graph.json"), { headers: authHeaders(accessToken) })
       .then((res) => {
         if (!res.ok) return null;
         return res.json();

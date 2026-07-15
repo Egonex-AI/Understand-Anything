@@ -32,6 +32,7 @@ export {
 export { SearchEngine, type SearchResult, type SearchOptions } from "./search.js";
 export {
   getChangedFiles,
+  getChangedFilesStrict,
   isStale,
   mergeGraphUpdate,
   type StalenessResult,

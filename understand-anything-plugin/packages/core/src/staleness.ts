@@ -29,6 +29,27 @@ export function getChangedFiles(
 }
 
 /**
+ * Strict variant of `getChangedFiles`: throws on git error instead of
+ * returning []. Use when the caller needs to distinguish "no changes" from
+ * "could not diff" — e.g. shallow clones, history rewrites, pruned commits.
+ * The thrown error carries git's stderr so the caller can surface it.
+ */
+export function getChangedFilesStrict(
+  projectDir: string,
+  lastCommitHash: string,
+): string[] {
+  const output = execFileSync(
+    "git",
+    ["diff", `${lastCommitHash}..HEAD`, "--name-only"],
+    { cwd: projectDir, encoding: "utf-8" },
+  );
+  return output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+/**
  * Check whether the knowledge graph is stale relative to the current HEAD.
  */
 export function isStale(

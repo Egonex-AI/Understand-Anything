@@ -146,19 +146,29 @@ describe("classifyUpdate", () => {
     expect(decision.action).toBe("FULL_UPDATE");
   });
 
-  it("includes new and structural files in filesToReanalyze for PARTIAL", () => {
+  it("includes new, structural, and deleted files in filesToReanalyze for PARTIAL", () => {
     const analysis = makeAnalysis({
       structurallyChangedFiles: ["src/modified.ts"],
       newFiles: ["src/added.ts"],
       deletedFiles: ["src/removed.ts"],
     });
 
-    const decision = classifyUpdate(analysis, 50);
+    // src/ already exists in the project (via allKnownFiles), so this doesn't
+    // read as a directory change and actually falls through to PARTIAL_UPDATE
+    // — omitting allKnownFiles here previously made every new/deleted file
+    // look like a brand-new directory, silently exercising the
+    // ARCHITECTURE_UPDATE branch instead of the one this test claims to cover.
+    const allKnownFiles = ["src/modified.ts", "src/removed.ts", "lib/util.ts"];
+    const decision = classifyUpdate(analysis, 50, allKnownFiles);
 
+    expect(decision.action).toBe("PARTIAL_UPDATE");
     expect(decision.filesToReanalyze).toContain("src/modified.ts");
     expect(decision.filesToReanalyze).toContain("src/added.ts");
-    // Deleted files shouldn't be re-analyzed
-    expect(decision.filesToReanalyze).not.toContain("src/removed.ts");
+    // Deleted files must be carried through so the consumer (auto-update-prompt.md's
+    // Phase 2 graph merge and Phase 3 fingerprint patch) knows to remove their nodes
+    // and fingerprints — they're not re-analyzed, but their path still needs to flow
+    // through this list since there's no separate deleted-files channel.
+    expect(decision.filesToReanalyze).toContain("src/removed.ts");
   });
 
   it("handles empty analysis (no changes at all)", () => {

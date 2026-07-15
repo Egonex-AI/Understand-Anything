@@ -25,8 +25,8 @@ type SourceState =
   | { status: "loaded"; source: SourceFile; error: null }
   | { status: "error"; source: null; error: string };
 
-function fileContentUrl(filePath: string, token: string): string {
-  const params = new URLSearchParams({ token, path: filePath });
+function fileContentUrl(filePath: string): string {
+  const params = new URLSearchParams({ path: filePath });
   return `/file-content.json?${params.toString()}`;
 }
 
@@ -164,7 +164,10 @@ export default function CodeViewer({
     const controller = new AbortController();
     setState({ status: "loading", source: null, error: null });
 
-    fetch(fileContentUrl(node.filePath, accessToken), { signal: controller.signal })
+    fetch(fileContentUrl(node.filePath), {
+      signal: controller.signal,
+      headers: { "X-Access-Token": accessToken },
+    })
       .then(async (res) => {
         const data = (await res.json()) as SourceFile | { error?: string };
         if (!res.ok) {

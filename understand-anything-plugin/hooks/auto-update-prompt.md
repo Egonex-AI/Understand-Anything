@@ -37,21 +37,22 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
    mkdir -p "$UA_DIR/intermediate"
    ```
 
-9. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
+9. **Resolve `$PLUGIN_ROOT`.** Needed by Phase 1's binary invocation regardless of whether `.understandignore` exists — resolve it unconditionally here, not nested inside the ignore-exclusions step below.
+   - Use `$CLAUDE_PLUGIN_ROOT` if set (Claude Code's hook context sets this).
+   - Otherwise try `$HOME/.understand-anything-plugin`.
+   - Validate the chosen candidate by checking that **both** `$candidate/packages/core/dist/ignore-filter.js` **and** `$candidate/packages/core/dist/bin/fingerprint-check.js` exist. Checking only `ignore-filter.js` isn't enough — that file predates the fingerprint-check binary, so a plugin checkout built before this feature shipped would pass validation here and then fail when Phase 1 tries to invoke a binary that was never built.
+   - If either check fails on an otherwise-valid candidate: report "Plugin install at `<candidate>` is missing `dist/bin/fingerprint-check.js` — rebuild with `pnpm --filter @understand-anything/core build` (or reinstall the plugin), then re-run." and **STOP**.
+   - If neither candidate resolves at all: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
 
-   Without this step, files in user-excluded paths (migrations, vendored code, tests) are counted as structural changes and can spuriously escalate the action to `FULL_UPDATE` even when the real change set is tiny.
+10. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
 
-   1. If neither `$UA_DIR/.understandignore` nor `$PROJECT_ROOT/.understandignore` exists, the step 7 extension filter is sufficient — skip to Phase 1.
+    Without this step, files in user-excluded paths (migrations, vendored code, tests) are counted as structural changes and can spuriously escalate the action to `FULL_UPDATE` even when the real change set is tiny.
 
-   2. Write the step 7 file list to `$UA_DIR/intermediate/changed-files-pre.json` as a JSON array of relative paths.
+    1. If neither `$UA_DIR/.understandignore` nor `$PROJECT_ROOT/.understandignore` exists, the step 7 extension filter is sufficient — skip to Phase 1.
 
-   3. Resolve `$PLUGIN_ROOT`:
-      - Use `$CLAUDE_PLUGIN_ROOT` if set (Claude Code's hook context sets this).
-      - Otherwise try `$HOME/.understand-anything-plugin`.
-      - Validate the chosen candidate by checking `$candidate/packages/core/dist/ignore-filter.js` exists.
-      - If neither resolves: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
+    2. Write the step 7 file list to `$UA_DIR/intermediate/changed-files-pre.json` as a JSON array of relative paths.
 
-   4. Write `$UA_DIR/intermediate/ignore-filter.mjs`:
+    3. Write `$UA_DIR/intermediate/ignore-filter.mjs`:
       ```javascript
       import { readFileSync, writeFileSync, existsSync } from 'node:fs';
       import { pathToFileURL } from 'node:url';
@@ -80,63 +81,50 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
       console.log(`.understandignore: kept ${kept.length}/${input.length} (removed ${removed})`);
       ```
 
-   5. Run it:
-      ```bash
-      node "$UA_DIR/intermediate/ignore-filter.mjs" \
-        "$PLUGIN_ROOT" \
-        "$UA_DIR/intermediate/changed-files-pre.json"
-      ```
+    4. Run it:
+       ```bash
+       node "$UA_DIR/intermediate/ignore-filter.mjs" \
+         "$PLUGIN_ROOT" \
+         "$UA_DIR/intermediate/changed-files-pre.json"
+       ```
 
-   6. Read `$UA_DIR/intermediate/changed-files.json`. Pass the `kept` array as the input file list for Phase 1's fingerprint-check script.
+    5. Read `$UA_DIR/intermediate/changed-files.json`. Pass the `kept` array as the input file list for Phase 1's fingerprint-check script.
 
-   7. If `kept.length === 0`: update `meta.json` with the new commit hash, report "All changed source files are in ignored paths. Metadata updated." and **STOP**.
+    6. If `kept.length === 0`: update `meta.json` with the new commit hash, report "All changed source files are in ignored paths. Metadata updated." and **STOP**.
 
 ---
 
 ## Phase 1 — Structural Fingerprint Check (Zero LLM Tokens)
 
-This phase runs a deterministic Node.js script that compares file structures against stored fingerprints. It costs **zero LLM tokens** — only the script execution cost.
+This phase runs a deterministic Node binary (shipped in `packages/core`) that compares file structures against stored fingerprints. It costs **zero LLM tokens** — only the binary's execution cost (~hundreds of ms for typical commits).
 
-1. Write and execute a Node.js script (`$UA_DIR/intermediate/fingerprint-check.mjs`):
+The binary used to be regenerated by the LLM on every commit (a JavaScript snippet in this prompt), which caused issues #152 and #153 — silent fingerprint-store overwrites whenever the regenerated script had a subtle bug. Now we ship the implementation and the prompt just invokes it.
 
-```javascript
-// The script should:
-// 1. Read fingerprints.json from the data directory (.ua/fingerprints.json, or .understand-anything/fingerprints.json when that legacy directory is present — resolve UA_DIR the same way as the other scripts)
-// 2. For each changed source file:
-//    a. Read the file content
-//    b. Compute SHA-256 content hash
-//    c. If content hash matches stored hash → NONE (skip)
-//    d. Extract structural elements via regex:
-//       - Functions: match patterns like `function NAME(`, `const NAME = (`, `export function NAME(`
-//       - Classes: match `class NAME`, `export class NAME`
-//       - Imports: match `import ... from '...'`, `import '...'`
-//       - Exports: match `export { ... }`, `export default`, `export function`, `export class`, `export const`
-//    e. Compare extracted elements against stored fingerprint
-//    f. Classify as NONE, COSMETIC, or STRUCTURAL
-// 3. For new files (not in fingerprints.json): classify as STRUCTURAL
-// 4. For deleted files (in fingerprints.json but not on disk): classify as STRUCTURAL
-// 5. Determine overall decision:
-//    - All NONE/COSMETIC → action: "SKIP"
-//    - Some STRUCTURAL, ≤10 files, same directories → action: "PARTIAL_UPDATE"
-//    - New/deleted directories or >10 structural files → action: "ARCHITECTURE_UPDATE"
-//    - >30 structural files or >50% of graph → action: "FULL_UPDATE"
-// 6. Write result to <UA_DIR>/intermediate/change-analysis.json (.ua/, or .understand-anything/ when that legacy directory is present)
+1. Run:
+
+```bash
+node "$PLUGIN_ROOT/packages/core/dist/bin/fingerprint-check.js" \
+  --project-dir "$PROJECT_ROOT"
 ```
 
-The output JSON should have this shape:
-```json
-{
-  "action": "SKIP | PARTIAL_UPDATE | ARCHITECTURE_UPDATE | FULL_UPDATE",
-  "filesToReanalyze": ["src/new-feature.ts"],
-  "rerunArchitecture": false,
-  "rerunTour": false,
-  "reason": "1 file has structural changes (new function added)",
-  "fileChanges": [
-    { "filePath": "src/utils.ts", "changeLevel": "COSMETIC", "details": ["internal logic changed"] },
-    { "filePath": "src/new-feature.ts", "changeLevel": "STRUCTURAL", "details": ["new function: handleRequest"] }
-  ]
-}
-```
+   The binary reads `$PROJECT_ROOT/.understand-anything/fingerprints.json` + `meta.json` (for the last analyzed commit), diffs against `HEAD` via `git diff --name-only`, applies `.understandignore`, re-computes per-file fingerprints using the same tree-sitter + non-code parsers `/understand` uses to populate the baseline, and writes `change-analysis.json` to `$PROJECT_ROOT/.understand-anything/intermediate/`. The write is atomic (tmp + rename) so a partial file is never observable. Exit codes: `0` ok, `2` no fingerprints (run `/understand` first), `3` cannot determine compare base, `4` silent-load-failure guard tripped.
+
+   The output JSON shape:
+   ```json
+   {
+     "action": "SKIP | PARTIAL_UPDATE | ARCHITECTURE_UPDATE | FULL_UPDATE",
+     "filesToReanalyze": ["src/new-feature.ts"],
+     "rerunArchitecture": false,
+     "rerunTour": false,
+     "reason": "1 file has structural changes (new function added)",
+     "fileChanges": [
+       { "filePath": "src/utils.ts", "changeLevel": "COSMETIC", "details": ["internal logic changed"] },
+       { "filePath": "src/new-feature.ts", "changeLevel": "STRUCTURAL", "details": ["new function: handleRequest"] }
+     ],
+     "stats": { "consideredFiles": 2, "ignoredByUnderstandignore": 0, "newFiles": 1, "deletedFiles": 0, "structurallyChanged": 1, "cosmeticOnly": 1, "unchanged": 0 },
+     "generatedAt": "ISO 8601"
+   }
+   ```
 
 2. Read `$UA_DIR/intermediate/change-analysis.json`.
 
@@ -157,7 +145,9 @@ Only re-analyze files with structural changes. This is the **only** phase that c
 
 1. Read the existing knowledge graph from `$UA_DIR/knowledge-graph.json`.
 
-2. Batch the files from `filesToReanalyze` (from Phase 1). Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
+2. Filter `filesToReanalyze` to files that still exist on disk, then batch those. Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
+
+   `filesToReanalyze` deliberately includes deleted files too (Phase 1's classifier folds them in so step 5's merge below can remove their nodes) — but there's nothing on disk to dispatch a `file-analyzer` subagent to read for those, so exclude them from the batch here. They still need to stay in the full `filesToReanalyze` list used by step 5's merge and by Phase 3's fingerprint patch, which is why this filters the batch input rather than filtering the list itself.
 
 3. For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Append:
 
