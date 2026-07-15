@@ -361,6 +361,13 @@ node "<SKILL_DIR>/compute-batches.mjs" "$PROJECT_ROOT" \
   --changed-files="$UA_DIR/tmp/changed-files.txt"
 ```
 
+Before batching, `compute-batches.mjs` compares the changed paths with the
+retained inventory and the current files on disk. When it detects structural
+drift (add, delete, rename, or changed ignore rules), it runs a deterministic
+inventory/import-map refresh. This refresh does not call the project-scanner
+LLM and does not fall back to a full analysis. If the refresh fails, incremental
+analysis stops instead of silently continuing with a stale scan result.
+
 This produces a `batches.json` that contains only batches with changed files, but neighborMap entries still reference unchanged files (with their full-graph batchIndex) so cross-batch edges remain emittable.
 
 Then dispatch file-analyzer subagents per the same template as the full path.

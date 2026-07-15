@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,6 +51,61 @@ function setupProjectInDir(fixtureName, dirName) {
 function readBatches(projectRoot) {
   const p = join(projectRoot, '.understand-anything', 'intermediate', 'batches.json');
   return JSON.parse(readFileSync(p, 'utf-8'));
+}
+
+function incrementalFileMeta(path) {
+  return {
+    path,
+    language: 'typescript',
+    sizeLines: 1,
+    fileCategory: 'code',
+  };
+}
+
+function setupIncrementalProject({
+  inventoryPaths = ['src/existing.ts'],
+  diskFiles = { 'src/existing.ts': 'export const existing = true;\n' },
+} = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'ua-cb-incremental-'));
+  const dataDir = join(root, '.understand-anything');
+  const intermediateDir = join(dataDir, 'intermediate');
+  mkdirSync(intermediateDir, { recursive: true });
+
+  for (const [path, content] of Object.entries(diskFiles)) {
+    const absolutePath = join(root, ...path.split('/'));
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, content);
+  }
+
+  const files = inventoryPaths.map(incrementalFileMeta);
+  const scan = {
+    name: 'incremental-structure-test',
+    description: 'retained narrative',
+    languages: ['typescript'],
+    frameworks: ['vitest'],
+    files,
+    totalFiles: files.length,
+    filteredByIgnore: 0,
+    estimatedComplexity: 'small',
+    importMap: Object.fromEntries(inventoryPaths.map(path => [path, []])),
+  };
+  const scanPath = join(intermediateDir, 'scan-result.json');
+  writeFileSync(scanPath, `${JSON.stringify(scan, null, 2)}\n`);
+
+  return {
+    root,
+    dataDir,
+    scanPath,
+    batchesPath: join(intermediateDir, 'batches.json'),
+  };
+}
+
+function writeChangedList(project, lines) {
+  const changedDir = join(project.dataDir, 'tmp');
+  mkdirSync(changedDir, { recursive: true });
+  const changedPath = join(changedDir, 'changed-files.txt');
+  writeFileSync(changedPath, lines.join('\r\n'));
+  return changedPath;
 }
 
 describe('compute-batches.mjs — Louvain basic', () => {
@@ -592,6 +657,9 @@ describe('compute-batches.mjs — --changed-files', () => {
 
   it('emits only changed files from retained batches with Windows-style changed-file paths', () => {
     root = setupProject('scan-result-3-cliques.json');
+    mkdirSync(join(root, 'src', 'auth'), { recursive: true });
+    writeFileSync(join(root, 'src', 'auth', 'login.ts'), 'export const login = true;\n');
+    writeFileSync(join(root, 'src', 'auth', 'tokens.ts'), 'export const tokens = true;\n');
     const changedPath = join(root, 'changed.txt');
     // Only two files in the auth clique are changed. Use CRLF plus one
     // backslash path to cover Windows git diff/path-list inputs.
@@ -617,6 +685,8 @@ describe('compute-batches.mjs — --changed-files', () => {
 
   it('does not emit unchanged same-community files as analysis targets', () => {
     root = setupProject('scan-result-3-cliques.json');
+    mkdirSync(join(root, 'src', 'auth'), { recursive: true });
+    writeFileSync(join(root, 'src', 'auth', 'login.ts'), 'export const login = true;\n');
     const changedPath = join(root, 'changed.txt');
     writeFileSync(changedPath, 'src/auth/login.ts\n');
 
@@ -714,6 +784,309 @@ describe('compute-batches.mjs — --changed-files', () => {
     ]));
     expect(neighbors.find(n => n.path === 'src/a/core.ts').batchIndex).not.toBe(batch.batchIndex);
     expect(neighbors.find(n => n.path === 'src/b/middle.ts').batchIndex).toBe(batch.batchIndex);
+  });
+});
+
+describe('compute-batches.mjs — changed-file inventory refresh', () => {
+  let project;
+  const externalPaths = [];
+
+  afterEach(() => {
+    if (project?.root) rmSync(project.root, { recursive: true, force: true });
+    for (const path of externalPaths.splice(0)) {
+      rmSync(path, { recursive: true, force: true });
+    }
+  });
+
+  it('refreshes stale inventory so a Windows-style added path enters the batch', () => {
+    project = setupIncrementalProject({
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/added.ts': 'import { existing } from "./existing";\nexport const added = existing;\n',
+      },
+    });
+    const changedPath = writeChangedList(project, ['src\\added.ts', '']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(/structural drift detected \(file added\); refreshing scan inventory/);
+    expect(result.stderr).toMatch(/refresh-scan-result: files=2 added=1 removed=0 importEdges=1/);
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    expect(scan.files.map(file => file.path)).toContain('src/added.ts');
+    expect(scan.importMap['src/added.ts']).toEqual(['src/existing.ts']);
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.batches.flatMap(batch => batch.files.map(file => file.path)))
+      .toEqual(['src/added.ts']);
+  });
+
+  it('refreshes stale inventory so a deleted path is not batched', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'src/deleted.ts'],
+      diskFiles: { 'src/existing.ts': 'export const existing = true;\n' },
+    });
+    const changedPath = writeChangedList(project, ['src/deleted.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(/structural drift detected \(file removed\); refreshing scan inventory/);
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    expect(scan.files.map(file => file.path)).not.toContain('src/deleted.ts');
+    expect(scan.importMap).not.toHaveProperty('src/deleted.ts');
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.totalBatches).toBe(0);
+    expect(out.batches).toEqual([]);
+  });
+
+  it('refreshes once for rename-old plus rename-new and analyzes only the new path', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'src/original.ts'],
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/renamed.ts': 'export const renamed = true;\n',
+      },
+    });
+    const changedPath = writeChangedList(project, ['src/original.ts', 'src/renamed.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    expect(scan.files.map(file => file.path).sort()).toEqual([
+      'src/existing.ts',
+      'src/renamed.ts',
+    ]);
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.batches.flatMap(batch => batch.files.map(file => file.path)))
+      .toEqual(['src/renamed.ts']);
+  });
+
+  it('keeps modified-only output deterministic without touching scan bytes or mtime', () => {
+    project = setupIncrementalProject();
+    const fixedTime = new Date('2024-01-02T03:04:05.000Z');
+    utimesSync(project.scanPath, fixedTime, fixedTime);
+    const beforeBytes = readFileSync(project.scanPath);
+    const beforeMtime = statSync(project.scanPath).mtimeMs;
+    const changedPath = writeChangedList(project, ['src/existing.ts']);
+
+    const first = runScript(project.root, [`--changed-files=${changedPath}`]);
+    const firstBatches = readFileSync(project.batchesPath, 'utf-8');
+    const second = runScript(project.root, [`--changed-files=${changedPath}`]);
+    const secondBatches = readFileSync(project.batchesPath, 'utf-8');
+
+    expect(first.status).toBe(0);
+    expect(second.status).toBe(0);
+    expect(first.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(second.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(secondBatches).toBe(firstBatches);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    expect(statSync(project.scanPath).mtimeMs).toBe(beforeMtime);
+  });
+
+  it('does not refresh for an empty changed-file list', () => {
+    project = setupIncrementalProject();
+    const beforeBytes = readFileSync(project.scanPath);
+    const beforeMtime = statSync(project.scanPath).mtimeMs;
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    expect(statSync(project.scanPath).mtimeMs).toBe(beforeMtime);
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.totalBatches).toBe(0);
+  });
+
+  it('refreshes an added ignored path but finishes with zero analysis batches', () => {
+    project = setupIncrementalProject({
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/ignored.ts': 'export const ignored = true;\n',
+      },
+    });
+    writeFileSync(join(project.root, '.understandignore'), 'src/ignored.ts\n');
+    const changedPath = writeChangedList(project, ['src/ignored.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(/refresh-scan-result:/);
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    expect(scan.files.map(file => file.path)).not.toContain('src/ignored.ts');
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.totalBatches).toBe(0);
+  });
+
+  it.each([
+    ['root ignore file', '.understandignore'],
+    ['active data-dir ignore file', '.understand-anything/.understandignore'],
+  ])('forces deterministic refresh when the %s changes', (_label, ignorePath) => {
+    project = setupIncrementalProject();
+    const absoluteIgnorePath = join(project.root, ...ignorePath.split('/'));
+    mkdirSync(dirname(absoluteIgnorePath), { recursive: true });
+    writeFileSync(absoluteIgnorePath, '# changed ignore rules\n');
+    const changedPath = writeChangedList(project, [ignorePath]);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(/structural drift detected \(ignore rules changed\)/);
+    expect(result.stderr).toMatch(/refresh-scan-result:/);
+  });
+
+  it('does not refresh structural drift in full mode', () => {
+    project = setupIncrementalProject({
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/added.ts': 'export const added = true;\n',
+      },
+    });
+    const beforeBytes = readFileSync(project.scanPath);
+
+    const result = runScript(project.root);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.totalFiles).toBe(1);
+  });
+
+  it('fails closed without changing scan or writing batches when refresh fails', () => {
+    project = setupIncrementalProject({
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/added.ts': 'export const added = true;\n',
+      },
+    });
+    const beforeBytes = readFileSync(project.scanPath);
+    writeFileSync(join(project.dataDir, 'tmp'), 'blocks refresh temp directory\n');
+    const changedDir = mkdtempSync(join(tmpdir(), 'ua-cb-changed-external-'));
+    externalPaths.push(changedDir);
+    const changedPath = join(changedDir, 'changed-files.txt');
+    writeFileSync(changedPath, 'src/added.ts\n');
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/refresh-scan-result\.mjs failed:/);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it('rejects absolute, drive-relative, and parent traversal paths from drift detection', () => {
+    project = setupIncrementalProject();
+    const beforeBytes = readFileSync(project.scanPath);
+    const changedPath = writeChangedList(project, [
+      '../outside.ts',
+      'C:\\outside.ts',
+      '/absolute.ts',
+      'src/../outside.ts',
+    ]);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.totalBatches).toBe(0);
+  });
+
+  it('fails closed before reading an inventoried path that resolves outside the project', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'linked/outside.ts'],
+    });
+    const outsideDir = mkdtempSync(join(tmpdir(), 'ua-cb-outside-'));
+    externalPaths.push(outsideDir);
+    writeFileSync(join(outsideDir, 'outside.ts'), 'export const outside = true;\n');
+    symlinkSync(outsideDir, join(project.root, 'linked'), 'junction');
+    const beforeBytes = readFileSync(project.scanPath);
+    const changedPath = writeChangedList(project, ['linked/outside.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/changed path resolves outside project root/);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it.each([
+    ['an added file', ['src/added.ts', 'linked/outside.ts'], true],
+    ['an ignore-file change', ['.understandignore', 'linked/outside.ts'], false],
+  ])('validates every changed path when %s appears before an outside junction', (
+    _label,
+    changedFiles,
+    includeAddedFile,
+  ) => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'linked/outside.ts'],
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        ...(includeAddedFile
+          ? { 'src/added.ts': 'export const added = true;\n' }
+          : {}),
+      },
+    });
+    if (!includeAddedFile) {
+      writeFileSync(join(project.root, '.understandignore'), '# changed ignore rules\n');
+    }
+    const outsideDir = mkdtempSync(join(tmpdir(), 'ua-cb-outside-late-'));
+    externalPaths.push(outsideDir);
+    writeFileSync(join(outsideDir, 'outside.ts'), 'export const outside = true;\n');
+    symlinkSync(outsideDir, join(project.root, 'linked'), 'junction');
+    const beforeBytes = readFileSync(project.scanPath);
+    const changedPath = writeChangedList(project, changedFiles);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/changed path resolves outside project root/);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it('fails closed when inspecting a changed path raises a non-missing stat error', () => {
+    const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+      import { isChangedPathFile } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
+      const accessError = Object.assign(new Error('access denied'), { code: 'EACCES' });
+      try {
+        isChangedPathFile('not-disclosed', () => { throw accessError; });
+        process.exitCode = 2;
+      } catch (error) {
+        process.stderr.write(error.message);
+        process.exitCode = /changed path stat failed \\(EACCES\\)/.test(error.message) ? 0 : 1;
+      }
+    `], { encoding: 'utf-8' });
+
+    expect(probe.status).toBe(0);
+    expect(probe.stderr).toMatch(/changed path stat failed \(EACCES\)/);
+  });
+
+  it('does not disclose absolute paths when realpath inspection fails', () => {
+    const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+      import { resolveRealPathForContainment } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
+      const realpathError = Object.assign(new Error('C:\\\\secret\\\\project'), { code: 'EIO' });
+      try {
+        resolveRealPathForContainment('C:\\\\secret\\\\project', 'changed path', () => {
+          throw realpathError;
+        });
+        process.exitCode = 2;
+      } catch (error) {
+        process.stderr.write(error.message);
+        process.exitCode = error.message === 'changed path realpath failed (EIO)' ? 0 : 1;
+      }
+    `], { encoding: 'utf-8' });
+
+    expect(probe.status).toBe(0);
+    expect(probe.stderr).toBe('changed path realpath failed (EIO)');
+    expect(probe.stderr).not.toContain('secret');
   });
 });
 

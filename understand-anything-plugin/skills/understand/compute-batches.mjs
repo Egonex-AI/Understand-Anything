@@ -15,11 +15,12 @@
  *   Output: <ua-dir>/intermediate/batches.json
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 
 /**
  * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
@@ -30,6 +31,7 @@ import { createRequire } from 'node:module';
 const IO_PARALLELISM = 64;
 
 const __filename = fileURLToPath(import.meta.url);
+const REFRESH_SCRIPT = join(dirname(__filename), 'refresh-scan-result.mjs');
 const PLUGIN_ROOT = resolve(dirname(__filename), '../..');
 const require = createRequire(resolve(PLUGIN_ROOT, 'package.json'));
 
@@ -252,6 +254,118 @@ function normalizeRelativePathForMatch(pathText) {
     .replace(/\/+/g, '/');
 }
 
+function resolveChangedProjectFile(projectRoot, normalizedPath) {
+  if (
+    !normalizedPath
+    || normalizedPath.includes('\0')
+    || isAbsolute(normalizedPath)
+    || win32.isAbsolute(normalizedPath)
+    || /^[A-Za-z]:/.test(normalizedPath)
+  ) {
+    return null;
+  }
+
+  const absolutePath = resolve(projectRoot, normalizedPath);
+  const roundTrip = relative(projectRoot, absolutePath).split(sep).join('/');
+  if (
+    roundTrip !== normalizedPath
+    || roundTrip === '..'
+    || roundTrip.startsWith('../')
+    || isAbsolute(roundTrip)
+    || win32.isAbsolute(roundTrip)
+  ) {
+    return null;
+  }
+  return absolutePath;
+}
+
+export function isChangedPathFile(absolutePath, stat = statSync) {
+  try {
+    return stat(absolutePath).isFile();
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return false;
+    const code = error?.code || 'UNKNOWN';
+    throw new Error(`changed path stat failed (${code})`);
+  }
+}
+
+export function resolveRealPathForContainment(
+  absolutePath,
+  label,
+  resolveRealpath = realpathSync,
+) {
+  try {
+    return resolveRealpath(absolutePath);
+  } catch (error) {
+    const code = error?.code || 'UNKNOWN';
+    throw new Error(`${label} realpath failed (${code})`);
+  }
+}
+
+function isWithinRealProjectRoot(realProjectRoot, absolutePath) {
+  const realChangedPath = resolveRealPathForContainment(absolutePath, 'changed path');
+  const realRelative = relative(realProjectRoot, realChangedPath).split(sep).join('/');
+  return realRelative !== '..'
+    && !realRelative.startsWith('../')
+    && !isAbsolute(realRelative)
+    && !win32.isAbsolute(realRelative);
+}
+
+function findStructuralDrift(projectRoot, uaDir, scan, changedFiles) {
+  const activeUaPath = relative(projectRoot, uaDir).split(sep).join('/');
+  const activeIgnorePath = normalizeRelativePathForMatch(
+    `${activeUaPath}/.understandignore`,
+  );
+  const inventoryPaths = new Set(
+    (scan.files || []).map(file => normalizeRelativePathForMatch(file.path)),
+  );
+  const realProjectRoot = resolveRealPathForContainment(projectRoot, 'project root');
+  const pathStates = [];
+  for (const changedPath of changedFiles) {
+    const absolutePath = resolveChangedProjectFile(projectRoot, changedPath);
+    if (!absolutePath) continue;
+
+    const existsOnDisk = isChangedPathFile(absolutePath);
+    if (existsOnDisk && !isWithinRealProjectRoot(realProjectRoot, absolutePath)) {
+      throw new Error('changed path resolves outside project root');
+    }
+    pathStates.push({ path: changedPath, existsOnDisk });
+  }
+
+  if (
+    changedFiles.has('.understandignore')
+    || changedFiles.has(activeIgnorePath)
+  ) {
+    return 'ignore rules changed';
+  }
+  for (const { path, existsOnDisk } of pathStates) {
+    if (existsOnDisk !== inventoryPaths.has(path)) {
+      return existsOnDisk ? 'file added' : 'file removed';
+    }
+  }
+  return null;
+}
+
+function refreshScanInventory(projectRoot, reason) {
+  process.stderr.write(
+    `Info: compute-batches: structural drift detected (${reason}); `
+    + `refreshing scan inventory\n`,
+  );
+  const result = spawnSync(process.execPath, [REFRESH_SCRIPT, projectRoot], {
+    encoding: 'utf-8',
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) {
+    throw new Error(`inventory refresh failed to start: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    const outcome = result.signal ? `signal ${result.signal}` : `status ${result.status}`;
+    throw new Error(`inventory refresh failed with ${outcome}`);
+  }
+}
+
 /**
  * Returns Map<path, communityId> via Louvain. May throw — caller must catch
  * and fall back if it does. Honors UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW=1
@@ -359,11 +473,12 @@ function mergeSmallBatches(bareBatches) {
 
 // ── Main: load → Louvain (or count-fallback) → enrich → write batches.json ─
 async function main() {
-  const projectRoot = process.argv[2];
-  if (!projectRoot) {
+  const projectRootArg = process.argv[2];
+  if (!projectRootArg) {
     process.stderr.write('Usage: node compute-batches.mjs <project-root> [--changed-files=<path>]\n');
     process.exit(1);
   }
+  const projectRoot = resolve(projectRootArg);
 
   let changedFiles = null;
   for (const arg of process.argv.slice(3)) {
@@ -394,7 +509,14 @@ async function main() {
     process.exit(1);
   }
 
-  const scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+  let scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+  if (changedFiles) {
+    const driftReason = findStructuralDrift(projectRoot, uaDir, scan, changedFiles);
+    if (driftReason) {
+      refreshScanInventory(projectRoot, driftReason);
+      scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+    }
+  }
   const files = scan.files || [];
   const codeFiles = files.filter(f => f.fileCategory === 'code');
   const nonCodeFiles = files.filter(f => f.fileCategory !== 'code');
