@@ -1,6 +1,30 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { findChild, findChildren } from "./base-extractor.js";
+import {
+  branchTypeMatcher,
+  computeCyclomaticComplexity,
+  findChild,
+  findChildren,
+} from "./base-extractor.js";
+
+/**
+ * AST node types that introduce a decision point in Python. Includes
+ * `boolean_operator` for `and`/`or` (which tree-sitter-python exposes as a
+ * dedicated node type, unlike TypeScript) so short-circuit `if a and b:`
+ * counts the same as `if a: if b:`.
+ */
+const PYTHON_BRANCH_NODE_TYPES = new Set<string>([
+  "if_statement",
+  "elif_clause",
+  "while_statement",
+  "for_statement",
+  "except_clause",
+  "conditional_expression", // `a if cond else b`
+  "case_clause",
+  "boolean_operator",
+]);
+
+const isPythonBranch = branchTypeMatcher(PYTHON_BRANCH_NODE_TYPES);
 
 /**
  * Extract parameter names from a Python `parameters` node.
@@ -209,6 +233,7 @@ export class PythonExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, isPythonBranch),
     });
   }
 

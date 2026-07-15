@@ -1,6 +1,40 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { findChild, findChildren } from "./base-extractor.js";
+import {
+  computeCyclomaticComplexity,
+  findChild,
+  findChildren,
+} from "./base-extractor.js";
+
+/**
+ * AST node types that introduce a decision point in Go. tree-sitter-go
+ * represents short-circuit operators (`&&`, `||`) as `binary_expression`
+ * sharing the type with arithmetic operators, so those are detected by
+ * inspecting the operator child rather than by name.
+ */
+const GO_BRANCH_NODE_TYPES = new Set<string>([
+  "if_statement",
+  "for_statement",
+  "type_switch_statement",
+  "expression_case",
+  "type_case",
+  "default_case",
+  "communication_case", // select statement cases
+  "select_statement",
+]);
+
+const GO_SHORT_CIRCUIT_OPS = new Set<string>(["&&", "||"]);
+
+function isGoBranch(node: TreeSitterNode): boolean {
+  if (GO_BRANCH_NODE_TYPES.has(node.type)) return true;
+  if (node.type === "binary_expression") {
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child && GO_SHORT_CIRCUIT_OPS.has(child.type)) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Extract parameter names from a Go `parameter_list` node.
@@ -203,6 +237,7 @@ export class GoExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, isGoBranch),
     });
 
     if (isExported(nameNode.text)) {
@@ -234,6 +269,7 @@ export class GoExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, isGoBranch),
     });
 
     // Track receiver type for struct association

@@ -183,7 +183,15 @@ export interface ReferenceResolution {
 
 // Plugin interfaces
 export interface StructuralAnalysis {
-  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string }>;
+  /**
+   * `cyclomaticComplexity` is optional and only populated by extractors that
+   * have wired up the per-language branch-node-type list (see
+   * `computeCyclomaticComplexity` in base-extractor.ts). When absent it
+   * means "extractor doesn't compute this yet", not "complexity is 0";
+   * downstream code (graph nodes, dashboard, complexity-based scoring)
+   * must treat the field as `number | undefined`.
+   */
+  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string; cyclomaticComplexity?: number }>;
   classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
   imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;

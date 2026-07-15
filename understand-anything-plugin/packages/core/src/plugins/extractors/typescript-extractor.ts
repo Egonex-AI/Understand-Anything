@@ -1,6 +1,46 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { getStringValue } from "./base-extractor.js";
+import { computeCyclomaticComplexity, getStringValue } from "./base-extractor.js";
+
+/**
+ * AST node types that introduce an additional decision point in TypeScript /
+ * JavaScript / TSX / JSX source. Used to compute McCabe cyclomatic
+ * complexity per function.
+ *
+ * Short-circuit operators (`&&`, `||`, `??`) are not in this set because
+ * tree-sitter-typescript represents them as `binary_expression` nodes
+ * sharing the same type with arithmetic operators — we detect those in
+ * `isTypeScriptBranch` below by inspecting the operator child.
+ */
+const TS_BRANCH_NODE_TYPES = new Set<string>([
+  "if_statement",
+  "while_statement",
+  "do_statement",
+  "for_statement",
+  "for_in_statement",
+  "for_of_statement",
+  "catch_clause",
+  "ternary_expression",
+  "switch_case",
+  "switch_default",
+]);
+
+/** Short-circuit binary operators that count as McCabe decision points. */
+const TS_SHORT_CIRCUIT_OPS = new Set<string>(["&&", "||", "??"]);
+
+function isTypeScriptBranch(node: TreeSitterNode): boolean {
+  if (TS_BRANCH_NODE_TYPES.has(node.type)) return true;
+  if (node.type === "binary_expression") {
+    // tree-sitter-typescript exposes the operator as a child token whose
+    // type IS the operator text (e.g. "&&"). Look at the second child
+    // (left operand, operator, right operand).
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child && TS_SHORT_CIRCUIT_OPS.has(child.type)) return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Extract parameter names from a formal_parameters node.
@@ -261,6 +301,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, isTypeScriptBranch),
     });
   }
 
@@ -351,6 +392,9 @@ export class TypeScriptExtractor implements LanguageExtractor {
           ],
           params,
           returnType,
+          // For arrow functions / function expressions, complexity is
+          // measured over the function body, not the surrounding declarator.
+          cyclomaticComplexity: computeCyclomaticComplexity(valueNode, isTypeScriptBranch),
         });
       }
     }

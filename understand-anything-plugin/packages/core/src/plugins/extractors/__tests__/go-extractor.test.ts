@@ -596,4 +596,87 @@ func helper(x int) string {
       parser.delete();
     });
   });
+
+  describe("cyclomaticComplexity", () => {
+    it("returns 1 for a straight-line function", () => {
+      const { root, tree, parser } = parse(`
+package main
+
+func add(a, b int) int {
+  return a + b
+}`);
+      const result = extractor.extractStructure(root);
+      expect(result.functions[0].cyclomaticComplexity).toBe(1);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("counts if + for + select branches", () => {
+      const { root, tree, parser } = parse(`
+package main
+
+func decide(x int) int {
+  if x > 0 {       // +1
+    for i := 0; i < x; i++ {  // +1
+      if i == 5 { return i }  // +1
+    }
+  }
+  return 0
+}`);
+      const result = extractor.extractStructure(root);
+      // base 1 + if + for + nested if = 4
+      expect(result.functions[0].cyclomaticComplexity).toBe(4);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("counts short-circuit && / || operators", () => {
+      const { root, tree, parser } = parse(`
+package main
+
+func gate(a, b, c bool) bool {
+  if a && b || c {  // if + && + ||  = +3
+    return true
+  }
+  return false
+}`);
+      const result = extractor.extractStructure(root);
+      // base 1 + if + && + || = 4
+      expect(result.functions[0].cyclomaticComplexity).toBe(4);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("ignores arithmetic binary expressions", () => {
+      const { root, tree, parser } = parse(`
+package main
+
+func compute(a, b int) int {
+  return a + b * 2 - 1  // arithmetic only — no branches
+}`);
+      const result = extractor.extractStructure(root);
+      expect(result.functions[0].cyclomaticComplexity).toBe(1);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("populates complexity on methods, not just top-level functions", () => {
+      const { root, tree, parser } = parse(`
+package main
+
+type Server struct{}
+
+func (s *Server) Handle(req string) error {
+  if req == "" {        // +1
+    return nil
+  }
+  return nil
+}`);
+      const result = extractor.extractStructure(root);
+      const handle = result.functions.find((f) => f.name === "Handle");
+      expect(handle?.cyclomaticComplexity).toBe(2);
+      tree.delete();
+      parser.delete();
+    });
+  });
 });
