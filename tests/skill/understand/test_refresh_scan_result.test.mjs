@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync as realRenameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -297,6 +298,28 @@ describe('refresh-scan-result.mjs validation', () => {
       .toThrow(/relative POSIX|reserved data path/i);
   });
 
+  it('matches reserved root data directories case-insensitively only on Windows', async () => {
+    const { validateInventory } = await loadRefreshModule();
+    const uppercaseRootPaths = [
+      '.UA/intermediate/leak.json',
+      '.UNDERSTAND-ANYTHING/tmp/leak.json',
+    ];
+
+    for (const path of uppercaseRootPaths) {
+      if (process.platform === 'win32') {
+        expect(() => validateInventory(inventory([file(path)])))
+          .toThrow(/reserved data path/i);
+      } else {
+        expect(() => validateInventory(inventory([file(path)]))).not.toThrow();
+      }
+    }
+
+    expect(() => validateInventory(inventory([
+      file('src/.UA/example.ts'),
+      file('src/.UNDERSTAND-ANYTHING/example.ts'),
+    ]))).not.toThrow();
+  });
+
   it('requires importMap keys to equal inventory paths exactly', async () => {
     const { validateImportResult } = await loadRefreshModule();
     const paths = ['src/a.ts', 'src/b.ts'];
@@ -407,5 +430,46 @@ describe('refresh-scan-result.mjs failure protection', () => {
         throw new Error('injected rename failure');
       },
     }, /injected rename failure/);
+  });
+
+  it('does not replace the old scan when owned work-temp cleanup fails before rename', async () => {
+    const project = protectedProject();
+    let cleanupFailureInjected = false;
+    let renameCalls = 0;
+
+    await expectProtected(project, {
+      rmSync(path, options) {
+        if (!cleanupFailureInjected && basename(path).startsWith('refresh-inventory-')) {
+          cleanupFailureInjected = true;
+          throw new Error('injected pre-rename cleanup failure');
+        }
+        return rmSync(path, options);
+      },
+      renameSync(...args) {
+        renameCalls += 1;
+        return realRenameSync(...args);
+      },
+    }, /injected pre-rename cleanup failure/);
+
+    expect(cleanupFailureInjected).toBe(true);
+    expect(renameCalls).toBe(0);
+  });
+
+  it('does not turn a committed refresh into failure when summary logging fails', async () => {
+    const { main } = await loadRefreshModule();
+    const project = protectedProject();
+    let summaryAttempts = 0;
+
+    expect(() => main(project.root, {
+      writeSummary() {
+        summaryAttempts += 1;
+        throw new Error('injected post-rename summary failure');
+      },
+    })).not.toThrow();
+
+    expect(summaryAttempts).toBe(1);
+    expect(readJson(project.scanPath).files.map(entry => entry.path))
+      .toContain('src/added.ts');
+    assertNoOwnedTemps(project, 'other-process.tmp');
   });
 });

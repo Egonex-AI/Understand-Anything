@@ -28,6 +28,15 @@ const SCAN_SCRIPT = join(__dirname, 'scan-project.mjs');
 const IMPORT_SCRIPT = join(__dirname, 'extract-import-map.mjs');
 const COMPLEXITIES = new Set(['small', 'moderate', 'large', 'very-large']);
 
+function isReservedDataPath(path) {
+  if (typeof path !== 'string') return false;
+  const [rootSegment] = path.split('/', 1);
+  const comparable = process.platform === 'win32'
+    ? rootSegment.toLowerCase()
+    : rootSegment;
+  return comparable === '.ua' || comparable === '.understand-anything';
+}
+
 export function runBundledScript(scriptPath, args, label) {
   const result = spawnSync(process.execPath, [scriptPath, ...args], {
     encoding: 'utf8',
@@ -42,6 +51,10 @@ export function runBundledScript(scriptPath, args, label) {
     const outcome = result.signal ? `signal ${result.signal}` : `status ${result.status}`;
     throw new Error(`${label} exited with ${outcome}`);
   }
+}
+
+function writeSummary(message) {
+  process.stderr.write(message);
 }
 
 export function validateInventory(value) {
@@ -86,10 +99,7 @@ export function validateInventory(value) {
     }
 
     const path = entry.path;
-    const reserved = path === '.ua'
-      || path?.startsWith('.ua/')
-      || path === '.understand-anything'
-      || path?.startsWith('.understand-anything/');
+    const reserved = isReservedDataPath(path);
     const normalized = typeof path === 'string' && posix.normalize(path) === path;
     if (
       typeof path !== 'string'
@@ -222,6 +232,8 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     runBundledScript,
     writeFileSync,
     renameSync,
+    rmSync,
+    writeSummary,
     ...overrides,
   };
   const suffix = randomBytes(8).toString('hex');
@@ -233,7 +245,13 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     intermediateDir,
     `scan-result.json.refresh-${process.pid}-${suffix}.tmp`,
   );
-  const ownedTemps = [inventoryPath, importInputPath, importOutputPath, candidatePath];
+  const workTemps = [inventoryPath, importInputPath, importOutputPath];
+  const pendingOwnedTemps = new Set([...workTemps, candidatePath]);
+
+  function removeOwnedTemp(tempPath) {
+    ops.rmSync(tempPath, { force: true });
+    pendingOwnedTemps.delete(tempPath);
+  }
 
   mkdirSync(tmpDir, { recursive: true });
   try {
@@ -296,14 +314,25 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     const importEdges = Object.values(importResult.importMap)
       .reduce((total, targets) => total + targets.length, 0);
 
+    for (const tempPath of workTemps) removeOwnedTemp(tempPath);
     ops.renameSync(candidatePath, scanResultPath);
-    process.stderr.write(
-      `refresh-scan-result: files=${filePaths.length} added=${added} `
-      + `removed=${removed} importEdges=${importEdges}\n`,
-    );
+    pendingOwnedTemps.delete(candidatePath);
+    try {
+      ops.writeSummary(
+        `refresh-scan-result: files=${filePaths.length} added=${added} `
+        + `removed=${removed} importEdges=${importEdges}\n`,
+      );
+    } catch {
+      // The replacement is already committed; diagnostics must remain non-fatal.
+    }
   } finally {
-    for (const tempPath of ownedTemps) {
-      rmSync(tempPath, { force: true });
+    for (const tempPath of pendingOwnedTemps) {
+      try {
+        ops.rmSync(tempPath, { force: true });
+        pendingOwnedTemps.delete(tempPath);
+      } catch {
+        // Preserve the original failure while making a best-effort cleanup pass.
+      }
     }
   }
 }

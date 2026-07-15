@@ -460,10 +460,11 @@ function toPosix(p) {
 
 function isReservedDataPath(relativePath) {
   const path = toPosix(relativePath);
-  return path === '.ua'
-    || path.startsWith('.ua/')
-    || path === '.understand-anything'
-    || path.startsWith('.understand-anything/');
+  const [rootSegment] = path.split('/', 1);
+  const comparable = process.platform === 'win32'
+    ? rootSegment.toLowerCase()
+    : rootSegment;
+  return comparable === '.ua' || comparable === '.understand-anything';
 }
 
 /**

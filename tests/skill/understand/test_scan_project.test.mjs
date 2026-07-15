@@ -530,6 +530,31 @@ describe('scan-project.mjs — reserved root data directories', () => {
     expect(r.status).toBe(0);
     expect(byPath(r.output, 'src/.ua/example.ts')).toBeDefined();
   });
+
+  it.each([
+    ['Git', true],
+    ['fallback walker', false],
+  ])('matches uppercase root data directories by platform via %s enumeration', (_, gitInit) => {
+    projectRoot = setupTree({
+      '.UA/knowledge-graph.json': '{}\n',
+      '.UNDERSTAND-ANYTHING/meta.json': '{}\n',
+      'src/.UA/example.ts': 'export const nestedUa = true;\n',
+      'src/.UNDERSTAND-ANYTHING/example.ts': 'export const nestedLegacy = true;\n',
+    }, { gitInit });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+
+    if (process.platform === 'win32') {
+      expect(byPath(r.output, '.UA/knowledge-graph.json')).toBeUndefined();
+      expect(byPath(r.output, '.UNDERSTAND-ANYTHING/meta.json')).toBeUndefined();
+    } else {
+      expect(byPath(r.output, '.UA/knowledge-graph.json')).toBeDefined();
+      expect(byPath(r.output, '.UNDERSTAND-ANYTHING/meta.json')).toBeDefined();
+    }
+
+    expect(byPath(r.output, 'src/.UA/example.ts')).toBeDefined();
+    expect(byPath(r.output, 'src/.UNDERSTAND-ANYTHING/example.ts')).toBeDefined();
+  });
 });
 
 describe('scan-project.mjs — data-dir resolution (.ua vs legacy)', () => {
