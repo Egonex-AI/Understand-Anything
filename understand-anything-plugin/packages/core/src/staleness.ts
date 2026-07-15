@@ -15,14 +15,24 @@ export function getChangedFiles(
   lastCommitHash: string,
 ): string[] {
   try {
-    const output = execFileSync('git', ['diff', `${lastCommitHash}..HEAD`, '--name-only'], {
+    // -z makes git emit NUL-terminated, unquoted paths. Without it git
+    // C-quotes any path containing non-ASCII bytes (e.g. `uni-café.txt`
+    // becomes `"uni-caf\303\251.txt"`), which never matches the stored
+    // filePath and silently skips incremental updates for that file.
+    //
+    // This parser assumes --name-only, where each NUL-terminated token is a
+    // single path. Do NOT switch to --name-status or -M/-C without rewriting
+    // this: under -z those modes emit multi-token entries (e.g. a rename is
+    // `R100\0old\0new\0`), and naive splitting would treat the status prefix
+    // and the old path as bogus changed files.
+    const output = execFileSync('git', ['diff', `${lastCommitHash}..HEAD`, '--name-only', '-z'], {
       cwd: projectDir,
       encoding: "utf-8",
     });
-    return output
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+    // Split on NUL only. git -z preserves raw path bytes (including any
+    // leading/trailing whitespace), so we must NOT trim tokens. The final
+    // NUL produces an empty trailing token, dropped by the length filter.
+    return output.split("\0").filter((line) => line.length > 0);
   } catch {
     return [];
   }
