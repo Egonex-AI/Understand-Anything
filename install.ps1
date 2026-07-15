@@ -90,11 +90,17 @@ function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
         Write-Host "→ Updating existing checkout at $RepoDir"
         git -C $RepoDir pull --ff-only
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "git pull failed (exit code $LASTEXITCODE). Check your network and try again."
+        }
     } else {
         Write-Host "→ Cloning $RepoUrl → $RepoDir"
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
         git clone $RepoUrl $RepoDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "git clone failed (exit code $LASTEXITCODE). Check your network and try again."
+        }
     }
 }
 
@@ -272,6 +278,9 @@ function Cmd-Update {
         Write-Error "No installation found at $RepoDir. Run install first."
     }
     git -C $RepoDir pull --ff-only
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "git pull failed (exit code $LASTEXITCODE). Check your network and try again."
+    }
     Write-Host '✓ Updated.'
 }
 
