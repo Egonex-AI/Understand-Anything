@@ -279,6 +279,17 @@ function resolveChangedProjectFile(projectRoot, normalizedPath) {
   return absolutePath;
 }
 
+function collectValidInventoryPaths(projectRoot, scan) {
+  const paths = new Set();
+  for (const file of scan.files || []) {
+    const normalizedPath = normalizeRelativePathForMatch(file.path);
+    if (resolveChangedProjectFile(projectRoot, normalizedPath)) {
+      paths.add(normalizedPath);
+    }
+  }
+  return paths;
+}
+
 export function isChangedPathFile(absolutePath, stat = statSync) {
   try {
     return stat(absolutePath).isFile();
@@ -497,7 +508,7 @@ async function main() {
       const lines = content
         .split('\n')
         .map(normalizeRelativePathForMatch)
-        .filter(Boolean);
+        .filter(line => resolveChangedProjectFile(projectRoot, line));
       changedFiles = new Set(lines);
     }
   }
@@ -510,11 +521,23 @@ async function main() {
   }
 
   let scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+  let effectiveChangedFiles = null;
   if (changedFiles) {
+    effectiveChangedFiles = new Set(changedFiles);
+    const inventoryBeforeRefresh = collectValidInventoryPaths(projectRoot, scan);
     const driftReason = findStructuralDrift(projectRoot, uaDir, scan, changedFiles);
     if (driftReason) {
       refreshScanInventory(projectRoot, driftReason);
       scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+      const inventoryAfterRefresh = collectValidInventoryPaths(projectRoot, scan);
+      for (const inventoryPath of new Set([
+        ...inventoryBeforeRefresh,
+        ...inventoryAfterRefresh,
+      ])) {
+        if (inventoryBeforeRefresh.has(inventoryPath) !== inventoryAfterRefresh.has(inventoryPath)) {
+          effectiveChangedFiles.add(inventoryPath);
+        }
+      }
     }
   }
   const files = scan.files || [];
@@ -631,7 +654,8 @@ async function main() {
 
   // Second-pass: enrich each batch with batchImportData + neighborMap.
   // `analysisFiles` is usually the full batch. In --changed-files mode, it is
-  // only the changed target set, while batchOf remains the full-graph lookup.
+  // the validated changed set plus any refreshed inventory membership delta,
+  // while batchOf remains the full-graph lookup.
   const buildBatchPayload = (b, analysisFiles = b.files) => {
     const analysisPaths = new Set(analysisFiles.map(f => f.path));
     const batchImportData = {};
@@ -681,11 +705,11 @@ async function main() {
   const batches = mergedBareBatches.map(b => buildBatchPayload(b));
 
   let finalBatches = batches;
-  if (changedFiles) {
+  if (effectiveChangedFiles) {
     finalBatches = mergedBareBatches
       .map(b => {
         const changedBatchFiles = b.files.filter(f =>
-          changedFiles.has(normalizeRelativePathForMatch(f.path)));
+          effectiveChangedFiles.has(normalizeRelativePathForMatch(f.path)));
         if (changedBatchFiles.length === 0) return null;
         return buildBatchPayload(b, changedBatchFiles);
       })
@@ -704,6 +728,9 @@ async function main() {
     algorithm,
     totalFiles: scan.files.length,
     totalBatches: finalBatches.length,
+    ...(effectiveChangedFiles
+      ? { effectiveChangedFiles: [...effectiveChangedFiles].sort() }
+      : {}),
     exportsByPath: Object.fromEntries(exportsByPath),
     batches: finalBatches,
   };

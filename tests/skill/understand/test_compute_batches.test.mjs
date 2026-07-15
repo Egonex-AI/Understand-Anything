@@ -816,6 +816,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(scan.files.map(file => file.path)).toContain('src/added.ts');
     expect(scan.importMap['src/added.ts']).toEqual(['src/existing.ts']);
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual(['src/added.ts']);
     expect(out.batches.flatMap(batch => batch.files.map(file => file.path)))
       .toEqual(['src/added.ts']);
   });
@@ -835,6 +836,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(scan.files.map(file => file.path)).not.toContain('src/deleted.ts');
     expect(scan.importMap).not.toHaveProperty('src/deleted.ts');
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual(['src/deleted.ts']);
     expect(out.totalBatches).toBe(0);
     expect(out.batches).toEqual([]);
   });
@@ -858,6 +860,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
       'src/renamed.ts',
     ]);
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual(['src/original.ts', 'src/renamed.ts']);
     expect(out.batches.flatMap(batch => batch.files.map(file => file.path)))
       .toEqual(['src/renamed.ts']);
   });
@@ -882,6 +885,8 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(secondBatches).toBe(firstBatches);
     expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
     expect(statSync(project.scanPath).mtimeMs).toBe(beforeMtime);
+    const out = JSON.parse(secondBatches);
+    expect(out.effectiveChangedFiles).toEqual(['src/existing.ts']);
   });
 
   it('does not refresh for an empty changed-file list', () => {
@@ -897,6 +902,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
     expect(statSync(project.scanPath).mtimeMs).toBe(beforeMtime);
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual([]);
     expect(out.totalBatches).toBe(0);
   });
 
@@ -907,7 +913,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
         'src/ignored.ts': 'export const ignored = true;\n',
       },
     });
-    writeFileSync(join(project.root, '.understandignore'), 'src/ignored.ts\n');
+    writeFileSync(join(project.dataDir, '.understandignore'), 'src/ignored.ts\n');
     const changedPath = writeChangedList(project, ['src/ignored.ts']);
 
     const result = runScript(project.root, [`--changed-files=${changedPath}`]);
@@ -917,6 +923,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
     expect(scan.files.map(file => file.path)).not.toContain('src/ignored.ts');
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual(['src/ignored.ts']);
     expect(out.totalBatches).toBe(0);
   });
 
@@ -937,6 +944,59 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(result.stderr).toMatch(/refresh-scan-result:/);
   });
 
+  it.each([
+    ['root ignore file', '.understandignore'],
+    ['active data-dir ignore file', '.understand-anything/.understandignore'],
+  ])('analyzes a file re-included by a changed %s', (_label, ignorePath) => {
+    project = setupIncrementalProject({
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/hidden.ts': 'export const hidden = true;\n',
+      },
+    });
+    const absoluteIgnorePath = join(project.root, ...ignorePath.split('/'));
+    mkdirSync(dirname(absoluteIgnorePath), { recursive: true });
+    writeFileSync(absoluteIgnorePath, '# src/hidden.ts is now re-included\n');
+    const changedPath = writeChangedList(project, [ignorePath]);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    expect(scan.files.map(file => file.path)).toContain('src/hidden.ts');
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.batches.flatMap(batch => batch.files.map(file => file.path)))
+      .toContain('src/hidden.ts');
+    expect(out.effectiveChangedFiles).toEqual([ignorePath, 'src/hidden.ts'].sort());
+  });
+
+  it.each([
+    ['root ignore file', '.understandignore'],
+    ['active data-dir ignore file', '.understand-anything/.understandignore'],
+  ])('exposes a file newly excluded by a changed %s for pruning', (_label, ignorePath) => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'src/hidden.ts'],
+      diskFiles: {
+        'src/existing.ts': 'export const existing = true;\n',
+        'src/hidden.ts': 'export const hidden = true;\n',
+      },
+    });
+    const absoluteIgnorePath = join(project.root, ...ignorePath.split('/'));
+    mkdirSync(dirname(absoluteIgnorePath), { recursive: true });
+    writeFileSync(absoluteIgnorePath, 'src/hidden.ts\n');
+    const changedPath = writeChangedList(project, [ignorePath]);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).toBe(0);
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    expect(scan.files.map(file => file.path)).not.toContain('src/hidden.ts');
+    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual([ignorePath, 'src/hidden.ts'].sort());
+    expect(out.batches.flatMap(batch => batch.files.map(file => file.path)))
+      .not.toContain('src/hidden.ts');
+  });
+
   it('does not refresh structural drift in full mode', () => {
     project = setupIncrementalProject({
       diskFiles: {
@@ -953,6 +1013,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
     expect(out.totalFiles).toBe(1);
+    expect(out).not.toHaveProperty('effectiveChangedFiles');
   });
 
   it('fails closed without changing scan or writing batches when refresh fails', () => {
@@ -993,6 +1054,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(result.stderr).not.toMatch(/refresh-scan-result:/);
     expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(out.effectiveChangedFiles).toEqual([]);
     expect(out.totalBatches).toBe(0);
   });
 

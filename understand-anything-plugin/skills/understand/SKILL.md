@@ -179,11 +179,11 @@ Determine whether to run a full analysis or incremental update.
    | No existing graph or meta | Full analysis (all phases) |
    | `--review` flag + existing graph + unchanged commit hash | Skip to Phase 6 (review-only — reuse existing assembled graph) |
    | Existing graph + unchanged commit hash | Ask the user: "The graph is up to date at this commit. Would you like to: **(a)** run a full rebuild (`--full`), **(b)** run the LLM graph reviewer (`--review`), or **(c)** do nothing?" Then follow their choice. If they pick (c), STOP. |
-   | Existing graph + changed files | Incremental update (re-analyze changed files only) |
+   | Existing graph + changed files | Incremental update (re-analyze changed files plus refreshed inventory membership changes) |
 
    **Review-only path:** Copy the existing `knowledge-graph.json` to `$UA_DIR/intermediate/assembled-graph.json`, then jump directly to Phase 6 step 3.
 
-   For incremental updates, get the changed file list:
+   For incremental updates, get the initial changed file list:
    ```bash
    git diff <lastCommitHash>..HEAD --name-only
    ```
@@ -368,12 +368,18 @@ inventory/import-map refresh. This refresh does not call the project-scanner
 LLM and does not fall back to a full analysis. If the refresh fails, incremental
 analysis stops instead of silently continuing with a stale scan result.
 
-This produces a `batches.json` that contains only batches with changed files, but neighborMap entries still reference unchanged files (with their full-graph batchIndex) so cross-batch edges remain emittable.
+This produces a `batches.json` whose analysis batches contain only files from
+the top-level `effectiveChangedFiles` set. That sorted, POSIX-style set is the
+validated initial changed paths plus any files added to or removed from the
+refreshed inventory. In particular, changing an ignore rule can expand the set
+even when Git reports only `.understandignore`. `neighborMap` entries still
+reference unchanged files (with their full-graph `batchIndex`) so cross-batch
+edges remain emittable.
 
 Then dispatch file-analyzer subagents per the same template as the full path.
 
 After batches complete:
-1. Remove old nodes whose `filePath` matches any changed file from the existing graph
+1. Load top-level `effectiveChangedFiles` from `batches.json` and remove old nodes whose `filePath` matches any entry from the existing graph. This is the authoritative prune set; do not use the initial Git changed-files list.
 2. Remove old edges whose `source` or `target` references a removed node
 3. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory
 4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
