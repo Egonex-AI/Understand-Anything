@@ -458,6 +458,14 @@ function toPosix(p) {
   return p.split(sep).join('/');
 }
 
+function isReservedDataPath(relativePath) {
+  const path = toPosix(relativePath);
+  return path === '.ua'
+    || path.startsWith('.ua/')
+    || path === '.understand-anything'
+    || path.startsWith('.understand-anything/');
+}
+
 /**
  * Enumerate all files in `projectRoot` via `git ls-files`. Returns an
  * array of project-relative POSIX paths, or null if the directory is not
@@ -678,8 +686,9 @@ async function main() {
   // 1. Enumerate. Either git ls-files or recursive walk.
   const candidates = enumerateFiles(projectRoot);
 
-  // 2. Filter via createIgnoreFilter (defaults + user .understandignore).
-  //    Build a defaults-only filter in parallel to count user-driven drops.
+  // 2. Hard-exclude reserved root data directories, then filter via
+  //    createIgnoreFilter (defaults + user .understandignore). Build a
+  //    defaults-only filter in parallel to count user-driven drops.
   const combined = createIgnoreFilter(projectRoot);
   const userIgnoresPresent = hasUserIgnoreFile(projectRoot);
   const defaultsOnly = userIgnoresPresent ? buildDefaultsOnlyFilter() : combined;
@@ -687,6 +696,7 @@ async function main() {
   let filteredByIgnore = 0;
   const kept = [];
   for (const rel of candidates) {
+    if (isReservedDataPath(rel)) continue;
     const isIgnoredCombined = combined.isIgnored(rel);
     if (!isIgnoredCombined) {
       kept.push(rel);

@@ -47,11 +47,8 @@ function setupTree(files, { gitInit = true } = {}) {
 /**
  * Tracks every temp output dir created by runScript() so the global
  * cleanup can sweep them between tests. The output file must live
- * OUTSIDE projectRoot because the project's default ignore patterns
- * do NOT exclude `.understand-anything/` (the dir is reserved for
- * persistent state, not transient scratch). If we wrote inside
- * projectRoot, the second call in the determinism test would
- * enumerate the first call's output file and produce drift.
+ * OUTSIDE projectRoot so test output never becomes scanner input. The
+ * reserved project data directories are covered directly below.
  */
 const _runScriptOutputDirs = [];
 
@@ -472,6 +469,66 @@ describe('scan-project.mjs — .understandignore handling', () => {
     // The defaults dropped drop.log — that's a baseline default drop,
     // NOT a user-driven drop. filteredByIgnore should be 0.
     expect(r.output.filteredByIgnore).toBe(0);
+  });
+});
+
+describe('scan-project.mjs — reserved root data directories', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('excludes root .ua and .understand-anything files via Git enumeration', () => {
+    projectRoot = setupTree({
+      '.ua/knowledge-graph.json': '{}\n',
+      '.understand-anything/meta.json': '{}\n',
+      'src/index.ts': 'export const x = 1;\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
+    expect(byPath(r.output, '.understand-anything/meta.json')).toBeUndefined();
+    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+    expect(r.output.filteredByIgnore).toBe(0);
+  });
+
+  it('excludes root .ua and .understand-anything files via the fallback walker', () => {
+    projectRoot = setupTree({
+      '.ua/knowledge-graph.json': '{}\n',
+      '.understand-anything/meta.json': '{}\n',
+      'src/index.ts': 'export const x = 1;\n',
+    }, { gitInit: false });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
+    expect(byPath(r.output, '.understand-anything/meta.json')).toBeUndefined();
+    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+    expect(r.output.filteredByIgnore).toBe(0);
+  });
+
+  it('does not let .understandignore negation restore root .ua files', () => {
+    projectRoot = setupTree({
+      '.understandignore': '!.ua/**\n',
+      '.ua/knowledge-graph.json': '{}\n',
+      'src/index.ts': 'export const x = 1;\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
+    expect(r.output.filteredByIgnore).toBe(0);
+  });
+
+  it('keeps a nested src/.ua directory scannable', () => {
+    projectRoot = setupTree({
+      'src/.ua/example.ts': 'export const nested = true;\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/.ua/example.ts')).toBeDefined();
   });
 });
 
