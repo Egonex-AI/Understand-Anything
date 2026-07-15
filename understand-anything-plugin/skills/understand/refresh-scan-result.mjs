@@ -9,7 +9,16 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join, posix, resolve, win32 } from 'node:path';
+import {
+  dirname,
+  isAbsolute,
+  join,
+  posix,
+  relative,
+  resolve,
+  sep,
+  win32,
+} from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,6 +36,15 @@ const { resolveUaDir } = core;
 const SCAN_SCRIPT = join(__dirname, 'scan-project.mjs');
 const IMPORT_SCRIPT = join(__dirname, 'extract-import-map.mjs');
 const COMPLEXITIES = new Set(['small', 'moderate', 'large', 'very-large']);
+const FILE_CATEGORIES = new Set([
+  'code',
+  'config',
+  'docs',
+  'infra',
+  'data',
+  'script',
+  'markup',
+]);
 
 function isReservedDataPath(path) {
   if (typeof path !== 'string') return false;
@@ -125,10 +143,47 @@ export function validateInventory(value) {
     if (typeof entry.language !== 'string' || entry.language.length === 0) {
       throw new Error(`inventory language must be a non-empty string: ${path}`);
     }
+    if (!Number.isInteger(entry.sizeLines) || entry.sizeLines < 0) {
+      throw new Error(`inventory sizeLines must be a non-negative integer: ${path}`);
+    }
+    if (!FILE_CATEGORIES.has(entry.fileCategory)) {
+      throw new Error(`inventory fileCategory is invalid: ${path}`);
+    }
     paths.add(path);
   }
 
   return value;
+}
+
+function validateInventoryFilesOnDisk(projectRoot, inventory, resolveRealpath) {
+  let projectRootReal;
+  try {
+    projectRootReal = resolveRealpath(projectRoot);
+  } catch {
+    throw new Error('refresh-scan-result: project root is unavailable or unsafe');
+  }
+
+  for (const entry of inventory.files) {
+    let candidateReal;
+    try {
+      candidateReal = resolveRealpath(join(projectRoot, entry.path));
+    } catch {
+      throw new Error(
+        `refresh-scan-result: inventory path is unavailable or unsafe: ${entry.path}`,
+      );
+    }
+
+    const fromRoot = relative(projectRootReal, candidateReal);
+    if (
+      fromRoot === '..'
+      || fromRoot.startsWith(`..${sep}`)
+      || isAbsolute(fromRoot)
+    ) {
+      throw new Error(
+        `refresh-scan-result: inventory path is outside project root: ${entry.path}`,
+      );
+    }
+  }
 }
 
 export function validateImportResult(value, filePaths) {
@@ -233,6 +288,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     writeFileSync,
     renameSync,
     rmSync,
+    realpathSync,
     writeSummary,
     ...overrides,
   };
@@ -264,6 +320,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
       throw new Error(`refresh-scan-result: inventory JSON parse failed: ${error.message}`);
     }
     validateInventory(inventory);
+    validateInventoryFilesOnDisk(projectRoot, inventory, ops.realpathSync);
 
     ops.writeFileSync(importInputPath, `${JSON.stringify({
       projectRoot,

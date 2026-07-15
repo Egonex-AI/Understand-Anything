@@ -7,6 +7,7 @@ import {
   readdirSync,
   renameSync as realRenameSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -284,6 +285,19 @@ describe('refresh-scan-result.mjs validation', () => {
   });
 
   it.each([
+    ['missing sizeLines', file('src/a.ts'), entry => { delete entry.sizeLines; }],
+    ['negative sizeLines', file('src/a.ts'), entry => { entry.sizeLines = -1; }],
+    ['fractional sizeLines', file('src/a.ts'), entry => { entry.sizeLines = 1.5; }],
+    ['missing fileCategory', file('src/a.ts'), entry => { delete entry.fileCategory; }],
+    ['unknown fileCategory', file('src/a.ts'), entry => { entry.fileCategory = 'binary'; }],
+  ])('rejects inventory entries with %s', async (_label, validEntry, mutate) => {
+    const { validateInventory } = await loadRefreshModule();
+    mutate(validEntry);
+    expect(() => validateInventory(inventory([validEntry])))
+      .toThrow(/sizeLines|fileCategory/i);
+  });
+
+  it.each([
     '/absolute.ts',
     'C:/absolute.ts',
     'src\\windows.ts',
@@ -378,6 +392,100 @@ describe('refresh-scan-result.mjs failure protection', () => {
         return module.runBundledScript(scriptPath, args, label);
       },
     }, /scan-project exited with status 17/);
+  });
+
+  it('rejects an invalid scanner entry before import extraction or replacement', async () => {
+    const project = protectedProject();
+    let importRuns = 0;
+    let renameCalls = 0;
+
+    await expectProtected(project, {
+      runBundledScript(scriptPath, args) {
+        if (basename(scriptPath) === 'scan-project.mjs') {
+          const invalidEntry = file('src/existing.ts');
+          delete invalidEntry.sizeLines;
+          writeFileSync(args[1], JSON.stringify(inventory([invalidEntry])), 'utf8');
+          return;
+        }
+        importRuns += 1;
+      },
+      renameSync() {
+        renameCalls += 1;
+      },
+    }, /sizeLines/i);
+
+    expect(importRuns).toBe(0);
+    expect(renameCalls).toBe(0);
+  });
+
+  it('rejects an external junction inventory path before import extraction', async () => {
+    const project = protectedProject();
+    const outsideRoot = makeTempRoot('ua-refresh-outside-');
+    writeFileSync(join(outsideRoot, 'outside.ts'), 'export const secret = true;\n', 'utf8');
+    symlinkSync(outsideRoot, join(project.root, 'linked-dir'), 'junction');
+    let importRuns = 0;
+
+    await expectProtected(project, {
+      runBundledScript(scriptPath, args) {
+        if (basename(scriptPath) === 'scan-project.mjs') {
+          writeFileSync(
+            args[1],
+            JSON.stringify(inventory([file('linked-dir/outside.ts')])),
+            'utf8',
+          );
+          return;
+        }
+        importRuns += 1;
+      },
+    }, /unsafe|outside project root/i);
+
+    expect(importRuns).toBe(0);
+  });
+
+  it('rejects missing inventory files before import extraction', async () => {
+    const project = protectedProject();
+    let importRuns = 0;
+
+    await expectProtected(project, {
+      runBundledScript(scriptPath, args) {
+        if (basename(scriptPath) === 'scan-project.mjs') {
+          writeFileSync(
+            args[1],
+            JSON.stringify(inventory([file('src/missing.ts')])),
+            'utf8',
+          );
+          return;
+        }
+        importRuns += 1;
+      },
+    }, /unavailable|unsafe/i);
+
+    expect(importRuns).toBe(0);
+  });
+
+  it('fails closed on inventory realpath errors before import extraction', async () => {
+    const project = protectedProject();
+    let importRuns = 0;
+
+    await expectProtected(project, {
+      runBundledScript(scriptPath, args) {
+        if (basename(scriptPath) === 'scan-project.mjs') {
+          writeFileSync(
+            args[1],
+            JSON.stringify(inventory([file('src/existing.ts')])),
+            'utf8',
+          );
+          return;
+        }
+        importRuns += 1;
+      },
+      realpathSync(path) {
+        if (basename(path) === 'existing.ts') throw new Error('injected realpath failure');
+        return path;
+      },
+    }, /unavailable|unsafe/i);
+
+    expect(importRuns).toBe(0);
   });
 
   it('keeps the old scan byte-identical when import output is invalid JSON', async () => {

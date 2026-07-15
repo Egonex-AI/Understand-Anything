@@ -51,7 +51,16 @@
  */
 
 import { createRequire } from 'node:module';
-import { dirname, resolve, join, basename, extname, relative, sep } from 'node:path';
+import {
+  dirname,
+  resolve,
+  join,
+  basename,
+  extname,
+  isAbsolute,
+  relative,
+  sep,
+} from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   existsSync,
@@ -657,6 +666,28 @@ function countLines(absPath, posixPath) {
   }
 }
 
+function assertProjectPathContained(projectRootReal, absPath, relativePath) {
+  let candidateReal;
+  try {
+    candidateReal = realpathSync(absPath);
+  } catch {
+    throw new Error(
+      `security policy could not verify project file: ${relativePath}`,
+    );
+  }
+
+  const fromRoot = relative(projectRootReal, candidateReal);
+  if (
+    fromRoot === '..'
+    || fromRoot.startsWith(`..${sep}`)
+    || isAbsolute(fromRoot)
+  ) {
+    throw new Error(
+      `security policy rejected file outside project root: ${relativePath}`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -683,6 +714,7 @@ async function main() {
     );
     process.exit(1);
   }
+  const projectRootReal = realpathSync(projectRoot);
 
   // 1. Enumerate. Either git ls-files or recursive walk.
   const candidates = enumerateFiles(projectRoot);
@@ -733,6 +765,7 @@ async function main() {
       );
       continue;
     }
+    assertProjectPathContained(projectRootReal, absPath, rel);
     const sizeLines = countLines(absPath, rel);
     if (sizeLines === null) {
       // countLines already emitted the Warning: line.

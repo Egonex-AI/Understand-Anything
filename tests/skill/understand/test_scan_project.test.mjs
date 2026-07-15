@@ -7,6 +7,7 @@ import {
   rmSync,
   chmodSync,
   existsSync,
+  symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
@@ -61,7 +62,7 @@ function runScript(projectRoot) {
   const outputDir = mkdtempSync(join(tmpdir(), 'ua-scan-out-'));
   _runScriptOutputDirs.push(outputDir);
   const outputPath = join(outputDir, 'scan-output.json');
-  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath], {
+  const result = spawnSync(process.execPath, [SCRIPT, projectRoot, outputPath], {
     encoding: 'utf-8',
   });
   let output = null;
@@ -557,6 +558,59 @@ describe('scan-project.mjs — reserved root data directories', () => {
   });
 });
 
+describe('scan-project.mjs — project-root containment', () => {
+  let projectRoot;
+  let outsideRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+    if (outsideRoot) {
+      rmSync(outsideRoot, { recursive: true, force: true });
+      outsideRoot = null;
+    }
+  });
+
+  it('fails closed when Git enumeration reaches a file through an external filesystem link', () => {
+    projectRoot = setupTree({
+      'src/local.ts': 'export const local = true;\n',
+    });
+    const gitCheck = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+    });
+    expect(gitCheck.status, gitCheck.stderr).toBe(0);
+
+    outsideRoot = mkdtempSync(join(tmpdir(), 'ua-scan-outside-'));
+    const outsideFile = join(outsideRoot, 'outside.ts');
+    writeFileSync(outsideFile, 'export const secret = true;\n', 'utf-8');
+    const enumeratedPath = process.platform === 'win32'
+      ? 'linked-dir/outside.ts'
+      : 'linked-file.ts';
+    if (process.platform === 'win32') {
+      symlinkSync(outsideRoot, join(projectRoot, 'linked-dir'), 'junction');
+    } else {
+      symlinkSync(outsideFile, join(projectRoot, enumeratedPath), 'file');
+    }
+
+    const enumerated = spawnSync(
+      'git',
+      ['ls-files', '-z', '-co', '--exclude-standard'],
+      { cwd: projectRoot, encoding: 'utf-8' },
+    );
+    expect(enumerated.status, enumerated.stderr).toBe(0);
+    expect(enumerated.stdout.split('\0')).toContain(enumeratedPath);
+
+    const result = runScript(projectRoot);
+    expect(result.status).not.toBe(0);
+    expect(result.output).toBeNull();
+    expect(result.stderr).toMatch(/security policy|outside project root/i);
+    expect(result.stderr).not.toContain(outsideRoot);
+  });
+});
+
 describe('scan-project.mjs — data-dir resolution (.ua vs legacy)', () => {
   let projectRoot;
 
@@ -689,6 +743,25 @@ describe('scan-project.mjs — per-file failure resilience', () => {
     }
   });
 
+  it('warns and skips a Git-tracked file that vanished after enumeration state was recorded', () => {
+    projectRoot = setupTree({
+      'src/good.ts': 'export const good = 1;\n',
+      'src/vanished.ts': 'export const vanished = 2;\n',
+    });
+    const add = spawnSync('git', ['add', 'src/good.ts', 'src/vanished.ts'], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+    });
+    expect(add.status, add.stderr).toBe(0);
+    rmSync(join(projectRoot, 'src/vanished.ts'));
+
+    const result = runScript(projectRoot);
+    expect(result.status).toBe(0);
+    expect(byPath(result.output, 'src/good.ts')).toBeDefined();
+    expect(byPath(result.output, 'src/vanished.ts')).toBeUndefined();
+    expect(result.stderr).toMatch(/src\/vanished\.ts.*stat failed.*file skipped/i);
+  });
+
   it('emits a Warning: and skips a file with unreadable permissions; other files survive', () => {
     if (process.platform === 'win32') {
       // chmod permission bits don't apply on Windows the same way; skip.
@@ -819,7 +892,7 @@ describe('scan-project.mjs — CLI entry guard + invocation', () => {
   });
 
   it('fails fast with usage message when projectRoot is missing', () => {
-    const result = spawnSync('node', [SCRIPT], { encoding: 'utf-8' });
+    const result = spawnSync(process.execPath, [SCRIPT], { encoding: 'utf-8' });
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/Usage: node scan-project\.mjs/);
   });
