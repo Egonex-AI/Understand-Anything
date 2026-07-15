@@ -113,12 +113,23 @@ Determine whether to run a full analysis or incremental update.
      exit 1
    fi
 
+   # Preflight: verify `node` (>= 22) and `pnpm` are reachable in the current
+   # shell before invoking anything that needs them. Phase 7 step 2 will later
+   # invoke `node build-fingerprints.mjs`, and Claude Code / Cursor / opencode
+   # spawn non-interactive Bash subshells that may not inherit the PATH set
+   # by ~/.zshrc or ~/.bashrc. Users on nvm/fnm/mise/asdf commonly hit this:
+   # their shim is sourced in the interactive rc file but not in ~/.zshenv
+   # or ~/.bash_profile. If node isn't reachable, the fingerprint script
+   # silently fails and meta.json advances without fingerprints.json — which
+   # permanently breaks subsequent auto-updates (issue #152 family).
+   bash "$PLUGIN_ROOT/skills/understand/preflight.sh" || exit 1
+
    if [ ! -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
      cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
    fi
    ```
 
-   If `pnpm` is missing, report to the user: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
+   If `preflight.sh` exits non-zero, surface its stderr to the user verbatim — the message names the most likely fix (e.g., sourcing nvm/fnm/mise from `~/.zshenv` for non-interactive shells, or upgrading Node).
 
 1.7. **Resolve the data directory `$UA_DIR`.** All Understand-Anything artifacts live in the project's data directory. Resolve it once, now that `$PROJECT_ROOT` is known, and reuse `$UA_DIR` for every read and write in later phases:
    ```bash
