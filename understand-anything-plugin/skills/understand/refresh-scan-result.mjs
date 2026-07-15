@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
