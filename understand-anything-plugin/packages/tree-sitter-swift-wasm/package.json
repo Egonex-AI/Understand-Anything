@@ -1,0 +1,9 @@
+{
+  "name": "@understand-anything/tree-sitter-swift-wasm",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Vendored tree-sitter-swift WASM grammar built with the modern dylink.0 ABI for use with web-tree-sitter@^0.26.",
+  "main": "tree-sitter-swift.wasm",
+  "files": ["tree-sitter-swift.wasm", "BUILD.md", ".swift-grammar-pin", "LICENSE"],
+  "license": "MIT"
+}

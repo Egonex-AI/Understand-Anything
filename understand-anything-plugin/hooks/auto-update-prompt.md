@@ -8,12 +8,12 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
 ## Phase 0 — Pre-flight (Zero Token Cost)
 
-1. Set `PROJECT_ROOT` to the current working directory.
+1. Set `PROJECT_ROOT` to the current working directory. **Resolve the data directory `$UA_DIR`** once and reuse it for every read and write below: `UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .understand-anything || echo .ua)"` — this selects the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Because each phase may run in a fresh shell, carry `$UA_DIR` forward like `$PROJECT_ROOT`, re-resolving it with the same line if a later command block needs it. Scripts written below that run in Node resolve the same rule in JavaScript.
 
-2. Check that `$PROJECT_ROOT/.understand-anything/knowledge-graph.json` exists.
+2. Check that `$UA_DIR/knowledge-graph.json` exists.
    - If not: report "No existing knowledge graph found. Run `/understand` first to create one." and **STOP**.
 
-3. Check that `$PROJECT_ROOT/.understand-anything/meta.json` exists and read `gitCommitHash`.
+3. Check that `$UA_DIR/meta.json` exists and read `gitCommitHash`.
    - If not: report "No analysis metadata found. Run `/understand` to create a baseline." and **STOP**.
 
 4. Get current commit hash:
@@ -25,7 +25,7 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
 6. Get changed files:
    ```bash
-   git diff <lastCommitHash>..HEAD --name-only
+   git diff "<lastCommitHash>..HEAD" --name-only
    ```
    If no files changed: update `meta.json` with the new commit hash and **STOP**.
 
@@ -34,16 +34,16 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
 8. Create intermediate directory:
    ```bash
-   mkdir -p $PROJECT_ROOT/.understand-anything/intermediate
+   mkdir -p "$UA_DIR/intermediate"
    ```
 
 9. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
 
    Without this step, files in user-excluded paths (migrations, vendored code, tests) are counted as structural changes and can spuriously escalate the action to `FULL_UPDATE` even when the real change set is tiny.
 
-   1. If neither `$PROJECT_ROOT/.understand-anything/.understandignore` nor `$PROJECT_ROOT/.understandignore` exists, the step 7 extension filter is sufficient — skip to Phase 1.
+   1. If neither `$UA_DIR/.understandignore` nor `$PROJECT_ROOT/.understandignore` exists, the step 7 extension filter is sufficient — skip to Phase 1.
 
-   2. Write the step 7 file list to `$PROJECT_ROOT/.understand-anything/intermediate/changed-files-pre.json` as a JSON array of relative paths.
+   2. Write the step 7 file list to `$UA_DIR/intermediate/changed-files-pre.json` as a JSON array of relative paths.
 
    3. Resolve `$PLUGIN_ROOT`:
       - Use `$CLAUDE_PLUGIN_ROOT` if set (Claude Code's hook context sets this).
@@ -51,13 +51,15 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
       - Validate the chosen candidate by checking `$candidate/packages/core/dist/ignore-filter.js` exists.
       - If neither resolves: report "Cannot locate plugin install at `$CLAUDE_PLUGIN_ROOT` or `$HOME/.understand-anything-plugin`; auto-update aborted. Run `/understand` to re-baseline." and **STOP**. Do **not** silently skip — silent skip reproduces issue #153.
 
-   4. Write `$PROJECT_ROOT/.understand-anything/intermediate/ignore-filter.mjs`:
+   4. Write `$UA_DIR/intermediate/ignore-filter.mjs`:
       ```javascript
-      import { readFileSync, writeFileSync } from 'node:fs';
+      import { readFileSync, writeFileSync, existsSync } from 'node:fs';
       import { pathToFileURL } from 'node:url';
       import path from 'node:path';
 
       const PROJECT_ROOT = process.cwd();
+      // Data directory: legacy `.understand-anything/` when present, else new `.ua/`.
+      const UA_DIR = existsSync(path.join(PROJECT_ROOT, '.understand-anything')) ? '.understand-anything' : '.ua';
       const PLUGIN_ROOT = process.argv[2];
       const inputPath = process.argv[3];
 
@@ -72,7 +74,7 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
       const removed = input.length - kept.length;
 
       writeFileSync(
-        path.join(PROJECT_ROOT, '.understand-anything/intermediate/changed-files.json'),
+        path.join(PROJECT_ROOT, UA_DIR, 'intermediate/changed-files.json'),
         JSON.stringify({ kept, removed, total: input.length }, null, 2),
       );
       console.log(`.understandignore: kept ${kept.length}/${input.length} (removed ${removed})`);
@@ -80,12 +82,12 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
    5. Run it:
       ```bash
-      node $PROJECT_ROOT/.understand-anything/intermediate/ignore-filter.mjs \
+      node "$UA_DIR/intermediate/ignore-filter.mjs" \
         "$PLUGIN_ROOT" \
-        $PROJECT_ROOT/.understand-anything/intermediate/changed-files-pre.json
+        "$UA_DIR/intermediate/changed-files-pre.json"
       ```
 
-   6. Read `$PROJECT_ROOT/.understand-anything/intermediate/changed-files.json`. Pass the `kept` array as the input file list for Phase 1's fingerprint-check script.
+   6. Read `$UA_DIR/intermediate/changed-files.json`. Pass the `kept` array as the input file list for Phase 1's fingerprint-check script.
 
    7. If `kept.length === 0`: update `meta.json` with the new commit hash, report "All changed source files are in ignored paths. Metadata updated." and **STOP**.
 
@@ -95,11 +97,11 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
 This phase runs a deterministic Node.js script that compares file structures against stored fingerprints. It costs **zero LLM tokens** — only the script execution cost.
 
-1. Write and execute a Node.js script (`$PROJECT_ROOT/.understand-anything/intermediate/fingerprint-check.mjs`):
+1. Write and execute a Node.js script (`$UA_DIR/intermediate/fingerprint-check.mjs`):
 
 ```javascript
 // The script should:
-// 1. Read fingerprints.json from .understand-anything/fingerprints.json
+// 1. Read fingerprints.json from the data directory (.ua/fingerprints.json, or .understand-anything/fingerprints.json when that legacy directory is present — resolve UA_DIR the same way as the other scripts)
 // 2. For each changed source file:
 //    a. Read the file content
 //    b. Compute SHA-256 content hash
@@ -118,7 +120,7 @@ This phase runs a deterministic Node.js script that compares file structures aga
 //    - Some STRUCTURAL, ≤10 files, same directories → action: "PARTIAL_UPDATE"
 //    - New/deleted directories or >10 structural files → action: "ARCHITECTURE_UPDATE"
 //    - >30 structural files or >50% of graph → action: "FULL_UPDATE"
-// 6. Write result to .understand-anything/intermediate/change-analysis.json
+// 6. Write result to <UA_DIR>/intermediate/change-analysis.json (.ua/, or .understand-anything/ when that legacy directory is present)
 ```
 
 The output JSON should have this shape:
@@ -136,7 +138,7 @@ The output JSON should have this shape:
 }
 ```
 
-2. Read `.understand-anything/intermediate/change-analysis.json`.
+2. Read `$UA_DIR/intermediate/change-analysis.json`.
 
 3. **Decision gate:**
 
@@ -153,7 +155,7 @@ The output JSON should have this shape:
 
 Only re-analyze files with structural changes. This is the **only** phase that costs LLM tokens.
 
-1. Read the existing knowledge graph from `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`.
+1. Read the existing knowledge graph from `$UA_DIR/knowledge-graph.json`.
 
 2. Batch the files from `filesToReanalyze` (from Phase 1). Use a single batch if ≤10 files, otherwise batch into groups of 5-10.
 
@@ -174,7 +176,7 @@ Only re-analyze files with structural changes. This is the **only** phase that c
    > Project: `<projectName>`
    > Languages: `<languages>`
    > Batch index: `1`
-   > Write output to: `$PROJECT_ROOT/.understand-anything/intermediate/batch-1.json`
+   > Write output to: `$UA_DIR/intermediate/batch-1.json`
    >
    > All project files (for import resolution):
    > `<file list from existing graph nodes>`
@@ -228,9 +230,9 @@ Perform lightweight validation (no graph-reviewer agent):
 
 ### 3d. Save
 
-1. Write the final knowledge graph to `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`.
+1. Write the final knowledge graph to `$UA_DIR/knowledge-graph.json`.
 
-2. Write updated metadata to `$PROJECT_ROOT/.understand-anything/meta.json`:
+2. Write updated metadata to `$UA_DIR/meta.json`:
    ```json
    {
      "lastAnalyzedAt": "<ISO 8601 timestamp>",
@@ -251,7 +253,8 @@ Perform lightweight validation (no graph-reviewer agent):
    import { createHash } from 'node:crypto';
    import path from 'node:path';
 
-   const fpPath = path.join(PROJECT_ROOT, '.understand-anything', 'fingerprints.json');
+   const UA_DIR = existsSync(path.join(PROJECT_ROOT, '.understand-anything')) ? '.understand-anything' : '.ua';
+   const fpPath = path.join(PROJECT_ROOT, UA_DIR, 'fingerprints.json');
    const existedAndNonEmpty = existsSync(fpPath) && readFileSync(fpPath, 'utf-8').trim().length > 0;
 
    // 1. LOAD ALL existing entries (NEVER skip — preserves un-analyzed files)
@@ -291,7 +294,10 @@ Perform lightweight validation (no graph-reviewer agent):
 
 4. Clean up intermediate files:
    ```bash
-   rm -rf $PROJECT_ROOT/.understand-anything/intermediate
+   INTERMEDIATE_DIR="$UA_DIR/intermediate"
+   if [ -n "$PROJECT_ROOT" ] && [ -d "$INTERMEDIATE_DIR" ]; then
+     rm -rf "$INTERMEDIATE_DIR"
+   fi
    ```
 
 5. Report a summary:
@@ -300,7 +306,7 @@ Perform lightweight validation (no graph-reviewer agent):
    - Cosmetic-only changes: N files (skipped)
    - Nodes updated: N
    - Action taken: PARTIAL_UPDATE / ARCHITECTURE_UPDATE
-   - Path to output: `$PROJECT_ROOT/.understand-anything/knowledge-graph.json`
+   - Path to output: `$UA_DIR/knowledge-graph.json`
 
 ---
 

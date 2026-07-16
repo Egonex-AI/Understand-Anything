@@ -17,3 +17,4 @@ venv/
 *.pyc
 *.pyo
 Thumbs.db
+*.tgz

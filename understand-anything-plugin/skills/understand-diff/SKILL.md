@@ -5,7 +5,7 @@ description: Use when you need to analyze git diffs or pull requests to understa
 
 # /understand-diff
 
-Analyze the current code changes against the knowledge graph at `.understand-anything/knowledge-graph.json`.
+Analyze the current code changes against the knowledge graph in the project's data directory (`.ua/knowledge-graph.json`, or the legacy `.understand-anything/knowledge-graph.json` when that directory is present).
 
 ## Graph Structure Reference
 
@@ -30,7 +30,7 @@ The knowledge graph JSON has this structure:
 
 ## Instructions
 
-1. Check that `.understand-anything/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
+1. **Resolve the data directory `$UA_DIR`.** Run `UA_DIR=$([ -d .understand-anything ] && echo .understand-anything || echo .ua)` — this is the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Check that `$UA_DIR/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
 
 2. **Get the changed files list** (do NOT read the graph yet):
    - If on a branch with uncommitted changes: `git diff --name-only`
@@ -58,7 +58,7 @@ The knowledge graph JSON has this structure:
    - **Risk Assessment**: Based on node `complexity` values, number of cross-layer edges, and blast radius (number of affected components)
    - Suggest what to review carefully and any potential issues
 
-8. **Write diff overlay for dashboard** — after producing the analysis, write the diff data to `.understand-anything/diff-overlay.json` so the dashboard can visualize changed and affected components. The file contains:
+8. **Write diff overlay for dashboard** — after producing the analysis, write the diff data to `$UA_DIR/diff-overlay.json` so the dashboard can visualize changed and affected components. The file contains:
    ```json
    {
      "version": "1.0.0",

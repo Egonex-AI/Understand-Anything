@@ -294,6 +294,72 @@ function main() {
     });
   });
 
+  describe("analyzeFileFull", () => {
+    const code = `
+import { helper } from "./helper";
+
+export function greet(name: string): string {
+  return formatMessage("Hello " + name);
+}
+
+function formatMessage(msg: string): string {
+  return msg.trim();
+}
+
+export class Greeter {
+  greet(name: string): string {
+    return greet(name);
+  }
+}
+`;
+
+    it("produces exactly the same output as analyzeFile + extractCallGraph", () => {
+      const separate = {
+        structure: plugin.analyzeFile("test.ts", code),
+        callGraph: plugin.extractCallGraph!("test.ts", code),
+      };
+      const full = plugin.analyzeFileFull("test.ts", code);
+
+      expect(full).toEqual(separate);
+      // Guard against vacuous equality — both sides must be non-trivial
+      expect(full.structure.functions.length).toBeGreaterThan(0);
+      expect(full.structure.classes.length).toBeGreaterThan(0);
+      expect(full.structure.imports.length).toBeGreaterThan(0);
+      expect(full.callGraph.length).toBeGreaterThan(0);
+    });
+
+    it("is stable across repeated calls (cached parser reuse)", () => {
+      const first = plugin.analyzeFileFull("test.ts", code);
+      const second = plugin.analyzeFileFull("test.ts", code);
+      expect(second).toEqual(first);
+    });
+
+    it("returns empty results for unsupported extensions", () => {
+      const full = plugin.analyzeFileFull("styles.xyz", "body { color: red; }");
+      expect(full.structure).toEqual({
+        functions: [],
+        classes: [],
+        imports: [],
+        exports: [],
+      });
+      expect(full.callGraph).toEqual([]);
+    });
+
+    it("returns fresh arrays per call — mutating one result cannot leak into the next", () => {
+      const first = plugin.analyzeFileFull("styles.xyz", "whatever");
+      first.structure.functions.push({
+        name: "injected",
+        lineRange: [1, 1],
+        params: [],
+      });
+      first.callGraph.push({ caller: "a", callee: "b", lineNumber: 1 });
+
+      const second = plugin.analyzeFileFull("styles.xyz", "whatever");
+      expect(second.structure.functions).toEqual([]);
+      expect(second.callGraph).toEqual([]);
+    });
+  });
+
   describe("plugin metadata", () => {
     it("should have correct name", () => {
       expect(plugin.name).toBe("tree-sitter");

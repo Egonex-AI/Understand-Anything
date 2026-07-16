@@ -1,6 +1,8 @@
 export const ru = {
   common: {
     loading: "Загрузка проекта...",
+    computingGraphLayout: "Вычисление расположения графа...",
+    forceLayoutFallback: "Силовая раскладка недоступна; показана резервная сетка.",
     noGraphLoaded: "Граф знаний не загружен",
     selectNode: "Выберите узел, чтобы увидеть подробности",
     back: "Назад",
@@ -179,6 +181,8 @@ export const ru = {
     closeExpanded: "Закрыть расширенный просмотрщик кода",
     closeViewer: "Закрыть просмотрщик кода",
     sourceUnavailable: "Исходный код недоступен",
+    rendered: "Просмотр",
+    source: "Исходник",
   },
   customNode: {
     tested: "Покрыт тестами",

@@ -298,10 +298,11 @@ For each pair of groups with imports between them, determine the dominant direct
 
 ### Preparing the Script Input
 
-Before writing the script, create its input JSON file:
+Before writing the script, create its input JSON file. First resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` for every path below:
 
 ```bash
-cat > $PROJECT_ROOT/.understand-anything/tmp/ua-arch-input.json << 'ENDJSON'
+UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .understand-anything || echo .ua)"
+cat > $UA_DIR/tmp/ua-arch-input.json << 'ENDJSON'
 {
   "fileNodes": [<file nodes from prompt — all node types>],
   "importEdges": [<import edges from prompt>],
@@ -315,7 +316,7 @@ ENDJSON
 After writing the script, execute it:
 
 ```bash
-node $PROJECT_ROOT/.understand-anything/tmp/ua-arch-analyze.js $PROJECT_ROOT/.understand-anything/tmp/ua-arch-input.json $PROJECT_ROOT/.understand-anything/tmp/ua-arch-results.json
+node $UA_DIR/tmp/ua-arch-analyze.js $UA_DIR/tmp/ua-arch-input.json $UA_DIR/tmp/ua-arch-results.json
 ```
 
 If the script exits with a non-zero code, read stderr, diagnose the issue, fix the script, and re-run. You have up to 2 retry attempts.
@@ -324,7 +325,7 @@ If the script exits with a non-zero code, read stderr, diagnose the issue, fix t
 
 ## Phase 2 -- Semantic Layer Assignment
 
-After the script completes, read `$PROJECT_ROOT/.understand-anything/tmp/ua-arch-results.json`. Use the structural analysis as the primary input for your layer decisions. Do NOT re-read source files or re-analyze imports -- trust the script's results entirely.
+After the script completes, read `$UA_DIR/tmp/ua-arch-results.json`. Use the structural analysis as the primary input for your layer decisions. Do NOT re-read source files or re-analyze imports -- trust the script's results entirely.
 
 ### Step 1 -- Evaluate Directory Groups as Layer Candidates
 
@@ -473,7 +474,7 @@ Produce a single, valid JSON array. Every field shown is **required**.
 
 After producing the JSON:
 
-1. Write the JSON array to: `<project-root>/.understand-anything/intermediate/layers.json`
+1. Write the JSON array to the `intermediate/layers.json` file inside the project's data directory — `$UA_DIR/intermediate/layers.json` (`.ua/`, or the legacy `.understand-anything/` when that directory is present). Use the exact output path given in your dispatch prompt if one was provided.
 2. The project root will be provided in your prompt.
 3. Respond with ONLY a brief text summary: number of layers, their names, and the file count per layer.
 

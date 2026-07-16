@@ -1,7 +1,7 @@
 ---
 name: understand-explain
 description: Use when you need a deep-dive explanation of a specific file, function, or module in the codebase
-argument-hint: [file-path]
+argument-hint: "[file-path]"
 ---
 
 # /understand-explain
@@ -31,7 +31,7 @@ The knowledge graph JSON has this structure:
 
 ## Instructions
 
-1. Check that `.understand-anything/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
+1. **Resolve the data directory `$UA_DIR`.** Run `UA_DIR=$([ -d .understand-anything ] && echo .understand-anything || echo .ua)` — this is the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Check that `$UA_DIR/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
 
 2. **Find the target node** — use Grep to search the knowledge graph for the component: "$ARGUMENTS"
    - For file paths (e.g., `src/auth/login.ts`): search for `"filePath"` matches

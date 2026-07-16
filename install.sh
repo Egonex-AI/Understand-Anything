@@ -222,6 +222,9 @@ KIROEOF
 
   printf '\n✓ Installed Understand-Anything for %s\n' "$id"
   printf '  Restart your CLI or IDE to pick up the skills.\n'
+  if [[ "$id" == "codex" ]]; then
+    printf '\n  Tip: Codex invokes skills with $ instead of / — type $understand, not /understand.\n'
+  fi
   if [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'
     printf '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.\n'

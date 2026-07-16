@@ -115,7 +115,7 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 /understand
 ```
 
-멀티 에이전트 파이프라인이 프로젝트를 스캔하고, 모든 파일, 함수, 클래스, 의존성을 추출한 뒤, `.understand-anything/knowledge-graph.json`에 지식 그래프를 저장합니다.
+멀티 에이전트 파이프라인이 프로젝트를 스캔하고, 모든 파일, 함수, 클래스, 의존성을 추출한 뒤, `.ua/knowledge-graph.json`에 지식 그래프를 저장합니다. (이미 `.understand-anything/` 디렉터리가 있는 프로젝트는 계속 그것을 사용합니다. 존재하는 경우 그것이 데이터 디렉터리로 유지되므로 마이그레이션이 필요 없습니다.)
 
 > **토큰 사용량 안내:** 최초 `/understand`는 전체 코드베이스를 분석하므로 대규모 프로젝트에서는 상당한 토큰을 소비할 수 있습니다. 토큰 요금제 / 구독으로 실행하거나, 초기화에는 로컬 모델(위 참조)을 사용하는 것을 권장합니다. 이후 실행은 기본적으로 증분 방식이라 변경된 파일만 다시 분석하므로 훨씬 적은 토큰을 사용합니다.
 
@@ -201,6 +201,8 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 설치 스크립트는 저장소를 `~/.understand-anything/repo`에 클론하고 선택한 플랫폼에 맞는 심볼릭 링크를 생성합니다. 설치 후 CLI 또는 IDE를 재시작하세요.
 
+> **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"*처럼 자연어로 요청하면 됩니다.
+
 - 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
 - 이후 업데이트: `./install.sh --update`
 - 제거: `./install.sh --uninstall <platform>`
@@ -264,11 +266,11 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **예시:** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) — 커밋된 그래프를 포함한 Go / Java / Python / Node 레퍼런스 프로젝트.
 
-**커밋할 대상:** `.understand-anything/` 내부의 모든 파일. 단, `intermediate/` 와 `diff-overlay.json` 은 제외합니다 (이들은 로컬 임시 파일입니다).
+**커밋할 대상:** `.ua/` 내부의 모든 파일. 단, `intermediate/` 와 `diff-overlay.json` 은 제외합니다 (이들은 로컬 임시 파일입니다). (레거시 프로젝트는 `.understand-anything/` 를 사용합니다. 해당 디렉터리가 있는 경우 아래의 디렉터리 이름을 그것으로 바꾸세요.)
 
 ```gitignore
-.understand-anything/intermediate/
-.understand-anything/diff-overlay.json
+.ua/intermediate/
+.ua/diff-overlay.json
 ```
 
 **최신 상태 유지:** `/understand --auto-update` 를 활성화하면 post-commit 훅이 그래프를 증분 업데이트하여 각 커밋마다 일치하는 그래프가 유지됩니다. 또는 릴리스 전에 `/understand` 를 수동으로 다시 실행하세요.
@@ -277,9 +279,21 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 ```bash
 git lfs install
-git lfs track ".understand-anything/*.json"
-git add .gitattributes .understand-anything/
+git lfs track ".ua/*.json"
+git add .gitattributes .ua/
 ```
+
+### Claude Code 없이 대시보드 보기
+
+그래프를 한 번 생성해 커밋해두면, 팀의 누구나 명령어 하나로 열 수 있습니다. Claude Code 도, LLM 도, API 키도 필요 없으며, Node.js(>= 18)만 있으면 됩니다:
+
+```bash
+npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+```
+
+터미널에 토큰이 포함된 URL(`http://127.0.0.1:5173/?token=…`)이 출력되고, 완전한 인터랙티브 대시보드가 브라우저에서 열립니다. 프로젝트 디렉터리(기본값: 현재 디렉터리)에는 커밋된 데이터 디렉터리(`.ua/`, 또는 레거시 `.understand-anything/`)가 있어야 합니다. 모든 것은 로컬 디스크에서 읽기 전용으로 제공되며, LLM 호출도 없고 데이터가 사용자의 컴퓨터를 벗어나지 않습니다.
+
+저장소를 클론해서 작업 중이라면 `pnpm install && pnpm --filter @understand-anything/core build` 후 `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard` 를 실행하면 Vite 개발 서버를 통해 같은 결과를 얻을 수 있습니다.
 
 ---
 

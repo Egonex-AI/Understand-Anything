@@ -663,3 +663,42 @@ namespace App.Services
     });
   });
 });
+
+describe("CSharpExtractor - modern type declarations", () => {
+  const extractor = new CSharpExtractor();
+
+  it("extracts a public struct as a class node with its methods", () => {
+    const { tree, parser, root } = parse(`namespace App {
+    public struct Vec {
+        public int X;
+        public void Add() {
+            X = X + 1;
+        }
+    }
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    const vec = result.classes.find((c) => c.name === "Vec");
+    expect(vec).toBeDefined();
+    expect(vec!.methods).toContain("Add");
+    expect(result.exports.some((e) => e.name === "Vec")).toBe(true);
+
+    tree.delete();
+    parser.delete();
+  });
+
+  it("extracts a public record as a class node", () => {
+    const { tree, parser, root } = parse(`namespace App {
+    public record Point(int X, int Y);
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    expect(result.classes.some((c) => c.name === "Point")).toBe(true);
+    expect(result.exports.some((e) => e.name === "Point")).toBe(true);
+
+    tree.delete();
+    parser.delete();
+  });
+});

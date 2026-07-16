@@ -116,7 +116,7 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 /understand
 ```
 
-Мультиагентный пайплайн сканирует ваш проект, извлекает каждый файл, функцию, класс и зависимость, а затем строит граф знаний и сохраняет его в `.understand-anything/knowledge-graph.json`.
+Мультиагентный пайплайн сканирует ваш проект, извлекает каждый файл, функцию, класс и зависимость, а затем строит граф знаний и сохраняет его в `.ua/knowledge-graph.json`. (Проекты, в которых уже есть каталог `.understand-anything/`, продолжают использовать его — при наличии он остаётся каталогом данных, поэтому ничего мигрировать не нужно.)
 
 > **Обратите внимание на расход токенов:** Первый запуск `/understand` анализирует всю кодовую базу и может потреблять значительное количество токенов на больших проектах. Рекомендуем запускать его с тарифным планом / подпиской на токены или использовать локальную модель (см. выше) для инициализации. Последующие запуски по умолчанию инкрементальны — повторно анализируются только изменённые файлы — поэтому расходуют гораздо меньше токенов.
 
@@ -202,6 +202,8 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 Установщик клонирует репозиторий в `~/.understand-anything/repo` и создаёт нужные симлинки для выбранной платформы. После установки перезапустите свой CLI/IDE.
 
+> **Как вызывать skills:** префикс вызова зависит от платформы. Большинство платформ используют слэш-команды (`/understand`), но **Codex использует `$`** — вводите `$understand`, а не `/understand`. Если ни один префикс не распознаётся, просто попросите обычным языком: *«Используй skill understand, чтобы проанализировать этот проект»*.
+
 - Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
 - Обновление: `./install.sh --update`
 - Удаление: `./install.sh --uninstall <platform>`
@@ -265,11 +267,11 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **Пример:** [GoogleCloudPlatform/microservices-demo (форк)](https://github.com/GoogleCloudPlatform/microservices-demo) — мультиязыковой проект (Go / Java / Python / Node) с уже зафиксированным графом.
 
-**Что коммитить:** всё содержимое `.understand-anything/`, *кроме* `intermediate/` и `diff-overlay.json` (это локальные временные файлы).
+**Что коммитить:** всё содержимое `.ua/`, *кроме* `intermediate/` и `diff-overlay.json` (это локальные временные файлы). (Устаревшие проекты используют `.understand-anything/` — подставьте это имя каталога ниже, если присутствует именно он.)
 
 ```gitignore
-.understand-anything/intermediate/
-.understand-anything/diff-overlay.json
+.ua/intermediate/
+.ua/diff-overlay.json
 ```
 
 **Держите граф в актуальном состоянии:** включите `/understand --auto-update` — post-commit хук будет инкрементально обновлять граф, так что каждый коммит сопровождается соответствующим графом. Либо запускайте `/understand` вручную перед релизами.
@@ -278,9 +280,21 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 ```bash
 git lfs install
-git lfs track ".understand-anything/*.json"
-git add .gitattributes .understand-anything/
+git lfs track ".ua/*.json"
+git add .gitattributes .ua/
 ```
+
+### Просмотр панели без Claude Code
+
+Как только граф сгенерирован и закоммичен, любой участник команды может открыть его одной командой — без Claude Code, без LLM, без API-ключа. Нужен только Node.js (>= 18):
+
+```bash
+npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+```
+
+В терминале выводится URL с токеном (`http://127.0.0.1:5173/?token=…`), и полностью интерактивная панель открывается в браузере. Каталог проекта (по умолчанию — текущий каталог) должен содержать закоммиченный каталог с данными (`.ua/` или устаревший `.understand-anything/`). Всё раздаётся только для чтения с локального диска — никаких обращений к LLM, никакие данные не покидают вашу машину.
+
+Работаете из клона репозитория? `pnpm install && pnpm --filter @understand-anything/core build`, затем `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard` — то же самое через dev-сервер Vite.
 
 ---
 

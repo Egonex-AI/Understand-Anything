@@ -9,7 +9,8 @@ Usage:
     python extract-domain-context.py <project-root>
 
 Output:
-    <project-root>/.understand-anything/intermediate/domain-context.json
+    <ua-dir>/intermediate/domain-context.json, where <ua-dir> is `.ua/` (or
+    legacy `.understand-anything/` when that directory already exists).
 """
 
 import json
@@ -18,6 +19,12 @@ import re
 import sys
 from pathlib import Path
 from typing import Any
+
+
+def resolve_ua_dir(root: Path) -> Path:
+    """Mirror core resolveUaDir: legacy .understand-anything/ wins if present."""
+    legacy = root / ".understand-anything"
+    return legacy if legacy.is_dir() else root / ".ua"
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
@@ -52,7 +59,7 @@ SKIP_DIRS = {
     "node_modules", ".git", ".svn", ".hg", "__pycache__", ".tox",
     "venv", ".venv", "env", ".env", "dist", "build", "out", ".next",
     ".nuxt", "target", "vendor", ".idea", ".vscode", "coverage",
-    ".understand-anything", ".pytest_cache", ".mypy_cache",
+    ".understand-anything", ".ua", ".pytest_cache", ".mypy_cache",
     "Pods", "DerivedData", ".gradle", "bin", "obj",
 }
 
@@ -123,7 +130,7 @@ def parse_gitignore(project_root: Path) -> list[re.Pattern[str]]:
     if not gitignore.exists():
         return patterns
 
-    for line in gitignore.read_text(errors="replace").splitlines():
+    for line in gitignore.read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -208,7 +215,7 @@ def detect_entry_points(root: Path, file_paths: list[str]) -> list[dict[str, Any
             continue
         full_path = root / rel_path
         try:
-            content = full_path.read_text(errors="replace")
+            content = full_path.read_text(encoding="utf-8", errors="replace")
         except (OSError, UnicodeDecodeError):
             continue
 
@@ -267,7 +274,7 @@ def extract_file_signatures(root: Path, file_paths: list[str]) -> list[dict[str,
     for rel_path in sorted_paths[:MAX_SAMPLED_FILES]:
         full_path = root / rel_path
         try:
-            content = full_path.read_text(errors="replace")
+            content = full_path.read_text(encoding="utf-8", errors="replace")
         except (OSError, UnicodeDecodeError):
             continue
 
@@ -312,7 +319,7 @@ def extract_metadata(root: Path) -> dict[str, Any]:
         if not filepath.exists():
             continue
         try:
-            content = filepath.read_text(errors="replace")
+            content = filepath.read_text(encoding="utf-8", errors="replace")
         except (OSError, UnicodeDecodeError):
             continue
 
@@ -385,7 +392,7 @@ def main() -> None:
 
     try:
         # Ensure output directory exists
-        output_dir = project_root / ".understand-anything" / "intermediate"
+        output_dir = resolve_ua_dir(project_root) / "intermediate"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / "domain-context.json"
 
@@ -415,7 +422,7 @@ def main() -> None:
 
         context = _truncate_to_fit(context)
         output = json.dumps(context, indent=2)
-        output_path.write_text(output)
+        output_path.write_text(output, encoding="utf-8")
         size_kb = len(output.encode()) / 1024
         print(f"  Wrote {output_path} ({size_kb:.0f} KB)", file=sys.stderr)
 

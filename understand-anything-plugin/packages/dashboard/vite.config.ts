@@ -12,15 +12,20 @@ import crypto from "crypto";
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
+// Legacy directory first — projects analyzed before the `.ua` rename keep
+// their existing `.understand-anything/` data.
+const UA_DIR_CANDIDATES = [".understand-anything", ".ua"];
+
 function graphFileCandidates(fileName: string): string[] {
   const graphDir = process.env.GRAPH_DIR;
-  return [
-    ...(graphDir
-      ? [path.resolve(graphDir, `.understand-anything/${fileName}`)]
-      : []),
-    path.resolve(process.cwd(), `.understand-anything/${fileName}`),
-    path.resolve(process.cwd(), `../../../.understand-anything/${fileName}`),
+  const roots = [
+    ...(graphDir ? [graphDir] : []),
+    process.cwd(),
+    path.resolve(process.cwd(), "../../.."),
   ];
+  return roots.flatMap((root) =>
+    UA_DIR_CANDIDATES.map((dir) => path.resolve(root, dir, fileName)),
+  );
 }
 
 function findGraphFile(fileName: string): string | null {

@@ -3,7 +3,7 @@ const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 const egonexUrl = 'https://egonex.ai';
 ---
 
-<section class="hero">
+<section class="hero" id="top">
   <div class="hero-bg">
     <img src="/images/hero.jpg" alt="" class="hero-bg-img" loading="eager" />
     <div class="hero-overlay"></div>
@@ -38,68 +38,120 @@ const egonexUrl = 'https://egonex.ai';
     </div>
 
     <div class="hero-actions anim anim-6">
-      <a href="#install" class="hero-cta">Get Started</a>
-      <a href="/demo/" class="hero-demo">Live Demo &rarr;</a>
+      <a href="#install" class="hero-cta"><span>Get Started</span></a>
+      <a href="#live-demo" class="hero-demo">Live Demo &rarr;</a>
       <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="hero-secondary">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 .587l3.668 7.568L24 9.306l-6 5.986 1.416 8.421L12 19.897l-7.416 3.816L6 15.292 0 9.306l8.332-1.151z"/></svg>
         Star on GitHub
       </a>
     </div>
 
-    <a href="https://trendshift.io/repositories/23482" target="_blank" rel="noopener noreferrer" class="hero-trendshift anim anim-6">
-      <img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" width="250" height="55" loading="lazy" />
+    <a
+      href="https://trendshift.io/repositories/23482"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="hero-trendshift anim anim-6"
+    >
+      <span class="trend-fallback" aria-hidden="true">
+        <span class="trend-rank">
+          <svg class="trend-laurel trend-laurel-left" viewBox="0 0 22 32" focusable="false">
+            <path d="M17 5C10 10 6 17 7 26" />
+            <path d="M12 9C8 9 6 11 5 14" />
+            <path d="M9 15C5 16 4 18 4 21" />
+            <path d="M9 22C6 23 5 25 6 28" />
+          </svg>
+          <span class="trend-number">1</span>
+          <svg class="trend-laurel" viewBox="0 0 22 32" focusable="false">
+            <path d="M5 5c7 5 11 12 10 21" />
+            <path d="M10 9c4 0 6 2 7 5" />
+            <path d="M13 15c4 1 5 3 5 6" />
+            <path d="M13 22c3 1 4 3 3 6" />
+          </svg>
+        </span>
+        <span class="trend-copy">
+          <span class="trend-kicker">GitHub Trending</span>
+          <span class="trend-title">#1 Repository Of The Day</span>
+        </span>
+      </span>
+      <img
+        src="https://trendshift.io/api/badge/repositories/23482"
+        alt="Understand Anything | Trendshift"
+        width="250"
+        height="55"
+        loading="lazy"
+        onerror="this.style.display='none'"
+      />
     </a>
 
-    <a href={egonexUrl} target="_blank" rel="noopener noreferrer" class="hero-company anim anim-6">
-      <span class="hero-company-label">Company</span>
-      <span class="hero-company-divider">&middot;</span>
-      <span class="hero-company-site">egonex.ai</span>
-      <span class="hero-company-arrow">&rarr;</span>
-    </a>
   </div>
 </section>
 
 <style>
   .hero {
     position: relative;
-    min-height: 100vh;
+    min-height: 100svh;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
     overflow: hidden;
-    padding: 2rem;
+    padding: 7rem 2rem 5rem;
+    background: transparent;
+    color: var(--text);
   }
 
   .hero-bg {
     position: absolute;
     inset: 0;
     z-index: 0;
+    background:
+      radial-gradient(circle at 12% 12%, rgba(147, 197, 253, 0.22), transparent 34rem),
+      radial-gradient(circle at 82% 22%, rgba(139, 92, 246, 0.24), transparent 34rem),
+      linear-gradient(180deg, #fbfdff 0%, #f8f8fd 100%);
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 72%, rgba(0, 0, 0, 0.72) 84%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 0%, #000 72%, rgba(0, 0, 0, 0.72) 84%, transparent 100%);
+  }
+
+  .hero-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url('/images/hero.jpg');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.14;
+    filter: saturate(0.72) contrast(1.18) brightness(1.04) sepia(0.08) hue-rotate(218deg);
+    mix-blend-mode: multiply;
+    -webkit-mask-image:
+      radial-gradient(ellipse at 17% 48%, #000 0%, #000 24%, transparent 50%),
+      radial-gradient(ellipse at 84% 48%, #000 0%, #000 24%, transparent 50%);
+    mask-image:
+      radial-gradient(ellipse at 17% 48%, #000 0%, #000 24%, transparent 50%),
+      radial-gradient(ellipse at 84% 48%, #000 0%, #000 24%, transparent 50%);
   }
 
   .hero-bg-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    opacity: 0.2;
+    opacity: 0.08;
+    filter: saturate(0.7) contrast(1.06) brightness(1.08);
+    mix-blend-mode: multiply;
   }
 
   .hero-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to bottom,
-      rgba(10, 10, 10, 0.4) 0%,
-      rgba(10, 10, 10, 0.75) 55%,
-      var(--bg) 100%
-    );
+    background:
+      radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.9) 24%, rgba(255, 255, 255, 0.56) 48%, transparent 70%),
+      linear-gradient(180deg, rgba(251, 253, 255, 0.82) 0%, rgba(248, 248, 253, 0.4) 36%, rgba(248, 248, 253, 0.76) 74%, var(--bg) 100%);
   }
 
   .hero-content {
     position: relative;
     z-index: 1;
-    width: min(100%, 900px);
-    max-width: 900px;
+    width: min(100%, 1180px);
+    max-width: 1180px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -110,30 +162,35 @@ const egonexUrl = 'https://egonex.ai';
   .hero-badge {
     display: inline-block;
     font-family: var(--font-code);
-    font-size: 0.8rem;
-    letter-spacing: 0.08em;
-    color: #d4a574;
-    border: 1px solid rgba(212, 165, 116, 0.3);
-    padding: 0.4rem 1.2rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    color: var(--accent-deep);
+    border: 1px solid rgba(88, 43, 232, 0.18);
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(18px) saturate(1.12);
+    padding: 0.45rem 1.15rem;
     border-radius: 100px;
-    margin-bottom: 2.5rem;
+    margin-bottom: 2rem;
   }
 
   /* Headline */
   .hero-title {
     font-family: var(--font-heading);
-    font-size: clamp(2.75rem, 9vw, 7rem);
-    color: #e8e2d8;
-    line-height: 1.05;
-    letter-spacing: -0.025em;
-    margin-bottom: 2rem;
+    font-size: clamp(3.25rem, 7.2vw, 6rem);
+    color: var(--text);
+    font-weight: 850;
+    line-height: 0.95;
+    letter-spacing: -0.06em;
+    margin-bottom: 1.55rem;
     white-space: nowrap;
     max-width: 100%;
+    text-shadow: none;
   }
 
   .hero-grad {
     display: inline-block;
-    background: linear-gradient(135deg, #c9867a, #b8865c, #d4a574);
+    background: linear-gradient(135deg, #0f1020, #4c35d9 58%, #8b5cf6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -146,27 +203,28 @@ const egonexUrl = 'https://egonex.ai';
     justify-content: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-    color: #e8e2d8;
+    color: var(--text);
     font-family: var(--font-heading);
+    font-weight: 760;
     font-size: 1.8rem;
     line-height: 1.25;
     margin: -0.4rem 0 0.8rem;
   }
 
   .hero-bridge a {
-    color: #d4a574;
+    color: var(--accent);
     text-decoration: none;
     transition: color 0.2s ease, text-shadow 0.2s ease;
   }
 
   .hero-bridge a:hover {
-    color: #e8c99e;
+    color: var(--accent-deep);
     text-decoration: none;
-    text-shadow: 0 0 20px rgba(212, 165, 116, 0.18);
+    text-shadow: 0 0 20px rgba(88, 43, 232, 0.14);
   }
 
   .hero-belief {
-    color: #a9a196;
+    color: var(--text-muted);
     font-size: 1.08rem;
     line-height: 1.6;
     margin: 0 0 0.75rem;
@@ -175,7 +233,7 @@ const egonexUrl = 'https://egonex.ai';
   /* Tagline */
   .hero-tagline {
     font-size: 1.08rem;
-    color: #8a8578;
+    color: var(--text-muted);
     line-height: 1.6;
     max-width: 900px;
     white-space: nowrap;
@@ -183,12 +241,12 @@ const egonexUrl = 'https://egonex.ai';
   }
 
   .hero-problem {
-    color: #c9867a;
+    color: #8b5cf6;
     font-style: italic;
   }
 
   .hero-value {
-    color: #d4a574;
+    color: var(--accent);
     font-weight: 600;
   }
 
@@ -204,13 +262,13 @@ const egonexUrl = 'https://egonex.ai';
 
   .pillar {
     font-size: 0.9rem;
-    color: #e8e2d8;
+    color: var(--text-soft);
     font-weight: 600;
     letter-spacing: 0.01em;
   }
 
   .pillar-dot {
-    color: #d4a574;
+    color: var(--accent);
     font-size: 1.2rem;
     line-height: 1;
   }
@@ -225,27 +283,42 @@ const egonexUrl = 'https://egonex.ai';
   }
 
   .hero-cta {
-    background: #d4a574;
-    color: #0a0a0a;
-    padding: 0.85rem 2.5rem;
-    border-radius: 8px;
+    background: var(--egonex-gradient-primary);
+    color: #ffffff;
+    padding: 1px;
+    border-radius: 999px;
     font-weight: 600;
     font-size: 1.05rem;
     text-decoration: none;
-    transition: box-shadow 0.3s ease, transform 0.2s ease;
+    box-shadow: none;
+    transition: transform 0.2s ease;
+  }
+
+  .hero-cta span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem 2.5rem;
+    border-radius: 999px;
+    background: #582be8;
+    transition: background 0.3s ease;
   }
 
   .hero-cta:hover {
     text-decoration: none;
-    box-shadow: 0 0 30px rgba(212, 165, 116, 0.15), 0 0 60px rgba(212, 165, 116, 0.08);
-    transform: translateY(-2px);
+  }
+
+  .hero-cta:hover span,
+  .hero-cta:focus-visible span {
+    background: transparent;
   }
 
   .hero-demo {
-    border: 1.5px solid #d4a574;
-    color: #d4a574;
+    border: 1.5px solid rgba(88, 43, 232, 0.24);
+    color: var(--accent);
+    background: rgba(255, 255, 255, 0.68);
     padding: 0.85rem 2.5rem;
-    border-radius: 8px;
+    border-radius: 999px;
     font-weight: 600;
     font-size: 1.05rem;
     text-decoration: none;
@@ -253,21 +326,26 @@ const egonexUrl = 'https://egonex.ai';
   }
 
   .hero-demo:hover {
-    background: rgba(212, 165, 116, 0.1);
-    box-shadow: 0 0 20px rgba(212, 165, 116, 0.15);
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(88, 43, 232, 0.18);
     transform: translateY(-2px);
     text-decoration: none;
   }
 
+  .hero-cta:active,
+  .hero-demo:active {
+    transform: scale(0.98);
+  }
+
   .hero-secondary {
-    color: #8a8578;
+    color: var(--text-muted);
     font-size: 0.95rem;
     text-decoration: none;
     transition: color 0.2s;
   }
 
   .hero-secondary:hover {
-    color: #d4a574;
+    color: var(--accent);
     text-decoration: none;
   }
 
@@ -275,72 +353,97 @@ const egonexUrl = 'https://egonex.ai';
   .hero-trendshift {
     margin-top: 1.75rem;
     display: inline-block;
-    line-height: 0;
+    position: relative;
+    width: 250px;
+    height: 55px;
+    line-height: 1;
     transition: transform 0.2s ease, filter 0.2s ease;
   }
 
   .hero-trendshift img {
     display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
     width: 250px;
     height: 55px;
   }
 
   .hero-trendshift:hover {
     transform: translateY(-2px);
-    filter: drop-shadow(0 0 14px rgba(212, 165, 116, 0.25));
+    filter: drop-shadow(0 12px 20px rgba(88, 43, 232, 0.14));
   }
 
-  .hero-company {
-    margin-top: 1.25rem;
+  .trend-fallback {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.45rem 1.1rem;
-    border: 1px solid rgba(212, 165, 116, 0.3);
-    border-radius: 100px;
-    background: rgba(212, 165, 116, 0.04);
-    text-decoration: none;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease,
-      background-color 0.25s ease;
+    justify-content: center;
+    gap: 0.52rem;
+    padding: 0.42rem 0.62rem;
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 14px 32px rgba(88, 43, 232, 0.12);
+    color: #4b2a92;
   }
 
-  .hero-company:hover {
-    border-color: rgba(212, 165, 116, 0.55);
-    background: rgba(212, 165, 116, 0.08);
-    box-shadow: 0 0 24px rgba(212, 165, 116, 0.15);
-    transform: translateY(-1px);
-    text-decoration: none;
+  .trend-rank {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12rem;
+    flex: 0 0 auto;
+    color: var(--accent);
   }
 
-  .hero-company-label {
-    font-family: var(--font-code);
-    font-size: 0.7rem;
-    letter-spacing: 0.14em;
+  .trend-number {
+    font-family: var(--font-heading);
+    font-size: 1.22rem;
+    font-weight: 780;
+    letter-spacing: 0;
+  }
+
+  .trend-laurel {
+    width: 14px;
+    height: 23px;
+    overflow: visible;
+  }
+
+  .trend-laurel path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .trend-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.17rem;
+    min-width: 0;
+  }
+
+  .trend-kicker {
+    font-family: var(--font-heading);
+    color: #6d58b5;
+    font-size: 0.5rem;
+    font-weight: 760;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    color: #d4a574;
+    white-space: nowrap;
   }
 
-  .hero-company-divider {
-    color: rgba(212, 165, 116, 0.45);
-    font-size: 0.85rem;
-    line-height: 1;
-  }
-
-  .hero-company-site {
-    font-family: var(--font-code);
-    font-size: 0.82rem;
-    color: #e8e2d8;
-  }
-
-  .hero-company-arrow {
-    color: #d4a574;
-    font-size: 0.95rem;
-    line-height: 1;
-    transition: transform 0.2s ease;
-  }
-
-  .hero-company:hover .hero-company-arrow {
-    transform: translateX(3px);
+  .trend-title {
+    font-family: var(--font-heading);
+    color: #4b2a92;
+    font-size: 0.76rem;
+    font-weight: 780;
+    letter-spacing: 0;
+    white-space: nowrap;
   }
 
   /* Staggered entrance */
@@ -429,16 +532,13 @@ const egonexUrl = 'https://egonex.ai';
       padding: 0.85rem 1.5rem;
       justify-content: center;
     }
+
+    .hero-cta span {
+      width: 100%;
+      padding: 0.85rem 1.5rem;
+    }
     .hero-pillars { flex-direction: column; gap: 0.4rem; }
     .pillar-dot { display: none; }
-    .hero-company {
-      flex-direction: column;
-      gap: 0.25rem;
-      padding: 0.6rem 1.25rem;
-      max-width: 100%;
-    }
-    .hero-company-divider { display: none; }
-    .hero-company-site { font-size: 0.78rem; }
   }
 
   @media (max-width: 480px) {

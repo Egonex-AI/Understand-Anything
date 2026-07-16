@@ -25,7 +25,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - Schema validation on graph load with error banner
 
 ## Agent Pipeline
-- Agents write intermediate results to `.understand-anything/intermediate/` on disk (not returned to context)
+- Agents write intermediate results to the data directory's `intermediate/` subdirectory on disk (not returned to context) — `.ua/intermediate/`, or `.understand-anything/intermediate/` when that legacy directory is present
 - Agent model field is omitted from frontmatter so each platform falls back to its configured default — `inherit` was a Claude Code-only keyword that opencode (and similar tools) treated as a literal model id and rejected with `ProviderModelNotFoundError` (see #167)
 - `/understand` auto-triggers `/understand-dashboard` after completion
 - Intermediate files cleaned up after graph assembly
@@ -44,7 +44,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - TypeScript strict mode everywhere
 - Vitest for testing
 - ESM modules (`"type": "module"`)
-- Knowledge graph JSON lives in `.understand-anything/` directory of analyzed projects
+- Knowledge graph JSON lives in the analyzed project's data directory: `.ua/` for new projects, or the legacy `.understand-anything/` directory when it already exists (if `.understand-anything/` is present it is used for both reads and writes; otherwise `.ua/`). All bundled scripts and core code self-resolve this rule.
 - Core uses subpath exports (`./search`, `./types`, `./schema`) to avoid pulling Node.js modules into browser
 
 ## Gotchas
@@ -52,12 +52,16 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - **Dashboard imports**: Dashboard must only import from core's browser-safe subpath exports (`./search`, `./types`, `./schema`), never the main entry point which pulls in Node.js modules
 
 ## Scripts
-- `scripts/generate-large-graph.mjs` — Generates a fake knowledge graph for performance testing (e.g. large-graph layout). Writes to `.understand-anything/knowledge-graph.json`. Usage: `node scripts/generate-large-graph.mjs [nodeCount]` (default: 3000 nodes). Not part of the production pipeline.
+- `scripts/generate-large-graph.mjs` — Generates a fake knowledge graph for performance testing (e.g. large-graph layout). Writes to the project data directory's `knowledge-graph.json` (`.ua/knowledge-graph.json`, or `.understand-anything/` when that legacy directory is present). Usage: `node scripts/generate-large-graph.mjs [nodeCount]` (default: 3000 nodes). Not part of the production pipeline.
+
+## Viewer Package
+`packages/viewer` serves a committed graph without Claude Code, via `npx <release-asset-url>`. Update it when (a) the dashboard UI changes — the tarball embeds the built `dist/` — or (b) the `vite.config.ts` dev-server middleware changes, which `bin/viewer.mjs` deliberately mirrors. On every release, repack (`pack:release` script) and re-upload the tarball to the GitHub release as `understand-anything-viewer.tgz` — exactly that name, the READMEs' `releases/latest/download/` URL depends on it.
 
 ## Versioning
-When pushing to remote, bump the version in **all five** of these files (keep them in sync):
+When pushing to remote, bump the version in **all six** of these files (keep them in sync):
 - `understand-anything-plugin/package.json` → `"version"` field
 - `understand-anything-plugin/.claude-plugin/plugin.json` → `"version"` field
+- `understand-anything-plugin/packages/viewer/package.json` → `"version"` field
 - `.claude-plugin/plugin.json` → `"version"` field
 - `.cursor-plugin/plugin.json` → `"version"` field
 - `.copilot-plugin/plugin.json` → `"version"` field

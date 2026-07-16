@@ -71,6 +71,20 @@ export class PluginRegistry {
     return plugin.extractCallGraph(filePath, content);
   }
 
+  /**
+   * Single-parse fast path: returns both structure and call graph from one
+   * parse when the resolved plugin supports it, else null so the caller can
+   * fall back to separate analyzeFile + extractCallGraph calls.
+   */
+  analyzeFileFull(
+    filePath: string,
+    content: string,
+  ): { structure: StructuralAnalysis; callGraph: CallGraphEntry[] } | null {
+    const plugin = this.getPluginForFile(filePath);
+    if (!plugin?.analyzeFileFull) return null;
+    return plugin.analyzeFileFull(filePath, content);
+  }
+
   getPlugins(): AnalyzerPlugin[] {
     return [...this.plugins];
   }

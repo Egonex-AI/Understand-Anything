@@ -52,16 +52,20 @@
     font-family: var(--font-heading);
     font-size: clamp(1.5rem, 3vw, 2.25rem);
     color: var(--text);
+    font-weight: 780;
     margin-bottom: 2.5rem;
   }
 
   .install-code {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    background: var(--surface-dark);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
     overflow: hidden;
     text-align: left;
     margin-bottom: 1.5rem;
+    box-shadow:
+      0 34px 90px rgba(88, 43, 232, 0.14),
+      0 14px 34px rgba(15, 16, 32, 0.12);
   }
 
   .install-code-header {
@@ -69,19 +73,19 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .install-code-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--accent-3);
   }
 
   .install-code-label {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--text-muted-on-dark);
     font-family: var(--font-code);
     flex: 1;
   }
@@ -91,10 +95,10 @@
     align-items: center;
     gap: 0.35rem;
     background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.3rem 0.6rem;
-    color: var(--text-muted);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.35rem 0.65rem;
+    color: var(--text-muted-on-dark);
     font-family: var(--font-code);
     font-size: 0.75rem;
     cursor: pointer;
@@ -103,7 +107,7 @@
 
   .install-copy:hover {
     color: var(--accent);
-    border-color: rgba(212, 165, 116, 0.3);
+    border-color: rgba(139, 92, 246, 0.42);
   }
 
   pre {
@@ -116,7 +120,7 @@
     font-family: var(--font-code);
     font-size: 0.95rem;
     line-height: 1.8;
-    color: var(--text);
+    color: var(--text-on-dark);
   }
 
   .cmd {

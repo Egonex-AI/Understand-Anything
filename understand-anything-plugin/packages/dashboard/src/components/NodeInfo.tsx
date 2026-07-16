@@ -26,6 +26,12 @@ const typeBadgeColors: Record<NodeType, string> = {
   topic: "text-node-topic border border-node-topic/30 bg-node-topic/10",
   claim: "text-node-claim border border-node-claim/30 bg-node-claim/10",
   source: "text-node-source border border-node-source/30 bg-node-source/10",
+  page: "text-node-concept border border-node-concept/30 bg-node-concept/10",
+  screen: "text-node-service border border-node-service/30 bg-node-service/10",
+  component: "text-node-class border border-node-class/30 bg-node-class/10",
+  componentSet: "text-node-module border border-node-module/30 bg-node-module/10",
+  instance: "text-node-function border border-node-function/30 bg-node-function/10",
+  token: "text-node-config border border-node-config/30 bg-node-config/10",
 };
 
 const complexityBadgeColors: Record<string, string> = {
@@ -35,12 +41,25 @@ const complexityBadgeColors: Record<string, string> = {
 };
 
 function getDirectionalLabel(edgeType: string, isSource: boolean, t: ReturnType<typeof useI18n>["t"]): string {
-  const labels = t.edgeLabels[edgeType as EdgeType];
+  // edgeLabels only defines the labels that have explicit translations; the new
+  // design edge types (instance_of/variant_of/uses_token) intentionally fall back
+  // to the generated label below, so index it as a partial map over EdgeType.
+  const labels = (t.edgeLabels as Partial<Record<EdgeType, { forward: string; backward: string }>>)[edgeType as EdgeType];
   if (!labels) {
     const formatted = edgeType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     return isSource ? formatted : `${formatted} (reverse)`;
   }
   return isSource ? labels.forward : labels.backward;
+}
+
+function FigmaThumbnail({ node }: { node: GraphNode }) {
+  const url = node.figmaMeta?.thumbnailUrl;
+  if (!url) return null;
+  return (
+    <div className="mb-3 rounded-lg overflow-hidden border border-border-subtle bg-elevated">
+      <img src={url} alt={node.name} className="w-full h-auto block" loading="lazy" />
+    </div>
+  );
 }
 
 function KnowledgeNodeDetails({ node, graph }: { node: GraphNode; graph: KnowledgeGraph }) {
@@ -379,6 +398,8 @@ export default function NodeInfo() {
           {focusNodeId === node.id ? t.common.unfocus : t.common.focus}
         </button>
       </div>
+
+      <FigmaThumbnail node={node} />
 
       <p className="text-sm text-text-secondary mb-4 leading-relaxed">
         {node.summary}
