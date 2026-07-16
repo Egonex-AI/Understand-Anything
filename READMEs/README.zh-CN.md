@@ -115,7 +115,7 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 /understand
 ```
 
-多智能体（multi-agent）架构会：扫描你的项目，提取函数 / 类 / 依赖，构建知识图谱保存至`.understand-anything/knowledge-graph.json`.
+多智能体（multi-agent）架构会：扫描你的项目，提取函数 / 类 / 依赖，构建知识图谱保存至`.ua/knowledge-graph.json`。（已经有 `.understand-anything/` 目录的项目会继续使用它——存在时它仍是数据目录，因此无需迁移。）
 
 > **关于 Token 消耗的提醒：** 首次运行 `/understand` 会分析整个代码库，在大型项目上可能消耗大量 token。建议在有 token 套餐 / 订阅的情况下运行，或在初始化时使用本地模型（见上文）。后续运行默认是增量式的——只重新分析变更过的文件——因此消耗的 token 大幅减少。
 
@@ -201,6 +201,8 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 安装脚本会将仓库克隆到 `~/.understand-anything/repo`，并为所选平台创建相应的符号链接。安装完成后请重启 CLI 或 IDE。
 
+> **关于技能调用方式：** 不同平台的调用前缀不同。大多数平台使用斜杠命令（`/understand`），但 **Codex 使用 `$`** —— 请输入 `$understand`，而不是 `/understand`。如果两种前缀都不被识别，直接用自然语言请求即可：*“使用 understand 技能分析这个项目”*。
+
 - 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
 - 后续更新：`./install.sh --update`
 - 卸载：`./install.sh --uninstall <platform>`
@@ -264,11 +266,11 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **示例：** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) —— 包含已提交图谱的 Go / Java / Python / Node 多语言参考项目。
 
-**需要提交的内容：** `.understand-anything/` 下的全部文件，*除了* `intermediate/` 和 `diff-overlay.json`（这些是本地临时文件）。
+**需要提交的内容：** `.ua/` 下的全部文件，*除了* `intermediate/` 和 `diff-overlay.json`（这些是本地临时文件）。（旧项目使用 `.understand-anything/`——如果存在的是该目录，请将下方的目录名替换为它。）
 
 ```gitignore
-.understand-anything/intermediate/
-.understand-anything/diff-overlay.json
+.ua/intermediate/
+.ua/diff-overlay.json
 ```
 
 **保持最新：** 启用 `/understand --auto-update` —— 一个 post-commit 钩子会增量更新图谱，每次提交都能得到匹配的图谱版本。也可以在发布前手动重跑 `/understand`。
@@ -277,9 +279,21 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 ```bash
 git lfs install
-git lfs track ".understand-anything/*.json"
-git add .gitattributes .understand-anything/
+git lfs track ".ua/*.json"
+git add .gitattributes .ua/
 ```
+
+### 无需 Claude Code 也能查看仪表盘
+
+图谱生成并提交后，团队中的任何人只需一条命令即可打开它 —— 无需 Claude Code，无需 LLM，无需 API 密钥，只需要 Node.js（>= 18）：
+
+```bash
+npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+```
+
+终端会打印一个带令牌的 URL（`http://127.0.0.1:5173/?token=…`），并在浏览器中打开完整的交互式仪表盘。项目目录（默认：当前目录）必须包含已提交的数据目录（`.ua/`，或旧版 `.understand-anything/`）。所有内容都从本地磁盘以只读方式提供 —— 没有 LLM 调用，也不会有任何数据离开你的机器。
+
+如果你是从克隆的仓库工作：先执行 `pnpm install && pnpm --filter @understand-anything/core build`，再运行 `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard`，即可通过 Vite 开发服务器实现同样的效果。
 
 ---
 

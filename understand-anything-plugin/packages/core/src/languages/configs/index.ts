@@ -9,6 +9,7 @@ import { rubyConfig } from "./ruby.js";
 import { phpConfig } from "./php.js";
 import { swiftConfig } from "./swift.js";
 import { kotlinConfig } from "./kotlin.js";
+import { scalaConfig } from "./scala.js";
 import { cConfig } from "./c.js";
 import { cppConfig } from "./cpp.js";
 import { dartConfig } from "./dart.js";
@@ -54,6 +55,7 @@ export const builtinLanguageConfigs: LanguageConfig[] = [
   phpConfig,
   swiftConfig,
   kotlinConfig,
+  scalaConfig,
   luaConfig,
   cConfig,
   cppConfig,
@@ -100,6 +102,7 @@ export {
   phpConfig,
   swiftConfig,
   kotlinConfig,
+  scalaConfig,
   luaConfig,
   cConfig,
   cppConfig,

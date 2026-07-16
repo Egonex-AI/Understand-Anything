@@ -1,6 +1,8 @@
 export const ko = {
   common: {
     loading: "프로젝트 로딩 중...",
+    computingGraphLayout: "그래프 레이아웃을 계산하는 중...",
+    forceLayoutFallback: "포스 레이아웃을 사용할 수 없어 대체 그리드를 표시합니다.",
     noGraphLoaded: "지식 그래프가 로드되지 않음",
     selectNode: "노드를 선택하여 상세 정보 확인",
     back: "뒤로",
@@ -179,6 +181,8 @@ export const ko = {
     closeExpanded: "확장된 코드 뷰어 닫기",
     closeViewer: "코드 뷰어 닫기",
     sourceUnavailable: "소스 사용 불가",
+    rendered: "렌더링",
+    source: "소스",
   },
   customNode: {
     tested: "테스트됨",

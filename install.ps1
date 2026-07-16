@@ -34,6 +34,7 @@ $Platforms = [ordered]@{
     pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     openclaw    = @{ Target = (Join-Path $HOME '.openclaw\skills');           Style = 'folder' }
     antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
+    vibe        = @{ Target = (Join-Path $HOME '.vibe\skills');               Style = 'per-skill' }
     vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
     hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder' }
     cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
@@ -234,6 +235,9 @@ function Cmd-Install([string]$Id) {
 
     Write-Host "`n✓ Installed Understand-Anything for $Id"
     Write-Host '  Restart your CLI or IDE to pick up the skills.'
+    if ($Id -eq 'codex') {
+        Write-Host "`n  Tip: Codex invokes skills with `$ instead of / — type `$understand, not /understand."
+    }
     if ($Id -eq 'vscode') {
         Write-Host "`n  Tip: VS Code can also auto-discover the plugin by opening this repo"
         Write-Host '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.'

@@ -1,6 +1,8 @@
 export const zhTW = {
   common: {
     loading: "載入專案...",
+    computingGraphLayout: "正在計算圖形配置...",
+    forceLayoutFallback: "力導向配置無法使用，正在顯示備用網格。",
     noGraphLoaded: "未載入知識圖谱",
     selectNode: "選擇節點查看詳情",
     back: "返回",
@@ -179,6 +181,8 @@ export const zhTW = {
     closeExpanded: "關閉展開的程式碼檢視器",
     closeViewer: "關閉程式碼檢視器",
     sourceUnavailable: "原始碼不可用",
+    rendered: "渲染",
+    source: "原始碼",
   },
   customNode: {
     tested: "已測試",

@@ -115,7 +115,7 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 /understand
 ```
 
-多智能體（multi-agent）架構會：掃描你的專案，提取函式 / 類別 / 相依關係，建構知識圖譜並儲存至 `.understand-anything/knowledge-graph.json`。
+多智能體（multi-agent）架構會：掃描你的專案，提取函式 / 類別 / 相依關係，建構知識圖譜並儲存至 `.ua/knowledge-graph.json`。（已經有 `.understand-anything/` 目錄的專案會繼續使用它——存在時它仍是資料目錄，因此無需遷移。）
 
 > **關於 Token 消耗的提醒：** 首次執行 `/understand` 會分析整個程式碼庫，在大型專案上可能消耗大量 token。建議在有 token 方案 / 訂閱的情況下執行，或在初始化時使用本地模型（見上文）。後續執行預設為增量式——只重新分析變更過的檔案——因此消耗的 token 大幅減少。
 
@@ -201,6 +201,8 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 安裝指令稿會將儲存庫複製到 `~/.understand-anything/repo`，並為所選平台建立相應的符號連結。安裝完成後請重新啟動 CLI 或 IDE。
 
+> **關於技能呼叫方式：** 不同平台的呼叫前綴不同。大多數平台使用斜線指令（`/understand`），但 **Codex 使用 `$`** —— 請輸入 `$understand`，而不是 `/understand`。如果兩種前綴都無法辨識，直接用自然語言請求即可：*「使用 understand 技能分析這個專案」*。
+
 - 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
 - 後續更新：`./install.sh --update`
 - 解除安裝：`./install.sh --uninstall <platform>`
@@ -264,11 +266,11 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **範例：** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) —— 包含已提交圖譜的 Go / Java / Python / Node 多語言參考專案。
 
-**需要提交的內容：** `.understand-anything/` 底下的全部檔案，*除了* `intermediate/` 與 `diff-overlay.json`（這些是本機暫存檔）。
+**需要提交的內容：** `.ua/` 底下的全部檔案，*除了* `intermediate/` 與 `diff-overlay.json`（這些是本機暫存檔）。（舊專案使用 `.understand-anything/`——如果存在的是該目錄，請將下方的目錄名稱替換為它。）
 
 ```gitignore
-.understand-anything/intermediate/
-.understand-anything/diff-overlay.json
+.ua/intermediate/
+.ua/diff-overlay.json
 ```
 
 **保持最新：** 啟用 `/understand --auto-update` —— 一個 post-commit 掛鉤會增量更新圖譜，讓每次提交都有對應的圖譜版本。也可以在發布前手動重跑 `/understand`。
@@ -277,9 +279,21 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 ```bash
 git lfs install
-git lfs track ".understand-anything/*.json"
-git add .gitattributes .understand-anything/
+git lfs track ".ua/*.json"
+git add .gitattributes .ua/
 ```
+
+### 無需 Claude Code 也能檢視儀表盤
+
+圖譜產生並提交後，團隊中的任何人只需一條命令即可開啟它 —— 無需 Claude Code，無需 LLM，無需 API 金鑰，只需要 Node.js（>= 18）：
+
+```bash
+npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+```
+
+終端會印出一個帶權杖的 URL（`http://127.0.0.1:5173/?token=…`），並在瀏覽器中開啟完整的互動式儀表盤。專案目錄（預設：目前目錄）必須包含已提交的資料目錄（`.ua/`，或舊版 `.understand-anything/`）。所有內容都從本機磁碟以唯讀方式提供 —— 沒有 LLM 呼叫，也不會有任何資料離開你的機器。
+
+如果你是從克隆的儲存庫工作：先執行 `pnpm install && pnpm --filter @understand-anything/core build`，再執行 `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard`，即可透過 Vite 開發伺服器達到同樣的效果。
 
 ---
 

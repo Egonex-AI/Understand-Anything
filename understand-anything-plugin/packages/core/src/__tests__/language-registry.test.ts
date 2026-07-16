@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 41 built-in language configs", () => {
+    it("registers all 42 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(41);
+      expect(all.length).toBe(42);
     });
 
     it("maps all expected extensions", () => {
@@ -66,12 +66,21 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".php")?.id).toBe("php");
       expect(registry.getByExtension(".swift")?.id).toBe("swift");
       expect(registry.getByExtension(".kt")?.id).toBe("kotlin");
+      expect(registry.getByExtension(".scala")?.id).toBe("scala");
       expect(registry.getByExtension(".cs")?.id).toBe("csharp");
       expect(registry.getByExtension(".cpp")?.id).toBe("cpp");
       expect(registry.getByExtension(".c")?.id).toBe("c");
       expect(registry.getByExtension(".h")?.id).toBe("c");
       expect(registry.getByExtension(".lua")?.id).toBe("lua");
       expect(registry.getByExtension(".js")?.id).toBe("javascript");
+    });
+
+    it("registers Swift with tree-sitter grammar metadata", () => {
+      const registry = LanguageRegistry.createDefault();
+      expect(registry.getById("swift")?.treeSitter).toEqual({
+        wasmPackage: "@understand-anything/tree-sitter-swift-wasm",
+        wasmFile: "tree-sitter-swift.wasm",
+      });
     });
 
     it("has no duplicate extension mappings across configs", () => {

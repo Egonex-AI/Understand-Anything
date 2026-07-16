@@ -566,3 +566,38 @@ interface Repository {
     });
   });
 });
+
+describe("JavaExtractor - modern type declarations", () => {
+  const extractor = new JavaExtractor();
+
+  it("extracts a public enum as a class node with its methods", () => {
+    const { tree, parser, root } = parse(`public enum Status {
+    ACTIVE, INACTIVE;
+    public boolean isActive() {
+        return this == ACTIVE;
+    }
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    const status = result.classes.find((c) => c.name === "Status");
+    expect(status).toBeDefined();
+    expect(status!.methods).toContain("isActive");
+    expect(result.exports.some((e) => e.name === "Status")).toBe(true);
+
+    tree.delete();
+    parser.delete();
+  });
+
+  it("extracts a public record as a class node", () => {
+    const { tree, parser, root } = parse(`public record Point(int x, int y) {}
+`);
+    const result = extractor.extractStructure(root);
+
+    expect(result.classes.some((c) => c.name === "Point")).toBe(true);
+    expect(result.exports.some((e) => e.name === "Point")).toBe(true);
+
+    tree.delete();
+    parser.delete();
+  });
+});

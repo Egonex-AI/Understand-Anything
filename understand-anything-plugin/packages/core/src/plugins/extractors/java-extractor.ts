@@ -112,6 +112,8 @@ export class JavaExtractor implements LanguageExtractor {
           break;
 
         case "class_declaration":
+        case "enum_declaration":
+        case "record_declaration":
           this.extractClass(node, functions, classes, exports);
           break;
 
@@ -346,6 +348,18 @@ export class JavaExtractor implements LanguageExtractor {
       if (!child) continue;
 
       switch (child.type) {
+        case "enum_body_declarations":
+          // Enum methods and members live in a nested enum_body_declarations
+          // node (after the constants); recurse so they are captured.
+          this.extractClassBodyMembers(
+            child,
+            methods,
+            properties,
+            functions,
+            exports,
+          );
+          break;
+
         case "method_declaration":
           this.extractMethod(child, methods, functions, exports);
           break;

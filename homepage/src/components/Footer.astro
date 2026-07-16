@@ -1,88 +1,250 @@
 ---
-const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
+const repositoryUrl = 'https://github.com/Egonex-AI/Understand-Anything';
+const githubUrl = 'https://github.com/Egonex-AI';
+const xUrl = 'https://x.com/EgonexAI';
+const egonexProductUrl = 'https://www.egonex.ai/';
+const privacyUrl = 'https://legal.egonex.ai/en/privacy';
+const termsUrl = 'https://legal.egonex.ai/en/terms';
+const configuredMotherSiteUrl = (import.meta.env.PUBLIC_MOTHER_SITE_URL ?? '')
+  .trim()
+  .replace(/\/+$/, '');
+const motherHomeUrl = configuredMotherSiteUrl
+  ? `${configuredMotherSiteUrl}/#top`
+  : 'https://egonexai.com/#top';
+const currentYear = new Date().getFullYear();
 ---
 
-<footer class="footer">
-  <div class="footer-inner">
-    <span class="footer-logo">Understand Anything</span>
-    <div class="footer-links">
-      <a href={githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>
-      <span class="footer-sep">&middot;</span>
-      <a href="/demo/">Live Demo</a>
-      <span class="footer-sep">&middot;</span>
-      <a href={`${githubUrl}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">MIT License</a>
+<footer class="brand-footer">
+  <div class="brand-footer-inner">
+    <div class="brand-footer-row">
+      <a class="brand-footer-logo" href={motherHomeUrl} data-mother-site-link aria-label="EgonexAI home">
+        <img
+          src="/assets/egonexai/egonex-logo.png"
+          width="28"
+          height="28"
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+        />
+        <span>EgonexAI</span>
+      </a>
+
+      <div class="brand-footer-links">
+        <nav class="brand-footer-link-group" aria-label="EgonexAI products">
+          <a href={egonexProductUrl}>Egonex</a>
+          <a href="/" aria-current="page">Understand Anything</a>
+        </nav>
+
+        <nav class="brand-footer-link-group" aria-label="Legal and project links">
+          <a href={motherHomeUrl} data-mother-site-link>About Us</a>
+          <a href="mailto:affiliate@egonex.ai">Contact Us</a>
+          <a href={privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a>
+          <a href={termsUrl} target="_blank" rel="noopener noreferrer">Terms</a>
+          <a href={`${repositoryUrl}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">MIT License</a>
+          <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">Source Code</a>
+        </nav>
+      </div>
+
+      <div class="brand-footer-social-links" aria-label="EgonexAI social links">
+        <a href={xUrl} target="_blank" rel="noopener noreferrer" aria-label="EgonexAI on X">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.657l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z"></path>
+          </svg>
+        </a>
+        <a href={githubUrl} target="_blank" rel="noopener noreferrer" aria-label="EgonexAI on GitHub">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"></path>
+          </svg>
+        </a>
+      </div>
     </div>
-    <p class="footer-note">An open-source project from Egonex. Originally created by Lum1104.</p>
-    <p class="footer-note">&copy; 2026 Infinite Universe, Inc.</p>
+
+    <div class="brand-footer-bottom">
+      <span>&copy; {currentYear} Infinite Universe, Inc.</span>
+    </div>
   </div>
 </footer>
 
 <style>
-  .footer {
-    padding: 4rem 2rem;
-    border-top: 1px solid var(--border);
-    text-align: center;
+  .brand-footer {
+    position: relative;
+    z-index: 3;
+    overflow: hidden;
+    padding: 30px 32px 22px;
+    color: #1a0b54;
+    background:
+      radial-gradient(circle at 78% 0%, rgba(88, 43, 232, 0.08), transparent 38%),
+      linear-gradient(180deg, #ffffff 0%, #f7f5ff 100%);
+    font-family: var(--font-brand);
   }
 
-  .footer-inner {
-    max-width: 1200px;
+  .brand-footer,
+  .brand-footer * {
+    box-sizing: border-box;
+    font-family: var(--font-brand);
+  }
+
+  .brand-footer-inner {
+    width: min(100%, 1152px);
     margin: 0 auto;
   }
 
-  .footer-links {
+  .brand-footer-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 28px;
+    min-height: 40px;
+  }
+
+  .brand-footer-logo {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    color: #1a0b54;
+    text-decoration: none;
+  }
+
+  .brand-footer-logo:hover {
+    color: #1a0b54;
+    text-decoration: none;
+  }
+
+  .brand-footer-logo img {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    object-fit: contain;
+  }
+
+  .brand-footer-logo span {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-footer-links,
+  .brand-footer-link-group {
     display: flex;
     align-items: center;
+  }
+
+  .brand-footer-links {
     justify-content: center;
+    min-width: 0;
+    gap: 26px;
+  }
+
+  .brand-footer-link-group {
+    gap: 18px;
     flex-wrap: wrap;
-    gap: 0.5rem 0.25rem;
+    justify-content: center;
   }
 
-  .footer-logo {
-    font-family: var(--font-heading);
-    font-size: 1.15rem;
-    color: var(--text);
-    display: block;
-    margin-bottom: 1rem;
-  }
-
-  .footer-links {
-    margin-bottom: 1rem;
-  }
-
-  .footer-links a {
-    color: var(--text-muted);
-    font-size: 0.85rem;
+  .brand-footer-link-group a {
+    color: #746c91;
+    font-size: 13px;
+    line-height: 1.25;
     text-decoration: none;
-    transition: color 0.2s;
+    white-space: nowrap;
+    transition: color 180ms ease;
   }
 
-  .footer-links a:hover {
-    color: var(--accent);
-  }
-
-  .footer-sep {
-    color: var(--border);
-    margin: 0 0.6rem;
-  }
-
-  .footer-note {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin: 0.25rem 0;
-  }
-
-  .footer-note a {
-    color: var(--accent);
+  .brand-footer-link-group a:hover,
+  .brand-footer-link-group a[aria-current='page'] {
+    color: #582be8;
     text-decoration: none;
   }
 
-  .footer-note a:hover {
-    text-decoration: underline;
+  .brand-footer-social-links {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
   }
 
-  @media (max-width: 480px) {
-    .footer { padding: 3rem 1.25rem; }
-    .footer-sep { display: none; }
-    .footer-links { gap: 0.25rem 1rem; }
+  .brand-footer-social-links a {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    color: #582be8;
+    background: #f4f2fb;
+    text-decoration: none;
+    transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+  }
+
+  .brand-footer-social-links a:hover {
+    color: #ffffff;
+    background: #582be8;
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+
+  .brand-footer-bottom {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.5rem;
+    margin-top: 18px;
+    color: #817a96;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .brand-footer a:focus-visible {
+    outline: 3px solid rgba(88, 43, 232, 0.48);
+    outline-offset: 3px;
+  }
+
+  @media (max-width: 1000px) {
+    .brand-footer-row {
+      grid-template-columns: 1fr auto;
+      gap: 18px 24px;
+    }
+
+    .brand-footer-links {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      justify-content: flex-start;
+    }
+
+    .brand-footer-social-links {
+      margin-left: auto;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .brand-footer {
+      padding: 26px 20px 22px;
+    }
+
+    .brand-footer-links {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .brand-footer-link-group {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      gap: 10px 16px;
+    }
+
+    .brand-footer-bottom {
+      justify-content: flex-start;
+      gap: 0.4rem;
+      margin-top: 20px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-footer * {
+      transition-duration: 0.01ms !important;
+    }
   }
 </style>

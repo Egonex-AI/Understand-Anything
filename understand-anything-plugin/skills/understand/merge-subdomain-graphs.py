@@ -2,8 +2,9 @@
 """
 merge-subdomain-graphs.py — Merge subdomain knowledge-graph files into one.
 
-Auto-discovers *knowledge-graph*.json files in .understand-anything/
-(excluding knowledge-graph.json itself), loads the existing
+Auto-discovers *knowledge-graph*.json files in the project's data dir
+(`.ua/`, or legacy `.understand-anything/` when that directory already exists)
+excluding knowledge-graph.json itself, loads the existing
 knowledge-graph.json as a base if present, and merges everything
 into a single knowledge-graph.json.
 
@@ -15,7 +16,7 @@ knowledge-graph.json is loaded as a base but never as a discovery input
 (prevents self-merging on repeated runs).
 
 Output:
-    <project-root>/.understand-anything/knowledge-graph.json
+    <ua-dir>/knowledge-graph.json
 """
 
 import json
@@ -23,6 +24,19 @@ import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+
+def resolve_ua_dir(root: Path) -> Path:
+    """Mirror core resolveUaDir: legacy .understand-anything/ wins if present."""
+    legacy = root / ".understand-anything"
+    return legacy if legacy.is_dir() else root / ".ua"
+
+# Edge types that carry the domain hierarchy. Dropping one of these changes
+# downstream graph traversal (unlike a routine `related` edge), so they are
+# warned about loudly and re-tried on later runs via merge-report.json —
+# subdomain graph files are cleaned up after assembly, so a drop would
+# otherwise be permanent even once the missing endpoint's subdomain arrives.
+STRUCTURAL_EDGE_TYPES = {"contains_flow", "flow_step", "cross_domain"}
 
 
 def _num(v: Any) -> float:
@@ -49,8 +63,13 @@ def load_graph(path: Path) -> dict[str, Any] | None:
     return data
 
 
-def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
-    """Merge multiple knowledge graph dicts into one. Returns (merged, report_lines)."""
+def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
+    """Merge multiple knowledge graph dicts into one.
+
+    Returns (merged, report_lines, dropped_edges) — dropped_edges holds the
+    full edge dicts that were removed for missing endpoints, each with an
+    extra "missing" key naming which endpoint(s) were absent.
+    """
 
     # ── Pattern counters for "Fixed" report ──────────────────────────
     node_dedup_by_type: Counter[str] = Counter()
@@ -91,6 +110,8 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
     # Drop edges referencing missing nodes
     node_ids = set(nodes_by_id.keys())
     valid_edges: list[dict] = []
+    dropped_edges: list[dict[str, Any]] = []
+    structural_warnings: list[str] = []
     for e in edges_by_key.values():
         src, tgt = e.get("source", ""), e.get("target", "")
         if src in node_ids and tgt in node_ids:
@@ -101,7 +122,15 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
                 missing.append(f"source '{src}'")
             if tgt not in node_ids:
                 missing.append(f"target '{tgt}'")
-            unfixable.append(f"Edge {src} → {tgt} ({e.get('type', '?')}): dropped, missing {', '.join(missing)}")
+            etype = e.get("type", "?")
+            dropped_edges.append({**e, "missing": missing})
+            if etype in STRUCTURAL_EDGE_TYPES:
+                structural_warnings.append(
+                    f"Warning: dropped structural edge {src} → {tgt} ({etype}), "
+                    f"missing {', '.join(missing)} — will retry on the next merge run"
+                )
+            else:
+                unfixable.append(f"Edge {src} → {tgt} ({etype}): dropped, missing {', '.join(missing)}")
 
     # ── Layers: merge by id, union nodeIds ────────────────────────────
     layers_by_id: dict[str, dict] = {}
@@ -202,6 +231,12 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
         report.append(f"Fixed ({total_fixed} corrections):")
         report.extend(fixed_lines)
 
+    # Structural drops surface as loud warnings, not buried counters —
+    # losing hierarchy/cross-domain edges changes downstream traversal.
+    if structural_warnings:
+        report.append("")
+        report.extend(structural_warnings)
+
     # Could not fix section
     if unfixable:
         report.append("")
@@ -229,7 +264,49 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
         "tour": all_tour_steps,
     }
 
-    return merged, report
+    return merged, report, dropped_edges
+
+
+def load_pending_structural_edges(report_path: Path) -> list[dict[str, Any]]:
+    """Read structural edges dropped by a previous run from merge-report.json.
+
+    Subdomain graph files are cleaned up after assembly, so these edges only
+    survive in the report — re-injecting them lets a later run resolve them
+    once the missing endpoint's subdomain graph has been merged.
+    """
+    if not report_path.exists():
+        return []
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Warning: could not read {report_path.name}: {e}", file=sys.stderr)
+        return []
+    pending = []
+    for entry in data.get("droppedEdges", []):
+        if isinstance(entry, dict) and entry.get("type") in STRUCTURAL_EDGE_TYPES:
+            pending.append({k: v for k, v in entry.items() if k != "missing"})
+    return pending
+
+
+def write_merge_report(
+    report_path: Path,
+    merged: dict[str, Any],
+    dropped_edges: list[dict[str, Any]],
+    recovered_count: int,
+) -> None:
+    """Persist the dropped-edge report so investigations don't require re-instrumenting the script."""
+    report = {
+        "generatedBy": "merge-subdomain-graphs.py",
+        "output": {
+            "nodes": len(merged.get("nodes", [])),
+            "edges": len(merged.get("edges", [])),
+            "layers": len(merged.get("layers", [])),
+            "tourSteps": len(merged.get("tour", [])),
+        },
+        "recoveredStructuralEdges": recovered_count,
+        "droppedEdges": dropped_edges,
+    }
+    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def main() -> None:
@@ -238,7 +315,7 @@ def main() -> None:
         sys.exit(1)
 
     project_root = Path(sys.argv[1]).resolve()
-    ua_dir = project_root / ".understand-anything"
+    ua_dir = resolve_ua_dir(project_root)
 
     if not ua_dir.is_dir():
         print(f"Error: {ua_dir} does not exist", file=sys.stderr)
@@ -289,16 +366,35 @@ def main() -> None:
             print(f"    Loaded base knowledge-graph.json: {node_count} nodes, {edge_count} edges", file=sys.stderr)
             graphs.insert(0, base)  # Base first — subdomain data wins on conflict
 
+    # Re-inject structural edges a previous run had to drop; if their missing
+    # endpoints have arrived in the meantime, this run resolves them.
+    report_path = ua_dir / "merge-report.json"
+    pending_edges = load_pending_structural_edges(report_path)
+    if pending_edges:
+        print(f"    Retrying {len(pending_edges)} structural edges dropped by a previous run", file=sys.stderr)
+        graphs.append({"nodes": [], "edges": pending_edges})
+
     # Merge
-    merged, report = merge_graphs(graphs)
+    merged, report, dropped_edges = merge_graphs(graphs)
 
     # Print report
     print("", file=sys.stderr)
     for line in report:
         print(line, file=sys.stderr)
 
+    # Count how many previously-dropped structural edges made it in this time
+    merged_edge_keys = {(e.get("source", ""), e.get("target", ""), e.get("type", "")) for e in merged["edges"]}
+    recovered = sum(
+        1 for e in pending_edges
+        if (e.get("source", ""), e.get("target", ""), e.get("type", "")) in merged_edge_keys
+    )
+    if recovered:
+        print(f"Recovered {recovered} structural edges dropped by a previous run", file=sys.stderr)
+
     # Write output
     output_path.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_merge_report(report_path, merged, dropped_edges, recovered)
+    print(f"Merge report written to {report_path}", file=sys.stderr)
 
     size_kb = output_path.stat().st_size / 1024
     print(f"\nWritten to {output_path} ({size_kb:.0f} KB)", file=sys.stderr)

@@ -2,3 +2,19 @@ packages:
   - 'understand-anything-plugin/packages/*'
   - 'understand-anything-plugin'
   - 'homepage'
+allowBuilds:
+  '@tree-sitter-grammars/tree-sitter-kotlin': true
+  esbuild: true
+  sharp: true
+  tree-sitter-c: true
+  tree-sitter-c-sharp: true
+  tree-sitter-cpp: true
+  tree-sitter-go: true
+  tree-sitter-java: true
+  tree-sitter-javascript: true
+  tree-sitter-php: true
+  tree-sitter-python: true
+  tree-sitter-ruby: true
+  tree-sitter-rust: true
+  tree-sitter-scala: true
+  tree-sitter-typescript: true

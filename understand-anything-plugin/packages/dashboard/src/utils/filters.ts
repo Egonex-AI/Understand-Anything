@@ -78,11 +78,20 @@ export function filterEdges(
 /**
  * Determine which category an edge type belongs to
  */
-function getEdgeCategory(edgeType: string): EdgeCategory | null {
+// Reverse index (edge type → category), built once at module load. Replaces a
+// per-edge linear scan over every category's type array — `getEdgeCategory`
+// runs for every edge in `filterEdges`. First category wins, matching the
+// original `Object.entries` scan order.
+const EDGE_TYPE_TO_CATEGORY: Map<string, EdgeCategory> = (() => {
+  const m = new Map<string, EdgeCategory>();
   for (const [category, types] of Object.entries(EDGE_CATEGORY_MAP)) {
-    if (types.includes(edgeType)) {
-      return category as EdgeCategory;
+    for (const t of types) {
+      if (!m.has(t)) m.set(t, category as EdgeCategory);
     }
   }
-  return null;
+  return m;
+})();
+
+function getEdgeCategory(edgeType: string): EdgeCategory | null {
+  return EDGE_TYPE_TO_CATEGORY.get(edgeType) ?? null;
 }

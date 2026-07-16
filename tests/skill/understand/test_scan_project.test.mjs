@@ -123,7 +123,7 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'f.cjs').language).toBe('javascript');
   });
 
-  it('maps Python, Go, Rust, Java, Kotlin, C# to their language ids', () => {
+  it('maps Python, Go, Rust, Java, Kotlin, C#, Swift to their language ids', () => {
     projectRoot = setupTree({
       'a.py': 'x = 1\n',
       'b.go': 'package main\n',
@@ -131,6 +131,7 @@ describe('scan-project.mjs — language detection', () => {
       'd.java': 'class D {}\n',
       'e.kt': 'fun main() {}\n',
       'f.cs': 'class F {}\n',
+      'g.swift': 'struct G {}\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
@@ -140,6 +141,22 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'd.java').language).toBe('java');
     expect(byPath(r.output, 'e.kt').language).toBe('kotlin');
     expect(byPath(r.output, 'f.cs').language).toBe('csharp');
+    expect(byPath(r.output, 'g.swift').language).toBe('swift');
+  });
+
+  it('maps Scala extensions to scala (with .sbt categorized as config)', () => {
+    projectRoot = setupTree({
+      'src/main/scala/App.scala': 'object App\n',
+      'scripts/task.sc': 'println(1)\n',
+      'build.sbt': 'name := "demo"\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/main/scala/App.scala').language).toBe('scala');
+    expect(byPath(r.output, 'src/main/scala/App.scala').fileCategory).toBe('code');
+    expect(byPath(r.output, 'scripts/task.sc').language).toBe('scala');
+    expect(byPath(r.output, 'build.sbt').language).toBe('scala');
+    expect(byPath(r.output, 'build.sbt').fileCategory).toBe('config');
   });
 
   it('maps Ruby, PHP, C, C++ to their language ids', () => {
@@ -241,12 +258,13 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     }
   });
 
-  it('assigns code to TypeScript, JavaScript, Python, Go, Rust source files', () => {
+  it('assigns code to TypeScript, JavaScript, Python, Go, Rust, Swift source files', () => {
     projectRoot = setupTree({
       'src/a.ts': 'export const a = 1;\n',
       'src/b.py': 'def b(): pass\n',
       'src/c.go': 'package main\n',
       'src/d.rs': 'fn main() {}\n',
+      'src/e.swift': 'struct E {}\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
@@ -254,6 +272,7 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     expect(byPath(r.output, 'src/b.py').fileCategory).toBe('code');
     expect(byPath(r.output, 'src/c.go').fileCategory).toBe('code');
     expect(byPath(r.output, 'src/d.rs').fileCategory).toBe('code');
+    expect(byPath(r.output, 'src/e.swift').fileCategory).toBe('code');
   });
 
   it('assigns config to JSON/YAML/TOML/INI/XML', () => {
@@ -453,6 +472,50 @@ describe('scan-project.mjs — .understandignore handling', () => {
     // The defaults dropped drop.log — that's a baseline default drop,
     // NOT a user-driven drop. filteredByIgnore should be 0.
     expect(r.output.filteredByIgnore).toBe(0);
+  });
+});
+
+describe('scan-project.mjs — data-dir resolution (.ua vs legacy)', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('honors .ua/.understandignore in a fresh project (no legacy dir)', () => {
+    // scan-project delegates ignore handling to core's createIgnoreFilter,
+    // which reads <resolveUaDir>/.understandignore — .ua/ for fresh projects.
+    projectRoot = setupTree({
+      '.ua/.understandignore': 'fixtures/\n',
+      'src/index.ts': 'export const x = 1;\n',
+      'fixtures/snap1.json': '{ "a": 1 }\n',
+      'fixtures/snap2.json': '{ "b": 2 }\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'fixtures/snap1.json')).toBeUndefined();
+    expect(byPath(r.output, 'fixtures/snap2.json')).toBeUndefined();
+    // Counted as user-driven drops (dual-filter accounting saw the ua ignore).
+    expect(r.output.filteredByIgnore).toBe(2);
+  });
+
+  it('honors legacy .understand-anything/.understandignore (legacy-compat)', () => {
+    // Legacy-compat regression: projects with an existing
+    // .understand-anything/ keep using it for the .understandignore lookup.
+    projectRoot = setupTree({
+      '.understand-anything/.understandignore': 'fixtures/\n',
+      'src/index.ts': 'export const x = 1;\n',
+      'fixtures/snap1.json': '{ "a": 1 }\n',
+      'fixtures/snap2.json': '{ "b": 2 }\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'fixtures/snap1.json')).toBeUndefined();
+    expect(byPath(r.output, 'fixtures/snap2.json')).toBeUndefined();
+    expect(r.output.filteredByIgnore).toBe(2);
   });
 });
 

@@ -1,6 +1,8 @@
 export const ja = {
   common: {
     loading: "プロジェクトを読み込み中...",
+    computingGraphLayout: "グラフのレイアウトを計算しています...",
+    forceLayoutFallback: "フォースレイアウトを使用できないため、代替グリッドを表示しています。",
     noGraphLoaded: "知識グラフが読み込まれていません",
     selectNode: "ノードを選択して詳細を表示",
     back: "戻る",
@@ -179,6 +181,8 @@ export const ja = {
     closeExpanded: "展開したコードビューアを閉じる",
     closeViewer: "コードビューアを閉じる",
     sourceUnavailable: "ソースが利用できません",
+    rendered: "プレビュー",
+    source: "ソース",
   },
   customNode: {
     tested: "テスト済み",

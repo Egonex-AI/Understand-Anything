@@ -1,12 +1,12 @@
 ---
 name: understand-chat
 description: Use when you need to ask questions about a codebase or understand code using a knowledge graph
-argument-hint: [query]
+argument-hint: "[query]"
 ---
 
 # /understand-chat
 
-Answer questions about this codebase using the knowledge graph at `.understand-anything/knowledge-graph.json`.
+Answer questions about this codebase using the knowledge graph in the project's data directory (`.ua/knowledge-graph.json`, or the legacy `.understand-anything/knowledge-graph.json` when that directory is present).
 
 ## Graph Structure Reference
 
@@ -31,7 +31,7 @@ The knowledge graph JSON has this structure:
 
 ## Instructions
 
-1. Check that `.understand-anything/knowledge-graph.json` exists in the current project root. If not, tell the user to run `/understand` first.
+1. **Resolve the data directory `$UA_DIR`.** Run `UA_DIR=$([ -d .understand-anything ] && echo .understand-anything || echo .ua)` — this is the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Check that `$UA_DIR/knowledge-graph.json` exists in the current project root. If not, tell the user to run `/understand` first.
 
 2. **Read project metadata only** — use Grep or Read with a line limit to extract just the `"project"` section from the top of the file for context (name, description, languages, frameworks).
 

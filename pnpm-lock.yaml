@@ -63,6 +63,9 @@ importers:
       '@understand-anything/tree-sitter-dart-wasm':
         specifier: workspace:*
         version: link:../tree-sitter-dart-wasm
+      '@understand-anything/tree-sitter-swift-wasm':
+        specifier: workspace:*
+        version: link:../tree-sitter-swift-wasm
       fuse.js:
         specifier: ^7.1.0
         version: 7.1.0
@@ -94,6 +97,9 @@ importers:
         specifier: ^0.23.1
         version: 0.23.1
       tree-sitter-rust:
+        specifier: ^0.24.0
+        version: 0.24.0
+      tree-sitter-scala:
         specifier: ^0.24.0
         version: 0.24.0
       tree-sitter-typescript:
@@ -166,6 +172,9 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.14)(react@19.2.4)
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       zustand:
         specifier: ^5.0.0
         version: 5.0.11(@types/react@19.2.14)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
@@ -202,6 +211,10 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.8.3)
 
   understand-anything-plugin/packages/tree-sitter-dart-wasm: {}
+
+  understand-anything-plugin/packages/tree-sitter-swift-wasm: {}
+
+  understand-anything-plugin/packages/viewer: {}
 
 packages:
 
@@ -2906,6 +2919,14 @@ packages:
     resolution: {integrity: sha512-NWemUDf629Tfc90Y0Z55zuwPCAHkLxWnMf2RznYu4iBkkrQl2o/CHGB7Cr52TyN5F1DAx8FmUnDtCy9iUkXZEQ==}
     peerDependencies:
       tree-sitter: ^0.22.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
+  tree-sitter-scala@0.24.0:
+    resolution: {integrity: sha512-vkMuAUrBZ1zZz2XcGDQk18Kz73JkpgaeXzbNVobPke0G35sd9jH32aUxG6OLRKM7et0TbsfqkWf4DeJoGk4K1g==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
     peerDependenciesMeta:
       tree-sitter:
         optional: true
@@ -6295,6 +6316,11 @@ snapshots:
       node-gyp-build: 4.8.4
 
   tree-sitter-rust@0.24.0:
+    dependencies:
+      node-addon-api: 8.6.0
+      node-gyp-build: 4.8.4
+
+  tree-sitter-scala@0.24.0:
     dependencies:
       node-addon-api: 8.6.0
       node-gyp-build: 4.8.4

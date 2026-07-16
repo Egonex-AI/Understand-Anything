@@ -300,6 +300,101 @@ async function loadGoModules(projectRoot, files) {
 }
 
 /**
+ * Parse Swift Package.swift target declarations just enough for import-map
+ * resolution. Swift imports modules, and SwiftPM target names are module names.
+ * The common convention is `Sources/<Target>`, but packages can override the
+ * source directory with `path: "..."`; without this light manifest pass those
+ * custom targets would stay disconnected.
+ *
+ * This is intentionally a focused parser, not a Swift evaluator. It handles
+ * `.target(...)`, `.executableTarget(...)`, and `.testTarget(...)` calls with
+ * literal `name:` and optional literal `path:` arguments.
+ */
+function parseSwiftPackageTargets(raw) {
+  const targets = [];
+  const callRe = /\.(target|executableTarget|testTarget)\s*\(/g;
+  let match;
+
+  while ((match = callRe.exec(raw)) !== null) {
+    const kind = match[1];
+    const bodyStart = callRe.lastIndex;
+    let depth = 1;
+    let i = bodyStart;
+    let inString = false;
+    let quote = '';
+    let escaped = false;
+
+    for (; i < raw.length; i++) {
+      const ch = raw[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === '\\') {
+          escaped = true;
+        } else if (ch === quote) {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'") {
+        inString = true;
+        quote = ch;
+        continue;
+      }
+      if (ch === '(') depth += 1;
+      if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+
+    const body = raw.slice(bodyStart, i);
+    callRe.lastIndex = i + 1;
+
+    const name = body.match(/\bname\s*:\s*"([^"]+)"/)?.[1];
+    if (!name) continue;
+    const explicitPath = body.match(/\bpath\s*:\s*"([^"]+)"/)?.[1];
+    const defaultRoot = kind === 'testTarget' ? 'Tests' : 'Sources';
+    targets.push({
+      name,
+      path: explicitPath || `${defaultRoot}/${name}`,
+    });
+  }
+
+  return targets;
+}
+
+async function loadSwiftPackageTargets(projectRoot, files) {
+  const targets = new Map();
+  const warnings = [];
+  const candidates = [];
+
+  for (const f of files) {
+    const p = toPosix(f.path);
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (base !== 'Package.swift') continue;
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    candidates.push({ key: p, absPath });
+  }
+
+  const reads = await readFilesParallel(candidates);
+  for (const { key: p, raw, err } of reads) {
+    if (err) continue;
+    const packageDir = dirOf(p);
+    for (const target of parseSwiftPackageTargets(raw)) {
+      const targetPath = resolveRelative(packageDir, target.path.replace(/\\/g, '/'));
+      if (!targetPath) continue;
+      if (!targets.has(target.name)) targets.set(target.name, new Set());
+      targets.get(target.name).add(targetPath);
+    }
+  }
+
+  return { targets, warnings };
+}
+
+/**
  * Walk up from `startDir` (project-relative POSIX, '' for project root)
  * and return the DEEPEST ancestor directory that exists as a key in
  * `configMap`, or undefined if no ancestor matches.
@@ -344,26 +439,28 @@ function findNearestConfigDir(startDir, configMap) {
 async function buildResolutionContext(projectRoot, files) {
   const fileSet = new Set(files.map(f => toPosix(f.path)));
 
-  // The three config-loader passes are independent and each does its own
+  // These config-loader passes are independent and each does its own
   // batched parallel I/O; run them concurrently so the wait for a slow
-  // tsconfig.json read doesn't block go.mod / composer.json scanning.
+  // tsconfig.json read doesn't block go.mod / composer.json / SwiftPM scanning.
   //
   // Each loader BUFFERS warnings into a private array rather than writing
   // them to stderr inline. If a loader streamed warnings directly during
   // the concurrent passes, lines from independent loader families could
   // interleave based on I/O timing — that would break the pre-PR
-  // deterministic order (ts → go → php) and make stderr-diff verification
+  // deterministic order (ts → go → php → swift) and make stderr-diff verification
   // flaky. Drain the buffers in canonical order *after* Promise.all, so
   // a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
-  const [tsResult, goResult, phpResult] = await Promise.all([
+  const [tsResult, goResult, phpResult, swiftResult] = await Promise.all([
     loadTsConfigs(projectRoot, files),
     loadGoModules(projectRoot, files),
     loadPhpAutoloads(projectRoot, files),
+    loadSwiftPackageTargets(projectRoot, files),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
   for (const w of phpResult.warnings) process.stderr.write(w);
+  for (const w of swiftResult.warnings) process.stderr.write(w);
   const tsConfigs = tsResult.configs;
   const goModules = goResult.modules;
   const phpAutoloads = phpResult.autoloads;
@@ -383,10 +480,14 @@ async function buildResolutionContext(projectRoot, files) {
   }
 
   // Build per-extension suffix indices for dotted-FQN resolvers (Java,
-  // Kotlin, C#). Indexed once; reused for every import dispatch.
+  // Kotlin, Scala, C#). Indexed once; reused for every import dispatch.
   const javaIndex = buildSuffixIndex(files, p => p.endsWith('.java'));
   const kotlinIndex = buildSuffixIndex(files, p => p.endsWith('.kt'));
+  const scalaFilePredicate = p => p.endsWith('.scala') || p.endsWith('.sc');
+  const scalaIndex = buildSuffixIndex(files, scalaFilePredicate);
+  const scalaPackageIndex = buildPackageIndex(files, scalaFilePredicate);
   const csIndex = buildSuffixIndex(files, p => p.endsWith('.cs'));
+  const swiftModuleIndex = buildSwiftModuleIndex(files, swiftResult.targets);
 
   return {
     projectRoot,
@@ -396,7 +497,10 @@ async function buildResolutionContext(projectRoot, files) {
     goFilesByDir,
     javaIndex,
     kotlinIndex,
+    scalaIndex,
+    scalaPackageIndex,
     csIndex,
+    swiftModuleIndex,
     phpAutoloads,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
@@ -923,6 +1027,107 @@ function buildSuffixIndex(files, extPredicate) {
   return idx;
 }
 
+function buildPackageIndex(files, extPredicate) {
+  const idx = new Map();
+  for (const f of files) {
+    const p = toPosix(f.path);
+    if (!extPredicate(p)) continue;
+    const dir = dirOf(p);
+    if (!dir) continue;
+
+    const parts = dir.split('/');
+    for (let i = 0; i < parts.length; i++) {
+      const suffix = parts.slice(i).join('/');
+      if (!idx.has(suffix)) idx.set(suffix, []);
+      idx.get(suffix).push(p);
+    }
+  }
+  for (const arr of idx.values()) {
+    arr.sort((a, b) => a.localeCompare(b));
+  }
+  return idx;
+}
+
+const SWIFT_SOURCE_ROOT_DIRS = new Set(['source', 'sources', 'test', 'tests']);
+const SWIFT_MODULE_CONTAINER_DIRS = new Set([
+  'framework',
+  'frameworks',
+  'library',
+  'libraries',
+  'module',
+  'modules',
+]);
+
+function addSwiftModuleFile(index, moduleName, filePath) {
+  if (!moduleName) return;
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(moduleName)) return;
+  if (!index.has(moduleName)) index.set(moduleName, new Set());
+  index.get(moduleName).add(filePath);
+}
+
+function inferSwiftModulesFromPath(filePath) {
+  const parts = filePath.split('/');
+  const dirs = parts.slice(0, -1);
+  const modules = new Set();
+
+  for (let i = 0; i < dirs.length - 1; i++) {
+    const lower = dirs[i].toLowerCase();
+    if (
+      SWIFT_SOURCE_ROOT_DIRS.has(lower) ||
+      SWIFT_MODULE_CONTAINER_DIRS.has(lower)
+    ) {
+      modules.add(dirs[i + 1]);
+    }
+  }
+
+  if (dirs.length > 0 && !SWIFT_SOURCE_ROOT_DIRS.has(dirs[0].toLowerCase())) {
+    modules.add(dirs[0]);
+  }
+
+  return modules;
+}
+
+/**
+ * Build a Swift module-name -> files index.
+ *
+ * Swift files in the same module do not import each other by relative path;
+ * `import Foo` imports a module. We therefore resolve to every project Swift
+ * file that belongs to module `Foo`, mirroring the Go resolver's package-level
+ * expansion. The index combines SwiftPM manifest targets with common on-disk
+ * conventions (`Sources/Foo`, `Tests/FooTests`, and top-level Xcode groups).
+ */
+function buildSwiftModuleIndex(files, packageTargets) {
+  const idx = new Map();
+  const targetEntries = [...packageTargets.entries()].map(([name, paths]) => [
+    name,
+    [...paths].sort((a, b) => a.localeCompare(b)),
+  ]);
+
+  for (const f of files) {
+    const p = toPosix(f.path);
+    if (!p.endsWith('.swift')) continue;
+    if (p.endsWith('/Package.swift') || p === 'Package.swift') continue;
+
+    for (const [moduleName, targetPaths] of targetEntries) {
+      for (const targetPath of targetPaths) {
+        if (p === targetPath || p.startsWith(`${targetPath}/`)) {
+          addSwiftModuleFile(idx, moduleName, p);
+        }
+      }
+    }
+
+    for (const moduleName of inferSwiftModulesFromPath(p)) {
+      addSwiftModuleFile(idx, moduleName, p);
+    }
+  }
+
+  const out = new Map();
+  for (const [moduleName, paths] of idx.entries()) {
+    out.set(moduleName, [...paths].sort((a, b) => a.localeCompare(b)));
+  }
+  return out;
+}
+
 /**
  * Resolve a dotted-import to a file. `fqn` is the qualified name
  * (`com.example.Foo`); `ext` is the file extension to probe (`.java`,
@@ -965,6 +1170,84 @@ export function resolveKotlinImport(rawImport, _file, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Scala resolver
+//
+// Scala imports come from the core ScalaExtractor in three shapes:
+//   - plain:    `import com.example.Foo`      -> source='com.example.Foo',
+//                                                specifiers=['Foo']
+//   - selector: `import com.example.{A, B}`   -> source='com.example',
+//                                                specifiers=['A', 'B']
+//   - wildcard: `import com.example._` / `.*` -> source='com.example',
+//                                                specifiers=['*']
+//
+// The plain source resolves like Java (`com/example/Foo.scala` suffix probe).
+// Selector lists probe each specifier under the source package. Scala also
+// allows package objects (`com/example/package.scala`) to hold members, so
+// the package prefix is additionally probed against `<pkg>/package.scala`.
+// Multi-type files (a `model.scala` holding many case classes) can't be
+// resolved by name probing — same accepted limitation as Java/Kotlin/C#.
+// ---------------------------------------------------------------------------
+
+export function resolveScalaImport(rawImport, specifiers, _file, ctx) {
+  const out = new Set();
+  const specs = Array.isArray(specifiers) ? specifiers : [];
+  const isPlain =
+    specs.length === 1 &&
+    specs[0] &&
+    specs[0] !== '*' &&
+    rawImport.endsWith(`.${specs[0]}`);
+
+  if (specs.includes('*')) {
+    for (const m of resolveScalaPackage(rawImport, ctx)) out.add(m);
+    return [...out].sort((a, b) => a.localeCompare(b));
+  }
+
+  if (isPlain) {
+    for (const m of resolveScalaDottedFqn(rawImport, ctx)) out.add(m);
+    if (out.size === 0) {
+      const pkg = rawImport.slice(0, -(specs[0].length + 1));
+      for (const m of resolveScalaDottedFqn(`${pkg}.package`, ctx)) out.add(m);
+    }
+    return [...out].sort((a, b) => a.localeCompare(b));
+  }
+
+  let unresolvedSelector = false;
+  for (const spec of specs) {
+    if (!spec) continue;
+    const matches = resolveScalaDottedFqn(`${rawImport}.${spec}`, ctx);
+    if (matches.length === 0) unresolvedSelector = true;
+    for (const m of matches) out.add(m);
+  }
+
+  if (unresolvedSelector) {
+    for (const m of resolveScalaDottedFqn(`${rawImport}.package`, ctx)) out.add(m);
+  }
+
+  return [...out].sort((a, b) => a.localeCompare(b));
+}
+
+function resolveScalaDottedFqn(fqn, ctx) {
+  return [
+    ...resolveDottedFqn(fqn, '.scala', ctx.scalaIndex),
+    ...resolveDottedFqn(fqn, '.sc', ctx.scalaIndex),
+  ];
+}
+
+function resolveScalaPackage(pkg, ctx) {
+  if (!pkg || typeof pkg !== 'string') return [];
+  const dirPart = pkg.replace(/\.\*$/, '').replace(/\./g, '/');
+  const matches = ctx.scalaPackageIndex.get(dirPart);
+  return matches ? [...matches].sort(compareScalaPackageMembers) : [];
+}
+
+function compareScalaPackageMembers(a, b) {
+  const aPackage = /\/package\.s(?:cala|c)$/.test(a);
+  const bPackage = /\/package\.s(?:cala|c)$/.test(b);
+  if (dirOf(a) === dirOf(b) && aPackage !== bPackage) return aPackage ? 1 : -1;
+  return a.localeCompare(b);
+}
+
+// ---------------------------------------------------------------------------
 // C# resolver
 //
 // C# `using Foo.Bar;` declarations are typically NAMESPACES, not files, and
@@ -975,6 +1258,30 @@ export function resolveKotlinImport(rawImport, _file, ctx) {
 
 export function resolveCSharpImport(rawImport, _file, ctx) {
   return resolveDottedFqn(rawImport, '.cs', ctx.csIndex);
+}
+
+// ---------------------------------------------------------------------------
+// Swift resolver
+//
+// Swift imports modules, not files. `SwiftExtractor` reports the module part
+// as `imp.source` for both `import Foo` and qualified forms such as
+// `import struct Foo.Bar`. If a project module named Foo exists in the Swift
+// module index, map the import to all Swift files in that module.
+// ---------------------------------------------------------------------------
+
+function normalizeSwiftModuleName(rawImport) {
+  if (!rawImport || typeof rawImport !== 'string') return null;
+  const moduleName = rawImport.trim().split('.')[0];
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(moduleName) ? moduleName : null;
+}
+
+export function resolveSwiftImport(rawImport, file, ctx) {
+  const moduleName = normalizeSwiftModuleName(rawImport);
+  if (!moduleName) return [];
+  const matches = ctx.swiftModuleIndex.get(moduleName);
+  if (!matches) return [];
+  const importer = toPosix(file.path);
+  return matches.filter(p => p !== importer);
 }
 
 // ---------------------------------------------------------------------------
@@ -1436,8 +1743,14 @@ function resolveImport(imp, file, ctx) {
   if (lang === 'kotlin') {
     return resolveKotlinImport(src, file, ctx);
   }
+  if (lang === 'scala') {
+    return resolveScalaImport(src, imp.specifiers, file, ctx);
+  }
   if (lang === 'csharp') {
     return resolveCSharpImport(src, file, ctx);
+  }
+  if (lang === 'swift') {
+    return resolveSwiftImport(src, file, ctx);
   }
   if (lang === 'php') {
     return resolvePhpImport(src, file, ctx);
@@ -1597,7 +1910,11 @@ async function main() {
           }
         }
       }
-      resolved = [...resolvedSet].sort((a, b) => a.localeCompare(b));
+      resolved = [...resolvedSet].sort((a, b) =>
+        file.language === 'scala'
+          ? compareScalaPackageMembers(a, b)
+          : a.localeCompare(b),
+      );
     } catch (err) {
       process.stderr.write(
         `Warning: extract-import-map: import resolution failed for ${path} ` +

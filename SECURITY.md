@@ -30,7 +30,7 @@ the maintainer will reply with a private channel.
 
 This project is a **local-only** static-analysis tool. It runs on a
 developer's machine, reads the analyzed project, and writes the resulting
-graph to `.understand-anything/`. It does not phone home and the dashboard's
+graph to the project's data directory (`.ua/`, or the legacy `.understand-anything/` when it already exists). It does not phone home and the dashboard's
 file-content endpoint is gated behind an access token and a graph-derived
 path allowlist.
 
