@@ -5,25 +5,24 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
-  renameSync as realRenameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SKILL_DIR = resolve(
-  __dirname,
-  '../../../understand-anything-plugin/skills/understand',
-);
+const SKILL_DIR = resolve(__dirname, '../../../understand-anything-plugin/skills/understand');
 const REFRESH_SCRIPT = join(SKILL_DIR, 'refresh-scan-result.mjs');
-const SCAN_SCRIPT = join(SKILL_DIR, 'scan-project.mjs');
-const IMPORT_SCRIPT = join(SKILL_DIR, 'extract-import-map.mjs');
+const {
+  main: refresh,
+  runBundledScript,
+  validateImportResult,
+  validateInventory,
+} = await import(pathToFileURL(REFRESH_SCRIPT).href);
 
 const tempRoots = [];
 
@@ -41,17 +40,14 @@ function writeTree(root, files) {
   }
 }
 
-function file(path, language = 'typescript', fileCategory = 'code') {
-  return { path, language, sizeLines: 1, fileCategory };
-}
+const file = (path, language = 'typescript', fileCategory = 'code') => (
+  { path, language, sizeLines: 1, fileCategory });
 
 function previousScan(files = [file('src/existing.ts')]) {
   return {
-    name: 'preserved-name',
-    description: 'preserved description',
+    name: 'preserved-name', description: 'preserved description',
     languages: ['stale-language'],
-    frameworks: ['React', 'Express'],
-    narrativeMetadata: { owner: 'kept', nested: true },
+    frameworks: ['React', 'Express'], narrativeMetadata: { owner: 'kept', nested: true },
     files,
     totalFiles: files.length,
     filteredByIgnore: 0,
@@ -62,11 +58,29 @@ function previousScan(files = [file('src/existing.ts')]) {
 
 function inventory(files, totalFiles = files.length) {
   return {
-    scriptCompleted: true,
-    files,
-    totalFiles,
+    scriptCompleted: true, files, totalFiles,
     filteredByIgnore: 0,
     estimatedComplexity: 'small',
+  };
+}
+
+function pipelineOverrides({ inventoryValue, importValue, calls } = {}) {
+  return {
+    runBundledScript(scriptPath, args) {
+      const scriptName = basename(scriptPath);
+      calls?.push(scriptName);
+      const value = scriptName === 'scan-project.mjs'
+        ? (inventoryValue ?? inventory([file('src/existing.ts'), file('src/added.ts')]))
+        : (importValue ?? {
+            scriptCompleted: true,
+            importMap: {
+              'src/existing.ts': [],
+              'src/added.ts': ['src/existing.ts'],
+            },
+          });
+      const contents = typeof value === 'string' ? value : JSON.stringify(value);
+      writeFileSync(args[1], contents, 'utf8');
+    },
   };
 }
 
@@ -82,23 +96,23 @@ function setupProject({
     'src/added.ts': "import { existing } from './existing';\nexport { existing };\n",
   });
 
-  const init = spawnSync('git', ['init', '-q'], { cwd: root, encoding: 'utf8' });
-  if (init.status !== 0) {
-    throw new Error(`fixture git init failed: ${init.stderr}`);
-  }
-
   const uaDir = join(root, uaDirName);
   const intermediateDir = join(uaDir, 'intermediate');
   const tmpDir = join(uaDir, 'tmp');
   mkdirSync(intermediateDir, { recursive: true });
   mkdirSync(tmpDir, { recursive: true });
-  if (ignore !== undefined) {
-    writeFileSync(join(uaDir, '.understandignore'), ignore, 'utf8');
-  }
+  if (ignore !== undefined) writeFileSync(join(uaDir, '.understandignore'), ignore, 'utf8');
 
   const scanPath = join(intermediateDir, 'scan-result.json');
   writeFileSync(scanPath, `${JSON.stringify(previous, null, 2)}\n`, 'utf8');
   return { root, uaDir, intermediateDir, tmpDir, scanPath, previous };
+}
+
+function setupCliProject(options) {
+  const project = setupProject(options);
+  const init = spawnSync('git', ['init', '-q'], { cwd: project.root, encoding: 'utf8' });
+  if (init.status !== 0) throw new Error(`fixture git init failed: ${init.stderr}`);
+  return project;
 }
 
 function runRefresh(projectRoot) {
@@ -108,13 +122,7 @@ function runRefresh(projectRoot) {
   });
 }
 
-function readJson(path) {
-  return JSON.parse(readFileSync(path, 'utf8'));
-}
-
-function sha256(bytes) {
-  return createHash('sha256').update(bytes).digest('hex');
-}
+const readJson = path => JSON.parse(readFileSync(path, 'utf8'));
 
 function assertNoOwnedTemps(project, sentinel = null) {
   const tmpEntries = existsSync(project.tmpDir) ? readdirSync(project.tmpDir) : [];
@@ -123,45 +131,15 @@ function assertNoOwnedTemps(project, sentinel = null) {
   expect(readdirSync(project.intermediateDir).filter(name => name.startsWith(candidatePrefix))).toEqual([]);
 }
 
-async function loadRefreshModule() {
-  return import(pathToFileURL(REFRESH_SCRIPT).href);
-}
-
 afterEach(() => {
   while (tempRoots.length > 0) {
     rmSync(tempRoots.pop(), { recursive: true, force: true });
   }
 });
 
-describe('refresh-scan-result.mjs fixtures', () => {
-  it('runs the existing scanner and import extractor before the refresh helper exists', () => {
-    const project = setupProject();
-    const outputDir = makeTempRoot('ua-refresh-prereq-');
-    const inventoryPath = join(outputDir, 'inventory.json');
-    const inputPath = join(outputDir, 'import-input.json');
-    const importPath = join(outputDir, 'imports.json');
-
-    const scan = spawnSync(process.execPath, [SCAN_SCRIPT, project.root, inventoryPath], {
-      encoding: 'utf8',
-    });
-    expect(scan.status).toBe(0);
-    const inventory = readJson(inventoryPath);
-    writeFileSync(inputPath, JSON.stringify({
-      projectRoot: project.root,
-      files: inventory.files,
-    }), 'utf8');
-
-    const imports = spawnSync(process.execPath, [IMPORT_SCRIPT, inputPath, importPath], {
-      encoding: 'utf8',
-    });
-    expect(imports.status).toBe(0);
-    expect(readJson(importPath).importMap['src/added.ts']).toContain('src/existing.ts');
-  });
-});
-
 describe('refresh-scan-result.mjs CLI integration', () => {
   it('refreshes added and non-TypeScript files while preserving narrative fields', () => {
-    const project = setupProject({
+    const project = setupCliProject({
       diskFiles: {
         'src/existing.ts': 'export const existing = 1;\n',
         'src/added.ts': "import { existing } from './existing';\nexport { existing };\n",
@@ -182,10 +160,9 @@ describe('refresh-scan-result.mjs CLI integration', () => {
     expect(scan.importMap['src/added.ts']).toContain('src/existing.ts');
     expect(Object.keys(scan.importMap).sort()).toEqual([...paths].sort());
     expect(scan.totalFiles).toBe(scan.files.length);
-    expect(scan.name).toBe(project.previous.name);
-    expect(scan.description).toBe(project.previous.description);
-    expect(scan.frameworks).toEqual(project.previous.frameworks);
-    expect(scan.narrativeMetadata).toEqual(project.previous.narrativeMetadata);
+    for (const field of ['name', 'description', 'frameworks', 'narrativeMetadata']) {
+      expect(scan[field]).toEqual(project.previous[field]);
+    }
     expect(scan.languages).toEqual(
       [...new Set(scan.files.map(entry => entry.language))]
         .sort((a, b) => a.localeCompare(b)),
@@ -195,16 +172,14 @@ describe('refresh-scan-result.mjs CLI integration', () => {
     expect(result.stderr).toContain('scan-project: filesScanned=');
     expect(result.stderr).toContain('extract-import-map: filesScanned=');
     expect(result.stderr).toContain('Warning: extract-import-map:');
-    expect(result.stderr).toMatch(
-      /refresh-scan-result: files=6 added=5 removed=0 importEdges=1/,
-    );
+    expect(result.stderr).toMatch(/refresh-scan-result: files=6 added=5 removed=0 importEdges=1/);
     expect(readFileSync(project.scanPath, 'utf8')).toMatch(/\n$/);
     assertNoOwnedTemps(project);
   });
 
   it('removes renamed-away paths from both files and importMap', () => {
     const old = file('src/old-name.ts');
-    const project = setupProject({
+    const project = setupCliProject({
       previous: previousScan([old]),
       diskFiles: { 'src/new-name.ts': 'export const renamed = true;\n' },
     });
@@ -220,7 +195,7 @@ describe('refresh-scan-result.mjs CLI integration', () => {
   });
 
   it('uses the legacy data directory, honors its ignore file, and preserves unrelated files', () => {
-    const project = setupProject({
+    const project = setupCliProject({
       uaDirName: '.understand-anything',
       ignore: 'src/ignored.ts\n',
       diskFiles: {
@@ -242,7 +217,7 @@ describe('refresh-scan-result.mjs CLI integration', () => {
   });
 
   it('is byte-deterministic when the project inventory is unchanged', () => {
-    const project = setupProject();
+    const project = setupCliProject();
     const first = runRefresh(project.root);
     expect(first.status, first.stderr).toBe(0);
     const firstBytes = readFileSync(project.scanPath);
@@ -251,37 +226,30 @@ describe('refresh-scan-result.mjs CLI integration', () => {
     expect(readFileSync(project.scanPath)).toEqual(firstBytes);
   }, 15_000);
 
-  it('fails clearly when the old scan is invalid JSON without replacing it', () => {
-    const project = setupProject();
-    writeFileSync(project.scanPath, '{ invalid old scan', 'utf8');
-    const before = readFileSync(project.scanPath);
-
-    const result = runRefresh(project.root);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/refresh-scan-result.*scan-result.*JSON/i);
-    expect(readFileSync(project.scanPath)).toEqual(before);
-    assertNoOwnedTemps(project);
-  });
-
-  it('fails clearly when the old scan is missing', () => {
-    const project = setupProject();
-    rmSync(project.scanPath);
-
-    const result = runRefresh(project.root);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toMatch(/refresh-scan-result.*scan-result.*missing|unreadable/i);
-    expect(existsSync(project.scanPath)).toBe(false);
-    assertNoOwnedTemps(project);
-  });
+  it.each([
+    ['invalid JSON', '{ invalid old scan', /refresh-scan-result.*scan-result.*JSON/i],
+    ['missing', null, /refresh-scan-result.*scan-result.*missing|unreadable/i],
+  ])('fails clearly when the old scan is %s without replacement',
+    (_label, oldScanContents, message) => {
+      const project = setupProject();
+      if (oldScanContents === null) rmSync(project.scanPath);
+      else writeFileSync(project.scanPath, oldScanContents, 'utf8');
+      const before = oldScanContents === null ? null : readFileSync(project.scanPath);
+      const result = runRefresh(project.root);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(message);
+      expect(existsSync(project.scanPath)).toBe(oldScanContents !== null);
+      if (before) expect(readFileSync(project.scanPath)).toEqual(before);
+      assertNoOwnedTemps(project);
+    });
 });
 
 describe('refresh-scan-result.mjs validation', () => {
-  it('rejects duplicate inventory paths and mismatched totalFiles', async () => {
-    const { validateInventory } = await loadRefreshModule();
-    const validFile = file('src/a.ts');
-    expect(() => validateInventory(inventory([validFile, validFile])))
-      .toThrow(/duplicate.*src\/a\.ts/i);
-    expect(() => validateInventory(inventory([validFile], 2))).toThrow(/totalFiles/i);
+  it.each([
+    ['duplicate paths', inventory([file('src/a.ts'), file('src/a.ts')]), /duplicate.*src\/a\.ts/i],
+    ['a totalFiles mismatch', inventory([file('src/a.ts')], 2), /totalFiles/i],
+  ])('rejects inventory with %s', (_label, value, message) => {
+    expect(() => validateInventory(value)).toThrow(message);
   });
 
   it.each([
@@ -290,8 +258,7 @@ describe('refresh-scan-result.mjs validation', () => {
     ['fractional sizeLines', file('src/a.ts'), entry => { entry.sizeLines = 1.5; }],
     ['missing fileCategory', file('src/a.ts'), entry => { delete entry.fileCategory; }],
     ['unknown fileCategory', file('src/a.ts'), entry => { entry.fileCategory = 'binary'; }],
-  ])('rejects inventory entries with %s', async (_label, validEntry, mutate) => {
-    const { validateInventory } = await loadRefreshModule();
+  ])('rejects inventory entries with %s', (_label, validEntry, mutate) => {
     mutate(validEntry);
     expect(() => validateInventory(inventory([validEntry])))
       .toThrow(/sizeLines|fileCategory/i);
@@ -306,69 +273,48 @@ describe('refresh-scan-result.mjs validation', () => {
     'src//double.ts',
     '.ua/intermediate/leak.json',
     '.understand-anything/tmp/leak.json',
-  ])('rejects non-normalized relative POSIX inventory path %s', async invalidPath => {
-    const { validateInventory } = await loadRefreshModule();
-    expect(() => validateInventory(inventory([file(invalidPath)])))
-      .toThrow(/relative POSIX|reserved data path/i);
+  ])('rejects non-normalized relative POSIX inventory path %s', invalidPath => {
+    expect(() => validateInventory(inventory([file(invalidPath)]))).toThrow(
+      /relative POSIX|reserved data path/i,
+    );
   });
 
-  it('matches reserved root data directories case-insensitively only on Windows', async () => {
-    const { validateInventory } = await loadRefreshModule();
+  it('matches reserved roots case-insensitively on Windows and allows nested lookalikes', () => {
     const uppercaseRootPaths = [
       '.UA/intermediate/leak.json',
       '.UNDERSTAND-ANYTHING/tmp/leak.json',
     ];
 
     for (const path of uppercaseRootPaths) {
-      if (process.platform === 'win32') {
-        expect(() => validateInventory(inventory([file(path)])))
-          .toThrow(/reserved data path/i);
-      } else {
-        expect(() => validateInventory(inventory([file(path)]))).not.toThrow();
-      }
+      const validate = () => validateInventory(inventory([file(path)]));
+      if (process.platform === 'win32') expect(validate).toThrow(/reserved data path/i);
+      else expect(validate).not.toThrow();
     }
 
-    expect(() => validateInventory(inventory([
-      file('src/.UA/example.ts'),
-      file('src/.UNDERSTAND-ANYTHING/example.ts'),
-    ]))).not.toThrow();
+    const nested = ['.ua', '.understand-anything', '.UA', '.UNDERSTAND-ANYTHING']
+      .map(dir => file(`src/${dir}/example.ts`));
+    expect(() => validateInventory(inventory(nested))).not.toThrow();
   });
 
-  it('requires importMap keys to equal inventory paths exactly', async () => {
-    const { validateImportResult } = await loadRefreshModule();
-    const paths = ['src/a.ts', 'src/b.ts'];
-    expect(() => validateImportResult({
-      scriptCompleted: true,
-      importMap: { 'src/a.ts': [] },
-    }, paths)).toThrow(/missing.*src\/b\.ts/i);
-    expect(() => validateImportResult({
-      scriptCompleted: true,
-      importMap: { 'src/a.ts': [], 'src/b.ts': [], 'src/extra.ts': [] },
-    }, paths)).toThrow(/extra.*src\/extra\.ts/i);
-  });
-
-  it('rejects non-array imports and targets outside the refreshed inventory', async () => {
-    const { validateImportResult } = await loadRefreshModule();
-    expect(() => validateImportResult({
-      scriptCompleted: true,
-      importMap: { 'src/a.ts': 'src/b.ts', 'src/b.ts': [] },
-    }, ['src/a.ts', 'src/b.ts'])).toThrow(/array/i);
-    expect(() => validateImportResult({
-      scriptCompleted: true,
-      importMap: { 'src/a.ts': ['src/missing.ts'], 'src/b.ts': [] },
-    }, ['src/a.ts', 'src/b.ts'])).toThrow(/internal target.*src\/missing\.ts/i);
+  it.each([
+    ['a missing exact key', { 'src/a.ts': [] }, /missing.*src\/b\.ts/i],
+    ['an extra exact key', { 'src/a.ts': [], 'src/b.ts': [], 'src/extra.ts': [] }, /extra.*src\/extra\.ts/i],
+    ['a non-array value', { 'src/a.ts': 'src/b.ts', 'src/b.ts': [] }, /array/i],
+    ['a target outside inventory', { 'src/a.ts': ['src/missing.ts'], 'src/b.ts': [] },
+      /internal target.*src\/missing\.ts/i],
+  ])('rejects importMap with %s', (_label, importMap, message) => {
+    expect(() => validateImportResult({ scriptCompleted: true, importMap }, [
+      'src/a.ts', 'src/b.ts',
+    ])).toThrow(message);
   });
 });
 
 describe('refresh-scan-result.mjs failure protection', () => {
-  async function expectProtected(project, overrides, message) {
-    const { main } = await loadRefreshModule();
+  function expectProtected(project, overrides = {}, message) {
     const before = readFileSync(project.scanPath);
-    const beforeHash = sha256(before);
-    expect(() => main(project.root, overrides)).toThrow(message);
-    const after = readFileSync(project.scanPath);
-    expect(after).toEqual(before);
-    expect(sha256(after)).toBe(beforeHash);
+    expect(() => refresh(project.root, { ...pipelineOverrides(), ...overrides }))
+      .toThrow(message);
+    expect(readFileSync(project.scanPath)).toEqual(before);
     assertNoOwnedTemps(project, 'other-process.tmp');
   }
 
@@ -378,174 +324,114 @@ describe('refresh-scan-result.mjs failure protection', () => {
     return project;
   }
 
-  it('keeps the old scan byte-identical when the scanner child process fails', async () => {
-    const module = await loadRefreshModule();
+  function expectBeforeImport(project, inventoryValue, overrides, message) {
+    const calls = [];
+    expectProtected(project, {
+      ...pipelineOverrides({ inventoryValue, calls }),
+      ...overrides,
+    }, message);
+    expect(calls).toEqual(['scan-project.mjs']);
+  }
+
+  it('keeps the old scan byte-identical when the scanner child process fails', () => {
     const project = protectedProject();
     const failureDir = makeTempRoot('ua-refresh-failing-child-');
     const failureScript = join(failureDir, 'fail.mjs');
+    const pipeline = pipelineOverrides();
     writeFileSync(failureScript, 'process.exit(17);\n', 'utf8');
-    await expectProtected(project, {
+    expectProtected(project, {
+      ...pipeline,
       runBundledScript(scriptPath, args, label) {
-        if (basename(scriptPath) === 'scan-project.mjs') {
-          return module.runBundledScript(failureScript, [], label);
-        }
-        return module.runBundledScript(scriptPath, args, label);
+        if (basename(scriptPath) === 'scan-project.mjs') return runBundledScript(failureScript, [], label);
+        return pipeline.runBundledScript(scriptPath, args, label);
       },
     }, /scan-project exited with status 17/);
   });
 
-  it('rejects an invalid scanner entry before import extraction or replacement', async () => {
+  it('rejects an invalid scanner entry before import extraction or replacement', () => {
     const project = protectedProject();
-    let importRuns = 0;
+    const invalidEntry = file('src/existing.ts');
     let renameCalls = 0;
+    delete invalidEntry.sizeLines;
 
-    await expectProtected(project, {
-      runBundledScript(scriptPath, args) {
-        if (basename(scriptPath) === 'scan-project.mjs') {
-          const invalidEntry = file('src/existing.ts');
-          delete invalidEntry.sizeLines;
-          writeFileSync(args[1], JSON.stringify(inventory([invalidEntry])), 'utf8');
-          return;
-        }
-        importRuns += 1;
-      },
-      renameSync() {
-        renameCalls += 1;
-      },
+    expectBeforeImport(project, inventory([invalidEntry]), {
+      renameSync: () => { renameCalls += 1; },
     }, /sizeLines/i);
-
-    expect(importRuns).toBe(0);
     expect(renameCalls).toBe(0);
   });
 
-  it('rejects an external junction inventory path before import extraction', async () => {
-    const project = protectedProject();
-    const outsideRoot = makeTempRoot('ua-refresh-outside-');
-    writeFileSync(join(outsideRoot, 'outside.ts'), 'export const secret = true;\n', 'utf8');
-    symlinkSync(outsideRoot, join(project.root, 'linked-dir'), 'junction');
-    let importRuns = 0;
-
-    await expectProtected(project, {
-      runBundledScript(scriptPath, args) {
-        if (basename(scriptPath) === 'scan-project.mjs') {
-          writeFileSync(
-            args[1],
-            JSON.stringify(inventory([file('linked-dir/outside.ts')])),
-            'utf8',
-          );
-          return;
-        }
-        importRuns += 1;
+  it.each([
+    [
+      'an external junction inventory path',
+      project => {
+        const outsideRoot = makeTempRoot('ua-refresh-outside-');
+        writeFileSync(join(outsideRoot, 'outside.ts'), 'export const secret = true;\n', 'utf8');
+        symlinkSync(outsideRoot, join(project.root, 'linked-dir'), 'junction');
+        return [inventory([file('linked-dir/outside.ts')]), {}, /unsafe|outside project root/i];
       },
-    }, /unsafe|outside project root/i);
-
-    expect(importRuns).toBe(0);
+    ],
+    ['a missing inventory file', () => [
+      inventory([file('src/missing.ts')]), {}, /unavailable|unsafe/i,
+    ]],
+    [
+      'an inventory realpath error',
+      () => [
+        inventory([file('src/existing.ts')]),
+        {
+          realpathSync(path) {
+            if (basename(path) === 'existing.ts') throw new Error('injected realpath failure');
+            return path;
+          },
+        },
+        /unavailable|unsafe/i,
+      ],
+    ],
+  ])('rejects %s before import extraction', (_label, arrange) => {
+    const project = protectedProject();
+    const [inventoryValue, overrides, message] = arrange(project);
+    expectBeforeImport(project, inventoryValue, overrides, message);
   });
 
-  it('rejects missing inventory files before import extraction', async () => {
+  it.each([
+    ['invalid JSON', '{ invalid import JSON', /import.*JSON/i],
+    ['incomplete keys', { scriptCompleted: true, importMap: {} }, /missing importMap key/i],
+  ])('keeps the old scan byte-identical when import output has %s',
+    (_label, importValue, message) => {
     const project = protectedProject();
-    let importRuns = 0;
+    expectProtected(project, pipelineOverrides({ importValue }), message);
+    });
 
-    await expectProtected(project, {
-      runBundledScript(scriptPath, args) {
-        if (basename(scriptPath) === 'scan-project.mjs') {
-          writeFileSync(
-            args[1],
-            JSON.stringify(inventory([file('src/missing.ts')])),
-            'utf8',
-          );
-          return;
-        }
-        importRuns += 1;
-      },
-    }, /unavailable|unsafe/i);
-
-    expect(importRuns).toBe(0);
-  });
-
-  it('fails closed on inventory realpath errors before import extraction', async () => {
+  it('keeps the old scan byte-identical when candidate writing fails', () => {
     const project = protectedProject();
-    let importRuns = 0;
-
-    await expectProtected(project, {
-      runBundledScript(scriptPath, args) {
-        if (basename(scriptPath) === 'scan-project.mjs') {
-          writeFileSync(
-            args[1],
-            JSON.stringify(inventory([file('src/existing.ts')])),
-            'utf8',
-          );
-          return;
-        }
-        importRuns += 1;
-      },
-      realpathSync(path) {
-        if (basename(path) === 'existing.ts') throw new Error('injected realpath failure');
-        return path;
-      },
-    }, /unavailable|unsafe/i);
-
-    expect(importRuns).toBe(0);
-  });
-
-  it('keeps the old scan byte-identical when import output is invalid JSON', async () => {
-    const module = await loadRefreshModule();
-    const project = protectedProject();
-    await expectProtected(project, {
-      runBundledScript(scriptPath, args, label) {
-        if (basename(scriptPath) === 'extract-import-map.mjs') {
-          writeFileSync(args[1], '{ invalid import JSON', 'utf8');
-          return;
-        }
-        return module.runBundledScript(scriptPath, args, label);
-      },
-    }, /import.*JSON/i);
-  });
-
-  it('keeps the old scan byte-identical when importMap keys are incomplete', async () => {
-    const module = await loadRefreshModule();
-    const project = protectedProject();
-    await expectProtected(project, {
-      runBundledScript(scriptPath, args, label) {
-        if (basename(scriptPath) === 'extract-import-map.mjs') {
-          writeFileSync(args[1], JSON.stringify({
-            scriptCompleted: true,
-            importMap: {},
-          }), 'utf8');
-          return;
-        }
-        return module.runBundledScript(scriptPath, args, label);
-      },
-    }, /missing importMap key/i);
-  });
-
-  it('keeps the old scan byte-identical when candidate writing fails', async () => {
-    const project = protectedProject();
-    await expectProtected(project, {
+    let renameCalls = 0;
+    expectProtected(project, {
       writeFileSync(path, contents, encoding) {
-        if (dirname(path) === project.intermediateDir) {
-          throw new Error('injected candidate write failure');
-        }
+        if (dirname(path) === project.intermediateDir) throw new Error('injected candidate write failure');
         return writeFileSync(path, contents, encoding);
       },
+      renameSync: () => { renameCalls += 1; },
     }, /injected candidate write failure/);
+    expect(renameCalls).toBe(0);
   });
 
-  it('keeps the old scan byte-identical and cleans the candidate when rename fails', async () => {
+  it('keeps the old scan byte-identical and cleans the candidate when rename fails', () => {
     const project = protectedProject();
-    await expectProtected(project, {
+    let renameCalls = 0;
+    expectProtected(project, {
       renameSync() {
+        renameCalls += 1;
         throw new Error('injected rename failure');
       },
     }, /injected rename failure/);
+    expect(renameCalls).toBe(1);
   });
 
-  it('does not replace the old scan when owned work-temp cleanup fails before rename', async () => {
+  it('does not replace the old scan when owned work-temp cleanup fails before rename', () => {
     const project = protectedProject();
     let cleanupFailureInjected = false;
     let renameCalls = 0;
 
-    await expectProtected(project, {
+    expectProtected(project, {
       rmSync(path, options) {
         if (!cleanupFailureInjected && basename(path).startsWith('refresh-inventory-')) {
           cleanupFailureInjected = true;
@@ -553,22 +439,19 @@ describe('refresh-scan-result.mjs failure protection', () => {
         }
         return rmSync(path, options);
       },
-      renameSync(...args) {
-        renameCalls += 1;
-        return realRenameSync(...args);
-      },
+      renameSync: () => { renameCalls += 1; },
     }, /injected pre-rename cleanup failure/);
 
     expect(cleanupFailureInjected).toBe(true);
     expect(renameCalls).toBe(0);
   });
 
-  it('does not turn a committed refresh into failure when summary logging fails', async () => {
-    const { main } = await loadRefreshModule();
+  it('does not turn a committed refresh into failure when summary logging fails', () => {
     const project = protectedProject();
     let summaryAttempts = 0;
 
-    expect(() => main(project.root, {
+    expect(() => refresh(project.root, {
+      ...pipelineOverrides(),
       writeSummary() {
         summaryAttempts += 1;
         throw new Error('injected post-rename summary failure');
@@ -576,8 +459,7 @@ describe('refresh-scan-result.mjs failure protection', () => {
     })).not.toThrow();
 
     expect(summaryAttempts).toBe(1);
-    expect(readJson(project.scanPath).files.map(entry => entry.path))
-      .toContain('src/added.ts');
+    expect(readJson(project.scanPath).files.map(entry => entry.path)).toContain('src/added.ts');
     assertNoOwnedTemps(project, 'other-process.tmp');
   });
 });
