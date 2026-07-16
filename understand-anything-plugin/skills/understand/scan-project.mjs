@@ -535,7 +535,7 @@ function enumerateViaWalk(projectRoot) {
 
   const out = [];
 
-  function walk(absDir) {
+  function walk(absDir, isRoot = false) {
     let entries;
     try {
       entries = readdirSync(absDir, { withFileTypes: true });
@@ -552,7 +552,7 @@ function enumerateViaWalk(projectRoot) {
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const ent of entries) {
       if (ent.isDirectory()) {
-        if (HARD_SKIP_DIRS.has(ent.name)) continue;
+        if (HARD_SKIP_DIRS.has(ent.name) || (isRoot && isReservedDataPath(ent.name))) continue;
         walk(join(absDir, ent.name));
       } else if (ent.isFile()) {
         const rel = toPosix(relative(projectRoot, join(absDir, ent.name)));
@@ -563,7 +563,7 @@ function enumerateViaWalk(projectRoot) {
     }
   }
 
-  walk(projectRoot);
+  walk(projectRoot, true);
   return out;
 }
 

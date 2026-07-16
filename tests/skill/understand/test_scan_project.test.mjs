@@ -501,12 +501,14 @@ describe('scan-project.mjs — reserved root data directories', () => {
     projectRoot = setupTree({
       '.ua/knowledge-graph.json': '{}\n',
       '.understand-anything/meta.json': '{}\n',
+      'src/.ua/example.ts': 'export const nested = true;\n',
       'src/index.ts': 'export const x = 1;\n',
     }, { gitInit: false });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
     expect(byPath(r.output, '.understand-anything/meta.json')).toBeUndefined();
+    expect(byPath(r.output, 'src/.ua/example.ts')).toBeDefined();
     expect(byPath(r.output, 'src/index.ts')).toBeDefined();
     expect(r.output.filteredByIgnore).toBe(0);
   });
