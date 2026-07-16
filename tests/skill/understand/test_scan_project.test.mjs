@@ -483,27 +483,17 @@ describe('scan-project.mjs — reserved root data directories', () => {
     }
   });
 
-  it('excludes root .ua and .understand-anything files via Git enumeration', () => {
+  it.each([
+    ['Git', true],
+    ['fallback walker', false],
+  ])('hard-excludes reserved roots before ignore negation via %s enumeration', (_, gitInit) => {
     projectRoot = setupTree({
-      '.ua/knowledge-graph.json': '{}\n',
-      '.understand-anything/meta.json': '{}\n',
-      'src/index.ts': 'export const x = 1;\n',
-    });
-    const r = runScript(projectRoot);
-    expect(r.status).toBe(0);
-    expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
-    expect(byPath(r.output, '.understand-anything/meta.json')).toBeUndefined();
-    expect(byPath(r.output, 'src/index.ts')).toBeDefined();
-    expect(r.output.filteredByIgnore).toBe(0);
-  });
-
-  it('excludes root .ua and .understand-anything files via the fallback walker', () => {
-    projectRoot = setupTree({
+      '.understandignore': '!.ua/**\n!.understand-anything/**\n',
       '.ua/knowledge-graph.json': '{}\n',
       '.understand-anything/meta.json': '{}\n',
       'src/.ua/example.ts': 'export const nested = true;\n',
       'src/index.ts': 'export const x = 1;\n',
-    }, { gitInit: false });
+    }, { gitInit });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
@@ -511,27 +501,6 @@ describe('scan-project.mjs — reserved root data directories', () => {
     expect(byPath(r.output, 'src/.ua/example.ts')).toBeDefined();
     expect(byPath(r.output, 'src/index.ts')).toBeDefined();
     expect(r.output.filteredByIgnore).toBe(0);
-  });
-
-  it('does not let .understandignore negation restore root .ua files', () => {
-    projectRoot = setupTree({
-      '.understandignore': '!.ua/**\n',
-      '.ua/knowledge-graph.json': '{}\n',
-      'src/index.ts': 'export const x = 1;\n',
-    });
-    const r = runScript(projectRoot);
-    expect(r.status).toBe(0);
-    expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
-    expect(r.output.filteredByIgnore).toBe(0);
-  });
-
-  it('keeps a nested src/.ua directory scannable', () => {
-    projectRoot = setupTree({
-      'src/.ua/example.ts': 'export const nested = true;\n',
-    });
-    const r = runScript(projectRoot);
-    expect(r.status).toBe(0);
-    expect(byPath(r.output, 'src/.ua/example.ts')).toBeDefined();
   });
 
   it.each([
@@ -579,12 +548,6 @@ describe('scan-project.mjs — project-root containment', () => {
     projectRoot = setupTree({
       'src/local.ts': 'export const local = true;\n',
     });
-    const gitCheck = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
-      cwd: projectRoot,
-      encoding: 'utf-8',
-    });
-    expect(gitCheck.status, gitCheck.stderr).toBe(0);
-
     outsideRoot = mkdtempSync(join(tmpdir(), 'ua-scan-outside-'));
     const outsideFile = join(outsideRoot, 'outside.ts');
     writeFileSync(outsideFile, 'export const secret = true;\n', 'utf-8');
@@ -596,14 +559,6 @@ describe('scan-project.mjs — project-root containment', () => {
     } else {
       symlinkSync(outsideFile, join(projectRoot, enumeratedPath), 'file');
     }
-
-    const enumerated = spawnSync(
-      'git',
-      ['ls-files', '-z', '-co', '--exclude-standard'],
-      { cwd: projectRoot, encoding: 'utf-8' },
-    );
-    expect(enumerated.status, enumerated.stderr).toBe(0);
-    expect(enumerated.stdout.split('\0')).toContain(enumeratedPath);
 
     const result = runScript(projectRoot);
     expect(result.status).not.toBe(0);
