@@ -20,7 +20,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { main as refreshScanResult } from './refresh-scan-result.mjs';
 
 /**
  * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
@@ -31,7 +31,6 @@ import { spawnSync } from 'node:child_process';
 const IO_PARALLELISM = 64;
 
 const __filename = fileURLToPath(import.meta.url);
-const REFRESH_SCRIPT = join(dirname(__filename), 'refresh-scan-result.mjs');
 const PLUGIN_ROOT = resolve(dirname(__filename), '../..');
 const require = createRequire(resolve(PLUGIN_ROOT, 'package.json'));
 
@@ -322,16 +321,17 @@ function isWithinRealProjectRoot(realProjectRoot, absolutePath) {
     && !win32.isAbsolute(realRelative);
 }
 
-function findStructuralDrift(projectRoot, uaDir, scan, changedFiles) {
+function findStructuralDrift(projectRoot, uaDir, inventoryPaths, changedFiles) {
   const activeUaPath = relative(projectRoot, uaDir).split(sep).join('/');
   const activeIgnorePath = normalizeRelativePathForMatch(
     `${activeUaPath}/.understandignore`,
   );
-  const inventoryPaths = new Set(
-    (scan.files || []).map(file => normalizeRelativePathForMatch(file.path)),
-  );
   const realProjectRoot = resolveRealPathForContainment(projectRoot, 'project root');
-  const pathStates = [];
+  let reason = changedFiles.has('.understandignore')
+    || changedFiles.has(activeIgnorePath)
+    ? 'ignore rules changed'
+    : null;
+
   for (const changedPath of changedFiles) {
     const absolutePath = resolveChangedProjectFile(projectRoot, changedPath);
     if (!absolutePath) continue;
@@ -340,21 +340,11 @@ function findStructuralDrift(projectRoot, uaDir, scan, changedFiles) {
     if (existsOnDisk && !isWithinRealProjectRoot(realProjectRoot, absolutePath)) {
       throw new Error('changed path resolves outside project root');
     }
-    pathStates.push({ path: changedPath, existsOnDisk });
-  }
-
-  if (
-    changedFiles.has('.understandignore')
-    || changedFiles.has(activeIgnorePath)
-  ) {
-    return 'ignore rules changed';
-  }
-  for (const { path, existsOnDisk } of pathStates) {
-    if (existsOnDisk !== inventoryPaths.has(path)) {
-      return existsOnDisk ? 'file added' : 'file removed';
+    if (!reason && existsOnDisk !== inventoryPaths.has(changedPath)) {
+      reason = existsOnDisk ? 'file added' : 'file removed';
     }
   }
-  return null;
+  return reason;
 }
 
 function refreshScanInventory(projectRoot, reason) {
@@ -362,18 +352,12 @@ function refreshScanInventory(projectRoot, reason) {
     `Info: compute-batches: structural drift detected (${reason}); `
     + `refreshing scan inventory\n`,
   );
-  const result = spawnSync(process.execPath, [REFRESH_SCRIPT, projectRoot], {
-    encoding: 'utf-8',
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  if (result.error) {
-    throw new Error(`inventory refresh failed to start: ${result.error.message}`);
-  }
-  if (result.status !== 0) {
-    const outcome = result.signal ? `signal ${result.signal}` : `status ${result.status}`;
-    throw new Error(`inventory refresh failed with ${outcome}`);
+  try {
+    refreshScanResult(projectRoot);
+  } catch (error) {
+    process.stderr.write(`refresh-scan-result.mjs failed: ${error.message}\n`);
+    // Preserve the CLI contract previously produced by the refresh child.
+    throw new Error('inventory refresh failed with status 1');
   }
 }
 
@@ -524,18 +508,23 @@ async function main() {
   let effectiveChangedFiles = null;
   if (changedFiles) {
     effectiveChangedFiles = new Set(changedFiles);
-    const inventoryBeforeRefresh = collectValidInventoryPaths(projectRoot, scan);
-    const driftReason = findStructuralDrift(projectRoot, uaDir, scan, changedFiles);
-    if (driftReason) {
-      refreshScanInventory(projectRoot, driftReason);
-      scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
-      const inventoryAfterRefresh = collectValidInventoryPaths(projectRoot, scan);
-      for (const inventoryPath of new Set([
-        ...inventoryBeforeRefresh,
-        ...inventoryAfterRefresh,
-      ])) {
-        if (inventoryBeforeRefresh.has(inventoryPath) !== inventoryAfterRefresh.has(inventoryPath)) {
-          effectiveChangedFiles.add(inventoryPath);
+    if (changedFiles.size > 0) {
+      const inventoryBeforeRefresh = collectValidInventoryPaths(projectRoot, scan);
+      const driftReason = findStructuralDrift(
+        projectRoot,
+        uaDir,
+        inventoryBeforeRefresh,
+        changedFiles,
+      );
+      if (driftReason) {
+        refreshScanInventory(projectRoot, driftReason);
+        scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+        const inventoryAfterRefresh = collectValidInventoryPaths(projectRoot, scan);
+        for (const path of inventoryBeforeRefresh) {
+          if (!inventoryAfterRefresh.has(path)) effectiveChangedFiles.add(path);
+        }
+        for (const path of inventoryAfterRefresh) {
+          if (!inventoryBeforeRefresh.has(path)) effectiveChangedFiles.add(path);
         }
       }
     }
@@ -702,22 +691,19 @@ async function main() {
     return { batchIndex: b.batchIndex, files: analysisFiles, batchImportData, neighborMap };
   };
 
-  const batches = mergedBareBatches.map(b => buildBatchPayload(b));
-
-  let finalBatches = batches;
-  if (effectiveChangedFiles) {
-    finalBatches = mergedBareBatches
+  const finalBatches = effectiveChangedFiles
+    ? mergedBareBatches
       .map(b => {
         const changedBatchFiles = b.files.filter(f =>
           effectiveChangedFiles.has(normalizeRelativePathForMatch(f.path)));
         if (changedBatchFiles.length === 0) return null;
         return buildBatchPayload(b, changedBatchFiles);
       })
-      .filter(Boolean);
-    // batchIndex on filtered batches retains the full-graph assignment
-    // (the design says neighborMap should still reference unchanged files'
-    // full-graph batchIndex). No renumbering.
-  }
+      .filter(Boolean)
+    : mergedBareBatches.map(b => buildBatchPayload(b));
+  // batchIndex on filtered batches retains the full-graph assignment
+  // (the design says neighborMap should still reference unchanged files'
+  // full-graph batchIndex). No renumbering.
 
   // Note: under --changed-files mode, totalFiles is the FULL project file
   // count (unchanged from the input scan) while totalBatches reflects only

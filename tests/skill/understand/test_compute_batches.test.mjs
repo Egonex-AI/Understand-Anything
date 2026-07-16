@@ -1034,6 +1034,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/refresh-scan-result\.mjs failed:/);
+    expect(result.stderr).toMatch(/inventory refresh failed with status 1/);
     expect(readFileSync(project.scanPath)).toEqual(beforeBytes);
     expect(existsSync(project.batchesPath)).toBe(false);
   });
