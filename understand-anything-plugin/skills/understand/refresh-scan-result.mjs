@@ -46,6 +46,21 @@ const FILE_CATEGORIES = new Set([
   'markup',
 ]);
 
+function isPlainObject(value) {
+  return value !== null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function readJson(path, label) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    throw new Error(`refresh-scan-result: ${label} JSON parse failed: ${error.message}`);
+  }
+}
+
 function isReservedDataPath(path) {
   if (typeof path !== 'string') return false;
   const [rootSegment] = path.split('/', 1);
@@ -71,17 +86,8 @@ export function runBundledScript(scriptPath, args, label) {
   }
 }
 
-function writeSummary(message) {
-  process.stderr.write(message);
-}
-
 export function validateInventory(value) {
-  if (
-    value === null
-    || typeof value !== 'object'
-    || Array.isArray(value)
-    || Object.getPrototypeOf(value) !== Object.prototype
-  ) {
+  if (!isPlainObject(value)) {
     throw new Error('inventory must be a plain object');
   }
   if (value.scriptCompleted !== true) {
@@ -107,12 +113,7 @@ export function validateInventory(value) {
 
   const paths = new Set();
   for (const entry of value.files) {
-    if (
-      entry === null
-      || typeof entry !== 'object'
-      || Array.isArray(entry)
-      || Object.getPrototypeOf(entry) !== Object.prototype
-    ) {
+    if (!isPlainObject(entry)) {
       throw new Error('inventory file entry must be a plain object');
     }
 
@@ -187,23 +188,13 @@ function validateInventoryFilesOnDisk(projectRoot, inventory, resolveRealpath) {
 }
 
 export function validateImportResult(value, filePaths) {
-  if (
-    value === null
-    || typeof value !== 'object'
-    || Array.isArray(value)
-    || Object.getPrototypeOf(value) !== Object.prototype
-  ) {
+  if (!isPlainObject(value)) {
     throw new Error('import result must be a plain object');
   }
   if (value.scriptCompleted !== true) {
     throw new Error('import result scriptCompleted must be true');
   }
-  if (
-    value.importMap === null
-    || typeof value.importMap !== 'object'
-    || Array.isArray(value.importMap)
-    || Object.getPrototypeOf(value.importMap) !== Object.prototype
-  ) {
+  if (!isPlainObject(value.importMap)) {
     throw new Error('importMap must be a plain object');
   }
 
@@ -289,7 +280,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     renameSync,
     rmSync,
     realpathSync,
-    writeSummary,
+    writeSummary: message => process.stderr.write(message),
     ...overrides,
   };
   const suffix = randomBytes(8).toString('hex');
@@ -313,12 +304,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
   try {
     ops.runBundledScript(SCAN_SCRIPT, [projectRoot, inventoryPath], 'scan-project');
 
-    let inventory;
-    try {
-      inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
-    } catch (error) {
-      throw new Error(`refresh-scan-result: inventory JSON parse failed: ${error.message}`);
-    }
+    const inventory = readJson(inventoryPath, 'inventory');
     validateInventory(inventory);
     validateInventoryFilesOnDisk(projectRoot, inventory, ops.realpathSync);
 
@@ -332,24 +318,14 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
       'extract-import-map',
     );
 
-    let importResult;
-    try {
-      importResult = JSON.parse(readFileSync(importOutputPath, 'utf8'));
-    } catch (error) {
-      throw new Error(`refresh-scan-result: import result JSON parse failed: ${error.message}`);
-    }
+    const importResult = readJson(importOutputPath, 'import result');
     const filePaths = inventory.files.map(entry => entry.path);
     validateImportResult(importResult, filePaths);
 
     const candidate = buildRefreshedScan(previous, inventory, importResult);
     ops.writeFileSync(candidatePath, `${JSON.stringify(candidate, null, 2)}\n`, 'utf8');
 
-    let writtenCandidate;
-    try {
-      writtenCandidate = JSON.parse(readFileSync(candidatePath, 'utf8'));
-    } catch (error) {
-      throw new Error(`refresh-scan-result: candidate JSON parse failed: ${error.message}`);
-    }
+    const writtenCandidate = readJson(candidatePath, 'candidate');
     validateInventory({
       scriptCompleted: true,
       files: writtenCandidate.files,
