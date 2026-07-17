@@ -16,6 +16,10 @@ const require = createRequire(import.meta.url);
 type TreeSitterParser = import("web-tree-sitter").Parser;
 type TreeSitterLanguage = import("web-tree-sitter").Language;
 
+export interface TreeSitterPluginOptions {
+  extensionLanguageMap?: Record<string, string>;
+}
+
 /**
  * Config-driven tree-sitter plugin.
  *
@@ -58,7 +62,11 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
    * @param configs Language configurations to load
    * @param extractors Optional language extractors; if none provided, registers all builtin extractors
    */
-  constructor(configs?: LanguageConfig[], extractors?: LanguageExtractor[]) {
+  constructor(
+    configs?: LanguageConfig[],
+    extractors?: LanguageExtractor[],
+    options?: TreeSitterPluginOptions,
+  ) {
     if (configs) {
       this.configs = configs.filter((c) => c.treeSitter);
     } else {
@@ -85,6 +93,28 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       this._extensionToLang.set(".mjs", "javascript");
       this._extensionToLang.set(".cjs", "javascript");
       this._extensionToLang.set(".jsx", "javascript");
+    }
+
+    const supportedLanguageIds = new Set(langs);
+    supportedLanguageIds.add("tsx");
+    for (const [rawExt, rawLanguageId] of Object.entries(
+      options?.extensionLanguageMap ?? {},
+    )) {
+      if (typeof rawLanguageId !== "string") {
+        throw new Error(
+          `TreeSitterPlugin extension alias "${rawExt}" must map to a string language id`,
+        );
+      }
+      const ext = rawExt.startsWith(".")
+        ? rawExt.toLowerCase()
+        : `.${rawExt.toLowerCase()}`;
+      const languageId = rawLanguageId.toLowerCase();
+      if (!supportedLanguageIds.has(languageId)) {
+        throw new Error(
+          `TreeSitterPlugin extension alias "${rawExt}" targets unsupported language "${rawLanguageId}"`,
+        );
+      }
+      this._extensionToLang.set(ext, languageId);
     }
 
     this.languages = langs;

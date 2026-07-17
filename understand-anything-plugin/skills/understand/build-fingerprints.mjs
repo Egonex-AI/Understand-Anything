@@ -28,6 +28,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { readTreeSitterExtensionLanguageMap } from './config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // skills/understand/ -> plugin root is two dirs up
@@ -49,6 +50,7 @@ try {
 const {
   TreeSitterPlugin,
   PluginRegistry,
+  LanguageRegistry,
   builtinLanguageConfigs,
   registerAllParsers,
   buildFingerprintStore,
@@ -72,14 +74,27 @@ async function main() {
     );
   }
 
+  const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
+  validLanguageIds.add('tsx');
+  const treeSitterExtensionLanguageMap = readTreeSitterExtensionLanguageMap(
+    projectRoot,
+    { validLanguageIds },
+  );
+
   // Create tree-sitter plugin with all configs that have WASM grammars,
   // mirroring extract-structure.mjs so the baseline matches the comparison
   // logic used during auto-updates.
   const tsConfigs = builtinLanguageConfigs.filter((c) => c.treeSitter);
-  const tsPlugin = new TreeSitterPlugin(tsConfigs);
+  const tsPlugin = new TreeSitterPlugin(tsConfigs, undefined, {
+    extensionLanguageMap: treeSitterExtensionLanguageMap,
+  });
   await tsPlugin.init();
 
-  const registry = new PluginRegistry();
+  const languageRegistry = LanguageRegistry.createDefault();
+  for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
+    languageRegistry.registerExtensionAlias(ext, languageId);
+  }
+  const registry = new PluginRegistry(languageRegistry);
   registry.register(tsPlugin);
   registerAllParsers(registry);
 

@@ -20,6 +20,8 @@ You will receive a batch of articles as a JSON array. Each article has:
 
 You will also receive the full list of existing node IDs so you can reference them.
 
+If the dispatch prompt includes a language directive, apply it to all natural-language fields you generate (`name`, `summary`, edge `description`). Keep IDs, schema keys, node/edge `type`, `direction`, and other enum values unchanged.
+
 ## Task
 
 For each article in the batch, extract:

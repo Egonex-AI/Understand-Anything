@@ -66,6 +66,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { readTreeSitterExtensionLanguageMap } from './config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // skills/understand/ -> plugin root is two dirs up
@@ -87,7 +88,7 @@ try {
   core = await import(pathToFileURL(resolve(pluginRoot, 'packages/core/dist/index.js')).href);
 }
 
-const { createIgnoreFilter, resolveUaDir } = core;
+const { createIgnoreFilter, builtinLanguageConfigs,resolveUaDir } = core;
 
 // ---------------------------------------------------------------------------
 // Language detection
@@ -227,7 +228,7 @@ const LANGUAGE_BY_FILENAME = Object.freeze({
  * extension. Downstream consumers rely on this field always being a string
  * (see project-scanner.md Step 3 "Fallback" note).
  */
-export function detectLanguage(filePath) {
+export function detectLanguage(filePath, extensionLanguageMap = null) {
   const base = basename(filePath);
   const ext = extname(filePath).toLowerCase();
 
@@ -243,6 +244,9 @@ export function detectLanguage(filePath) {
   if (dotKey && LANGUAGE_BY_EXT[dotKey]) return LANGUAGE_BY_EXT[dotKey];
 
   if (ext) {
+    if (extensionLanguageMap && extensionLanguageMap[ext]) {
+      return extensionLanguageMap[ext];
+    }
     const byExt = LANGUAGE_BY_EXT[ext];
     if (byExt) return byExt;
     // Unknown extension → drop the leading dot, lowercase. Never null.
@@ -697,6 +701,13 @@ async function main() {
   // 1. Enumerate. Either git ls-files or recursive walk.
   const candidates = enumerateFiles(projectRoot);
 
+  const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
+  validLanguageIds.add('tsx');
+  const treeSitterExtensionLanguageMap = readTreeSitterExtensionLanguageMap(
+    projectRoot,
+    { validLanguageIds },
+  );
+
   // 2. Filter via createIgnoreFilter (defaults + user .understandignore + CLI --exclude).
   //    Build a defaults-only filter in parallel to count user-driven drops.
   const combined = createIgnoreFilter(projectRoot, excludePatterns);
@@ -748,7 +759,7 @@ async function main() {
     }
     fileEntries.push({
       path: rel,
-      language: detectLanguage(rel),
+      language: detectLanguage(rel, treeSitterExtensionLanguageMap),
       sizeLines,
       fileCategory: detectCategory(rel),
     });

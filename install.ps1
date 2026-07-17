@@ -26,22 +26,23 @@ $RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
 
-# Platform table — Target = skills directory; Style = "per-skill" | "folder"
+# Platform table — Target = skills directory; Style = "per-skill" | "folder";
+# AgentsTarget is empty for platforms that need a custom agent bundle format.
 $Platforms = [ordered]@{
-    gemini      = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    opencode    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
-    openclaw    = @{ Target = (Join-Path $HOME '.openclaw\skills');           Style = 'folder' }
-    antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
-    vibe        = @{ Target = (Join-Path $HOME '.vibe\skills');               Style = 'per-skill' }
-    vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
-    hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder' }
-    cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
-    kimi        = @{ Target = (Join-Path $HOME '.kimi\skills');               Style = 'folder' }
-    trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
-    nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
-    kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    gemini      = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.agents\agents') }
+    codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.agents\agents') }
+    opencode    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.agents\agents') }
+    pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.agents\agents') }
+    openclaw    = @{ Target = (Join-Path $HOME '.openclaw\skills');           Style = 'folder';    AgentsTarget = (Join-Path $HOME '.openclaw\agents') }
+    antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder';    AgentsTarget = (Join-Path $HOME '.gemini\antigravity\agents') }
+    vibe        = @{ Target = (Join-Path $HOME '.vibe\skills');               Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.vibe\agents') }
+    vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.copilot\agents') }
+    hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder';    AgentsTarget = (Join-Path $HOME '.hermes\agents') }
+    cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder';    AgentsTarget = (Join-Path $HOME '.cline\agents') }
+    kimi        = @{ Target = (Join-Path $HOME '.kimi\skills');               Style = 'folder';    AgentsTarget = (Join-Path $HOME '.kimi\agents') }
+    trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.trae\agents') }
+    nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill'; AgentsTarget = (Join-Path $HOME '.nanobot\workspace\agents') }
+    kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill'; AgentsTarget = '' }
 }
 
 function Show-Usage {
@@ -85,6 +86,7 @@ function Prompt-Platform {
 }
 
 function Get-SkillsRoot { Join-Path $RepoDir 'understand-anything-plugin\skills' }
+function Get-AgentsRoot { Join-Path $RepoDir 'understand-anything-plugin\agents' }
 
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
@@ -194,6 +196,39 @@ function Link-Plugin-Root {
     }
 }
 
+function Link-AgentProfiles([string]$Target) {
+    if (-not $Target) { return }
+    $root = Get-AgentsRoot
+    if (-not (Test-Path $root)) { Write-Error "Agents directory not found: $root" }
+    if (-not (Test-Path $Target)) { New-Item -ItemType Directory -Path $Target | Out-Null }
+
+    Get-ChildItem -Path $root -Filter '*.md' -File | Sort-Object Name | ForEach-Object {
+        $link = Join-Path $Target $_.Name
+        New-Junction $link $_.FullName
+        Write-Host "  ✓ $link → $($_.FullName)"
+    }
+}
+
+function Unlink-AgentProfiles([string]$Target) {
+    if (-not $Target) { return }
+    if (-not (Test-Path $Target)) { return }
+
+    $root = Get-AgentsRoot
+    if (Test-Path $root) {
+        Get-ChildItem -Path $root -Filter '*.md' -File | ForEach-Object {
+            Remove-Reparse (Join-Path $Target $_.Name) | Out-Null
+        }
+    } else {
+        Get-ChildItem -LiteralPath $Target -Filter '*.md' -Force | ForEach-Object {
+            if ($_.LinkType -eq 'Junction' -or $_.LinkType -eq 'SymbolicLink') {
+                if ($_.Target -match 'understand-anything-plugin[\\/]+agents[\\/]+') {
+                    Remove-Reparse $_.FullName | Out-Null
+                }
+            }
+        }
+    }
+}
+
 function ConvertTo-FileUri([string]$Path) {
     # Produce a forward-slashed file URI (Windows: file:///C:/path/...).
     return 'file:///' + ($Path -replace '\\', '/')
@@ -206,6 +241,11 @@ function Cmd-Install([string]$Id) {
     Link-Skills $cfg.Target $cfg.Style
     Write-Host '→ Linking universal plugin root'
     Link-Plugin-Root
+
+    if ($cfg.AgentsTarget) {
+        Write-Host "→ Linking agent profiles ($($cfg.AgentsTarget))"
+        Link-AgentProfiles $cfg.AgentsTarget
+    }
 
     if ($Id -eq 'kiro') {
         Write-Host '→ Creating Kiro agent configuration'
@@ -257,6 +297,10 @@ function Cmd-Uninstall([string]$Id) {
             Remove-Item -LiteralPath $agentJson -Force
             Write-Host "  ✓ removed $agentJson"
         }
+    }
+    if ($cfg.AgentsTarget) {
+        Write-Host '→ Removing agent profile links'
+        Unlink-AgentProfiles $cfg.AgentsTarget
     }
     if (Remove-Reparse $PluginLink) {
         Write-Host "  ✓ removed $PluginLink"

@@ -38,6 +38,7 @@ import { dirname, resolve, join, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { readTreeSitterExtensionLanguageMap } from './config.mjs';
 
 /**
  * Read a list of files concurrently while preserving result order. Failures
@@ -81,7 +82,13 @@ try {
   core = await import(pathToFileURL(resolve(pluginRoot, 'packages/core/dist/index.js')).href);
 }
 
-const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers } = core;
+const {
+  TreeSitterPlugin,
+  PluginRegistry,
+  LanguageRegistry,
+  builtinLanguageConfigs,
+  registerAllParsers,
+} = core;
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -1805,6 +1812,13 @@ async function main() {
     throw new Error('Invalid input: must contain projectRoot and files array');
   }
 
+  const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
+  validLanguageIds.add('tsx');
+  const treeSitterExtensionLanguageMap = readTreeSitterExtensionLanguageMap(
+    projectRoot,
+    { validLanguageIds },
+  );
+
   // Create tree-sitter plugin with all configs that have WASM grammars.
   //
   // WHY graceful init: the most likely real-world failure mode is the WASM
@@ -1818,9 +1832,15 @@ async function main() {
   let treeSitterReady = false;
   try {
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
-    const tsPlugin = new TreeSitterPlugin(tsConfigs);
+    const tsPlugin = new TreeSitterPlugin(tsConfigs, undefined, {
+      extensionLanguageMap: treeSitterExtensionLanguageMap,
+    });
     await tsPlugin.init();
-    registry = new PluginRegistry();
+    const languageRegistry = LanguageRegistry.createDefault();
+    for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
+      languageRegistry.registerExtensionAlias(ext, languageId);
+    }
+    registry = new PluginRegistry(languageRegistry);
     registry.register(tsPlugin);
     registerAllParsers(registry);
     treeSitterReady = true;

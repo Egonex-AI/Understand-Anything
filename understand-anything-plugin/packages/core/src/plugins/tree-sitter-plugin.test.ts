@@ -185,6 +185,24 @@ const double = (x) => x * 2;
       expect(result.functions[1].params).toEqual(["x"]);
     });
 
+    it("supports extension aliases for custom project file types", async () => {
+      const aliasPlugin = new TreeSitterPlugin(undefined, undefined, {
+        extensionLanguageMap: {
+          ".customts": "typescript",
+        },
+      });
+      await aliasPlugin.init();
+
+      const code = `
+function greet(name: string): string {
+  return "Hello " + name;
+}
+`;
+      const result = aliasPlugin.analyzeFile("test.customts", code);
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("greet");
+    });
+
     it("should handle a comprehensive TypeScript file", () => {
       const code = `
 import { EventEmitter } from 'events';

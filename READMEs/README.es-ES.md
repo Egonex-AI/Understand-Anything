@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>La IA debería ayudar a las personas, no reemplazarlas.</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -22,8 +28,11 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Página_Principal-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Demo_en_Vivo-00c853" alt="Live Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
@@ -128,10 +137,30 @@ Un pipeline multi-agente escanea tu proyecto, extrae cada archivo, función, cla
 # Idiomas soportados: en (default), zh, zh-TW, ja, ko, ru
 ```
 
+En la **primera ejecución** en un proyecto — cuando no pasas `--language` y no hay un idioma guardado aún — `/understand` detecta el idioma en el que estás conversando. Si no es inglés, te pide confirmar (o cambiar) antes de generar; las conversaciones en inglés no se ven afectadas. Tu elección se guarda en `.ua/config.json` y se reutiliza en cada ejecución posterior.
+
+**Alias de extensiones tree-sitter a nivel de proyecto:** Si tu código usa extensiones de archivo personalizadas, puedes agregarlas a `.understand-anything/config.json`:
+
+```json
+{
+  "treeSitter": {
+    "extensionLanguageMap": {
+      ".customts": "typescript",
+      ".custompy": "python"
+    }
+  }
+}
+```
+
+Esto permite que `/understand` trate esas extensiones como el lenguaje especificado durante el escaneo estructural basado en tree-sitter.
+
 El parámetro `--language` afecta:
 - Resúmenes y descripciones de nodos en el grafo de conocimiento
 - Etiquetas, botones y tooltips de la UI del dashboard
 - Explicaciones de los tours guiados
+- Salida de `/understand-domain` (nombres/resúmenes de dominios, flujos, pasos)
+- Texto de la guía de incorporación generada por `/understand-onboard`
+- Descripciones de entidades/afirmaciones/relaciones inferidas por `/understand-knowledge`
 
 ### 3. Explora el panel
 

@@ -1058,6 +1058,98 @@ def recover_imports_from_scan(
     return recovered, lines
 
 
+def normalize_file_language_metadata_from_scan(
+    assembled: dict[str, Any],
+    scan_result_path: Path,
+) -> tuple[int, list[str]]:
+    """Normalize file-node language tags from the deterministic scan result.
+
+    File-analyzer agents sometimes infer the language from the filename
+    extension when writing free-form tags/summaries. Project-level tree-sitter
+    aliases deliberately override that extension (for example `.phtml` -> `php`),
+    so the final graph should reflect the scan result's language, not the raw
+    suffix.
+    """
+    if not scan_result_path.is_file():
+        return 0, [f"  language metadata normalization skipped — {scan_result_path.name} not found"]
+
+    try:
+        scan = json.loads(scan_result_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        return 0, [f"  language metadata normalization skipped — could not parse {scan_result_path.name}: {e}"]
+
+    files = scan.get("files")
+    if not isinstance(files, list):
+        return 0, [f"  language metadata normalization skipped — no files array in {scan_result_path.name}"]
+
+    language_by_path: dict[str, str] = {}
+    for file_meta in files:
+        if not isinstance(file_meta, dict):
+            continue
+        path = file_meta.get("path")
+        language = file_meta.get("language")
+        if isinstance(path, str) and path and isinstance(language, str) and language:
+            language_by_path[path] = language.lower()
+
+    normalized = 0
+    generic_summary_rewrites = 0
+
+    for node in assembled.get("nodes", []):
+        if not isinstance(node, dict) or node.get("type") != "file":
+            continue
+        file_path = node.get("filePath")
+        if not isinstance(file_path, str) or not file_path:
+            continue
+        language = language_by_path.get(file_path)
+        if not language:
+            continue
+
+        suffix = Path(file_path).suffix.lower().lstrip(".")
+        if not suffix or suffix == language:
+            continue
+
+        changed = False
+        tags = node.get("tags")
+        if isinstance(tags, list):
+            new_tags: list[Any] = []
+            removed_suffix_tag = False
+            has_language_tag = False
+            for tag in tags:
+                if isinstance(tag, str):
+                    tag_l = tag.lower()
+                    if tag_l == language:
+                        has_language_tag = True
+                    if tag_l == suffix:
+                        removed_suffix_tag = True
+                        changed = True
+                        continue
+                new_tags.append(tag)
+            if removed_suffix_tag and not has_language_tag:
+                new_tags.append(language)
+                changed = True
+            node["tags"] = new_tags
+
+        summary = node.get("summary")
+        if isinstance(summary, str) and summary:
+            # Common fallback emitted by file-analyzer when it does not inspect
+            # the source deeply: "code phtml file at path." Preserve richer
+            # summaries; only correct this generic extension-derived wording.
+            pattern = re.compile(rf"\b(code|script|markup)\s+{re.escape(suffix)}\s+file\s+at\b", re.IGNORECASE)
+            updated_summary = pattern.sub(rf"\1 {language} file at", summary)
+            if updated_summary != summary:
+                node["summary"] = updated_summary
+                generic_summary_rewrites += 1
+                changed = True
+
+        if changed:
+            normalized += 1
+
+    return normalized, [
+        f"  Normalized {normalized} file node(s) using scan-result languages",
+        f"  Rewrote {generic_summary_rewrites} generic extension-derived summary field(s)",
+    ]
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1230,6 +1322,14 @@ def main() -> None:
         report.append("")
         report.append("Imports edge recovery:")
         report.extend(recovery_report)
+
+    normalized_language_nodes, language_metadata_report = normalize_file_language_metadata_from_scan(
+        assembled, scan_result_path
+    )
+    if language_metadata_report:
+        report.append("")
+        report.append("File language metadata normalization:")
+        report.extend(language_metadata_report)
 
     # Print report
     print("", file=sys.stderr)

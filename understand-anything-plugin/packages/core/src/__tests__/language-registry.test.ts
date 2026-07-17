@@ -33,6 +33,19 @@ describe("LanguageRegistry", () => {
     expect(registry.getForFile("file.unknown")).toBeNull();
   });
 
+  it("registers extension aliases for existing languages", () => {
+    const registry = LanguageRegistry.createDefault();
+    registry.registerExtensionAlias(".customts", "typescript");
+    expect(registry.getForFile("src/component.customts")?.id).toBe("typescript");
+  });
+
+  it("throws when aliasing an unknown language id", () => {
+    const registry = LanguageRegistry.createDefault();
+    expect(() => registry.registerExtensionAlias(".custom", "not-a-language")).toThrow(
+      'unknown language "not-a-language"',
+    );
+  });
+
   it("returns null for files without extensions and no filename match", () => {
     const registry = new LanguageRegistry();
     expect(registry.getForFile("SOMEFILE")).toBeNull();

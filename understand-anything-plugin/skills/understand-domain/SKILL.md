@@ -1,7 +1,7 @@
 ---
 name: understand-domain
 description: Extract business domain knowledge from a codebase and generate an interactive domain flow graph. Works standalone (lightweight scan) or derives from an existing /understand knowledge graph.
-argument-hint: "[--full]"
+argument-hint: "[--full|--language <lang>]"
 ---
 
 # /understand-domain
@@ -13,6 +13,7 @@ Extracts business domain knowledge — domains, business flows, and process step
 - If a knowledge graph already exists (`.ua/knowledge-graph.json`, or the legacy `.understand-anything/knowledge-graph.json` when that directory is present), derives domain knowledge from it (cheap, no file scanning)
 - If no knowledge graph exists, performs a lightweight scan: file tree + entry point detection + sampled files
 - Use `--full` flag to force a fresh scan even if a knowledge graph exists
+- Output language defaults to `.understand-anything/config.json` `outputLanguage`; override with `--language <lang>` for this run and persist it
 
 ## Instructions
 
@@ -92,6 +93,19 @@ fi
 
 Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases.
 
+### Phase 0.5: Resolve output language
+
+1. Read `$PROJECT_ROOT/.understand-anything/config.json` if it exists.
+2. Parse `$ARGUMENTS` for `--language <lang>`:
+   - If provided, set `$OUTPUT_LANGUAGE` to that value and merge `{"outputLanguage":"<lang>"}` back into `config.json` while preserving existing keys.
+   - If not provided, use `outputLanguage` from config when present.
+   - If still empty, set `$OUTPUT_LANGUAGE=en`.
+3. Build `$LANGUAGE_DIRECTIVE`:
+
+```markdown
+> **Language directive**: Generate all textual content in **{language}**. This includes `project.description`, every node `name`, node `summary`, edge `description` (if present), and all free-text business/domain fields. Keep fixed schema keys, enum values, and IDs unchanged.
+```
+
 ### Phase 1: Detect Existing Graph
 
 1. Check if `$UA_DIR/knowledge-graph.json` exists
@@ -129,7 +143,7 @@ The preprocessing script does NOT produce a domain graph — it produces **raw m
 ### Phase 4: Domain Analysis
 
 1. Read the domain-analyzer agent prompt from `$PLUGIN_ROOT/agents/domain-analyzer.md`
-2. Dispatch a subagent with the domain-analyzer prompt + the context from Phase 2 or 3
+2. Dispatch a subagent with the domain-analyzer prompt + the context from Phase 2 or 3 + `$LANGUAGE_DIRECTIVE`
 3. The agent writes its output to `$UA_DIR/intermediate/domain-analysis.json`
 
 ### Phase 5: Validate and Save
