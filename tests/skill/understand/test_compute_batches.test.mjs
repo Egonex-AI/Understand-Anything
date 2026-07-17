@@ -774,23 +774,30 @@ describe('compute-batches.mjs — --changed-files', () => {
     if (root) rmSync(root, { recursive: true, force: true });
   });
 
-  it('emits only changed files from retained batches with Windows-style changed-file paths', () => {
+  it('emits only changed files from retained batches with platform-native changed-file paths', () => {
     root = setupProject('scan-result-3-cliques.json');
     materializeRetainedInventory(root);
     mkdirSync(join(root, 'src', 'auth'), { recursive: true });
     writeFileSync(join(root, 'src', 'auth', 'login.ts'), 'export const login = true;\n');
     writeFileSync(join(root, 'src', 'auth', 'tokens.ts'), 'export const tokens = true;\n');
-    // Only two files in the auth clique are changed. Use CRLF plus one
-    // backslash path to cover Windows git diff/path-list inputs.
+    // Only two files in the auth clique are changed. Use CRLF on every
+    // platform and a backslash path on Windows.
+    const loginPath = process.platform === 'win32'
+      ? 'src\\auth\\login.ts'
+      : 'src/auth/login.ts';
     const changedPath = writeLegacyChangedList(
       root,
-      ['src\\auth\\login.ts', 'src/auth/tokens.ts'],
+      [loginPath, 'src/auth/tokens.ts'],
     );
 
     const result = runScript(root, [`--changed-files=${changedPath}`]);
     expect(result.status).toBe(0);
 
     const out = readBatches(root);
+    expect(out.effectiveChangedFiles).toEqual([
+      'src/auth/login.ts',
+      'src/auth/tokens.ts',
+    ]);
     // Auth files are retained, but the unchanged auth file from the original
     // full-graph batch must not be analyzed in changed-files mode.
     const allPaths = out.batches.flatMap(b => b.files.map(f => f.path));
@@ -1045,7 +1052,11 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     }],
     ['refreshes once for rename-old plus rename-new and analyzes only the new path', {
       inventoryPaths: ['src/existing.ts', 'src/original.ts'], diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/renamed.ts']),
-      changedFiles: ['src/original.ts', 'src\\renamed.ts'], reason: 'file removed',
+      changedFiles: [
+        'src/original.ts',
+        process.platform === 'win32' ? 'src\\renamed.ts' : 'src/renamed.ts',
+      ],
+      reason: 'file removed',
       expectedInventory: ['src/existing.ts', 'src/renamed.ts'],
       effectiveChangedFiles: ['src/original.ts', 'src/renamed.ts'], batchedFiles: ['src/renamed.ts'],
     }],
@@ -1372,7 +1383,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
 
   it.each([
     ['duplicate inventory paths', scan => scan.files.push({ ...scan.files[0] }), /duplicate retained inventory path/],
-    ['non-normalized inventory paths', scan => { scan.files[0].path = 'src\\existing.ts'; }, /invalid retained inventory path/],
+    ['non-normalized inventory paths', scan => { scan.files[0].path = 'src//existing.ts'; }, /invalid retained inventory path/],
     ['non-normalized exclude patterns', scan => { scan.excludePatterns = [' tests/** ']; }, /excludePatterns must be an array/],
   ])('fails closed on %s even when the changed-file list is empty', (_title, mutate, message) => {
     project = setupIncrementalProject();
