@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: "[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>]"
+argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>|--exclude <patterns>]"]
 ---
 
 # /understand
@@ -16,6 +16,7 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in the pr
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `$UA_DIR/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `$UA_DIR/config.json` for consistency across incremental updates.
+  - `--exclude <patterns>` — Comma-separated glob patterns for additional files/directories to exclude from analysis (e.g., `--exclude "tests/*,docs/*"`). These patterns take highest priority over built-in defaults and `.understandignore` rules. Supports gitignore syntax including `!` negation.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
 
 ---
@@ -162,7 +163,14 @@ Determine whether to run a full analysis or incremental update.
       > **Language directive**: Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in **{language}**. Maintain technical accuracy while using natural, native-level phrasing in the target language. Keep technical terms in English when no standard translation exists (e.g., "middleware", "hook", "barrel").
       ```
 
- 4. **Check for subdomain knowledge graphs to merge:**
+ 3.7. **Exclude patterns:**
+    - Parse `$ARGUMENTS` for `--exclude <patterns>` flag. If found, extract the comma-separated patterns string.
+    - Split on commas, trim whitespace from each pattern, and filter out empty entries.
+    - Store the patterns as `$EXCLUDE_PATTERNS` (comma-joined for passing to downstream scripts: `"tests/*,docs/*"`).
+    - These patterns take highest priority — they are applied on top of default patterns and `.understandignore` rules. Use `!` prefix to force-include files that would otherwise be excluded.
+    - **Note:** Newly added `--exclude` patterns require a `--full` scan to take effect.
+
+4. **Check for subdomain knowledge graphs to merge:**
    List all `*knowledge-graph*.json` files in `$UA_DIR/` **excluding** `knowledge-graph.json` itself (e.g. `frontend-knowledge-graph.json`, `backend-knowledge-graph.json`). If any subdomain graphs exist, run the merge script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
    ```bash
    python "<SKILL_DIR>/merge-subdomain-graphs.py" "$PROJECT_ROOT"
@@ -247,6 +255,8 @@ Pass these parameters in the dispatch prompt:
 > Scan this project directory to discover all project files (including non-code files like configs, docs, infrastructure), detect languages and frameworks.
 > Project root: `$PROJECT_ROOT`
 > Write output to: `$UA_DIR/intermediate/scan-result.json`
+>
+> Exclude patterns (from --exclude CLI flag; pass to scan-project.mjs via --exclude): $EXCLUDE_PATTERNS
 
 After the subagent completes, read `$UA_DIR/intermediate/scan-result.json` to get:
 - Project name, description
@@ -261,7 +271,7 @@ Store the file list as `$FILE_LIST` with `fileCategory` metadata for use in Phas
 **Gate check:** If >100 files, inform the user and suggest scoping with a subdirectory argument. Proceed only if user confirms or add guidance that this may take a while.
 
 If the scan result includes `filteredByIgnore > 0`, report:
-> Excluded {filteredByIgnore} files via `.understandignore`.
+> Excluded {filteredByIgnore} files via user-provided ignore rules.
 
 ---
 

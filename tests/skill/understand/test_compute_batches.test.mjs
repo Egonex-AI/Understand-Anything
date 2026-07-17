@@ -70,6 +70,7 @@ function incrementalDiskFiles(paths) {
 function setupIncrementalProject({
   inventoryPaths = ['src/existing.ts'],
   diskFiles = { 'src/existing.ts': 'export const existing = true;\n' },
+  excludePatterns,
 } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'ua-cb-incremental-'));
   const dataDir = join(root, '.understand-anything');
@@ -94,6 +95,7 @@ function setupIncrementalProject({
     estimatedComplexity: 'small',
     importMap: Object.fromEntries(inventoryPaths.map(path => [path, []])),
   };
+  if (excludePatterns !== undefined) scan.excludePatterns = excludePatterns;
   const scanPath = join(intermediateDir, 'scan-result.json');
   writeFileSync(scanPath, `${JSON.stringify(scan, null, 2)}\n`);
 
@@ -153,6 +155,9 @@ function runIncrementalCase(project, testCase) {
   expect(result.stderr.match(/refresh-scan-result:/g)).toHaveLength(1);
   if (testCase.summary) expect(result.stderr).toMatch(testCase.summary);
   const { scan, batches } = readIncrementalArtifacts(project);
+  if (testCase.excludePatterns !== undefined) {
+    expect(scan.excludePatterns).toEqual(testCase.excludePatterns);
+  }
   expect(scan.files.map(file => file.path).sort()).toEqual(testCase.expectedInventory);
   expect(Object.keys(scan.importMap).sort()).toEqual(testCase.expectedInventory);
   expect(scan.importMap).toMatchObject(testCase.expectedImports ?? {});
@@ -885,6 +890,27 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     }],
   ])('%s', (_title, testCase) => {
     project = setupIncrementalProject(testCase);
+    runIncrementalCase(project, testCase);
+  }, 15_000);
+
+  it('preserves CLI --exclude patterns during incremental inventory refresh', () => {
+    const testCase = {
+      inventoryPaths: ['src/existing.ts'],
+      diskFiles: incrementalDiskFiles([
+        'src/existing.ts',
+        'src/added.ts',
+        'tests/excluded.ts',
+      ]),
+      excludePatterns: ['tests/**'],
+      changedFiles: ['src/added.ts'],
+      reason: 'file added',
+      expectedInventory: ['src/added.ts', 'src/existing.ts'],
+      effectiveChangedFiles: ['src/added.ts'],
+      batchedFiles: ['src/added.ts'],
+      summary: /files=2 added=1 removed=0 importEdges=0/,
+    };
+    project = setupIncrementalProject(testCase);
+
     runIncrementalCase(project, testCase);
   }, 15_000);
 

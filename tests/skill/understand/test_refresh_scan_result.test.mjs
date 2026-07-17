@@ -56,11 +56,12 @@ function previousScan(files = [file('src/existing.ts')]) {
   };
 }
 
-function inventory(files, totalFiles = files.length) {
+function inventory(files, totalFiles = files.length, excludePatterns = []) {
   return {
     scriptCompleted: true, files, totalFiles,
     filteredByIgnore: 0,
     estimatedComplexity: 'small',
+    excludePatterns,
   };
 }
 
@@ -225,6 +226,69 @@ describe('refresh-scan-result.mjs CLI integration', () => {
     expect(second.status, second.stderr).toBe(0);
     expect(readFileSync(project.scanPath)).toEqual(firstBytes);
   }, 15_000);
+
+  it('treats a missing retained excludePatterns field as an empty array', () => {
+    const project = setupProject();
+
+    refresh(project.root, pipelineOverrides());
+
+    expect(readJson(project.scanPath).excludePatterns).toEqual([]);
+  });
+
+  it('forwards retained exclude patterns to the scanner and preserves them', () => {
+    const excludePatterns = ['tests/**', 'docs/*.md'];
+    const project = setupProject({
+      previous: { ...previousScan(), excludePatterns },
+    });
+    const inventoryValue = inventory(
+      [file('src/existing.ts'), file('src/added.ts')],
+      2,
+      excludePatterns,
+    );
+    const overrides = pipelineOverrides({ inventoryValue });
+    const calls = [];
+    const runPipeline = overrides.runBundledScript;
+    overrides.runBundledScript = (scriptPath, args, label) => {
+      calls.push({ scriptName: basename(scriptPath), args: [...args] });
+      return runPipeline(scriptPath, args, label);
+    };
+
+    refresh(project.root, overrides);
+
+    const scanCall = calls.find(call => call.scriptName === 'scan-project.mjs');
+    expect(scanCall.args.slice(2)).toEqual([
+      '--exclude',
+      'tests/**,docs/*.md',
+    ]);
+    expect(readJson(project.scanPath).excludePatterns).toEqual(excludePatterns);
+  });
+
+  it('rejects refreshed inventory whose excludePatterns differ from retained state', () => {
+    const project = setupProject({
+      previous: { ...previousScan(), excludePatterns: ['tests/**'] },
+    });
+
+    expect(() => refresh(project.root, pipelineOverrides()))
+      .toThrow(/excludePatterns.*match/i);
+    expect(readJson(project.scanPath).excludePatterns).toEqual(['tests/**']);
+    assertNoOwnedTemps(project);
+  });
+
+  it.each([
+    ['a non-array value', 'tests/**'],
+    ['a non-string member', ['tests/**', 42]],
+    ['an empty member', ['']],
+    ['an untrimmed member', [' tests/**']],
+    ['a comma-delimited member', ['tests/**,docs/**']],
+  ])('rejects retained excludePatterns with %s', (_label, excludePatterns) => {
+    const project = setupProject({
+      previous: { ...previousScan(), excludePatterns },
+    });
+
+    expect(() => refresh(project.root, pipelineOverrides()))
+      .toThrow(/excludePatterns/i);
+    assertNoOwnedTemps(project);
+  });
 
   it.each([
     ['invalid JSON', '{ invalid old scan', /refresh-scan-result.*scan-result.*JSON/i],

@@ -58,11 +58,11 @@ const _runScriptOutputDirs = [];
  * { status, stdout, stderr, output } where `output` is the parsed JSON
  * written by the script (or null on failure).
  */
-function runScript(projectRoot) {
+function runScript(projectRoot, extraArgs = []) {
   const outputDir = mkdtempSync(join(tmpdir(), 'ua-scan-out-'));
   _runScriptOutputDirs.push(outputDir);
   const outputPath = join(outputDir, 'scan-output.json');
-  const result = spawnSync(process.execPath, [SCRIPT, projectRoot, outputPath], {
+  const result = spawnSync(process.execPath, [SCRIPT, projectRoot, outputPath, ...extraArgs], {
     encoding: 'utf-8',
   });
   let output = null;
@@ -473,6 +473,68 @@ describe('scan-project.mjs — .understandignore handling', () => {
   });
 });
 
+describe('scan-project.mjs — CLI --exclude', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('applies comma-separated --exclude patterns and counts only additional drops', () => {
+    projectRoot = setupTree({
+      'src/keep.ts': 'export const keep = true;\n',
+      'src/drop.ts': 'export const drop = true;\n',
+      'docs/drop.md': '# excluded\n',
+      'debug.log': 'default-only drop\n',
+    });
+
+    const r = runScript(projectRoot, [
+      '--exclude',
+      ' src/drop.ts, , docs/** ,',
+    ]);
+
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.output.excludePatterns).toEqual(['src/drop.ts', 'docs/**']);
+    expect(byPath(r.output, 'src/keep.ts')).toBeDefined();
+    expect(byPath(r.output, 'src/drop.ts')).toBeUndefined();
+    expect(byPath(r.output, 'docs/drop.md')).toBeUndefined();
+    expect(byPath(r.output, 'debug.log')).toBeUndefined();
+    expect(r.output.filteredByIgnore).toBe(2);
+  });
+
+  it.each([
+    ['Git', true],
+    ['fallback walker', false],
+  ])('keeps reserved roots hard-excluded and uncounted despite CLI negation via %s enumeration',
+    (_label, gitInit) => {
+      projectRoot = setupTree({
+        '.ua/knowledge-graph.json': '{}\n',
+        '.understand-anything/meta.json': '{}\n',
+        'src/.ua/example.ts': 'export const nested = true;\n',
+        'src/index.ts': 'export const keep = true;\n',
+      }, { gitInit });
+
+      const r = runScript(projectRoot, [
+        '--exclude',
+        '!.ua/**,!.understand-anything/**',
+      ]);
+
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.output.excludePatterns).toEqual([
+        '!.ua/**',
+        '!.understand-anything/**',
+      ]);
+      expect(byPath(r.output, '.ua/knowledge-graph.json')).toBeUndefined();
+      expect(byPath(r.output, '.understand-anything/meta.json')).toBeUndefined();
+      expect(byPath(r.output, 'src/.ua/example.ts')).toBeDefined();
+      expect(byPath(r.output, 'src/index.ts')).toBeDefined();
+      expect(r.output.filteredByIgnore).toBe(0);
+    });
+});
+
 describe('scan-project.mjs — reserved root data directories', () => {
   let projectRoot;
 
@@ -875,6 +937,7 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(r.status).toBe(0);
     const out = r.output;
     expect(out.scriptCompleted).toBe(true);
+    expect(out.excludePatterns).toEqual([]);
     expect(Array.isArray(out.files)).toBe(true);
     expect(typeof out.totalFiles).toBe('number');
     expect(out.totalFiles).toBe(out.files.length);

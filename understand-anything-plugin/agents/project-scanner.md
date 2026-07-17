@@ -54,6 +54,8 @@ If the manifest is missing or malformed, leave the corresponding field empty rat
 
 Invoke the bundled scan script. It walks the project (preferring `git ls-files`, falling back to a recursive walk for non-git directories), applies `.understandignore` filtering (defaults + user patterns), assigns `language` and `fileCategory` per the canonical tables, counts lines, and writes deterministic JSON. You do not see or maintain those tables — they live in the script.
 
+If the dispatch prompt includes exclude patterns, append `--exclude "<patterns>"` to the invocation (patterns should be comma-separated; the script splits them internally).
+
 Resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` for every path below:
 
 ```bash
@@ -64,11 +66,21 @@ node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
   "$UA_DIR/tmp/ua-scan-files.json"
 ```
 
+With exclude patterns (add the `--exclude` flag after the output path):
+
+```bash
+node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
+  "$PROJECT_ROOT" \
+  "$UA_DIR/tmp/ua-scan-files.json" \
+  --exclude "tests/*,docs/*"
+```
+
 Output JSON shape (you will read this verbatim and merge into the final scan-result):
 
 ```json
 {
   "scriptCompleted": true,
+  "excludePatterns": ["tests/*", "docs/*"],
   "files": [
     {"path": "src/index.ts", "language": "typescript", "sizeLines": 150, "fileCategory": "code"},
     {"path": "README.md", "language": "markdown", "sizeLines": 45, "fileCategory": "docs"},
@@ -90,7 +102,8 @@ The script:
 - sorts `files` by `path.localeCompare` (deterministic)
 - emits `fileCategory ∈ {code, config, docs, infra, data, script, markup}` per file (priority-ordered per the rules below)
 - emits `language` as a non-null string for every file (canonical id for known extensions, lowercased extension for unknowns, `"unknown"` for no-extension files that don't match `Dockerfile` / `Makefile` / `Jenkinsfile`)
-- counts `filteredByIgnore` as the delta beyond hardcoded defaults — `!`-negation in `.understandignore` correctly re-includes files
+- emits the normalized CLI patterns as `excludePatterns` for retained incremental-refresh state
+- counts `filteredByIgnore` as the user-provided-rule delta beyond hardcoded defaults; final `!`-negation from `.understandignore` or `--exclude` correctly re-includes files
 - emits `Warning: scan-project: <path> — <reason> — file skipped from output` on stderr for per-file failures (permission denied, malformed unicode, vanished file). Capture these and append to phase warnings.
 - emits `scan-project: filesScanned=… filteredByIgnore=… complexity=…` as the final stderr summary line; informational only.
 
@@ -110,7 +123,7 @@ The script:
 
 **Priority rule:** most-specific wins. Filename / path rules fire before extension rules — e.g., `docker-compose.yml` is `infra` (not `config`); `.github/workflows/ci.yml` is `infra` (not `config`); `LICENSE` is `code` (not `docs`).
 
-**`.understandignore` behavior:** the bundled script reads `.understandignore` and the data directory's `.understandignore` (`.ua/.understandignore`, or `.understand-anything/.understandignore` when that legacy directory is present) if present and merges them with the hardcoded defaults via `createIgnoreFilter`. `!`-negation overrides defaults (`!dist/` would re-include `dist/` files). The `filteredByIgnore` counter measures only user-driven drops, not baseline default drops.
+**Ignore behavior:** the bundled script reads `.understandignore` and the data directory's `.understandignore` (`.ua/.understandignore`, or `.understand-anything/.understandignore` when that legacy directory is present), then applies CLI `--exclude` patterns last. `!`-negation can override earlier rules (`!dist/` would re-include `dist/` files). The `filteredByIgnore` counter measures only user-driven drops, not baseline default drops.
 
 If the script exits with a non-zero status, read stderr to diagnose. You have up to 2 retry attempts (re-invocations) before failing the phase. Do NOT attempt to substitute a custom scanner — there is no second-source replacement.
 
@@ -170,13 +183,13 @@ Read the output JSON and merge the `importMap` field directly into your final sc
 ## Phase 2 -- Description and Final Assembly
 
 After Steps A + B + C have all completed, read:
-1. `$UA_DIR/tmp/ua-scan-files.json` — output of `scan-project.mjs` (file list with language, sizeLines, fileCategory; plus `totalFiles`, `filteredByIgnore`, `estimatedComplexity`).
+1. `$UA_DIR/tmp/ua-scan-files.json` — output of `scan-project.mjs` (file list with language, sizeLines, fileCategory; plus `excludePatterns`, `totalFiles`, `filteredByIgnore`, `estimatedComplexity`).
 2. `$UA_DIR/tmp/ua-import-map-output.json` — output of `extract-import-map.mjs` (the `importMap` field).
 3. Your Step A in-memory notes (`name`, `rawDescription`, `readmeHead`, `frameworks`, `languages` narrative).
 
 Do NOT re-walk the file tree, re-count lines, or re-derive categories — trust `scan-project.mjs` entirely. Do NOT re-implement import resolution — trust `extract-import-map.mjs` entirely.
 
-**IMPORTANT:** The final output must NOT contain the `scriptCompleted` or `stats` fields from either bundled script, nor your transient `rawDescription` / `readmeHead` work-strings. Strip them when assembling the final JSON. The final `importMap` MUST equal the `importMap` field from `extract-import-map.mjs` verbatim (do not edit, re-sort, or filter it). The final `files` array MUST equal Step B's `files` array verbatim (do not re-order, drop, or augment it).
+**IMPORTANT:** The final output must NOT contain the `scriptCompleted` or `stats` fields from either bundled script, nor your transient `rawDescription` / `readmeHead` work-strings. Strip them when assembling the final JSON. The final `importMap` MUST equal the `importMap` field from `extract-import-map.mjs` verbatim (do not edit, re-sort, or filter it). The final `files` array and `excludePatterns` array MUST equal their Step B values verbatim (do not re-order, drop, or augment them).
 
 Your only synthesis task in this phase is the final `description` field:
 
@@ -193,6 +206,7 @@ Then assemble the final output JSON:
   "description": "Brief description from README or package.json",
   "languages": ["markdown", "typescript", "yaml"],
   "frameworks": ["React", "Vite", "Vitest", "Docker"],
+  "excludePatterns": ["tests/*", "docs/*"],
   "files": [
     {"path": "src/index.ts", "language": "typescript", "sizeLines": 150, "fileCategory": "code"},
     {"path": "README.md", "language": "markdown", "sizeLines": 45, "fileCategory": "docs"},
@@ -212,6 +226,7 @@ Then assemble the final output JSON:
 - `description` (string): your synthesized 1-2 sentence description
 - `languages` (string[]): from your Step A narrative work (deduplicated, sorted alphabetically; cross-checked against Step B's `stats.byLanguage` keys)
 - `frameworks` (string[]): from your Step A narrative work; only confirmed frameworks (empty array if none detected)
+- `excludePatterns` (string[]): directly from Step B, preserving its normalized order verbatim
 - `files` (object[]): directly from Step B's `files[]` (verbatim, including `fileCategory`)
 - `totalFiles` (integer): directly from Step B
 - `filteredByIgnore` (integer): directly from Step B

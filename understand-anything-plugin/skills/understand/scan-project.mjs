@@ -26,13 +26,18 @@
  *   - Complexity estimation (project-scanner.md Step 7 thresholds)
  *
  * Usage:
- *   node scan-project.mjs <projectRoot> <outputPath>
+ *   node scan-project.mjs <projectRoot> <outputPath> [--exclude <patterns>]
+ *
+ *   --exclude <patterns>  Comma-separated glob patterns to additionally exclude.
+ *                         These take highest priority over built-in defaults and
+ *                         .understandignore rules. Supports gitignore syntax.
  *
  * Output JSON (subset of what project-scanner.md Phase 1 expects — the LLM
  * agent merges this with Step A's narrative fields and Step C's importMap to
  * produce the final scan-result.json):
  *   {
  *     "scriptCompleted": true,
+ *     "excludePatterns": ["tests/**"],
  *     "files": [{ "path": "...", "language": "...", "sizeLines": N, "fileCategory": "..." }, ...],
  *     "totalFiles": N,
  *     "filteredByIgnore": M,
@@ -586,8 +591,8 @@ function enumerateFiles(projectRoot) {
 // Filter accounting
 //
 // The project-scanner.md contract requires `filteredByIgnore` to count files
-// dropped *specifically* by user `.understandignore` patterns (the delta
-// beyond what the hardcoded defaults would have removed). We accomplish this
+// dropped specifically by user-provided ignore rules (the delta beyond what
+// the hardcoded defaults would have removed). We accomplish this
 // by building TWO filters:
 //   - `defaultOnly`: defaults only, no user patterns
 //   - `combined`: defaults + user patterns (createIgnoreFilter)
@@ -601,7 +606,7 @@ function enumerateFiles(projectRoot) {
 
 /**
  * Build a defaults-only IgnoreFilter — same patterns as createIgnoreFilter
- * would apply, minus any user .understandignore content. We synthesize this
+ * would apply, minus user .understandignore and CLI content. We synthesize this
  * via a temp directory with no .understandignore files so the core function
  * still drives the matcher. (Re-implementing the ignore-package wiring here
  * would risk subtle behavior drift from core's matcher.)
@@ -693,10 +698,25 @@ function assertProjectPathContained(projectRootReal, absPath, relativePath) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  const [, , projectRoot, outputPath] = process.argv;
+  // Parse CLI arguments: <projectRoot> <outputPath> [--exclude <patterns>]
+  let projectRoot, outputPath, excludePatterns = [];
+  for (let i = 2; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg === '--exclude' && i + 1 < process.argv.length) {
+      excludePatterns = process.argv[++i]
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
+    } else if (!projectRoot) {
+      projectRoot = arg;
+    } else if (!outputPath) {
+      outputPath = arg;
+    }
+  }
+
   if (!projectRoot || !outputPath) {
     process.stderr.write(
-      'Usage: node scan-project.mjs <projectRoot> <outputPath>\n',
+      'Usage: node scan-project.mjs <projectRoot> <outputPath> [--exclude <patterns>]\n',
     );
     process.exit(1);
   }
@@ -720,10 +740,10 @@ async function main() {
   const candidates = enumerateFiles(projectRoot);
 
   // 2. Hard-exclude reserved root data directories, then filter via
-  //    createIgnoreFilter (defaults + user .understandignore). Build a
-  //    defaults-only filter in parallel to count user-driven drops.
-  const combined = createIgnoreFilter(projectRoot);
-  const userIgnoresPresent = hasUserIgnoreFile(projectRoot);
+  //    createIgnoreFilter (defaults + user .understandignore + CLI --exclude).
+  //    Build a defaults-only filter in parallel to count user-driven drops.
+  const combined = createIgnoreFilter(projectRoot, excludePatterns);
+  const userIgnoresPresent = hasUserIgnoreFile(projectRoot) || excludePatterns.length > 0;
   const defaultsOnly = userIgnoresPresent ? buildDefaultsOnlyFilter() : combined;
 
   let filteredByIgnore = 0;
@@ -794,6 +814,7 @@ async function main() {
 
   const output = {
     scriptCompleted: true,
+    excludePatterns,
     files: fileEntries,
     totalFiles: fileEntries.length,
     filteredByIgnore,

@@ -48,6 +48,24 @@ function isPlainObject(value) {
     && Object.getPrototypeOf(value) === Object.prototype;
 }
 
+function validateExcludePatterns(value, label, { allowMissing = false } = {}) {
+  if (value === undefined && allowMissing) return [];
+  if (
+    !Array.isArray(value)
+    || value.some(pattern => (
+      typeof pattern !== 'string'
+      || pattern.length === 0
+      || pattern.trim() !== pattern
+      || pattern.includes(',')
+    ))
+  ) {
+    throw new Error(
+      `${label} excludePatterns must be an array of normalized non-empty strings`,
+    );
+  }
+  return value;
+}
+
 function readJson(path, label) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
@@ -88,6 +106,7 @@ export function validateInventory(value) {
   if (value.scriptCompleted !== true) {
     throw new Error('inventory scriptCompleted must be true');
   }
+  validateExcludePatterns(value.excludePatterns, 'inventory');
   if (!Array.isArray(value.files)) {
     throw new Error('inventory files must be an array');
   }
@@ -225,6 +244,7 @@ export function validateImportResult(value, filePaths) {
 export function buildRefreshedScan(previous, inventory, importResult) {
   const refreshed = {
     ...previous,
+    excludePatterns: inventory.excludePatterns,
     files: inventory.files,
     totalFiles: inventory.totalFiles,
     filteredByIgnore: inventory.filteredByIgnore,
@@ -269,6 +289,11 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
   ) {
     throw new Error('refresh-scan-result: old scan-result must be an object with files array');
   }
+  const excludePatterns = validateExcludePatterns(
+    previous.excludePatterns,
+    'retained scan',
+    { allowMissing: true },
+  );
 
   const ops = {
     runBundledScript,
@@ -299,10 +324,20 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
 
   mkdirSync(tmpDir, { recursive: true });
   try {
-    ops.runBundledScript(SCAN_SCRIPT, [projectRoot, inventoryPath], 'scan-project');
+    const scanArgs = [projectRoot, inventoryPath];
+    if (excludePatterns.length > 0) {
+      scanArgs.push('--exclude', excludePatterns.join(','));
+    }
+    ops.runBundledScript(SCAN_SCRIPT, scanArgs, 'scan-project');
 
     const inventory = readJson(inventoryPath, 'inventory');
     validateInventory(inventory);
+    if (
+      inventory.excludePatterns.length !== excludePatterns.length
+      || inventory.excludePatterns.some((pattern, index) => pattern !== excludePatterns[index])
+    ) {
+      throw new Error('inventory excludePatterns must match retained scan');
+    }
     validateInventoryFilesOnDisk(projectRoot, inventory, ops.realpathSync, ops.statSync);
 
     ops.writeFileSync(importInputPath, `${JSON.stringify({
@@ -325,6 +360,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     const writtenCandidate = readJson(candidatePath, 'candidate');
     validateInventory({
       scriptCompleted: true,
+      excludePatterns: writtenCandidate.excludePatterns,
       files: writtenCandidate.files,
       totalFiles: writtenCandidate.totalFiles,
       filteredByIgnore: writtenCandidate.filteredByIgnore,
