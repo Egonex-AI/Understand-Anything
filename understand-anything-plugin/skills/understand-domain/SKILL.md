@@ -95,8 +95,22 @@ Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases
 ### Phase 1: Detect Existing Graph
 
 1. Check if `$UA_DIR/knowledge-graph.json` exists
-2. If it exists AND `--full` was NOT passed → proceed to Phase 3 (derive from graph)
-3. Otherwise → proceed to Phase 2 (lightweight scan)
+2. If it exists AND `--full` was NOT passed, check freshness before deriving from it:
+   - Read `project.gitCommitHash` from the graph metadata as `GRAPH_COMMIT_RAW`. Change to `$PROJECT_ROOT`, resolve it as a commit before using it in any Git diff, compare the resolved commit with `git rev-parse HEAD`, and inspect project-scoped committed and working-tree changes:
+     ```bash
+     GRAPH_COMMIT=$(git rev-parse --verify --end-of-options "${GRAPH_COMMIT_RAW}^{commit}" 2>/dev/null)
+     git rev-parse HEAD
+     git diff --name-only "$GRAPH_COMMIT" HEAD -- .
+     git diff --cached --name-only -- .
+     git diff --name-only -- .
+     git ls-files --others --exclude-standard -- .
+     ```
+   - The `-- .` pathspec is required: commits that only touch a sibling monorepo project must not make this graph stale. A hash mismatch alone is not stale when the project diff is empty.
+   - Ignore the selected data directory (`.ua/` or legacy `.understand-anything/`) in every command's output because it contains generated graph artifacts, not project source drift.
+   - If the committed diff or any working-tree command reports project files, warn that domain extraction may omit those changes. Suggest: Run `/understand` to refresh the knowledge graph.
+   - Run the commit diff only when `GRAPH_COMMIT_RAW` resolves successfully. If the graph commit or Git metadata is missing, invalid, or unavailable, give a brief best-effort warning and continue instead of blocking.
+3. After that preflight, proceed to Phase 3 (derive from graph).
+4. Otherwise, proceed to Phase 2 (lightweight scan). When `--full` is used, skip this preflight because the command performs a fresh scan instead of consuming the existing graph.
 
 ### Phase 2: Lightweight Scan (Path 1)
 
