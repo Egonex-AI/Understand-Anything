@@ -54,6 +54,8 @@ If the manifest is missing or malformed, leave the corresponding field empty rat
 
 Invoke the bundled scan script. It walks the project (preferring `git ls-files`, falling back to a recursive walk for non-git directories), applies `.understandignore` filtering (defaults + user patterns), assigns `language` and `fileCategory` per the canonical tables, counts lines, and writes deterministic JSON. You do not see or maintain those tables — they live in the script.
 
+If the dispatch prompt includes exclude patterns, append `--exclude "<patterns>"` to the invocation (patterns should be comma-separated; the script splits them internally).
+
 Resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` for every path below:
 
 ```bash
@@ -62,6 +64,15 @@ mkdir -p $UA_DIR/tmp
 node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
   "$PROJECT_ROOT" \
   "$UA_DIR/tmp/ua-scan-files.json"
+```
+
+With exclude patterns (add the `--exclude` flag after the output path):
+
+```bash
+node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
+  "$PROJECT_ROOT" \
+  "$UA_DIR/tmp/ua-scan-files.json" \
+  --exclude "tests/*,docs/*"
 ```
 
 Output JSON shape (you will read this verbatim and merge into the final scan-result):

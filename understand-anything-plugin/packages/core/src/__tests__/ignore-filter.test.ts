@@ -152,4 +152,56 @@ describe("IgnoreFilter", () => {
       expect(filter.isIgnored("src/index.ts")).toBe(false);
     });
   });
+
+  describe("createIgnoreFilter with CLI --exclude patterns", () => {
+    it("applies CLI exclude patterns alongside defaults", () => {
+      const filter = createIgnoreFilter(testDir, ["tests/", "e2e/"]);
+      expect(filter.isIgnored("tests/foo.test.ts")).toBe(true);
+      expect(filter.isIgnored("e2e/smoke.spec.ts")).toBe(true);
+      // Defaults still apply
+      expect(filter.isIgnored("node_modules/foo.js")).toBe(true);
+      expect(filter.isIgnored("dist/bundle.js")).toBe(true);
+      // Non-excluded source files pass through
+      expect(filter.isIgnored("src/index.ts")).toBe(false);
+      expect(filter.isIgnored("README.md")).toBe(false);
+    });
+
+    it("CLI patterns have highest priority over .understandignore files", () => {
+      // .understandignore says to include docs/
+      writeFileSync(
+        join(testDir, ".understand-anything", ".understandignore"),
+        "!docs/\n"
+      );
+      // CLI --exclude says to exclude docs/
+      const filter = createIgnoreFilter(testDir, ["docs/"]);
+      // CLI patterns are added last, so they override the ! negation from .understandignore
+      expect(filter.isIgnored("docs/README.md")).toBe(true);
+    });
+
+    it("CLI ! negation can re-include files excluded by defaults", () => {
+      // CLI says to include dist/ even though defaults exclude it
+      const filter = createIgnoreFilter(testDir, ["!dist/"]);
+      expect(filter.isIgnored("dist/bundle.js")).toBe(false);
+      // Other defaults still apply
+      expect(filter.isIgnored("node_modules/foo.js")).toBe(true);
+    });
+
+    it("CLI patterns combined with .understandignore files all apply", () => {
+      writeFileSync(
+        join(testDir, ".understandignore"),
+        "fixtures/\n"
+      );
+      const filter = createIgnoreFilter(testDir, ["e2e/"]);
+      expect(filter.isIgnored("fixtures/data.json")).toBe(true);
+      expect(filter.isIgnored("e2e/smoke.spec.ts")).toBe(true);
+      expect(filter.isIgnored("src/index.ts")).toBe(false);
+    });
+
+    it("empty CLI patterns array has no effect", () => {
+      const filter = createIgnoreFilter(testDir, []);
+      expect(filter.isIgnored("node_modules/foo.js")).toBe(true);
+      expect(filter.isIgnored("src/index.ts")).toBe(false);
+      expect(filter.isIgnored("docs/README.md")).toBe(false);
+    });
+  });
 });
