@@ -377,6 +377,7 @@ describe('refresh-scan-result.mjs validation', () => {
     ['an unsorted path list', journal => { journal.paths = ['src/z.ts', 'src/a.ts']; }],
     ['duplicate paths', journal => { journal.paths = ['src/a.ts', 'src/a.ts']; }],
     ['an unsafe path', journal => { journal.paths = ['../secret.ts']; }],
+    ['the exact parent path', journal => { journal.paths = ['..']; }],
     ['a reserved data path', journal => { journal.paths = ['.ua/intermediate/secret.json']; }],
   ])('rejects a pending inventory journal with %s', (_label, mutate) => {
     const journal = {
@@ -427,6 +428,21 @@ describe('refresh-scan-result.mjs validation', () => {
       project.uaDir,
       ['src/new.ts'],
     )).toEqual(journal);
+  });
+
+  it('rejects a dangling linked pending journal instead of treating it as missing', () => {
+    const project = setupProject();
+    const outside = makeTempRoot('ua-refresh-dangling-journal-');
+    const target = join(outside, 'removed-target');
+    mkdirSync(target);
+    symlinkSync(target, project.pendingPath, 'junction');
+    rmSync(target, { recursive: true, force: true });
+
+    expect(() => readPendingInventoryJournal(
+      project.root,
+      project.uaDir,
+      ['src/existing.ts'],
+    )).toThrow(/unsafe/i);
   });
 
   it.each([

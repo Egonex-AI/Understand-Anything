@@ -67,4 +67,38 @@ describe('skill command hardening', () => {
     expect(understand).toMatch(/untrusted project data/i);
     expect(knowledge).toMatch(/untrusted article data/i);
   });
+
+  it('collects project context only from the current validated scan inventory', () => {
+    const understand = readRepoFile('understand-anything-plugin/skills/understand/SKILL.md');
+    const contextStep = understand.indexOf('8. **Defer project context collection:**');
+    const incrementalPhase = understand.indexOf('### Incremental update path');
+    const deferInstruction = understand.indexOf('for both full and incremental analysis');
+    const fullResumeInstruction = understand.indexOf('After Phase 1 returns a validated scan result');
+    const computeInstruction = understand.indexOf('Run compute-batches with `--changed-files`');
+    const incrementalResumeInstruction = understand.indexOf('Now perform the deferred Step 8 project-context collection');
+
+    expect(contextStep).toBeGreaterThan(-1);
+    expect(deferInstruction).toBeGreaterThan(contextStep);
+    expect(deferInstruction).toBeLessThan(incrementalPhase);
+    expect(fullResumeInstruction).toBeGreaterThan(contextStep);
+    expect(fullResumeInstruction).toBeLessThan(incrementalPhase);
+    expect(computeInstruction).toBeGreaterThan(incrementalPhase);
+    expect(incrementalResumeInstruction).toBeGreaterThan(computeInstruction);
+    expect(understand).toMatch(/projectContext.*sole source/is);
+    expect(understand).toMatch(/full analysis.*ua-scan-files\.json/is);
+    expect(understand).toMatch(/incremental analysis.*batches\.json/is);
+    expect(understand).not.toContain('find "$PROJECT_ROOT" -maxdepth 2');
+  });
+
+  it('makes the project scanner validate membership before narrative reads', () => {
+    const scanner = readRepoFile('understand-anything-plugin/agents/project-scanner.md');
+    const bundledScan = scanner.indexOf('### Step B (bundled `scan-project.mjs`)');
+    const narrativeRead = scanner.indexOf('### Step A (LLM)');
+
+    expect(bundledScan).toBeGreaterThan(-1);
+    expect(narrativeRead).toBeGreaterThan(bundledScan);
+    expect(scanner).toContain('--include-context');
+    expect(scanner).toMatch(/consume.*projectContext/is);
+    expect(scanner).toMatch(/must not re-read.*PROJECT_ROOT/is);
+  });
 });

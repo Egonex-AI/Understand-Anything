@@ -10,24 +10,24 @@
  * minutes of per-run latency on mid-sized monorepos.
  *
  * What the LLM still owns (Step A of project-scanner.md Phase 1):
- *   - Reading README + top-level manifests to synthesize `name`,
- *     `rawDescription`, `readmeHead`, `frameworks`, and the high-level
- *     `languages` narrative.
+ *   - Synthesizing `name`, `rawDescription`, `readmeHead`, `frameworks`, and
+ *     the high-level `languages` narrative from optional `projectContext`.
  *
  * What this script owns:
  *   - File enumeration (git ls-files preferred, recursive walk fallback)
- *   - `.understandignore` filtering (delegated to core's createIgnoreFilter,
- *     which reads the resolved data dir — `.ua/`, or legacy
- *     `.understand-anything/` when that directory already exists)
+ *   - `.understandignore` filtering (validated here, then matched through
+ *     core's createIgnoreFilter)
  *   - Per-file language detection (extension + filename table)
  *   - Per-file category assignment (priority-ordered rules from
  *     project-scanner.md Step 4)
  *   - Line counting
  *   - Complexity estimation (project-scanner.md Step 7 thresholds)
+ *   - Optional project context derived only from validated membership
  *
  * Usage:
- *   node scan-project.mjs <projectRoot> <outputPath> [--exclude <patterns>]
+ *   node scan-project.mjs <projectRoot> <outputPath> [--include-context] [--exclude <patterns>]
  *
+ *   --include-context     Emit bounded README/manifest/tree/entry context.
  *   --exclude <patterns>  Comma-separated glob patterns to additionally exclude.
  *                         These take highest priority over built-in defaults and
  *                         .understandignore rules. Supports gitignore syntax.
@@ -69,7 +69,12 @@ import {
 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
+  closeSync,
   existsSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -77,6 +82,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // skills/understand/ -> plugin root is two dirs up
@@ -614,7 +620,7 @@ function enumerateFiles(projectRoot) {
  * still drives the matcher. (Re-implementing the ignore-package wiring here
  * would risk subtle behavior drift from core's matcher.)
  */
-function buildDefaultsOnlyFilter() {
+function buildIgnoreFilter(patterns = []) {
   // Use the createIgnoreFilter with a path that we KNOW has no .understandignore.
   // `os.tmpdir()`-based fresh dir guarantees no user patterns leak in.
   // The directory doesn't need to exist on disk because createIgnoreFilter
@@ -623,23 +629,100 @@ function buildDefaultsOnlyFilter() {
     require('node:os').tmpdir(),
     `ua-scan-defaults-${process.pid}-${Date.now()}`,
   );
-  return createIgnoreFilter(fakeProjectRoot);
+  return createIgnoreFilter(fakeProjectRoot, patterns);
 }
 
-/**
- * Determine whether `projectRoot` has any user .understandignore files.
- * When neither file exists, the combined and defaults-only filters are
- * identical, so we can skip the dual-filter accounting entirely.
- *
- * Mirrors core's createIgnoreFilter, which reads the resolved data dir —
- * `.ua/`, or legacy `.understand-anything/` when that directory already
- * exists (see resolveUaDir).
- */
-function hasUserIgnoreFile(projectRoot) {
-  return (
-    existsSync(join(projectRoot, '.understandignore'))
-    || existsSync(join(resolveUaDir(projectRoot), '.understandignore'))
+function sameCanonicalPath(left, right) {
+  return process.platform === 'win32'
+    ? left.toLowerCase() === right.toLowerCase()
+    : left === right;
+}
+
+function readSafeIgnoreFile(path, trustedParentReal, label) {
+  let entryStat;
+  try {
+    entryStat = lstatSync(path);
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') {
+      return { present: false, content: null };
+    }
+    throw new Error(`security policy rejected unsafe ${label}`);
+  }
+
+  let realPath;
+  try {
+    realPath = realpathSync(path);
+  } catch {
+    throw new Error(`security policy rejected unsafe ${label}`);
+  }
+  if (
+    entryStat.isSymbolicLink()
+    || !entryStat.isFile()
+    || !isPathWithin(trustedParentReal, realPath)
+  ) {
+    throw new Error(`security policy rejected unsafe ${label}`);
+  }
+
+  let content;
+  try {
+    content = readFileSync(realPath, 'utf8');
+    const afterStat = lstatSync(path);
+    const afterReal = realpathSync(path);
+    if (
+      afterStat.isSymbolicLink()
+      || !afterStat.isFile()
+      || !sameCanonicalPath(realPath, afterReal)
+    ) {
+      throw new Error('changed during read');
+    }
+  } catch {
+    throw new Error(`security policy rejected unsafe ${label}`);
+  }
+  return { present: true, content };
+}
+
+function collectSafeUserIgnoreState(projectRoot, projectRootReal) {
+  const dataDir = resolveUaDir(projectRoot);
+  let dataDirStat;
+  let dataDirReal = null;
+  try {
+    dataDirStat = lstatSync(dataDir);
+  } catch (error) {
+    if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') {
+      throw new Error('security policy rejected unsafe project data directory');
+    }
+  }
+  if (dataDirStat) {
+    try {
+      dataDirReal = realpathSync(dataDir);
+    } catch {
+      throw new Error('security policy rejected unsafe project data directory');
+    }
+    if (
+      dataDirStat.isSymbolicLink()
+      || !dataDirStat.isDirectory()
+      || !isPathWithin(projectRootReal, dataDirReal)
+    ) {
+      throw new Error('security policy rejected unsafe project data directory');
+    }
+  }
+
+  const dataIgnore = dataDirReal === null
+    ? { present: false, content: null }
+    : readSafeIgnoreFile(
+      join(dataDir, '.understandignore'),
+      dataDirReal,
+      'project data .understandignore',
+    );
+  const rootIgnore = readSafeIgnoreFile(
+    join(projectRoot, '.understandignore'),
+    projectRootReal,
+    'root .understandignore',
   );
+  return {
+    patterns: [dataIgnore.content, rootIgnore.content].filter(content => content !== null),
+    present: dataIgnore.present || rootIgnore.present,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -705,6 +788,7 @@ function isPathWithin(rootPath, candidatePath) {
  */
 export function collectProjectMembership(projectRoot, excludePatterns = []) {
   const projectRootReal = realpathSync(projectRoot);
+  const userIgnore = collectSafeUserIgnoreState(projectRoot, projectRootReal);
   const reservedRootReals = ['.ua', '.understand-anything']
     .map(name => join(projectRoot, name))
     .map(path => {
@@ -717,9 +801,9 @@ export function collectProjectMembership(projectRoot, excludePatterns = []) {
     .filter(Boolean)
     .filter(path => isPathWithin(projectRootReal, path));
   const enumeration = enumerateFiles(projectRoot);
-  const combined = createIgnoreFilter(projectRoot, excludePatterns);
-  const userIgnoresPresent = hasUserIgnoreFile(projectRoot) || excludePatterns.length > 0;
-  const defaultsOnly = userIgnoresPresent ? buildDefaultsOnlyFilter() : combined;
+  const combined = buildIgnoreFilter([...userIgnore.patterns, ...excludePatterns]);
+  const userIgnoresPresent = userIgnore.present || excludePatterns.length > 0;
+  const defaultsOnly = userIgnoresPresent ? buildIgnoreFilter() : combined;
   const members = [];
   let filteredByIgnore = 0;
   let degraded = enumeration.degraded;
@@ -754,10 +838,7 @@ export function collectProjectMembership(projectRoot, excludePatterns = []) {
     assertProjectRealPathContained(projectRootReal, realPath, rel);
     if (reservedRootReals.some(root => isPathWithin(root, realPath))) continue;
     try {
-      if (!statSync(realPath).isFile()) {
-        degraded = true;
-        continue;
-      }
+      if (!statSync(realPath).isFile()) continue;
     } catch (error) {
       process.stderr.write(
         `Warning: scan-project: ${rel} — stat failed (${error.message}) `
@@ -778,6 +859,210 @@ export function collectProjectMembership(projectRoot, excludePatterns = []) {
   };
 }
 
+const CONTEXT_READMES = ['README.md', 'README.rst', 'readme.md', 'README'];
+const CONTEXT_MANIFESTS = [
+  'package.json',
+  'pyproject.toml',
+  'Cargo.toml',
+  'go.mod',
+  'pom.xml',
+  'setup.py',
+  'setup.cfg',
+  'Pipfile',
+  'requirements.txt',
+  'Gemfile',
+  'build.gradle',
+  'build.gradle.kts',
+  'composer.json',
+];
+const CONTEXT_ENTRY_POINTS = [
+  'src/index.ts',
+  'src/main.ts',
+  'src/App.tsx',
+  'index.js',
+  'main.py',
+  'manage.py',
+  'app.py',
+  'wsgi.py',
+  'asgi.py',
+  'run.py',
+  '__main__.py',
+  'main.go',
+  /^cmd\/[^/]+\/main\.go$/,
+  'src/main.rs',
+  'src/lib.rs',
+  /^src\/main\/java\/(?:.+\/)?Application\.java$/,
+  'Program.cs',
+  'config.ru',
+  'index.php',
+];
+const CONTEXT_README_MAX_CHARS = 3000;
+const CONTEXT_README_MAX_BYTES = 12 * 1024;
+const CONTEXT_MANIFEST_MAX_BYTES = 16 * 1024;
+const CONTEXT_MANIFEST_TOTAL_MAX_BYTES = 64 * 1024;
+const CONTEXT_UNAVAILABLE_ERROR_CODES = new Set([
+  'EACCES',
+  'EBUSY',
+  'EIO',
+  'EMFILE',
+  'ENFILE',
+  'ENOENT',
+  'ENOTDIR',
+  'EPERM',
+  'ETXTBSY',
+]);
+
+class UnsafeProjectContextError extends Error {}
+
+function readContextMember(
+  projectRoot,
+  projectRootReal,
+  membership,
+  path,
+  maxBytes,
+  maxChars = null,
+  onUnavailable = () => {},
+) {
+  const realPath = membership.realPaths.get(path);
+  if (!realPath) return null;
+
+  const verify = () => {
+    const projectRootPath = resolve(projectRoot);
+    const sourcePath = resolve(projectRootPath, path);
+    if (!isPathWithin(projectRootPath, sourcePath)) {
+      throw new UnsafeProjectContextError();
+    }
+    const stat = lstatSync(sourcePath);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      throw new UnsafeProjectContextError();
+    }
+    const currentRealPath = realpathSync(sourcePath);
+    if (
+      !isPathWithin(projectRootReal, currentRealPath)
+      || !sameCanonicalPath(realPath, currentRealPath)
+    ) {
+      throw new UnsafeProjectContextError();
+    }
+  };
+
+  let descriptor;
+  try {
+    verify();
+    descriptor = openSync(realPath, 'r');
+    const before = fstatSync(descriptor);
+    if (!before.isFile()) throw new UnsafeProjectContextError();
+    const buffer = Buffer.alloc(Math.min(before.size, maxBytes));
+    let bytesRead = 0;
+    while (bytesRead < buffer.length) {
+      const count = readSync(
+        descriptor,
+        buffer,
+        bytesRead,
+        buffer.length - bytesRead,
+        bytesRead,
+      );
+      if (count === 0) break;
+      bytesRead += count;
+    }
+    const after = fstatSync(descriptor);
+    verify();
+    let truncated = before.size > bytesRead || after.size > bytesRead;
+    const decoder = new StringDecoder('utf8');
+    let content = decoder.write(buffer.subarray(0, bytesRead));
+    if (!truncated) content += decoder.end();
+    if (maxChars !== null && content.length > maxChars) {
+      content = content.slice(0, maxChars);
+      truncated = true;
+    }
+    return { content, truncated, bytesRead };
+  } catch (error) {
+    if (
+      !(error instanceof UnsafeProjectContextError)
+      && CONTEXT_UNAVAILABLE_ERROR_CODES.has(error?.code)
+    ) {
+      process.stderr.write(
+        'Warning: scan-project: optional project context unavailable '
+        + '— entry omitted\n',
+      );
+      onUnavailable();
+      return null;
+    }
+    throw new Error('security policy rejected unsafe project context');
+  } finally {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {
+        // The read result is already bounded and validated; there is no safe
+        // recovery action for a close failure.
+      }
+    }
+  }
+}
+
+export function collectProjectContext(
+  projectRoot,
+  membership,
+  onUnavailable = () => {},
+) {
+  let projectRootReal;
+  try {
+    projectRootReal = realpathSync(projectRoot);
+  } catch {
+    throw new Error('security policy rejected unsafe project context');
+  }
+  const members = new Set(membership.paths);
+  const manifests = [];
+  let remainingManifestBytes = CONTEXT_MANIFEST_TOTAL_MAX_BYTES;
+  for (const path of CONTEXT_MANIFESTS) {
+    if (!members.has(path)) continue;
+    const result = readContextMember(
+      projectRoot,
+      projectRootReal,
+      membership,
+      path,
+      Math.min(CONTEXT_MANIFEST_MAX_BYTES, remainingManifestBytes),
+      null,
+      onUnavailable,
+    );
+    if (result === null) continue;
+    manifests.push({ path, content: result.content, truncated: result.truncated });
+    remainingManifestBytes -= result.bytesRead;
+  }
+  let readme = null;
+  for (const path of CONTEXT_READMES) {
+    if (!members.has(path)) continue;
+    const result = readContextMember(
+      projectRoot,
+      projectRootReal,
+      membership,
+      path,
+      CONTEXT_README_MAX_BYTES,
+      CONTEXT_README_MAX_CHARS,
+      onUnavailable,
+    );
+    if (result === null) continue;
+    readme = { path, content: result.content, truncated: result.truncated };
+    break;
+  }
+  let entryPoint = null;
+  for (const candidate of CONTEXT_ENTRY_POINTS) {
+    entryPoint = typeof candidate === 'string'
+      ? (members.has(candidate) ? candidate : null)
+      : membership.paths.find(path => candidate.test(path)) ?? null;
+    if (entryPoint) break;
+  }
+
+  return {
+    readme,
+    manifests,
+    directoryTree: membership.paths
+      .filter(path => path.split('/').length <= 2)
+      .slice(0, 100),
+    entryPoint,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -785,9 +1070,12 @@ export function collectProjectMembership(projectRoot, excludePatterns = []) {
 async function main() {
   // Parse CLI arguments: <projectRoot> <outputPath> [--exclude <patterns>]
   let projectRoot, outputPath, excludePatterns = [];
+  let includeContext = false;
   for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
-    if (arg === '--exclude' && i + 1 < process.argv.length) {
+    if (arg === '--include-context') {
+      includeContext = true;
+    } else if (arg === '--exclude' && i + 1 < process.argv.length) {
       excludePatterns = process.argv[++i]
         .split(',')
         .map(p => p.trim())
@@ -801,7 +1089,7 @@ async function main() {
 
   if (!projectRoot || !outputPath) {
     process.stderr.write(
-      'Usage: node scan-project.mjs <projectRoot> <outputPath> [--exclude <patterns>]\n',
+      'Usage: node scan-project.mjs <projectRoot> <outputPath> [--include-context] [--exclude <patterns>]\n',
     );
     process.exit(1);
   }
@@ -853,6 +1141,19 @@ async function main() {
   }
 
   const estimatedComplexity = estimateComplexity(fileEntries.length);
+  let projectContext;
+  if (includeContext) {
+    const contextPaths = fileEntries.map(file => file.path);
+    const contextMembership = {
+      paths: contextPaths,
+      realPaths: new Map(contextPaths.map(path => [path, membership.realPaths.get(path)])),
+    };
+    projectContext = collectProjectContext(
+      projectRoot,
+      contextMembership,
+      () => { degraded = true; },
+    );
+  }
 
   const output = {
     scriptCompleted: true,
@@ -867,6 +1168,7 @@ async function main() {
       byCategory,
       byLanguage,
     },
+    ...(includeContext ? { projectContext } : {}),
   };
 
   writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf-8');

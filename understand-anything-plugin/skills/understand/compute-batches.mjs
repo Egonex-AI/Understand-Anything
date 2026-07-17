@@ -25,7 +25,7 @@ import {
   readPendingInventoryJournal,
   readRetainedScanResult,
 } from './refresh-scan-result.mjs';
-import { collectProjectMembership } from './scan-project.mjs';
+import { collectProjectContext, collectProjectMembership } from './scan-project.mjs';
 
 /**
  * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
@@ -591,6 +591,7 @@ async function main() {
   let scan = readRetainedScanResult(projectRoot, uaDir);
   let effectiveChangedFiles = null;
   let verifiedRealPaths = null;
+  let membership = null;
   if (changedFiles) {
     effectiveChangedFiles = new Set(changedFiles);
     const inventoryBeforeRefresh = collectStrictInventoryPaths(projectRoot, scan);
@@ -605,7 +606,7 @@ async function main() {
       effectiveChangedFiles.add(path);
     }
     const excludePatterns = collectRetainedExcludePatterns(scan);
-    const membership = collectProjectMembership(projectRoot, excludePatterns);
+    membership = collectProjectMembership(projectRoot, excludePatterns);
     if (membership.degraded) {
       throw new Error('current project membership is incomplete');
     }
@@ -639,6 +640,24 @@ async function main() {
       }
     }
   }
+  if (effectiveChangedFiles?.size === 0) {
+    const output = {
+      schemaVersion: 1,
+      algorithm: 'louvain',
+      totalFiles: scan.files.length,
+      totalBatches: 0,
+      effectiveChangedFiles: [],
+      exportsByPath: {},
+      batches: [],
+    };
+    const outPath = join(uaDir, 'intermediate', 'batches.json');
+    writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
+    process.stderr.write(`Wrote 0 batches (sizes: max=0, min=0) to ${outPath}\n`);
+    return;
+  }
+  const projectContext = effectiveChangedFiles
+    ? collectProjectContext(projectRoot, membership)
+    : null;
   const files = scan.files || [];
   const codeFiles = files.filter(f => f.fileCategory === 'code');
   const nonCodeFiles = files.filter(f => f.fileCategory !== 'code');
@@ -827,6 +846,7 @@ async function main() {
     ...(effectiveChangedFiles
       ? { effectiveChangedFiles: [...effectiveChangedFiles].sort() }
       : {}),
+    ...(projectContext ? { projectContext } : {}),
     exportsByPath: Object.fromEntries(exportsByPath),
     batches: finalBatches,
   };

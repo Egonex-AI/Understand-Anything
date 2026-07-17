@@ -75,6 +75,7 @@ function isValidPendingPath(path) {
       || (!path.includes('\\') && !win32.isAbsolute(path) && !/^[A-Za-z]:/.test(path))
     )
     && path !== '.'
+    && path !== '..'
     && !path.startsWith('../')
     && posix.normalize(path) === path
     && !isReservedDataPath(path);
@@ -144,14 +145,19 @@ function assertSafeRegularFileWithin(
   { allowMissing = false } = {},
 ) {
   let fileStat;
-  let realPath;
   try {
     fileStat = ops.lstatSync(path);
-    realPath = ops.realpathSync(path);
   } catch (error) {
     if (allowMissing && (error?.code === 'ENOENT' || error?.code === 'ENOTDIR')) {
       return null;
     }
+    throw new Error(`${label} is unsafe`);
+  }
+
+  let realPath;
+  try {
+    realPath = ops.realpathSync(path);
+  } catch {
     throw new Error(`${label} is unsafe`);
   }
   if (

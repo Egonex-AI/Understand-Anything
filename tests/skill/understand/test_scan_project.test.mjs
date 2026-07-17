@@ -39,6 +39,25 @@ function collectMembership(projectRoot, excludePatterns = []) {
   return membership;
 }
 
+function runProjectContext(projectRoot, membership) {
+  const serializedMembership = {
+    ...membership,
+    realPaths: [...membership.realPaths],
+  };
+  const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+    import { collectProjectContext } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
+    const membership = ${JSON.stringify(serializedMembership)};
+    membership.realPaths = new Map(membership.realPaths);
+    const context = collectProjectContext(${JSON.stringify(projectRoot)}, membership);
+    process.stdout.write(JSON.stringify(context));
+  `], { encoding: 'utf-8' });
+  return {
+    status: probe.status,
+    stderr: probe.stderr,
+    output: probe.status === 0 ? JSON.parse(probe.stdout) : null,
+  };
+}
+
 /**
  * Build a project tree from a `{ relPath: contents }` object. Creates parent
  * directories as needed. Initializes a real git repo so the script's preferred
@@ -77,12 +96,13 @@ const _runScriptOutputDirs = [];
  * { status, stdout, stderr, output } where `output` is the parsed JSON
  * written by the script (or null on failure).
  */
-function runScript(projectRoot, extraArgs = []) {
+function runScript(projectRoot, extraArgs = [], env = process.env) {
   const outputDir = mkdtempSync(join(tmpdir(), 'ua-scan-out-'));
   _runScriptOutputDirs.push(outputDir);
   const outputPath = join(outputDir, 'scan-output.json');
   const result = spawnSync(process.execPath, [SCRIPT, projectRoot, outputPath, ...extraArgs], {
     encoding: 'utf-8',
+    env,
   });
   let output = null;
   try {
@@ -550,6 +570,47 @@ describe('scan-project.mjs membership-only enumeration', () => {
       chmodSync(lockedDir, 0o755);
     }
   });
+
+  it('deterministically skips an initialized gitlink directory without degrading membership', () => {
+    projectRoot = setupTree({
+      'root.txt': 'root file\n',
+    });
+    const add = spawnSync('git', ['add', 'root.txt'], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+    });
+    expect(add.status, add.stderr).toBe(0);
+    const commit = spawnSync('git', [
+      '-c', 'user.name=UA Test',
+      '-c', 'user.email=ua-test@example.invalid',
+      'commit', '-q', '-m', 'fixture root',
+    ], { cwd: projectRoot, encoding: 'utf8' });
+    expect(commit.status, commit.stderr).toBe(0);
+    const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+    }).stdout.trim();
+    mkdirSync(join(projectRoot, 'libs', 'child'), { recursive: true });
+    writeFileSync(join(projectRoot, 'libs', 'child', 'child.txt'), 'child\n', 'utf8');
+    const gitlink = spawnSync('git', [
+      'update-index', '--add', '--cacheinfo', `160000,${head},libs/child`,
+    ], { cwd: projectRoot, encoding: 'utf8' });
+    expect(gitlink.status, gitlink.stderr).toBe(0);
+    const staged = spawnSync('git', ['ls-files', '--stage', '--', 'libs/child'], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+    });
+    expect(staged.stdout).toMatch(/^160000 /);
+
+    const membership = collectMembership(projectRoot);
+    const full = runScript(projectRoot);
+
+    expect(membership.degraded).toBe(false);
+    expect(membership.paths).toEqual(['root.txt']);
+    expect(full.status, full.stderr).toBe(0);
+    expect(full.output.degraded).toBe(false);
+    expect(full.output.files.map(file => file.path)).toEqual(['root.txt']);
+  });
 });
 
 describe('scan-project.mjs — CLI --exclude', () => {
@@ -721,6 +782,199 @@ describe('scan-project.mjs — reserved root data directories', () => {
   });
 });
 
+describe('scan-project.mjs — validated project context', () => {
+  let projectRoot;
+  let outsideRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+    if (outsideRoot) {
+      rmSync(outsideRoot, { recursive: true, force: true });
+      outsideRoot = null;
+    }
+  });
+
+  it('derives bounded context only from the validated membership', () => {
+    projectRoot = setupTree({
+      'README.md': 'r'.repeat(3500),
+      'package.json': '{"name":"fixture"}\n',
+      'go.mod': 'module example.test/fixture\n',
+      'src/index.ts': 'export const entry = true;\n',
+      'main.py': 'print("secondary")\n',
+      'docs/guide.md': '# Guide\n',
+      'docs/deep/hidden.md': '# Too deep\n',
+    });
+
+    const result = runScript(projectRoot, ['--include-context']);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.projectContext).toEqual({
+      readme: { path: 'README.md', content: 'r'.repeat(3000), truncated: true },
+      manifests: [
+        { path: 'package.json', content: '{"name":"fixture"}\n', truncated: false },
+        { path: 'go.mod', content: 'module example.test/fixture\n', truncated: false },
+      ],
+      directoryTree: [
+        'docs/guide.md',
+        'go.mod',
+        'main.py',
+        'package.json',
+        'README.md',
+        'src/index.ts',
+      ],
+      entryPoint: 'src/index.ts',
+    });
+  });
+
+  it('degrades instead of failing when optional context becomes unreadable', () => {
+    projectRoot = setupTree({
+      'README.md': '# Optional context\n',
+      'src/local.ts': 'export const local = true;\n',
+    });
+    const preloadDir = mkdtempSync(join(tmpdir(), 'ua-context-preload-'));
+    _runScriptOutputDirs.push(preloadDir);
+    const preloadPath = join(preloadDir, 'reject-readme-open.cjs');
+    writeFileSync(preloadPath, `
+      const fs = require('node:fs');
+      const { syncBuiltinESMExports } = require('node:module');
+      const { basename } = require('node:path');
+      const originalOpenSync = fs.openSync;
+      let readmeOpenCount = 0;
+      fs.openSync = function(path, ...args) {
+        if (
+          basename(String(path)).toLowerCase() === 'readme.md'
+          && readmeOpenCount++ > 0
+        ) {
+          const error = new Error('simulated context access failure');
+          error.code = 'EACCES';
+          throw error;
+        }
+        return originalOpenSync.call(this, path, ...args);
+      };
+      syncBuiltinESMExports();
+    `, 'utf8');
+    const preloadSpecifier = preloadPath.replaceAll('\\', '/');
+    const nodeOptions = [
+      process.env.NODE_OPTIONS,
+      `--require="${preloadSpecifier}"`,
+    ].filter(Boolean).join(' ');
+
+    const result = runScript(projectRoot, ['--include-context'], {
+      ...process.env,
+      NODE_OPTIONS: nodeOptions,
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.degraded).toBe(true);
+    expect(byPath(result.output, 'README.md')).toBeDefined();
+    expect(result.output.projectContext.readme).toBeNull();
+    expect(result.stderr).toMatch(/optional project context unavailable.*entry omitted/i);
+  });
+
+  it('never reads an ignored external context alias', () => {
+    projectRoot = setupTree({
+      '.understandignore': 'README.md\n',
+      'src/local.ts': 'export const local = true;\n',
+    });
+    outsideRoot = mkdtempSync(join(tmpdir(), 'ua-context-secret-'));
+    const secret = 'SECRET_EXTERNAL_CONTEXT';
+    const target = process.platform === 'win32'
+      ? outsideRoot
+      : join(outsideRoot, 'README.md');
+    if (process.platform !== 'win32') writeFileSync(target, secret, 'utf8');
+    symlinkSync(
+      target,
+      join(projectRoot, 'README.md'),
+      process.platform === 'win32' ? 'junction' : 'file',
+    );
+
+    const result = runScript(projectRoot, ['--include-context']);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.projectContext.readme).toBeNull();
+    expect(result.output.projectContext.directoryTree).not.toContain('README.md');
+    expect(JSON.stringify(result.output)).not.toContain(secret);
+    expect(JSON.stringify(result.output)).not.toContain(outsideRoot);
+  });
+
+  it('rejects a context alias into an ignored in-project target', () => {
+    const secret = 'SECRET_IGNORED_INTERNAL_CONTEXT';
+    projectRoot = setupTree({
+      '.understandignore': 'private/\n',
+      'private/secret.txt': secret,
+      'src/local.ts': 'export const local = true;\n',
+    });
+    const secretPath = join(projectRoot, 'private', 'secret.txt');
+    const readmePath = join(projectRoot, 'README.md');
+    let membership;
+    try {
+      symlinkSync(secretPath, readmePath, 'file');
+      membership = collectMembership(projectRoot);
+      expect(membership.paths).toContain('README.md');
+    } catch (error) {
+      if (error?.code !== 'EPERM') throw error;
+      symlinkSync(dirname(secretPath), readmePath, 'junction');
+      membership = {
+        paths: ['README.md'],
+        realPaths: new Map([['README.md', secretPath]]),
+      };
+    }
+
+    const result = runProjectContext(projectRoot, membership);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/security policy.*unsafe project context/i);
+  });
+
+  it('bounds each manifest and the combined manifest context', () => {
+    projectRoot = setupTree({
+      'package.json': '€'.repeat(7_000),
+      'pyproject.toml': 'b'.repeat(20_000),
+      'Cargo.toml': 'c'.repeat(20_000),
+      'go.mod': 'd'.repeat(20_000),
+      'pom.xml': 'e'.repeat(20_000),
+      'src/local.ts': 'export const local = true;\n',
+    });
+
+    const result = runScript(projectRoot, ['--include-context']);
+
+    expect(result.status, result.stderr).toBe(0);
+    const manifests = result.output.projectContext.manifests;
+    expect(manifests).toHaveLength(5);
+    expect(manifests.every(
+      manifest => Buffer.byteLength(manifest.content) <= 16 * 1024,
+    )).toBe(true);
+    expect(manifests.reduce((sum, manifest) => sum + Buffer.byteLength(manifest.content), 0))
+      .toBeLessThanOrEqual(64 * 1024);
+    expect(manifests.every(manifest => manifest.truncated === true)).toBe(true);
+  });
+
+  it('applies CLI exclusions to every context field', () => {
+    projectRoot = setupTree({
+      'README.md': '# Hidden\n',
+      'package.json': '{"name":"hidden"}\n',
+      'src/index.ts': 'export const hidden = true;\n',
+      'src/keep.ts': 'export const keep = true;\n',
+    });
+
+    const result = runScript(projectRoot, [
+      '--include-context',
+      '--exclude',
+      'README.md,package.json,src/index.ts',
+    ]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.projectContext).toEqual({
+      readme: null,
+      manifests: [],
+      directoryTree: ['src/keep.ts'],
+      entryPoint: null,
+    });
+  });
+});
+
 describe('scan-project.mjs — project-root containment', () => {
   let projectRoot;
   let outsideRoot;
@@ -756,6 +1010,86 @@ describe('scan-project.mjs — project-root containment', () => {
     expect(result.status).not.toBe(0);
     expect(result.output).toBeNull();
     expect(result.stderr).toMatch(/security policy|outside project root/i);
+    expect(result.stderr).not.toContain(outsideRoot);
+  });
+
+  it.each([
+    ['root ignore file', 'root-ignore'],
+    ['active data-dir ignore file', 'data-ignore'],
+    ['active data directory', 'data-dir'],
+  ])('rejects an external %s before ignore content is read', (_label, linkKind) => {
+    projectRoot = setupTree({
+      'src/local.ts': 'export const local = true;\n',
+    });
+    outsideRoot = mkdtempSync(join(tmpdir(), 'ua-scan-ignore-outside-'));
+    const secret = '.understandignore\nsrc/\n# SECRET_EXTERNAL_IGNORE\n';
+
+    if (linkKind === 'data-dir') {
+      writeFileSync(join(outsideRoot, '.understandignore'), secret, 'utf8');
+      symlinkSync(
+        outsideRoot,
+        join(projectRoot, '.ua'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+    } else {
+      const parent = linkKind === 'root-ignore'
+        ? projectRoot
+        : join(projectRoot, '.ua');
+      mkdirSync(parent, { recursive: true });
+      const linkPath = join(parent, '.understandignore');
+      const target = process.platform === 'win32'
+        ? outsideRoot
+        : join(outsideRoot, '.understandignore');
+      if (process.platform === 'win32') {
+        writeFileSync(join(outsideRoot, 'external-ignore.txt'), secret, 'utf8');
+      } else {
+        writeFileSync(target, secret, 'utf8');
+      }
+      symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'file');
+    }
+
+    const result = runScript(projectRoot);
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toBeNull();
+    expect(result.stderr).toMatch(/security policy.*unsafe/i);
+    expect(result.stderr).not.toContain('SECRET_EXTERNAL_IGNORE');
+    expect(result.stderr).not.toContain(outsideRoot);
+  });
+
+  it.each([
+    ['root ignore file', 'root-ignore'],
+    ['active data-dir ignore file', 'data-ignore'],
+    ['active data directory', 'data-dir'],
+  ])('rejects a dangling linked %s instead of treating it as missing', (_label, linkKind) => {
+    projectRoot = setupTree({
+      'src/local.ts': 'export const local = true;\n',
+    });
+    outsideRoot = mkdtempSync(join(tmpdir(), 'ua-scan-dangling-ignore-'));
+    const target = join(outsideRoot, 'removed-target');
+    const linkPath = linkKind === 'data-dir'
+      ? join(projectRoot, '.ua')
+      : join(
+        linkKind === 'root-ignore' ? projectRoot : join(projectRoot, '.ua'),
+        '.understandignore',
+      );
+    mkdirSync(dirname(linkPath), { recursive: true });
+
+    if (process.platform === 'win32' || linkKind === 'data-dir') {
+      mkdirSync(target);
+      symlinkSync(target, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
+      rmSync(target, { recursive: true, force: true });
+    } else {
+      writeFileSync(target, 'src/\n', 'utf8');
+      symlinkSync(target, linkPath, 'file');
+      rmSync(target, { force: true });
+    }
+
+    const result = runScript(projectRoot);
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toBeNull();
+    expect(result.stderr).toMatch(/security policy.*unsafe/i);
     expect(result.stderr).not.toContain(outsideRoot);
   });
 });

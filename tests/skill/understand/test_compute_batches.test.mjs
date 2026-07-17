@@ -1266,6 +1266,29 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     runIncrementalCase(project, testCase);
   }, 15_000);
 
+  it('builds project context from the same retained-exclude membership', () => {
+    project = setupIncrementalProject({
+      diskFiles: {
+        'README.md': 'SECRET_EXCLUDED_CONTEXT\n',
+        'src/existing.ts': 'export const existing = true;\n',
+      },
+      excludePatterns: ['README.md'],
+    });
+    const changedPath = writeChangedList(project, ['src/existing.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status, result.stderr).toBe(0);
+    const batches = JSON.parse(readFileSync(project.batchesPath, 'utf8'));
+    expect(batches.projectContext).toEqual({
+      readme: null,
+      manifests: [],
+      directoryTree: ['src/existing.ts'],
+      entryPoint: null,
+    });
+    expect(JSON.stringify(batches)).not.toContain('SECRET_EXCLUDED_CONTEXT');
+  });
+
   it('keeps modified-only output deterministic without touching scan bytes or mtime', () => {
     project = setupIncrementalProject();
     const fixedTime = new Date('2024-01-02T03:04:05.000Z');
@@ -1301,6 +1324,50 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
     expect(out.effectiveChangedFiles).toEqual([]);
     expect(out.totalBatches).toBe(0);
+  });
+
+  it('returns an empty batch result before source reads or clustering when no work remains', () => {
+    project = setupIncrementalProject();
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+    const preloadPath = join(project.dataDir, 'tmp', 'fail-source-read.cjs');
+    writeFileSync(preloadPath, `
+      const fs = require('node:fs');
+      const { syncBuiltinESMExports } = require('node:module');
+      fs.promises.readFile = async () => { throw new Error('EMPTY_FAST_PATH_READ'); };
+      syncBuiltinESMExports();
+    `, 'utf8');
+    const preloadSpecifier = preloadPath.replaceAll('\\', '/');
+    const nodeOptions = [process.env.NODE_OPTIONS, `--require="${preloadSpecifier}"`]
+      .filter(Boolean)
+      .join(' ');
+
+    const result = spawnSync('node', [
+      SCRIPT,
+      project.root,
+      `--changed-files=${changedPath}`,
+    ], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        NODE_OPTIONS: nodeOptions,
+        UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW: '1',
+      },
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).not.toContain('EMPTY_FAST_PATH_READ');
+    expect(result.stderr).not.toContain('forced throw via UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW');
+    expectScanUnchanged(project, before);
+    expect(JSON.parse(readFileSync(project.batchesPath, 'utf8'))).toEqual({
+      schemaVersion: 1,
+      algorithm: 'louvain',
+      totalFiles: 1,
+      totalBatches: 0,
+      effectiveChangedFiles: [],
+      exportsByPath: {},
+      batches: [],
+    });
   });
 
   it.each([
