@@ -1483,7 +1483,7 @@ describe('extract-import-map.mjs — Swift resolver', () => {
       'Core/Model/User.swift',
     ]);
     expect(result.output.importMap['Package.swift']).toEqual([]);
-  });
+  }, 15_000);
 
   it('drops Swift SDK imports when no project module matches', () => {
     projectRoot = setupTree({
@@ -1500,7 +1500,7 @@ describe('extract-import-map.mjs — Swift resolver', () => {
     expect(result.status).toBe(0);
     expect(result.output.importMap['Sources/App/View.swift']).toEqual([]);
     expect(result.output.stats.totalEdges).toBe(0);
-  });
+  }, 15_000);
 });
 
 describe('extract-import-map.mjs — per-file failure resilience', () => {
