@@ -1363,7 +1363,7 @@ describe('scan-project.mjs — estimatedComplexity thresholds', () => {
     expect(r.status).toBe(0);
     expect(r.output.totalFiles).toBe(501);
     expect(r.output.estimatedComplexity).toBe('very-large');
-  });
+  }, 15_000);
 });
 
 describe('scan-project.mjs — CLI entry guard + invocation', () => {

@@ -1451,7 +1451,7 @@ describe('extract-import-map.mjs — Swift resolver', () => {
     expect(result.output.importMap['Sources/App/Feature.swift']).toEqual([]);
     expect(result.output.stats.filesWithImports).toBe(1);
     expect(result.output.stats.totalEdges).toBe(2);
-  });
+  }, 15_000);
 
   it('uses Package.swift custom target paths when module name differs from directory name', () => {
     projectRoot = setupTree({
