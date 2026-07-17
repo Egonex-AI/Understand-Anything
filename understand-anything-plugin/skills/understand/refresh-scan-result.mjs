@@ -164,6 +164,54 @@ function assertSafeRegularFileWithin(
   return realPath;
 }
 
+function resolveSafeScanResultPath(projectRoot, uaDir, ops) {
+  const projectRootReal = resolveRealProjectRoot(projectRoot, ops);
+  const uaDirReal = assertSafeDirectory(
+    projectRootReal,
+    uaDir,
+    ops,
+    'project data directory',
+  );
+  const intermediateReal = assertSafeDirectory(
+    uaDirReal,
+    join(uaDir, 'intermediate'),
+    ops,
+    'intermediate directory',
+  );
+  const scanReal = assertSafeRegularFileWithin(
+    intermediateReal,
+    join(uaDir, 'intermediate', 'scan-result.json'),
+    ops,
+    'retained scan-result',
+  );
+  return { projectRootReal, uaDirReal, intermediateReal, scanReal };
+}
+
+export function readRetainedScanResult(projectRoot, uaDir, overrides = {}) {
+  const ops = { lstatSync, readFileSync, realpathSync, ...overrides };
+  const before = resolveSafeScanResultPath(projectRoot, uaDir, ops);
+  let raw;
+  try {
+    raw = ops.readFileSync(before.scanReal, 'utf8');
+  } catch {
+    throw new Error('retained scan-result is unsafe');
+  }
+  const after = resolveSafeScanResultPath(projectRoot, uaDir, ops);
+  if (
+    !sameCanonicalPath(before.projectRootReal, after.projectRootReal)
+    || !sameCanonicalPath(before.uaDirReal, after.uaDirReal)
+    || !sameCanonicalPath(before.intermediateReal, after.intermediateReal)
+    || !sameCanonicalPath(before.scanReal, after.scanReal)
+  ) {
+    throw new Error('retained scan-result is unsafe');
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error('retained scan-result JSON is invalid');
+  }
+}
+
 export function readPendingInventoryJournal(
   projectRoot,
   uaDir,

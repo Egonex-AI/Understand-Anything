@@ -15,7 +15,7 @@
  *   Output: <ua-dir>/intermediate/batches.json
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, realpathSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -23,6 +23,7 @@ import { createRequire } from 'node:module';
 import {
   main as refreshScanResult,
   readPendingInventoryJournal,
+  readRetainedScanResult,
 } from './refresh-scan-result.mjs';
 import { collectProjectMembership } from './scan-project.mjs';
 
@@ -587,13 +588,7 @@ async function main() {
   }
 
   const uaDir = resolveUaDir(projectRoot);
-  const scanPath = join(uaDir, 'intermediate', 'scan-result.json');
-  if (!existsSync(scanPath)) {
-    process.stderr.write(`Error: scan-result.json not found at ${scanPath}\n`);
-    process.exit(1);
-  }
-
-  let scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+  let scan = readRetainedScanResult(projectRoot, uaDir);
   let effectiveChangedFiles = null;
   let verifiedRealPaths = null;
   if (changedFiles) {
@@ -625,7 +620,7 @@ async function main() {
         delta,
       );
       refreshScanInventory(projectRoot, driftReason);
-      scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+      scan = readRetainedScanResult(projectRoot, uaDir);
       const inventoryAfterRefresh = collectStrictInventoryPaths(projectRoot, scan);
       const refreshedDelta = compareMembership(inventoryAfterRefresh, currentPaths);
       if (refreshedDelta.removed.length > 0 || refreshedDelta.added.length > 0) {

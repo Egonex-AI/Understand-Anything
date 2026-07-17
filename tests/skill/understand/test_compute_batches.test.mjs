@@ -919,6 +919,56 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     }
   });
 
+  it.each([
+    ['active data directory', '.ua', 'data'],
+    ['legacy data directory', '.understand-anything', 'data'],
+    ['intermediate directory', '.ua', 'intermediate'],
+    ['scan-result file', '.ua', 'scan'],
+  ])('rejects an external %s before reading retained scan content', (_label, dataName, linkKind) => {
+    const root = mkdtempSync(join(tmpdir(), 'ua-cb-state-link-'));
+    const outside = mkdtempSync(join(tmpdir(), 'ua-cb-state-outside-'));
+    project = { root };
+    externalPaths.push(outside);
+
+    const dataDir = join(root, dataName);
+    const intermediateDir = join(dataDir, 'intermediate');
+    const scanPath = join(intermediateDir, 'scan-result.json');
+    const secret = '{"SECRET_EXTERNAL_SCAN":';
+
+    if (linkKind === 'data') {
+      mkdirSync(join(outside, 'intermediate'), { recursive: true });
+      writeFileSync(join(outside, 'intermediate', 'scan-result.json'), secret, 'utf8');
+      symlinkSync(outside, dataDir, process.platform === 'win32' ? 'junction' : 'dir');
+    } else if (linkKind === 'intermediate') {
+      mkdirSync(dataDir, { recursive: true });
+      writeFileSync(join(outside, 'scan-result.json'), secret, 'utf8');
+      symlinkSync(
+        outside,
+        intermediateDir,
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+    } else {
+      mkdirSync(intermediateDir, { recursive: true });
+      const target = process.platform === 'win32'
+        ? outside
+        : join(outside, 'scan-result.json');
+      if (process.platform === 'win32') {
+        writeFileSync(join(outside, 'external.json'), secret, 'utf8');
+      } else {
+        writeFileSync(target, secret, 'utf8');
+      }
+      symlinkSync(target, scanPath, process.platform === 'win32' ? 'junction' : 'file');
+    }
+
+    const result = runScript(root);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/unsafe/i);
+    expect(result.stderr).not.toContain('SECRET_EXTERNAL_SCAN');
+    expect(result.stderr).not.toContain(outside);
+    expect(result.stderr).not.toMatch(/^Loaded /m);
+  });
+
   it('rejects an existing retained path whose canonical target is outside the project before export reads', () => {
     const outside = mkdtempSync(join(tmpdir(), 'ua-cb-retained-outside-'));
     externalPaths.push(outside);
