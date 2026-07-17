@@ -7,6 +7,7 @@ import {
   realpathSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import {
@@ -37,13 +38,7 @@ const SCAN_SCRIPT = join(__dirname, 'scan-project.mjs');
 const IMPORT_SCRIPT = join(__dirname, 'extract-import-map.mjs');
 const COMPLEXITIES = new Set(['small', 'moderate', 'large', 'very-large']);
 const FILE_CATEGORIES = new Set([
-  'code',
-  'config',
-  'docs',
-  'infra',
-  'data',
-  'script',
-  'markup',
+  'code', 'config', 'docs', 'infra', 'data', 'script', 'markup',
 ]);
 
 function isPlainObject(value) {
@@ -156,7 +151,7 @@ export function validateInventory(value) {
   return value;
 }
 
-function validateInventoryFilesOnDisk(projectRoot, inventory, resolveRealpath) {
+function validateInventoryFilesOnDisk(projectRoot, inventory, resolveRealpath, stat) {
   let projectRootReal;
   try {
     projectRootReal = resolveRealpath(projectRoot);
@@ -168,6 +163,7 @@ function validateInventoryFilesOnDisk(projectRoot, inventory, resolveRealpath) {
     let candidateReal;
     try {
       candidateReal = resolveRealpath(join(projectRoot, entry.path));
+      if (!stat(candidateReal).isFile()) throw new Error('not a file');
     } catch {
       throw new Error(
         `refresh-scan-result: inventory path is unavailable or unsafe: ${entry.path}`,
@@ -280,6 +276,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
     renameSync,
     rmSync,
     realpathSync,
+    statSync,
     writeSummary: message => process.stderr.write(message),
     ...overrides,
   };
@@ -306,7 +303,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
 
     const inventory = readJson(inventoryPath, 'inventory');
     validateInventory(inventory);
-    validateInventoryFilesOnDisk(projectRoot, inventory, ops.realpathSync);
+    validateInventoryFilesOnDisk(projectRoot, inventory, ops.realpathSync, ops.statSync);
 
     ops.writeFileSync(importInputPath, `${JSON.stringify({
       projectRoot,
@@ -337,6 +334,7 @@ export function main(projectRootArg = process.argv[2], overrides = {}) {
       scriptCompleted: true,
       importMap: writtenCandidate.importMap,
     }, writtenCandidate.files.map(entry => entry.path));
+    validateInventoryFilesOnDisk(projectRoot, writtenCandidate, ops.realpathSync, ops.statSync);
 
     const oldPaths = new Set(previous.files.map(entry => entry?.path).filter(path => typeof path === 'string'));
     const newPaths = new Set(filePaths);

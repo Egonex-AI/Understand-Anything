@@ -247,7 +247,6 @@ function buildBatchOfMap(allBatches) {
 
 function normalizeRelativePathForMatch(pathText) {
   return pathText
-    .trim()
     .replace(/\\/g, '/')
     .replace(/^\.\/+/, '')
     .replace(/\/+/g, '/');
@@ -489,9 +488,10 @@ async function main() {
         );
         process.exit(1);
       }
+      const nulDelimited = content.includes('\0');
       const lines = content
-        .split('\n')
-        .map(normalizeRelativePathForMatch)
+        .split(nulDelimited ? '\0' : '\n')
+        .map(line => normalizeRelativePathForMatch(nulDelimited ? line : line.trim()))
         .filter(line => resolveChangedProjectFile(projectRoot, line));
       changedFiles = new Set(lines);
     }

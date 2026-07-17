@@ -350,9 +350,9 @@ Include the script's warnings in `$PHASE_WARNINGS` for the reviewer.
 
 ### Incremental update path
 
-Write the changed-files list (one path per line) to a temp file:
+Write the changed-files list as NUL-delimited raw paths so Git does not quote Unicode names and filenames may safely contain newlines or surrounding spaces:
 ```bash
-git diff "<lastCommitHash>..HEAD" --name-only > "$UA_DIR/tmp/changed-files.txt"
+git diff "<lastCommitHash>..HEAD" --name-only -z --output="$UA_DIR/tmp/changed-files.txt"
 ```
 
 Run compute-batches with `--changed-files`:

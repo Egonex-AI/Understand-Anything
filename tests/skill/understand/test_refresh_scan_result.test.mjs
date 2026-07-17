@@ -373,6 +373,7 @@ describe('refresh-scan-result.mjs failure protection', () => {
     ['a missing inventory file', () => [
       inventory([file('src/missing.ts')]), {}, /unavailable|unsafe/i,
     ]],
+    ['a directory inventory path', () => [inventory([file('src')]), {}, /unavailable|unsafe/i]],
     [
       'an inventory realpath error',
       () => [
@@ -390,6 +391,21 @@ describe('refresh-scan-result.mjs failure protection', () => {
     const project = protectedProject();
     const [inventoryValue, overrides, message] = arrange(project);
     expectBeforeImport(project, inventoryValue, overrides, message);
+  });
+
+  it('revalidates containment after import extraction before committing', () => {
+    const project = protectedProject();
+    const outsideSrc = join(setupProject().root, 'src');
+    const pipeline = pipelineOverrides();
+    expectProtected(project, {
+      runBundledScript(scriptPath, args) {
+        pipeline.runBundledScript(scriptPath, args);
+        if (basename(scriptPath) === 'extract-import-map.mjs') {
+          rmSync(join(project.root, 'src'), { recursive: true, force: true });
+          symlinkSync(outsideSrc, join(project.root, 'src'), 'junction');
+        }
+      },
+    }, /outside project root|unsafe/i);
   });
 
   it.each([

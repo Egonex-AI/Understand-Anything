@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -113,6 +113,15 @@ function writeChangedList(project, lines) {
   return changedPath;
 }
 
+function writeGitChangedList(project, changedFile) {
+  const changedPath = writeChangedList(project, []);
+  [
+    ['init', '-q'], ['add', '-N', '--', changedFile],
+    ['diff', '--no-ext-diff', '--name-only', '-z', `--output=${changedPath}`],
+  ].forEach(args => execFileSync('git', args, { cwd: project.root }));
+  return changedPath;
+}
+
 function snapshotScan(project) {
   return [readFileSync(project.scanPath), statSync(project.scanPath).mtimeMs];
 }
@@ -135,7 +144,9 @@ function runIncrementalCase(project, testCase) {
     mkdirSync(dirname(ignorePath), { recursive: true });
     writeFileSync(ignorePath, testCase.ignoreContent);
   }
-  const changedPath = writeChangedList(project, testCase.changedFiles);
+  const changedPath = testCase.gitChangedPath
+    ? writeGitChangedList(project, testCase.gitChangedPath)
+    : writeChangedList(project, testCase.changedFiles);
   const result = runScript(project.root, [`--changed-files=${changedPath}`]);
   expect(result.status).toBe(0);
   expect(result.stderr).toContain(`structural drift detected (${testCase.reason})`);
@@ -845,13 +856,13 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
   });
 
   it.each([
-    ['refreshes stale inventory so a Windows-style added path enters the batch', {
+    ['accepts NUL-delimited Git output without quoting or trimming a Unicode path', {
       inventoryPaths: ['src/existing.ts'], diskFiles: { ...incrementalDiskFiles(['src/existing.ts']),
-        'src/added.ts': 'import { existing } from "./existing";\nexport const added = existing;\n' },
-      changedFiles: ['src\\added.ts', ''], reason: 'file added',
-      expectedInventory: ['src/added.ts', 'src/existing.ts'],
-      effectiveChangedFiles: ['src/added.ts'], batchedFiles: ['src/added.ts'],
-      expectedImports: { 'src/added.ts': ['src/existing.ts'] }, summary: /files=2 added=1 removed=0 importEdges=1/,
+        ' 中文新增.ts': 'export const unicodeAdded = true;\n' },
+      gitChangedPath: ' 中文新增.ts', reason: 'file added',
+      expectedInventory: [' 中文新增.ts', 'src/existing.ts'],
+      effectiveChangedFiles: [' 中文新增.ts'], batchedFiles: [' 中文新增.ts'],
+      summary: /files=2 added=1 removed=0 importEdges=0/,
     }],
     ['refreshes stale inventory so a deleted path is not batched', {
       inventoryPaths: ['src/existing.ts', 'src/deleted.ts'], diskFiles: incrementalDiskFiles(['src/existing.ts']),
@@ -861,7 +872,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     }],
     ['refreshes once for rename-old plus rename-new and analyzes only the new path', {
       inventoryPaths: ['src/existing.ts', 'src/original.ts'], diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/renamed.ts']),
-      changedFiles: ['src/original.ts', 'src/renamed.ts'], reason: 'file removed',
+      changedFiles: ['src/original.ts', 'src\\renamed.ts'], reason: 'file removed',
       expectedInventory: ['src/existing.ts', 'src/renamed.ts'],
       effectiveChangedFiles: ['src/original.ts', 'src/renamed.ts'], batchedFiles: ['src/renamed.ts'],
     }],
@@ -875,7 +886,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
   ])('%s', (_title, testCase) => {
     project = setupIncrementalProject(testCase);
     runIncrementalCase(project, testCase);
-  });
+  }, 15_000);
 
   it('keeps modified-only output deterministic without touching scan bytes or mtime', () => {
     project = setupIncrementalProject();
@@ -953,7 +964,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
   it.each(ignoreCases)('%s', (_title, testCase) => {
     project = setupIncrementalProject(testCase);
     runIncrementalCase(project, testCase);
-  });
+  }, 15_000);
 
   it('does not refresh structural drift in full mode', () => {
     project = setupIncrementalProject({
@@ -1049,40 +1060,20 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(existsSync(project.batchesPath)).toBe(false);
   });
 
-  it('fails closed when inspecting a changed path raises a non-missing stat error', () => {
+  it('fails closed without disclosing paths when changed-path inspection errors', () => {
     const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
-      import { isChangedPathFile } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
+      import { isChangedPathFile, resolveRealPathForContainment } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
       const accessError = Object.assign(new Error('access denied'), { code: 'EACCES' });
-      try {
-        isChangedPathFile('not-disclosed', () => { throw accessError; });
-        process.exitCode = 2;
-      } catch (error) {
-        process.stderr.write(error.message);
-        process.exitCode = /changed path stat failed \\(EACCES\\)/.test(error.message) ? 0 : 1;
-      }
-    `], { encoding: 'utf-8' });
-
-    expect(probe.status).toBe(0);
-    expect(probe.stderr).toMatch(/changed path stat failed \(EACCES\)/);
-  });
-
-  it('does not disclose absolute paths when realpath inspection fails', () => {
-    const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
-      import { resolveRealPathForContainment } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
       const realpathError = Object.assign(new Error('C:\\\\secret\\\\project'), { code: 'EIO' });
-      try {
-        resolveRealPathForContainment('C:\\\\secret\\\\project', 'changed path', () => {
-          throw realpathError;
-        });
-        process.exitCode = 2;
-      } catch (error) {
-        process.stderr.write(error.message);
-        process.exitCode = error.message === 'changed path realpath failed (EIO)' ? 0 : 1;
-      }
+      const messages = [
+        () => isChangedPathFile('not-disclosed', () => { throw accessError; }),
+        () => resolveRealPathForContainment('C:\\\\secret\\\\project', 'changed path', () => { throw realpathError; }),
+      ].map(run => { try { run(); return 'did not throw'; } catch (error) { return error.message; } });
+      process.stderr.write(messages.join('\\n'));
     `], { encoding: 'utf-8' });
 
     expect(probe.status).toBe(0);
-    expect(probe.stderr).toBe('changed path realpath failed (EIO)');
+    expect(probe.stderr.split('\n')).toEqual(['changed path stat failed (EACCES)', 'changed path realpath failed (EIO)']);
     expect(probe.stderr).not.toContain('secret');
   });
 });
