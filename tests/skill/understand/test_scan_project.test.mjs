@@ -490,6 +490,23 @@ describe('scan-project.mjs — .understandignore handling', () => {
     expect(r.output.filteredByIgnore).toBe(2);
   });
 
+  it('preserves multiple ignore-file patterns in their original order', () => {
+    projectRoot = setupTree({
+      '.understandignore': 'fixtures/first.data\ngenerated/second.data\n',
+      'fixtures/first.data': 'ignored first\n',
+      'generated/second.data': 'ignored second\n',
+      'src/keep.ts': 'export const keep = true;\n',
+    });
+
+    const result = runScript(projectRoot);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(byPath(result.output, 'fixtures/first.data')).toBeUndefined();
+    expect(byPath(result.output, 'generated/second.data')).toBeUndefined();
+    expect(byPath(result.output, 'src/keep.ts')).toBeDefined();
+    expect(result.output.filteredByIgnore).toBe(2);
+  });
+
   it('supports `!pattern` negation to re-include defaults-excluded files', () => {
     // `*.log` is in the hardcoded defaults; the user re-includes a
     // specific file with `!keep.log`. After the override, keep.log MUST

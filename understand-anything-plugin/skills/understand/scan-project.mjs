@@ -720,7 +720,9 @@ function collectSafeUserIgnoreState(projectRoot, projectRootReal) {
     'root .understandignore',
   );
   return {
-    patterns: [dataIgnore.content, rootIgnore.content].filter(content => content !== null),
+    patterns: [dataIgnore.content, rootIgnore.content]
+      .filter(content => content !== null)
+      .flatMap(content => content.split(/\r\n|\n|\r/)),
     present: dataIgnore.present || rootIgnore.present,
   };
 }
