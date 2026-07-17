@@ -153,7 +153,7 @@ Determine whether to run a full analysis or incremental update.
       - **Stored preference wins.** If `$UA_DIR/config.json` has an `outputLanguage` field, set `$OUTPUT_LANGUAGE` to it and skip the rest.
       - **Otherwise detect (first run only).** Infer the predominant language of the user's conversation as an ISO 639-1 code (`$DETECTED_LANG`). If it is `en` or cannot be confidently determined, set `$OUTPUT_LANGUAGE=en` and proceed silently — no prompt (English users see no change).
       - **If `$DETECTED_LANG` ≠ `en`, confirm once before analyzing:** tell the user you detected `<language>` and ask whether to generate all content in it; they press Enter/"yes" to accept, or type another language code/name to override (normalize via the friendly-name map above). If running non-interactively (no reply possible), skip the wait, use `$DETECTED_LANG`, and print a one-line notice instead of blocking.
-      - **Persist** the resolved `$OUTPUT_LANGUAGE` (including `en`) into `config.json` so it never re-prompts for this project.
+      - **Persist** the resolved `$OUTPUT_LANGUAGE` (including `en`) into `config.json` so it never re-prompts for this project. Merge `{"outputLanguage": "<lang>"}` into the existing object; do NOT overwrite or remove other keys such as `treeSitter.extensionLanguageMap`.
     - If `--language` IS specified:
       - Update `$UA_DIR/config.json` with the new language: merge `{"outputLanguage": "<lang>"}` into existing config.
       - Store as `$OUTPUT_LANGUAGE` for use throughout all phases.
@@ -224,7 +224,7 @@ Set up and verify the `.understandignore` file before scanning.
 
 Report to the user: `[Phase 1/7] Scanning project files...`
 
-Dispatch a subagent using the `project-scanner` agent definition (at `agents/project-scanner.md`). Append the following additional context:
+Dispatch a subagent using the `project-scanner` agent definition (at `$PLUGIN_ROOT/agents/project-scanner.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -290,7 +290,7 @@ Load `$UA_DIR/intermediate/batches.json` (produced by Phase 1.5). Iterate the `b
 
 Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
 
-For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
+For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `$PLUGIN_ROOT/agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -380,7 +380,7 @@ After batches complete:
 
 Report to the user: `[Phase 3/7] Reviewing assembled graph...`
 
-Dispatch a subagent using the `assemble-reviewer` agent definition (at `agents/assemble-reviewer.md`).
+Dispatch a subagent using the `assemble-reviewer` agent definition (at `$PLUGIN_ROOT/agents/assemble-reviewer.md`).
 
 Pass these parameters in the dispatch prompt:
 
@@ -408,7 +408,7 @@ After the subagent completes, read `$UA_DIR/intermediate/assemble-review.json` a
 Report to the user: `[Phase 4/7] Identifying architectural layers...`
 
 **Build the combined prompt template:**
- 1. Use the `architecture-analyzer` agent definition (at `agents/architecture-analyzer.md`).
+ 1. Use the `architecture-analyzer` agent definition (at `$PLUGIN_ROOT/agents/architecture-analyzer.md`).
  2. **Language context injection:** For each language detected in Phase 1 (e.g., `python`, `markdown`, `dockerfile`, `yaml`, `sql`, `terraform`, `graphql`, `protobuf`, `shell`, `html`, `css`), read the file at `./languages/<language-id>.md` (e.g., `./languages/python.md`, `./languages/dockerfile.md`) and append its content after the base template under a `## Language Context` header. If the file does not exist for a detected language, skip it silently and continue. These files are in the `languages/` subdirectory next to this SKILL.md file. **Include non-code language snippets** — they provide edge patterns and summary styles for non-code files.
  3. **Framework addendum injection:** For each framework detected in Phase 1 (e.g., `Django`), read the file at `./frameworks/<framework-id-lowercase>.md` (e.g., `./frameworks/django.md`) and append its full content after the language context. If the file does not exist for a detected framework, skip it silently and continue. These files are in the `frameworks/` subdirectory next to this SKILL.md file.
  4. **Output locale injection:** If `$OUTPUT_LANGUAGE` is NOT `en` (English), read the locale guidance file at `./locales/<language-code>.md` (e.g., `./locales/zh.md`, `./locales/ja.md`, `./locales/ko.md`) and append its content after the framework addendums under a `## Output Language Guidelines` header. This provides language-specific guidance for tag naming conventions, summary style, and layer name translations. If the locale file does not exist for the specified language, skip silently — the `$LANGUAGE_DIRECTIVE` still applies. These files are in the `locales/` subdirectory next to this SKILL.md file.
@@ -490,7 +490,7 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 
 Report to the user: `[Phase 5/7] Building guided tour...`
 
-Dispatch a subagent using the `tour-builder` agent definition (at `agents/tour-builder.md`). Append the following additional context:
+Dispatch a subagent using the `tour-builder` agent definition (at `$PLUGIN_ROOT/agents/tour-builder.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -683,7 +683,7 @@ If the script exits non-zero, read stderr, fix the script, and retry once.
 
 If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent as follows:
 
-Dispatch a subagent using the `graph-reviewer` agent definition (at `agents/graph-reviewer.md`). Append the following additional context:
+Dispatch a subagent using the `graph-reviewer` agent definition (at `$PLUGIN_ROOT/agents/graph-reviewer.md`). Append the following additional context:
 
 > **Additional context from main session:**
 >

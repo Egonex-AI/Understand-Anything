@@ -246,6 +246,22 @@ describe('scan-project.mjs — language detection', () => {
     expect(r.status).toBe(0);
     expect(byPath(r.output, 'data.weirdext').language).toBe('weirdext');
   });
+
+  it('supports project-level tree-sitter extension language aliases', () => {
+    projectRoot = setupTree({
+      '.understand-anything/config.json': JSON.stringify({
+        treeSitter: {
+          extensionLanguageMap: {
+            '.customts': 'typescript',
+          },
+        },
+      }, null, 2),
+      'src/component.customts': 'export const x: number = 1;\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/component.customts').language).toBe('typescript');
+  });
 });
 
 describe('scan-project.mjs — category assignment (project-scanner.md Step 4)', () => {

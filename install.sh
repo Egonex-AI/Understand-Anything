@@ -22,26 +22,27 @@ REPO_URL="${UA_REPO_URL:-https://github.com/Egonex-AI/Understand-Anything.git}"
 REPO_DIR="${UA_DIR:-$HOME/.understand-anything/repo}"
 PLUGIN_LINK="$HOME/.understand-anything-plugin"
 
-# Platform table — id|skills-target-dir|style
+# Platform table — id|skills-target-dir|style|agents-target-dir
 # style "per-skill": one symlink per skill into the target dir
 # style "folder":    one symlink for the whole skills/ dir into the target,
 #                    named "understand-anything"
+# agents-target-dir is empty for platforms that need a custom agent bundle format.
 platforms_table() {
   cat <<EOF
-gemini|$HOME/.agents/skills|per-skill
-codex|$HOME/.agents/skills|per-skill
-opencode|$HOME/.agents/skills|per-skill
-pi|$HOME/.agents/skills|per-skill
-openclaw|$HOME/.openclaw/skills|folder
-antigravity|$HOME/.gemini/antigravity/skills|folder
-vibe|$HOME/.vibe/skills|per-skill
-vscode|$HOME/.copilot/skills|per-skill
-hermes|$HOME/.hermes/skills|folder
-cline|$HOME/.cline/skills|folder
-kimi|$HOME/.kimi/skills|folder
-trae|$HOME/.trae/skills|per-skill
-nanobot|$HOME/.nanobot/workspace/skills|per-skill
-kiro|$HOME/.kiro/skills|per-skill
+gemini|$HOME/.agents/skills|per-skill|$HOME/.agents/agents
+codex|$HOME/.agents/skills|per-skill|$HOME/.agents/agents
+opencode|$HOME/.agents/skills|per-skill|$HOME/.agents/agents
+pi|$HOME/.agents/skills|per-skill|$HOME/.agents/agents
+openclaw|$HOME/.openclaw/skills|folder|$HOME/.openclaw/agents
+antigravity|$HOME/.gemini/antigravity/skills|folder|$HOME/.gemini/antigravity/agents
+vibe|$HOME/.vibe/skills|per-skill|$HOME/.vibe/agents
+vscode|$HOME/.copilot/skills|per-skill|$HOME/.copilot/agents
+hermes|$HOME/.hermes/skills|folder|$HOME/.hermes/agents
+cline|$HOME/.cline/skills|folder|$HOME/.cline/agents
+kimi|$HOME/.kimi/skills|folder|$HOME/.kimi/agents
+trae|$HOME/.trae/skills|per-skill|$HOME/.trae/agents
+nanobot|$HOME/.nanobot/workspace/skills|per-skill|$HOME/.nanobot/workspace/agents
+kiro|$HOME/.kiro/skills|per-skill|
 EOF
 }
 
@@ -102,6 +103,7 @@ clone_or_update() {
 }
 
 skills_root() { printf '%s\n' "$REPO_DIR/understand-anything-plugin/skills"; }
+agents_root() { printf '%s\n' "$REPO_DIR/understand-anything-plugin/agents"; }
 
 list_skills() {
   local root
@@ -169,6 +171,43 @@ unlink_skills() {
   esac
 }
 
+link_agent_profiles() {
+  local target="$1" root agent_md
+  [[ -n "$target" ]] || return 0
+  root="$(agents_root)"
+  if [[ ! -d "$root" ]]; then
+    printf 'Agents directory not found: %s\n' "$root" >&2
+    exit 1
+  fi
+  mkdir -p "$target"
+  while IFS= read -r agent_md; do
+    [[ -n "$agent_md" ]] || continue
+    ln -sfn "$agent_md" "$target/$(basename "$agent_md")"
+    printf '  ✓ %s → %s\n' "$target/$(basename "$agent_md")" "$agent_md"
+  done < <(find "$root" -maxdepth 1 -type f -name '*.md' | LC_ALL=C sort)
+}
+
+unlink_agent_profiles() {
+  local target="$1" root agent_md link resolved
+  [[ -n "$target" ]] || return 0
+  root="$(agents_root)"
+  [[ -d "$target" ]] || return 0
+  if [[ -d "$root" ]]; then
+    while IFS= read -r agent_md; do
+      [[ -n "$agent_md" ]] || continue
+      link="$target/$(basename "$agent_md")"
+      [[ -L "$link" ]] && rm -f "$link"
+    done < <(find "$root" -maxdepth 1 -type f -name '*.md' | LC_ALL=C sort)
+  else
+    for link in "$target"/*.md; do
+      [[ -L "$link" ]] || continue
+      resolved="$(readlink "$link" 2>/dev/null || true)"
+      [[ "$resolved" == *"/understand-anything-plugin/agents/"* ]] || continue
+      rm -f "$link"
+    done
+  fi
+}
+
 link_plugin_root() {
   if [[ -L "$PLUGIN_LINK" || -e "$PLUGIN_LINK" ]]; then
     printf '  • %s already exists, leaving as-is\n' "$PLUGIN_LINK"
@@ -180,16 +219,22 @@ link_plugin_root() {
 
 cmd_install() {
   local id="$1"
-  local row target style
+  local row target style agents_target
   row="$(resolve_platform "$id")"
   target="$(printf '%s\n' "$row" | cut -d'|' -f2)"
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
+  agents_target="$(printf '%s\n' "$row" | cut -d'|' -f4)"
 
   clone_or_update
   printf -- '→ Linking skills for %s (%s → %s)\n' "$id" "$style" "$target"
   link_skills "$target" "$style"
   printf -- '→ Linking universal plugin root\n'
   link_plugin_root
+
+  if [[ -n "$agents_target" ]]; then
+    printf -- '→ Linking agent profiles (%s)\n' "$agents_target"
+    link_agent_profiles "$agents_target"
+  fi
 
   if [[ "$id" == "kiro" ]]; then
     printf -- '→ Creating Kiro agent configuration\n'
@@ -236,16 +281,21 @@ KIROEOF
 
 cmd_uninstall() {
   local id="$1"
-  local row target style
+  local row target style agents_target
   row="$(resolve_platform "$id")"
   target="$(printf '%s\n' "$row" | cut -d'|' -f2)"
   style="$(printf '%s\n' "$row" | cut -d'|' -f3)"
+  agents_target="$(printf '%s\n' "$row" | cut -d'|' -f4)"
 
   printf -- '→ Removing skill links for %s\n' "$id"
   unlink_skills "$target" "$style"
   if [[ "$id" == "kiro" && -f "$HOME/.kiro/agents/understand.json" ]]; then
     rm -f "$HOME/.kiro/agents/understand.json"
     printf '  ✓ removed %s\n' "$HOME/.kiro/agents/understand.json"
+  fi
+  if [[ -n "$agents_target" ]]; then
+    printf -- '→ Removing agent profile links\n'
+    unlink_agent_profiles "$agents_target"
   fi
   if [[ -L "$PLUGIN_LINK" ]]; then
     rm -f "$PLUGIN_LINK"

@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>AI 應該幫助人，而不是取代人。</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -22,8 +28,11 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/專案首頁-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/線上展示-00c853" alt="Live Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
@@ -128,10 +137,30 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 # 支援的語言：en（預設）、zh、zh-TW、ja、ko、ru
 ```
 
+在專案的**首次執行**時 —— 當你沒有傳入 `--language` 且尚未儲存語言設定時 —— `/understand` 會檢測你正在使用的語言。如果檢測到非英語，它會詢問你確認（或改用其他語言）後再生成；英語對話不受影響。你的選擇會儲存到 `.ua/config.json` 並在後續執行中復用。
+
+**專案級 tree-sitter 擴充別名：** 如果你的程式碼庫使用自訂檔案副檔名，可以在 `.understand-anything/config.json` 中新增：
+
+```json
+{
+  "treeSitter": {
+    "extensionLanguageMap": {
+      ".customts": "typescript",
+      ".custompy": "python"
+    }
+  }
+}
+```
+
+這樣 `/understand` 在基於 tree-sitter 的結構掃描時就會將這些副檔名視為指定語言。
+
 `--language` 參數會影響：
 - 知識圖譜中的節點摘要和描述
 - Dashboard UI 的標籤、按鈕和提示
--導覽路線的解釋說明
+- 導覽路線的解釋說明
+- `/understand-domain` 輸出（領域、流程、步驟的名稱/摘要）
+- `/understand-onboard` 生成的入門指南文字
+- `/understand-knowledge` 推斷的實體/論斷/關係描述
 
 ### 3. 開啟資料看板
 
@@ -159,6 +188,15 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 # 提取業務領域知識（領域、流程、步驟）
 /understand-domain
 
+# 以繁體中文提取領域知識（也會儲存到 config.json）
+/understand-domain --language zh-TW
+
+# 以繁體中文生成入門指南
+/understand-onboard --language zh-TW
+
+# 以繁體中文分析 Karpathy wiki 並輸出推斷的知識
+/understand-knowledge ~/path/to/wiki --language zh-TW
+
 # 分析 Karpathy 模式的 LLM Wiki 知識庫
 /understand-knowledge ~/path/to/wiki
 
@@ -185,7 +223,7 @@ Understand-Anything 可在多個 AI 編碼平台上執行。
 /plugin install understand-anything
 ```
 
-### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro）
+### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro）
 
 **macOS / Linux：**
 ```bash
@@ -203,7 +241,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **關於技能呼叫方式：** 不同平台的呼叫前綴不同。大多數平台使用斜線指令（`/understand`），但 **Codex 使用 `$`** —— 請輸入 `$understand`，而不是 `/understand`。如果兩種前綴都無法辨識，直接用自然語言請求即可：*「使用 understand 技能分析這個專案」*。
 
-- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
+- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`
 - 後續更新：`./install.sh --update`
 - 解除安裝：`./install.sh --uninstall <platform>`
 
@@ -255,6 +293,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Hermes | ✅ 支援 | `install.sh hermes` |
 | Cline | ✅ 支援 | `install.sh cline` |
 | KIMI CLI | ✅ 支援 | `install.sh kimi` |
+| Trae | ✅ 支援 | `install.sh trae` |
 | Nanobot | ✅ 支援 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 支援 | `install.sh kiro` |
 

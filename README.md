@@ -140,10 +140,28 @@ A multi-agent pipeline scans your project, extracts every file, function, class,
 
 On the **first run** in a project — when you don't pass `--language` and no language is stored yet — `/understand` detects the language you're conversing in. If it isn't English, it asks you to confirm (or override) before generating; English conversations are unaffected. Your choice is saved to `.ua/config.json` and reused on every later run.
 
+**Project-level tree-sitter extension aliases:** If your codebase uses custom file extensions, add them to `.understand-anything/config.json`:
+
+```json
+{
+  "treeSitter": {
+    "extensionLanguageMap": {
+      ".customts": "typescript",
+      ".custompy": "python"
+    }
+  }
+}
+```
+
+This lets `/understand` treat those extensions as the specified language during tree-sitter-based structural scanning.
+
 The `--language` parameter affects:
 - Node summaries and descriptions in the knowledge graph
 - Dashboard UI labels, buttons, and tooltips
 - Guided tour explanations
+- `/understand-domain` output (domain, flow, step names/summaries)
+- `/understand-onboard` generated onboarding guide text
+- `/understand-knowledge` inferred entity/claim/edge descriptions
 
 ### 3. Explore the dashboard
 
@@ -170,6 +188,15 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 
 # Extract business domain knowledge (domains, flows, steps)
 /understand-domain
+
+# Extract domain knowledge in Chinese (also persisted to config.json)
+/understand-domain --language zh
+
+# Generate onboarding guide in Chinese
+/understand-onboard --language zh
+
+# Analyze Karpathy wiki and output inferred knowledge in Chinese
+/understand-knowledge ~/path/to/wiki --language zh
 
 # Analyze a Karpathy-pattern LLM wiki knowledge base
 /understand-knowledge ~/path/to/wiki
@@ -213,7 +240,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
 ```
 
-The installer clones the repo to `~/.understand-anything/repo` and creates the right symlinks for the chosen platform. Restart your CLI/IDE afterwards.
+The installer clones the repo to `~/.understand-anything/repo` and creates the right symlinks for the chosen platform. For platforms with a supported agent-profile directory, it also links the bundled `agents/*.md` profiles so the multi-agent pipeline can run without deterministic fallback. Restart your CLI/IDE afterwards.
 
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 

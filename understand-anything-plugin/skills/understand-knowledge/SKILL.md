@@ -1,7 +1,7 @@
 ---
 name: understand-knowledge
 description: Analyze a Karpathy-pattern LLM wiki knowledge base and generate an interactive knowledge graph with entity extraction, implicit relationships, and topic clustering.
-argument-hint: "[wiki-directory]"
+argument-hint: "[wiki-directory] [--language <lang>]"
 ---
 
 # /understand-knowledge
@@ -20,6 +20,42 @@ The **Karpathy LLM wiki pattern** (see https://gist.github.com/karpathy/442a6bf5
 Detection signals: has `index.md` + multiple `.md` files with wikilinks. May have `raw/` directory and schema file.
 
 ## Instructions
+
+### Phase 0: Resolve target directory and output language
+
+1. Parse `$ARGUMENTS`:
+   - `--language <lang>` is optional.
+   - Any remaining positional argument is the wiki directory (`$TARGET_DIR`).
+2. Determine `$TARGET_DIR`:
+   - If a positional path argument exists, use it.
+   - Otherwise, use the current working directory.
+   - If `$TARGET_DIR` is inside a git worktree checkout, redirect to the main repository root (same behavior as `/understand`) so config and outputs use the canonical `.understand-anything/`:
+     ```bash
+     COMMON_DIR=$(git -C "$TARGET_DIR" rev-parse --git-common-dir 2>/dev/null)
+     GIT_DIR=$(git -C "$TARGET_DIR" rev-parse --git-dir 2>/dev/null)
+     if [ -n "$COMMON_DIR" ] && [ -n "$GIT_DIR" ]; then
+       COMMON_ABS=$(cd "$TARGET_DIR" && cd "$COMMON_DIR" 2>/dev/null && pwd -P)
+       GIT_ABS=$(cd "$TARGET_DIR" && cd "$GIT_DIR" 2>/dev/null && pwd -P)
+       if [ -n "$COMMON_ABS" ] && [ "$COMMON_ABS" != "$GIT_ABS" ]; then
+         MAIN_ROOT=$(dirname "$COMMON_ABS")
+         if [ -d "$MAIN_ROOT" ] && [ "${UNDERSTAND_NO_WORKTREE_REDIRECT:-0}" != "1" ]; then
+           echo "[understand-knowledge] Detected git worktree at $TARGET_DIR"
+           echo "[understand-knowledge] Redirecting output to main repo root: $MAIN_ROOT"
+           TARGET_DIR="$MAIN_ROOT"
+         fi
+       fi
+     fi
+     ```
+3. Resolve `$OUTPUT_LANGUAGE`:
+   - Read `$TARGET_DIR/.understand-anything/config.json` if it exists.
+   - If `--language <lang>` is provided, use it and merge `{"outputLanguage":"<lang>"}` into config while preserving existing keys.
+   - Otherwise, use `outputLanguage` from config when present.
+   - If still empty, default to `en`.
+4. Build `$LANGUAGE_DIRECTIVE`:
+
+```markdown
+> **Language directive**: Generate all textual content in **{language}**. Apply this to newly generated node `name`, node `summary`, and edge `description` fields. Keep schema keys, enum/type values, and IDs unchanged.
+```
 
 ### Phase 1: DETECT
 
@@ -123,6 +159,7 @@ Dispatch `article-analyzer` subagents to extract implicit knowledge:
    - "Knowledge graph saved: N articles, N entities, N topics, N claims, N sources"
    - "N edges (N wikilink, N categorized, N implicit)"
    - "N layers, N tour steps"
+   - Write this summary in `$OUTPUT_LANGUAGE`
 
 7. Auto-trigger the dashboard:
    ```

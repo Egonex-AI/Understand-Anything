@@ -47,6 +47,17 @@ export class LanguageRegistry {
     return this.getByExtension(ext);
   }
 
+  registerExtensionAlias(ext: string, languageId: string): void {
+    const config = this.byId.get(languageId);
+    if (!config) {
+      throw new Error(
+        `Cannot register extension alias "${ext}": unknown language "${languageId}"`,
+      );
+    }
+    const key = (ext.startsWith(".") ? ext : `.${ext}`).toLowerCase();
+    this.byExtension.set(key, config);
+  }
+
   getAllLanguages(): LanguageConfig[] {
     return [...this.byId.values()];
   }

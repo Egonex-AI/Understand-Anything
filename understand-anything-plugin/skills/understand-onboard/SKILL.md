@@ -1,6 +1,7 @@
 ---
 name: understand-onboard
 description: Use when you need to generate an onboarding guide for new team members joining a project
+argument-hint: "[--language <lang>]"
 ---
 
 # /understand-onboard
@@ -32,17 +33,29 @@ The knowledge graph JSON has this structure:
 
 1. **Resolve the data directory `$UA_DIR`.** Run `UA_DIR=$([ -d .understand-anything ] && echo .understand-anything || echo .ua)` — this is the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Check that `$UA_DIR/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
 
-2. **Read project metadata** — use Grep or Read with a line limit to extract the `"project"` section (name, description, languages, frameworks).
+1. **Resolve output language**
+   - Read `$PROJECT_ROOT/.understand-anything/config.json` if it exists.
+   - Parse `$ARGUMENTS` for `--language <lang>`:
+     - If provided, set `$OUTPUT_LANGUAGE` to that value and merge `{"outputLanguage":"<lang>"}` into `$PROJECT_ROOT/.understand-anything/config.json` while preserving other keys.
+     - If not provided, use `outputLanguage` from config when present.
+     - If still empty, set `$OUTPUT_LANGUAGE=en`.
+   - This step is mandatory. Do NOT ignore `outputLanguage` when present.
+   - Use this directive when writing the guide:
+     - **Language directive**: Generate all textual content in **$OUTPUT_LANGUAGE**. Keep file paths, IDs, code identifiers, and command snippets unchanged.
 
-3. **Read layers** — Grep for `"layers"` to get the full layers array. These define the architecture and will structure the guide.
+2. Check that `$PROJECT_ROOT/.understand-anything/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
 
-4. **Read the tour** — Grep for `"tour"` to get the guided walkthrough steps. These provide the recommended learning path.
+3. **Read project metadata** — use Grep or Read with a line limit to extract the `"project"` section (name, description, languages, frameworks).
 
-5. **Read file-level structural nodes only** — use Grep to find nodes with file-level types (`file`, `config`, `document`, `service`, `pipeline`, `table`, `schema`, `resource`, `endpoint`) in the knowledge graph. Skip function-level and class-level nodes to keep the guide high-level. Extract each node's `name`, `filePath`, `summary`, and `complexity`.
+4. **Read layers** — Grep for `"layers"` to get the full layers array. These define the architecture and will structure the guide.
 
-6. **Identify complexity hotspots** — from the file-level nodes, find those with the highest `complexity` values. These are areas new developers should approach carefully.
+5. **Read the tour** — Grep for `"tour"` to get the guided walkthrough steps. These provide the recommended learning path.
 
-7. **Generate the onboarding guide** with these sections:
+6. **Read file-level structural nodes only** — use Grep to find nodes with file-level types (`file`, `config`, `document`, `service`, `pipeline`, `table`, `schema`, `resource`, `endpoint`) in the knowledge graph. Skip function-level and class-level nodes to keep the guide high-level. Extract each node's `name`, `filePath`, `summary`, and `complexity`.
+
+7. **Identify complexity hotspots** — from the file-level nodes, find those with the highest `complexity` values. These are areas new developers should approach carefully.
+
+8. **Generate the onboarding guide** with these sections (all prose follows the language directive):
    - **Project Overview**: name, languages, frameworks, description (from project metadata)
    - **Architecture Layers**: each layer's name, description, and key files (from layers + file nodes)
    - **Key Concepts**: important patterns and design decisions (from node summaries and tags)
@@ -50,6 +63,6 @@ The knowledge graph JSON has this structure:
    - **File Map**: what each key file does (from file-level nodes, organized by layer)
    - **Complexity Hotspots**: areas to approach carefully (from complexity values)
 
-8. Format as clean markdown
-9. Offer to save the guide to `docs/ONBOARDING.md` in the project
-10. Suggest the user commit it to the repo for the team
+9. Format as clean markdown
+10. Offer to save the guide to `docs/ONBOARDING.md` in the project
+11. Suggest the user commit it to the repo for the team

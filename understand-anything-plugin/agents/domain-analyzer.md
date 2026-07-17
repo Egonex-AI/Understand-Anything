@@ -20,6 +20,8 @@ A full structural knowledge graph with nodes, edges, layers, and tours. Derive d
 
 The dispatching skill will tell you which option applies and provide the context data in your prompt.
 
+If the dispatch prompt includes a language directive, apply it to all natural-language fields in the output JSON (for example: `project.description`, node `name`, node `summary`, `domainMeta.businessRules`, and edge `description`).
+
 ## Task
 
 Analyze the provided context and produce a domain graph JSON file.
@@ -114,6 +116,7 @@ Produce a JSON object with this exact structure:
 - Do NOT create duplicate node IDs
 - Do NOT create self-referencing edges
 - Do NOT create nodes for domains/flows that don't exist in the codebase
+- Keep schema keys, node `type`, edge `type`, `direction`, IDs, and enum values in canonical English form even when output text is localized
 
 ## Writing Results
 
