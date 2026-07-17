@@ -37,6 +37,7 @@
  * produce the final scan-result.json):
  *   {
  *     "scriptCompleted": true,
+ *     "degraded": false,
  *     "excludePatterns": ["tests/**"],
  *     "files": [{ "path": "...", "language": "...", "sizeLines": N, "fileCategory": "..." }, ...],
  *     "totalFiles": N,
@@ -539,12 +540,14 @@ function enumerateViaWalk(projectRoot) {
   ]);
 
   const out = [];
+  let degraded = false;
 
   function walk(absDir, isRoot = false) {
     let entries;
     try {
       entries = readdirSync(absDir, { withFileTypes: true });
     } catch (err) {
+      degraded = true;
       process.stderr.write(
         `Warning: scan-project: ${toPosix(relative(projectRoot, absDir)) || '.'} ` +
         `— directory read failed (${err.message}) — subtree skipped\n`,
@@ -569,7 +572,7 @@ function enumerateViaWalk(projectRoot) {
   }
 
   walk(projectRoot, true);
-  return out;
+  return { paths: out, degraded };
 }
 
 /**
@@ -580,7 +583,7 @@ function enumerateViaWalk(projectRoot) {
  */
 function enumerateFiles(projectRoot) {
   const fromGit = enumerateViaGit(projectRoot);
-  if (fromGit !== null) return fromGit;
+  if (fromGit !== null) return { paths: fromGit, degraded: false };
   process.stderr.write(
     `scan-project: git ls-files unavailable — falling back to recursive walk\n`,
   );
@@ -671,16 +674,7 @@ function countLines(absPath, posixPath) {
   }
 }
 
-function assertProjectPathContained(projectRootReal, absPath, relativePath) {
-  let candidateReal;
-  try {
-    candidateReal = realpathSync(absPath);
-  } catch {
-    throw new Error(
-      `security policy could not verify project file: ${relativePath}`,
-    );
-  }
-
+function assertProjectRealPathContained(projectRootReal, candidateReal, relativePath) {
   const fromRoot = relative(projectRootReal, candidateReal);
   if (
     fromRoot === '..'
@@ -691,6 +685,97 @@ function assertProjectPathContained(projectRootReal, absPath, relativePath) {
       `security policy rejected file outside project root: ${relativePath}`,
     );
   }
+  return candidateReal;
+}
+
+function isPathWithin(rootPath, candidatePath) {
+  const fromRoot = relative(rootPath, candidatePath);
+  return fromRoot === ''
+    || (
+      fromRoot !== '..'
+      && !fromRoot.startsWith(`..${sep}`)
+      && !isAbsolute(fromRoot)
+    );
+}
+
+/**
+ * Collect current source membership without reading source-file contents or
+ * extracting imports. Downstream callers can reuse the canonical real paths
+ * that were verified during this pass.
+ */
+export function collectProjectMembership(projectRoot, excludePatterns = []) {
+  const projectRootReal = realpathSync(projectRoot);
+  const reservedRootReals = ['.ua', '.understand-anything']
+    .map(name => join(projectRoot, name))
+    .map(path => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean)
+    .filter(path => isPathWithin(projectRootReal, path));
+  const enumeration = enumerateFiles(projectRoot);
+  const combined = createIgnoreFilter(projectRoot, excludePatterns);
+  const userIgnoresPresent = hasUserIgnoreFile(projectRoot) || excludePatterns.length > 0;
+  const defaultsOnly = userIgnoresPresent ? buildDefaultsOnlyFilter() : combined;
+  const members = [];
+  let filteredByIgnore = 0;
+  let degraded = enumeration.degraded;
+
+  for (const rel of enumeration.paths) {
+    if (isReservedDataPath(rel)) continue;
+    if (combined.isIgnored(rel)) {
+      if (userIgnoresPresent && !defaultsOnly.isIgnored(rel)) filteredByIgnore++;
+      continue;
+    }
+
+    const absPath = join(projectRoot, rel);
+    let realPath;
+    try {
+      realPath = realpathSync(absPath);
+    } catch (error) {
+      if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') {
+        process.stderr.write(
+          `Warning: scan-project: ${rel} — realpath failed `
+          + `(${error?.code || 'UNKNOWN'}) — file skipped from output\n`,
+        );
+        degraded = true;
+        continue;
+      }
+      process.stderr.write(
+        `Warning: scan-project: ${rel} — stat failed (${error.message}) `
+        + '— file skipped from output\n',
+      );
+      continue;
+    }
+
+    assertProjectRealPathContained(projectRootReal, realPath, rel);
+    if (reservedRootReals.some(root => isPathWithin(root, realPath))) continue;
+    try {
+      if (!statSync(realPath).isFile()) {
+        degraded = true;
+        continue;
+      }
+    } catch (error) {
+      process.stderr.write(
+        `Warning: scan-project: ${rel} — stat failed (${error.message}) `
+        + '— file skipped from output\n',
+      );
+      degraded = true;
+      continue;
+    }
+    members.push({ path: rel, realPath });
+  }
+
+  members.sort((a, b) => a.path.localeCompare(b.path));
+  return {
+    paths: members.map(member => member.path),
+    realPaths: new Map(members.map(member => [member.path, member.realPath])),
+    filteredByIgnore,
+    degraded,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -734,61 +819,18 @@ async function main() {
     );
     process.exit(1);
   }
-  const projectRootReal = realpathSync(projectRoot);
-
-  // 1. Enumerate. Either git ls-files or recursive walk.
-  const candidates = enumerateFiles(projectRoot);
-
-  // 2. Hard-exclude reserved root data directories, then filter via
-  //    createIgnoreFilter (defaults + user .understandignore + CLI --exclude).
-  //    Build a defaults-only filter in parallel to count user-driven drops.
-  const combined = createIgnoreFilter(projectRoot, excludePatterns);
-  const userIgnoresPresent = hasUserIgnoreFile(projectRoot) || excludePatterns.length > 0;
-  const defaultsOnly = userIgnoresPresent ? buildDefaultsOnlyFilter() : combined;
-
-  let filteredByIgnore = 0;
-  const kept = [];
-  for (const rel of candidates) {
-    if (isReservedDataPath(rel)) continue;
-    const isIgnoredCombined = combined.isIgnored(rel);
-    if (!isIgnoredCombined) {
-      kept.push(rel);
-      continue;
-    }
-    // Dropped by combined filter. If defaults-only would have ALSO dropped
-    // it, this is a baseline default drop — not counted. If defaults-only
-    // would have KEPT it, this drop is attributable to the user's
-    // .understandignore content.
-    if (userIgnoresPresent && !defaultsOnly.isIgnored(rel)) {
-      filteredByIgnore++;
-    }
-  }
+  const membership = collectProjectMembership(projectRoot, excludePatterns);
 
   // 3. Per-file: language + category + line count.
   //    Drop files that fail line counting (per-file resilience).
   const fileEntries = [];
-  for (const rel of kept) {
-    const absPath = join(projectRoot, rel);
-    // Stat first — git ls-files could include paths that vanished between
-    // listing and processing; the walker shouldn't but defensive anyway.
-    try {
-      const st = statSync(absPath);
-      if (!st.isFile()) {
-        // Symlinks-to-dir, special files, etc. — skip silently. Not a
-        // warning condition because git wouldn't have tracked it as a file.
-        continue;
-      }
-    } catch (err) {
-      process.stderr.write(
-        `Warning: scan-project: ${rel} — stat failed (${err.message}) ` +
-        `— file skipped from output\n`,
-      );
-      continue;
-    }
-    assertProjectPathContained(projectRootReal, absPath, rel);
-    const sizeLines = countLines(absPath, rel);
+  let degraded = membership.degraded;
+  for (const rel of membership.paths) {
+    const realPath = membership.realPaths.get(rel);
+    const sizeLines = countLines(realPath, rel);
     if (sizeLines === null) {
       // countLines already emitted the Warning: line.
+      degraded = true;
       continue;
     }
     fileEntries.push({
@@ -814,10 +856,11 @@ async function main() {
 
   const output = {
     scriptCompleted: true,
+    degraded,
     excludePatterns,
     files: fileEntries,
     totalFiles: fileEntries.length,
-    filteredByIgnore,
+    filteredByIgnore: membership.filteredByIgnore,
     estimatedComplexity,
     stats: {
       filesScanned: fileEntries.length,
@@ -834,7 +877,7 @@ async function main() {
 
   process.stderr.write(
     `scan-project: filesScanned=${fileEntries.length} ` +
-    `filteredByIgnore=${filteredByIgnore} ` +
+    `filteredByIgnore=${membership.filteredByIgnore} ` +
     `complexity=${estimatedComplexity}\n`,
   );
 }

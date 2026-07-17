@@ -186,7 +186,7 @@ Determine whether to run a full analysis or incremental update.
    | `--full` flag in `$ARGUMENTS` | Full analysis (all phases) |
    | No existing graph or meta | Full analysis (all phases) |
    | `--review` flag + existing graph + unchanged commit hash | Skip to Phase 6 (review-only — reuse existing assembled graph) |
-   | Existing graph + unchanged commit hash | Ask the user: "The graph is up to date at this commit. Would you like to: **(a)** run a full rebuild (`--full`), **(b)** run the LLM graph reviewer (`--review`), or **(c)** do nothing?" Then follow their choice. If they pick (c), STOP. |
+   | Existing graph + unchanged commit hash | Continue to the incremental membership check in Phase 2 with an empty Git changed-files list. Only declare the graph up to date after `effectiveChangedFiles` is empty. |
    | Existing graph + changed files | Incremental update (re-analyze changed files plus refreshed inventory membership changes) |
 
    **Review-only path:** Copy the existing `knowledge-graph.json` to `$UA_DIR/intermediate/assembled-graph.json`, then jump directly to Phase 6 step 3.
@@ -195,7 +195,9 @@ Determine whether to run a full analysis or incremental update.
    ```bash
    git diff <lastCommitHash>..HEAD --name-only
    ```
-   If this returns no files, report "Graph is up to date" and STOP.
+   This is only the initial Git list. Even when it is empty, continue to Phase 2:
+   untracked ignore-rule changes, current inventory membership drift, or a pending
+   inventory journal may still require analysis or old-graph pruning.
 
 8. **Collect project context for subagent injection:**
    - Read `README.md` (or `README.rst`, `readme.md`) from `$PROJECT_ROOT` if it exists. Store as `$README_CONTENT` (first 3000 characters).
@@ -370,6 +372,16 @@ Run compute-batches with `--changed-files`:
 node "<SKILL_DIR>/compute-batches.mjs" "$PROJECT_ROOT" \
   --changed-files="$UA_DIR/tmp/changed-files.txt"
 ```
+
+After the command succeeds, read top-level `effectiveChangedFiles` from
+`batches.json`. If it is empty, only then report that the graph is up to date
+and ask: "Would you like to: **(a)** run a full rebuild (`--full`), **(b)** run
+the LLM graph reviewer (`--review`), or **(c)** do nothing?" For (a), restart
+on the full-analysis path. For (b), copy the existing graph to
+`$UA_DIR/intermediate/assembled-graph.json` and jump to Phase 6 step 3. For (c),
+STOP. Only a non-empty `effectiveChangedFiles` continues on the incremental
+path; membership and pending-journal entries remain authoritative even when Git
+reported no files.
 
 Before batching, `compute-batches.mjs` compares the changed paths with the
 retained inventory and the current files on disk. When it detects structural

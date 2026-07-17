@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   existsSync,
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -11,6 +12,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -104,7 +106,31 @@ function setupIncrementalProject({
     dataDir,
     scanPath,
     batchesPath: join(intermediateDir, 'batches.json'),
+    pendingPath: join(intermediateDir, 'pending-inventory-changes.json'),
   };
+}
+
+function inventoryPathDigest(paths) {
+  return createHash('sha256')
+    .update(JSON.stringify([...paths].sort()))
+    .digest('hex');
+}
+
+function writePendingJournal(project, {
+  fromPaths,
+  resultPaths,
+  paths,
+  ...overrides
+}) {
+  const journal = {
+    version: 1,
+    fromDigest: inventoryPathDigest(fromPaths),
+    resultDigest: inventoryPathDigest(resultPaths),
+    paths: [...paths].sort(),
+    ...overrides,
+  };
+  writeFileSync(project.pendingPath, `${JSON.stringify(journal, null, 2)}\n`, 'utf8');
+  return journal;
 }
 
 function writeChangedList(project, lines) {
@@ -113,6 +139,25 @@ function writeChangedList(project, lines) {
   const changedPath = join(changedDir, 'changed-files.txt');
   writeFileSync(changedPath, lines.join('\r\n'));
   return changedPath;
+}
+
+function writeLegacyChangedList(projectRoot, lines) {
+  return writeChangedList({
+    dataDir: join(projectRoot, '.understand-anything'),
+  }, lines);
+}
+
+function materializeRetainedInventory(projectRoot) {
+  const scan = JSON.parse(readFileSync(
+    join(projectRoot, '.understand-anything', 'intermediate', 'scan-result.json'),
+    'utf-8',
+  ));
+  for (const file of scan.files) {
+    const absolutePath = join(projectRoot, ...file.path.split('/'));
+    if (existsSync(absolutePath)) continue;
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, 'export const fixture = true;\n');
+  }
 }
 
 function writeGitChangedList(project, changedFile) {
@@ -713,19 +758,34 @@ describe('compute-batches.mjs — merge-small', () => {
 describe('compute-batches.mjs — --changed-files', () => {
   let root;
 
+  it('treats backslashes as separators only on Windows', () => {
+    const probe = spawnSync('node', [
+      '--input-type=module',
+      '--eval',
+      "const { normalizeRelativePathForMatch: n } = await import(process.argv[1]); console.log(JSON.stringify([n('src\\\\literal.ts', 'linux'), n('src\\\\literal.ts', 'win32')]));",
+      pathToFileURL(SCRIPT).href,
+    ], { encoding: 'utf8' });
+
+    expect(probe.status, probe.stderr).toBe(0);
+    expect(JSON.parse(probe.stdout)).toEqual(['src\\literal.ts', 'src/literal.ts']);
+  });
+
   afterEach(() => {
     if (root) rmSync(root, { recursive: true, force: true });
   });
 
   it('emits only changed files from retained batches with Windows-style changed-file paths', () => {
     root = setupProject('scan-result-3-cliques.json');
+    materializeRetainedInventory(root);
     mkdirSync(join(root, 'src', 'auth'), { recursive: true });
     writeFileSync(join(root, 'src', 'auth', 'login.ts'), 'export const login = true;\n');
     writeFileSync(join(root, 'src', 'auth', 'tokens.ts'), 'export const tokens = true;\n');
-    const changedPath = join(root, 'changed.txt');
     // Only two files in the auth clique are changed. Use CRLF plus one
     // backslash path to cover Windows git diff/path-list inputs.
-    writeFileSync(changedPath, ['src\\auth\\login.ts', 'src/auth/tokens.ts'].join('\r\n'));
+    const changedPath = writeLegacyChangedList(
+      root,
+      ['src\\auth\\login.ts', 'src/auth/tokens.ts'],
+    );
 
     const result = runScript(root, [`--changed-files=${changedPath}`]);
     expect(result.status).toBe(0);
@@ -747,10 +807,10 @@ describe('compute-batches.mjs — --changed-files', () => {
 
   it('does not emit unchanged same-community files as analysis targets', () => {
     root = setupProject('scan-result-3-cliques.json');
+    materializeRetainedInventory(root);
     mkdirSync(join(root, 'src', 'auth'), { recursive: true });
     writeFileSync(join(root, 'src', 'auth', 'login.ts'), 'export const login = true;\n');
-    const changedPath = join(root, 'changed.txt');
-    writeFileSync(changedPath, 'src/auth/login.ts\n');
+    const changedPath = writeLegacyChangedList(root, ['src/auth/login.ts']);
 
     const result = runScript(root, [`--changed-files=${changedPath}`]);
     expect(result.status).toBe(0);
@@ -818,8 +878,7 @@ describe('compute-batches.mjs — --changed-files', () => {
       join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
       JSON.stringify(scan));
 
-    const changedPath = join(root, 'changed.txt');
-    writeFileSync(changedPath, 'src/b/entry.ts\n');
+    const changedPath = writeLegacyChangedList(root, ['src/b/entry.ts']);
 
     const result = runScript(root, [`--changed-files=${changedPath}`]);
     expect(result.status).toBe(0);
@@ -860,6 +919,65 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     }
   });
 
+  it('rejects an existing retained path whose canonical target is outside the project before export reads', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'ua-cb-retained-outside-'));
+    externalPaths.push(outside);
+    writeFileSync(
+      join(outside, 'outside.ts'),
+      'export const SECRET_RETAINED_ALIAS = true;\n',
+      'utf8',
+    );
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'linked/outside.ts'],
+      diskFiles: incrementalDiskFiles(['src/existing.ts']),
+    });
+    symlinkSync(
+      outside,
+      join(project.root, 'linked'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/retained inventory path.*outside project root/i);
+    expect(result.stderr).not.toContain('SECRET_RETAINED_ALIAS');
+    expect(result.stderr).not.toContain(outside);
+    expect(result.stderr).not.toMatch(/^Loaded /m);
+    expectScanUnchanged(project, before);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it('rejects an existing retained alias into the active reserved data root before export reads', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'ua-alias/private.ts'],
+      diskFiles: incrementalDiskFiles(['src/existing.ts']),
+    });
+    writeFileSync(
+      join(project.dataDir, 'private.ts'),
+      'export const SECRET_RESERVED_ALIAS = true;\n',
+      'utf8',
+    );
+    symlinkSync(
+      project.dataDir,
+      join(project.root, 'ua-alias'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/retained inventory path.*reserved data root/i);
+    expect(result.stderr).not.toContain('SECRET_RESERVED_ALIAS');
+    expect(result.stderr).not.toMatch(/^Loaded /m);
+    expectScanUnchanged(project, before);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
   it.each([
     ['accepts NUL-delimited Git output without quoting or trimming a Unicode path', {
       inventoryPaths: ['src/existing.ts'], diskFiles: { ...incrementalDiskFiles(['src/existing.ts']),
@@ -881,17 +999,201 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
       expectedInventory: ['src/existing.ts', 'src/renamed.ts'],
       effectiveChangedFiles: ['src/original.ts', 'src/renamed.ts'], batchedFiles: ['src/renamed.ts'],
     }],
-    ['refreshes an added ignored path but finishes with zero analysis batches', {
-      inventoryPaths: ['src/existing.ts'], diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/ignored.ts']),
-      changedFiles: ['src/ignored.ts'], reason: 'file added',
-      ignorePath: '.understand-anything/.understandignore', ignoreContent: 'src/ignored.ts\n',
-      expectedInventory: ['src/existing.ts'],
-      effectiveChangedFiles: ['src/ignored.ts'], batchedFiles: [],
-    }],
   ])('%s', (_title, testCase) => {
     project = setupIncrementalProject(testCase);
     runIncrementalCase(project, testCase);
   }, 15_000);
+
+  it('retains rename-old pruning paths on a no-drift retry', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'src/original.ts'],
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/renamed.ts']),
+    });
+    const firstChanged = writeChangedList(project, [
+      'src/original.ts',
+      'src/renamed.ts',
+    ]);
+
+    const first = runScript(project.root, [`--changed-files=${firstChanged}`]);
+    expect(first.status, first.stderr).toBe(0);
+    expect(existsSync(project.pendingPath)).toBe(true);
+
+    const retryChanged = writeChangedList(project, []);
+    const retry = runScript(project.root, [`--changed-files=${retryChanged}`]);
+
+    expect(retry.status, retry.stderr).toBe(0);
+    expect(retry.stderr).not.toMatch(/refresh-scan-result:/);
+    const batches = JSON.parse(readFileSync(project.batchesPath, 'utf8'));
+    expect(batches.effectiveChangedFiles).toEqual([
+      'src/original.ts',
+      'src/renamed.ts',
+    ]);
+    expect(batches.batches.flatMap(batch => batch.files.map(file => file.path)))
+      .toEqual(['src/renamed.ts']);
+  }, 20_000);
+
+  it('retains ignore-only removed paths on a no-drift retry', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'src/hidden.ts'],
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/hidden.ts']),
+    });
+    const ignorePath = join(project.dataDir, '.understandignore');
+    writeFileSync(ignorePath, 'src/hidden.ts\n', 'utf8');
+    const firstChanged = writeChangedList(project, [
+      '.understand-anything/.understandignore',
+    ]);
+
+    const first = runScript(project.root, [`--changed-files=${firstChanged}`]);
+    expect(first.status, first.stderr).toBe(0);
+    expect(existsSync(project.pendingPath)).toBe(true);
+
+    const retryChanged = writeChangedList(project, []);
+    const retry = runScript(project.root, [`--changed-files=${retryChanged}`]);
+
+    expect(retry.status, retry.stderr).toBe(0);
+    expect(retry.stderr).not.toMatch(/refresh-scan-result:/);
+    const batches = JSON.parse(readFileSync(project.batchesPath, 'utf8'));
+    expect(batches.effectiveChangedFiles).toEqual(['src/hidden.ts']);
+    expect(batches.batches).toEqual([]);
+  }, 20_000);
+
+  it.each([
+    ['corrupt JSON', '{ "secret-journal-path": ', /pending inventory journal is invalid/],
+    ['a digest mismatch', null, /pending inventory journal does not match current inventory/],
+  ])('fails closed on %s before writing batches', (_label, rawValue, message) => {
+    project = setupIncrementalProject();
+    if (rawValue === null) {
+      writePendingJournal(project, {
+        fromPaths: ['src/unrelated-before.ts'],
+        resultPaths: ['src/unrelated-after.ts'],
+        paths: ['src/unrelated-after.ts'],
+      });
+    } else {
+      writeFileSync(project.pendingPath, rawValue, 'utf8');
+    }
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(message);
+    expect(result.stderr).not.toContain('secret-journal-path');
+    expect(result.stderr).not.toContain('unrelated-before.ts');
+    expectScanUnchanged(project, before);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it('rejects a linked pending journal without reading or mutating its target', () => {
+    project = setupIncrementalProject();
+    const outside = mkdtempSync(join(tmpdir(), 'ua-pending-journal-outside-'));
+    externalPaths.push(outside);
+    const target = join(outside, 'do-not-read.json');
+    const targetBytes = '{ "secret-linked-journal": true }\n';
+    writeFileSync(target, targetBytes, 'utf8');
+    symlinkSync(outside, project.pendingPath, 'junction');
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/pending inventory journal is unsafe/);
+    expect(result.stderr).not.toContain('secret-linked-journal');
+    expect(readFileSync(target, 'utf8')).toBe(targetBytes);
+    expectScanUnchanged(project, before);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it('refreshes membership with an empty Git list after an untracked active ignore change', () => {
+    project = setupIncrementalProject({
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/hidden.ts']),
+    });
+    const activeIgnorePath = join(project.dataDir, '.understandignore');
+    writeFileSync(activeIgnorePath, 'src/hidden.ts\n');
+    writeFileSync(
+      activeIgnorePath,
+      '# hidden.ts is no longer excluded\n',
+    );
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toMatch(/structural drift detected/);
+    expect(result.stderr.match(/refresh-scan-result:/g)).toHaveLength(1);
+    const { scan, batches } = readIncrementalArtifacts(project);
+    expect(scan.files.map(file => file.path).sort()).toEqual([
+      'src/existing.ts',
+      'src/hidden.ts',
+    ]);
+    expect(batches.effectiveChangedFiles).toEqual(['src/hidden.ts']);
+  }, 15_000);
+
+  it('refreshes membership when deleting .gitignore reveals an untracked source', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts'],
+      diskFiles: {
+        '.gitignore': 'src/revealed.ts\n',
+        ...incrementalDiskFiles(['src/existing.ts', 'src/revealed.ts']),
+      },
+    });
+    const init = spawnSync('git', ['init', '-q'], { cwd: project.root, encoding: 'utf-8' });
+    expect(init.status, init.stderr).toBe(0);
+    execFileSync('git', ['add', '--', '.gitignore', 'src/existing.ts'], { cwd: project.root });
+    rmSync(join(project.root, '.gitignore'));
+    const changedPath = writeChangedList(project, ['.gitignore']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr.match(/refresh-scan-result:/g)).toHaveLength(1);
+    const { scan, batches } = readIncrementalArtifacts(project);
+    expect(scan.files.map(file => file.path).sort()).toEqual([
+      'src/existing.ts',
+      'src/revealed.ts',
+    ]);
+    expect(batches.effectiveChangedFiles).toEqual([
+      '.gitignore',
+      'src/revealed.ts',
+    ]);
+  }, 15_000);
+
+  it('does not refresh when a modified tracked file remains excluded', () => {
+    project = setupIncrementalProject({
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'tests/excluded.ts']),
+      excludePatterns: ['tests/**'],
+    });
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, ['tests/excluded.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expectScanUnchanged(project, before);
+    const batches = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(batches.effectiveChangedFiles).toEqual(['tests/excluded.ts']);
+    expect(batches.batches).toEqual([]);
+  });
+
+  it('does not refresh when an added file is excluded from both memberships', () => {
+    project = setupIncrementalProject({
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/ignored.ts']),
+    });
+    writeFileSync(join(project.dataDir, '.understandignore'), 'src/ignored.ts\n');
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, ['src/ignored.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expectScanUnchanged(project, before);
+    const batches = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+    expect(batches.effectiveChangedFiles).toEqual(['src/ignored.ts']);
+    expect(batches.batches).toEqual([]);
+  });
 
   it('preserves CLI --exclude patterns during incremental inventory refresh', () => {
     const testCase = {
@@ -951,17 +1253,32 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(out.totalBatches).toBe(0);
   });
 
+  it.each([
+    ['duplicate inventory paths', scan => scan.files.push({ ...scan.files[0] }), /duplicate retained inventory path/],
+    ['non-normalized inventory paths', scan => { scan.files[0].path = 'src\\existing.ts'; }, /invalid retained inventory path/],
+    ['non-normalized exclude patterns', scan => { scan.excludePatterns = [' tests/** ']; }, /excludePatterns must be an array/],
+  ])('fails closed on %s even when the changed-file list is empty', (_title, mutate, message) => {
+    project = setupIncrementalProject();
+    const scan = JSON.parse(readFileSync(project.scanPath, 'utf-8'));
+    mutate(scan);
+    writeFileSync(project.scanPath, `${JSON.stringify(scan, null, 2)}\n`);
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(message);
+    expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+    expectScanUnchanged(project, before);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
   const ignoreLocations = [
     ['root ignore file', '.understandignore'],
     ['active data-dir ignore file', '.understand-anything/.understandignore'],
   ];
   const ignoreModes = [
-    {
-      title: 'forces deterministic refresh when the %s changes',
-      inventoryPaths: ['src/existing.ts'], diskFiles: incrementalDiskFiles(['src/existing.ts']),
-      ignoreContent: '# changed ignore rules\n',
-      expectedInventory: ['src/existing.ts'], inventoryChanges: [], batchedFiles: [],
-    },
     {
       title: 'analyzes a file re-included by a changed %s',
       inventoryPaths: ['src/existing.ts'], diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/hidden.ts']),
@@ -991,6 +1308,35 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     project = setupIncrementalProject(testCase);
     runIncrementalCase(project, testCase);
   }, 15_000);
+
+  it.each(ignoreLocations)(
+    'does not refresh when changed %s preserves exact membership',
+    (_location, ignorePath) => {
+      const rootIgnore = ignorePath === '.understandignore';
+      project = setupIncrementalProject({
+        inventoryPaths: [
+          ...(rootIgnore ? ['.understandignore'] : []),
+          'src/existing.ts',
+        ],
+        diskFiles: {
+          ...(rootIgnore ? { '.understandignore': '# original rules\n' } : {}),
+          ...incrementalDiskFiles(['src/existing.ts']),
+        },
+      });
+      const absoluteIgnorePath = join(project.root, ...ignorePath.split('/'));
+      writeFileSync(absoluteIgnorePath, '# changed rules, same membership\n');
+      const before = snapshotScan(project);
+      const changedPath = writeChangedList(project, [ignorePath]);
+
+      const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+      expectScanUnchanged(project, before);
+      const batches = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
+      expect(batches.effectiveChangedFiles).toEqual([ignorePath]);
+    },
+  );
 
   it('does not refresh structural drift in full mode', () => {
     project = setupIncrementalProject({
@@ -1034,7 +1380,7 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
     expect(existsSync(project.batchesPath)).toBe(false);
   });
 
-  it('rejects absolute, drive-relative, and parent traversal paths from drift detection', () => {
+  it('fails closed on absolute, drive-relative, and parent traversal changed paths', () => {
     project = setupIncrementalProject();
     const before = snapshotScan(project);
     const changedPath = writeChangedList(project, [
@@ -1046,12 +1392,59 @@ describe('compute-batches.mjs — changed-file inventory refresh', () => {
 
     const result = runScript(project.root, [`--changed-files=${changedPath}`]);
 
-    expect(result.status).toBe(0);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/invalid changed path/);
+    expect(result.stderr).not.toContain('outside.ts');
     expect(result.stderr).not.toMatch(/refresh-scan-result:/);
     expectScanUnchanged(project, before);
-    const out = JSON.parse(readFileSync(project.batchesPath, 'utf-8'));
-    expect(out.effectiveChangedFiles).toEqual([]);
-    expect(out.totalBatches).toBe(0);
+    expect(existsSync(project.batchesPath)).toBe(false);
+  });
+
+  it('refreshes a real Git tracked deletion without treating definitive absence as degraded', () => {
+    project = setupIncrementalProject({
+      inventoryPaths: ['src/existing.ts', 'src/vanished.ts'],
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'src/vanished.ts']),
+    });
+    const init = spawnSync('git', ['init', '-q'], { cwd: project.root, encoding: 'utf-8' });
+    expect(init.status, init.stderr).toBe(0);
+    execFileSync('git', ['add', '--', 'src/existing.ts', 'src/vanished.ts'], {
+      cwd: project.root,
+    });
+    rmSync(join(project.root, 'src', 'vanished.ts'));
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, ['src/vanished.ts']);
+
+    const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toMatch(/structural drift detected \(file removed\)/);
+    expect(readFileSync(project.scanPath)).not.toEqual(before[0]);
+    const { scan, batches } = readIncrementalArtifacts(project);
+    expect(scan.files.map(file => file.path)).toEqual(['src/existing.ts']);
+    expect(batches.effectiveChangedFiles).toEqual(['src/vanished.ts']);
+  });
+
+  it('fails closed when fallback membership enumeration is degraded', () => {
+    if (process.platform === 'win32' || (process.getuid && process.getuid() === 0)) return;
+    project = setupIncrementalProject({
+      diskFiles: incrementalDiskFiles(['src/existing.ts', 'locked/private.ts']),
+    });
+    const lockedDir = join(project.root, 'locked');
+    chmodSync(lockedDir, 0o000);
+    const before = snapshotScan(project);
+    const changedPath = writeChangedList(project, []);
+
+    try {
+      const result = runScript(project.root, [`--changed-files=${changedPath}`]);
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toMatch(/current project membership is incomplete/);
+      expect(result.stderr).not.toMatch(/refresh-scan-result:/);
+      expectScanUnchanged(project, before);
+      expect(existsSync(project.batchesPath)).toBe(false);
+    } finally {
+      chmodSync(lockedDir, 0o755);
+    }
   });
 
   it.each([

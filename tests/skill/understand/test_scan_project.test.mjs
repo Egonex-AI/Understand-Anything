@@ -4,6 +4,7 @@ import {
   mkdirSync,
   writeFileSync,
   readFileSync,
+  realpathSync,
   rmSync,
   chmodSync,
   existsSync,
@@ -12,13 +13,31 @@ import {
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(
   __dirname,
   '../../../understand-anything-plugin/skills/understand/scan-project.mjs',
 );
+
+function collectMembership(projectRoot, excludePatterns = []) {
+  const probe = spawnSync(process.execPath, ['--input-type=module', '--eval', `
+    import { collectProjectMembership } from ${JSON.stringify(pathToFileURL(SCRIPT).href)};
+    const membership = collectProjectMembership(
+      ${JSON.stringify(projectRoot)},
+      ${JSON.stringify(excludePatterns)},
+    );
+    process.stdout.write(JSON.stringify({
+      ...membership,
+      realPaths: [...membership.realPaths],
+    }));
+  `], { encoding: 'utf-8' });
+  expect(probe.status, probe.stderr).toBe(0);
+  const membership = JSON.parse(probe.stdout);
+  membership.realPaths = new Map(membership.realPaths);
+  return membership;
+}
 
 /**
  * Build a project tree from a `{ relPath: contents }` object. Creates parent
@@ -473,6 +492,66 @@ describe('scan-project.mjs — .understandignore handling', () => {
   });
 });
 
+describe('scan-project.mjs membership-only enumeration', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('matches full-scan membership while applying every scanner filter without content metadata', () => {
+    projectRoot = setupTree({
+      '.gitignore': 'ignored-by-git.ts\n',
+      '.understandignore': 'ignored-by-understand.ts\n',
+      '.ua/private.ts': 'export const privateUa = true;\n',
+      '.understand-anything/private.ts': 'export const privateLegacy = true;\n',
+      'src/keep.ts': 'export const keep = true;\n',
+      'tests/excluded.ts': 'export const excluded = true;\n',
+      'ignored-by-git.ts': 'export const ignoredByGit = true;\n',
+      'ignored-by-understand.ts': 'export const ignoredByUnderstand = true;\n',
+    });
+
+    const full = runScript(projectRoot, ['--exclude', 'tests/**']);
+    expect(full.status, full.stderr).toBe(0);
+
+    const membership = collectMembership(projectRoot, ['tests/**']);
+    expect(membership.degraded).toBe(false);
+    expect(membership.paths).toEqual(full.output.files.map(file => file.path));
+    expect([...membership.realPaths.keys()]).toEqual(membership.paths);
+    for (const [path, realPath] of membership.realPaths) {
+      expect(realPath).toBe(realpathSync(join(projectRoot, ...path.split('/'))));
+    }
+    expect(membership).not.toHaveProperty('files');
+    expect(membership).not.toHaveProperty('sizeLines');
+  });
+
+  it('marks fallback enumeration as degraded when a directory cannot be read', () => {
+    if (process.platform === 'win32' || (process.getuid && process.getuid() === 0)) return;
+    projectRoot = setupTree({
+      'src/keep.ts': 'export const keep = true;\n',
+      'locked/private.ts': 'export const privateValue = true;\n',
+    }, { gitInit: false });
+    const lockedDir = join(projectRoot, 'locked');
+    chmodSync(lockedDir, 0o000);
+
+    try {
+      const membership = collectMembership(projectRoot);
+      expect(membership.degraded).toBe(true);
+      expect(membership.paths).toEqual(['src/keep.ts']);
+
+      const full = runScript(projectRoot);
+      expect(full.status, full.stderr).toBe(0);
+      expect(full.output.degraded).toBe(true);
+      expect(full.output.files.map(file => file.path)).toEqual(['src/keep.ts']);
+    } finally {
+      chmodSync(lockedDir, 0o755);
+    }
+  });
+});
+
 describe('scan-project.mjs — CLI --exclude', () => {
   let projectRoot;
 
@@ -588,6 +667,57 @@ describe('scan-project.mjs — reserved root data directories', () => {
 
     expect(byPath(r.output, 'src/.UA/example.ts')).toBeDefined();
     expect(byPath(r.output, 'src/.UNDERSTAND-ANYTHING/example.ts')).toBeDefined();
+  });
+
+  it('hard-excludes Git-enumerated aliases whose canonical targets are reserved roots', () => {
+    projectRoot = setupTree({
+      '.ua/private.ts': 'export const privateUa = true;\n',
+      '.understand-anything/private.ts': 'export const privateLegacy = true;\n',
+      'src/keep.ts': 'export const keep = true;\n',
+    });
+
+    const aliases = process.platform === 'win32'
+      ? [
+          ['ua-alias', join(projectRoot, '.ua'), 'junction', 'ua-alias/private.ts'],
+          [
+            'legacy-alias',
+            join(projectRoot, '.understand-anything'),
+            'junction',
+            'legacy-alias/private.ts',
+          ],
+        ]
+      : [
+          ['ua-alias.ts', join(projectRoot, '.ua', 'private.ts'), 'file', 'ua-alias.ts'],
+          [
+            'legacy-alias.ts',
+            join(projectRoot, '.understand-anything', 'private.ts'),
+            'file',
+            'legacy-alias.ts',
+          ],
+        ];
+    for (const [name, target, type] of aliases) {
+      symlinkSync(target, join(projectRoot, name), type);
+    }
+
+    const enumerated = spawnSync('git', ['ls-files', '-z', '-co', '--exclude-standard'], {
+      cwd: projectRoot,
+      encoding: 'utf-8',
+    });
+    expect(enumerated.status, enumerated.stderr).toBe(0);
+    const enumeratedPaths = enumerated.stdout.split('\0').filter(Boolean);
+    for (const [, , , expectedPath] of aliases) {
+      expect(enumeratedPaths).toContain(expectedPath);
+    }
+
+    const membership = collectMembership(projectRoot);
+    const full = runScript(projectRoot);
+    expect(full.status, full.stderr).toBe(0);
+    for (const [, , , expectedPath] of aliases) {
+      expect(membership.paths).not.toContain(expectedPath);
+      expect(byPath(full.output, expectedPath)).toBeUndefined();
+    }
+    expect(membership.paths).toContain('src/keep.ts');
+    expect(byPath(full.output, 'src/keep.ts')).toBeDefined();
   });
 });
 
@@ -778,6 +908,7 @@ describe('scan-project.mjs — per-file failure resilience', () => {
     expect(result.status).toBe(0);
     expect(byPath(result.output, 'src/good.ts')).toBeDefined();
     expect(byPath(result.output, 'src/vanished.ts')).toBeUndefined();
+    expect(result.output.degraded).toBe(false);
     expect(result.stderr).toMatch(/src\/vanished\.ts.*stat failed.*file skipped/i);
   });
 
@@ -801,6 +932,7 @@ describe('scan-project.mjs — per-file failure resilience', () => {
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     expect(r.output.scriptCompleted).toBe(true);
+    expect(r.output.degraded).toBe(true);
     // The good file is in the output.
     expect(byPath(r.output, 'src/good.ts')).toBeDefined();
     // The unreadable file is dropped.
@@ -937,6 +1069,7 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(r.status).toBe(0);
     const out = r.output;
     expect(out.scriptCompleted).toBe(true);
+    expect(out.degraded).toBe(false);
     expect(out.excludePatterns).toEqual([]);
     expect(Array.isArray(out.files)).toBe(true);
     expect(typeof out.totalFiles).toBe('number');

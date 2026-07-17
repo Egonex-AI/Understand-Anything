@@ -24,6 +24,7 @@
  * Output JSON:
  *   {
  *     scriptCompleted: true,
+ *     degraded: false,
  *     stats: { filesScanned, filesWithImports, totalEdges },
  *     importMap: { <path>: [<resolvedPath>, ...], ... }
  *   }
@@ -34,9 +35,18 @@
  */
 
 import { createRequire } from 'node:module';
-import { dirname, resolve, join, posix } from 'node:path';
+import {
+  dirname,
+  isAbsolute,
+  resolve,
+  join,
+  posix,
+  relative,
+  sep,
+  win32,
+} from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
 /**
@@ -59,6 +69,22 @@ async function readFilesParallel(paths) {
       }
     }),
   );
+}
+
+async function readDiscoveredFiles(files, canonicalPaths, basename) {
+  const candidates = [];
+  let degraded = false;
+  for (const f of files) {
+    const p = toPosix(f.path);
+    if (posix.basename(p) !== basename) continue;
+    const absPath = canonicalPaths.get(p);
+    if (!absPath) {
+      degraded = true;
+      continue;
+    }
+    candidates.push({ key: p, absPath });
+  }
+  return { reads: await readFilesParallel(candidates), degraded };
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -93,7 +119,87 @@ const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllPar
  * cross-platform.
  */
 function toPosix(p) {
-  return p.split(/[\\/]/).filter(Boolean).join('/');
+  const separator = process.platform === 'win32' ? /[\\/]/ : '/';
+  return p.split(separator).filter(Boolean).join('/');
+}
+
+function isReservedDataPath(path) {
+  const [rootSegment] = path.split('/', 1);
+  const comparable = process.platform === 'win32'
+    ? rootSegment.toLowerCase()
+    : rootSegment;
+  return comparable === '.ua' || comparable === '.understand-anything';
+}
+
+function isSafeInventoryPath(path) {
+  return typeof path === 'string'
+    && path.length > 0
+    && !path.includes('\0')
+    && !path.endsWith('/')
+    && !posix.isAbsolute(path)
+    && (
+      process.platform !== 'win32'
+      || (!path.includes('\\') && !win32.isAbsolute(path) && !/^[A-Za-z]:/.test(path))
+    )
+    && path !== '.'
+    && !path.startsWith('../')
+    && posix.normalize(path) === path
+    && !isReservedDataPath(path);
+}
+
+function isWithinProject(realProjectRoot, realPath) {
+  const fromRoot = relative(realProjectRoot, realPath);
+  return fromRoot !== '..'
+    && !fromRoot.startsWith(`..${sep}`)
+    && !isAbsolute(fromRoot)
+    && (process.platform !== 'win32' || !win32.isAbsolute(fromRoot));
+}
+
+function buildCanonicalFileMap(projectRoot, files) {
+  let realProjectRoot;
+  try {
+    realProjectRoot = realpathSync(projectRoot);
+  } catch {
+    throw new Error('input project root is unavailable or unsafe');
+  }
+
+  const canonicalPaths = new Map();
+  let degraded = false;
+  for (const file of files) {
+    const path = file?.path;
+    if (!isSafeInventoryPath(path) || canonicalPaths.has(path)) {
+      throw new Error('input files must contain unique normalized project-relative paths');
+    }
+
+    let realPath;
+    try {
+      realPath = realpathSync(join(projectRoot, path));
+    } catch {
+      canonicalPaths.set(path, null);
+      degraded = true;
+      continue;
+    }
+    if (!isWithinProject(realProjectRoot, realPath)) {
+      throw new Error('input file resolves outside project root');
+    }
+    const canonicalRelative = relative(realProjectRoot, realPath).split(sep).join('/');
+    if (isReservedDataPath(canonicalRelative)) {
+      throw new Error('input file resolves into a reserved data root');
+    }
+    try {
+      if (!statSync(realPath).isFile()) {
+        canonicalPaths.set(path, null);
+        degraded = true;
+        continue;
+      }
+    } catch {
+      canonicalPaths.set(path, null);
+      degraded = true;
+      continue;
+    }
+    canonicalPaths.set(path, realPath);
+  }
+  return { canonicalPaths, degraded };
 }
 
 /**
@@ -203,21 +309,14 @@ function parseTsConfigText(raw) {
  *      where the stripper damaged a string literal containing `//`.
  *   3. If both fail, warn and skip — that tsconfig contributes no aliases.
  */
-async function loadTsConfigs(projectRoot, files) {
+async function loadTsConfigs(projectRoot, files, canonicalPaths) {
   const out = new Map();
   const warnings = [];
   // Collect the candidate paths in the original file order before reading,
   // so warning emit order matches the previous sequential implementation.
-  const candidates = [];
-  for (const f of files) {
-    const p = toPosix(f.path);
-    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
-    if (base !== 'tsconfig.json') continue;
-    const absPath = join(projectRoot, p);
-    if (!existsSync(absPath)) continue;
-    candidates.push({ key: p, absPath });
-  }
-  const reads = await readFilesParallel(candidates);
+  const { reads, degraded } = await readDiscoveredFiles(
+    files, canonicalPaths, 'tsconfig.json',
+  );
   for (const { key: p, raw, err } of reads) {
     if (err) {
       // absPath isn't carried through the helper return shape; reconstruct it.
@@ -239,7 +338,7 @@ async function loadTsConfigs(projectRoot, files) {
     }
     out.set(dirOf(p), parsed);
   }
-  return { configs: out, warnings };
+  return { configs: out, warnings, degraded: degraded || warnings.length > 0 };
 }
 
 /**
@@ -266,7 +365,7 @@ async function loadTsConfigs(projectRoot, files) {
  * The resolver uses each module's prefix to translate
  * `import "github.com/foo/bar/x"` into the project-internal `x/<file>.go`.
  */
-async function loadGoModules(projectRoot, files) {
+async function loadGoModules(projectRoot, files, canonicalPaths) {
   const out = new Map();
   // loadGoModules currently emits no warnings (read failures are silently
   // skipped — per-file resolvers surface "no ancestor go.mod" later), but
@@ -274,18 +373,14 @@ async function loadGoModules(projectRoot, files) {
   // so the concurrent caller in buildResolutionContext can drain them
   // uniformly in canonical order.
   const warnings = [];
-  const candidates = [];
-  for (const f of files) {
-    const p = toPosix(f.path);
-    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
-    if (base !== 'go.mod') continue;
-    const absPath = join(projectRoot, p);
-    if (!existsSync(absPath)) continue;
-    candidates.push({ key: p, absPath });
-  }
-  const reads = await readFilesParallel(candidates);
+  let { reads, degraded } = await readDiscoveredFiles(
+    files, canonicalPaths, 'go.mod',
+  );
   for (const { key: p, raw, err } of reads) {
-    if (err) continue;
+    if (err) {
+      degraded = true;
+      continue;
+    }
     let moduleName = '';
     for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.replace(/\/\/.*$/, '').trim();
@@ -293,10 +388,13 @@ async function loadGoModules(projectRoot, files) {
       moduleName = trimmed.slice('module '.length).trim();
       break;
     }
-    if (!moduleName) continue;
+    if (!moduleName) {
+      degraded = true;
+      continue;
+    }
     out.set(dirOf(p), moduleName);
   }
-  return { modules: out, warnings };
+  return { modules: out, warnings, degraded };
 }
 
 /**
@@ -365,23 +463,17 @@ function parseSwiftPackageTargets(raw) {
   return targets;
 }
 
-async function loadSwiftPackageTargets(projectRoot, files) {
+async function loadSwiftPackageTargets(projectRoot, files, canonicalPaths) {
   const targets = new Map();
   const warnings = [];
-  const candidates = [];
-
-  for (const f of files) {
-    const p = toPosix(f.path);
-    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
-    if (base !== 'Package.swift') continue;
-    const absPath = join(projectRoot, p);
-    if (!existsSync(absPath)) continue;
-    candidates.push({ key: p, absPath });
-  }
-
-  const reads = await readFilesParallel(candidates);
+  let { reads, degraded } = await readDiscoveredFiles(
+    files, canonicalPaths, 'Package.swift',
+  );
   for (const { key: p, raw, err } of reads) {
-    if (err) continue;
+    if (err) {
+      degraded = true;
+      continue;
+    }
     const packageDir = dirOf(p);
     for (const target of parseSwiftPackageTargets(raw)) {
       const targetPath = resolveRelative(packageDir, target.path.replace(/\\/g, '/'));
@@ -391,7 +483,7 @@ async function loadSwiftPackageTargets(projectRoot, files) {
     }
   }
 
-  return { targets, warnings };
+  return { targets, warnings, degraded };
 }
 
 /**
@@ -436,7 +528,7 @@ function findNearestConfigDir(startDir, configMap) {
  *
  * Build once; pass everywhere.
  */
-async function buildResolutionContext(projectRoot, files) {
+async function buildResolutionContext(projectRoot, files, canonicalPaths) {
   const fileSet = new Set(files.map(f => toPosix(f.path)));
 
   // These config-loader passes are independent and each does its own
@@ -452,10 +544,10 @@ async function buildResolutionContext(projectRoot, files) {
   // a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
   const [tsResult, goResult, phpResult, swiftResult] = await Promise.all([
-    loadTsConfigs(projectRoot, files),
-    loadGoModules(projectRoot, files),
-    loadPhpAutoloads(projectRoot, files),
-    loadSwiftPackageTargets(projectRoot, files),
+    loadTsConfigs(projectRoot, files, canonicalPaths),
+    loadGoModules(projectRoot, files, canonicalPaths),
+    loadPhpAutoloads(projectRoot, files, canonicalPaths),
+    loadSwiftPackageTargets(projectRoot, files, canonicalPaths),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
@@ -502,6 +594,10 @@ async function buildResolutionContext(projectRoot, files) {
     csIndex,
     swiftModuleIndex,
     phpAutoloads,
+    degraded: tsResult.degraded
+      || goResult.degraded
+      || phpResult.degraded
+      || swiftResult.degraded,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
     _warnedNoRustCrateRoot: new Set(),
@@ -946,6 +1042,7 @@ export function resolveGoImport(rawImport, file, ctx) {
     // module-prefixed paths, so suppress duplicates.
     if (!ctx._warnedNoGoModule.has(importerPath)) {
       ctx._warnedNoGoModule.add(importerPath);
+      ctx.degraded = true;
       process.stderr.write(
         `Warning: extract-import-map: Go file ${importerPath} has no ` +
         `ancestor go.mod — import ${src} unresolvable — module-prefix ` +
@@ -1430,19 +1527,12 @@ function parseComposerAutoloadText(raw) {
  * at the bad file and skips it. The rest of the project's PHP imports keep
  * resolving via whichever composer.json files parsed cleanly.
  */
-async function loadPhpAutoloads(projectRoot, files) {
+async function loadPhpAutoloads(projectRoot, files, canonicalPaths) {
   const out = new Map();
   const warnings = [];
-  const candidates = [];
-  for (const f of files) {
-    const p = toPosix(f.path);
-    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
-    if (base !== 'composer.json') continue;
-    const absPath = join(projectRoot, p);
-    if (!existsSync(absPath)) continue;
-    candidates.push({ key: p, absPath });
-  }
-  const reads = await readFilesParallel(candidates);
+  const { reads, degraded } = await readDiscoveredFiles(
+    files, canonicalPaths, 'composer.json',
+  );
   for (const { key: p, raw, err } of reads) {
     if (err) {
       warnings.push(
@@ -1464,7 +1554,7 @@ async function loadPhpAutoloads(projectRoot, files) {
     }
     out.set(dirOf(p), parsed);
   }
-  return { autoloads: out, warnings };
+  return { autoloads: out, warnings, degraded: degraded || warnings.length > 0 };
 }
 
 /**
@@ -1609,6 +1699,7 @@ export function resolveRustImport(rawImport, file, ctx) {
       const importerPath = toPosix(file.path);
       if (!ctx._warnedNoRustCrateRoot.has(importerPath)) {
         ctx._warnedNoRustCrateRoot.add(importerPath);
+        ctx.degraded = true;
         process.stderr.write(
           `Warning: extract-import-map: Rust file ${importerPath} has ` +
           `'use crate::' but no crate root (src/lib.rs or src/main.rs) ` +
@@ -1804,6 +1895,8 @@ async function main() {
   if (!projectRoot || !Array.isArray(files)) {
     throw new Error('Invalid input: must contain projectRoot and files array');
   }
+  const canonical = buildCanonicalFileMap(projectRoot, files);
+  const { canonicalPaths } = canonical;
 
   // Create tree-sitter plugin with all configs that have WASM grammars.
   //
@@ -1816,6 +1909,7 @@ async function main() {
   // (file inventory, exports inferred from filenames, etc.) keeps working.
   let registry = null;
   let treeSitterReady = false;
+  let degraded = canonical.degraded;
   try {
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
     const tsPlugin = new TreeSitterPlugin(tsConfigs);
@@ -1825,6 +1919,7 @@ async function main() {
     registerAllParsers(registry);
     treeSitterReady = true;
   } catch (err) {
+    degraded = true;
     process.stderr.write(
       `Warning: extract-import-map: tree-sitter init failed ` +
       `(${err.message}) — all importMap entries will be empty — ` +
@@ -1835,7 +1930,8 @@ async function main() {
   // Build resolution context (cached configs). The loader pass for the
   // tsconfig/go.mod/composer.json files inside is parallelised — see
   // `buildResolutionContext`.
-  const ctx = await buildResolutionContext(projectRoot, files);
+  const ctx = await buildResolutionContext(projectRoot, files, canonicalPaths);
+  degraded ||= ctx.degraded;
 
   const importMap = {};
   let filesWithImports = 0;
@@ -1858,13 +1954,24 @@ async function main() {
       continue;
     }
 
-    const absolutePath = join(projectRoot, file.path);
+    const absolutePath = canonicalPaths.get(path);
+
+    if (!absolutePath) {
+      degraded = true;
+      process.stderr.write(
+        `Warning: extract-import-map: import resolution failed for ${path} ` +
+        `(read error: canonical path unavailable) — importMap[${path}]=[]\n`,
+      );
+      importMap[path] = [];
+      continue;
+    }
 
     // Read file content (per-file resilience)
     let content;
     try {
       content = readFileSync(absolutePath, 'utf-8');
     } catch (err) {
+      degraded = true;
       process.stderr.write(
         `Warning: extract-import-map: import resolution failed for ${path} ` +
         `(read error: ${err.message}) — importMap[${path}]=[]\n`,
@@ -1916,6 +2023,7 @@ async function main() {
           : a.localeCompare(b),
       );
     } catch (err) {
+      degraded = true;
       process.stderr.write(
         `Warning: extract-import-map: import resolution failed for ${path} ` +
         `(analyze error: ${err.message}) — importMap[${path}]=[]\n`,
@@ -1933,6 +2041,7 @@ async function main() {
 
   const output = {
     scriptCompleted: true,
+    degraded: degraded || ctx.degraded,
     stats: {
       filesScanned: files.length,
       filesWithImports,

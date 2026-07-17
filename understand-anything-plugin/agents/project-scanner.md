@@ -80,6 +80,7 @@ Output JSON shape (you will read this verbatim and merge into the final scan-res
 ```json
 {
   "scriptCompleted": true,
+  "degraded": false,
   "excludePatterns": ["tests/*", "docs/*"],
   "files": [
     {"path": "src/index.ts", "language": "typescript", "sizeLines": 150, "fileCategory": "code"},
@@ -103,6 +104,7 @@ The script:
 - emits `fileCategory ∈ {code, config, docs, infra, data, script, markup}` per file (priority-ordered per the rules below)
 - emits `language` as a non-null string for every file (canonical id for known extensions, lowercased extension for unknowns, `"unknown"` for no-extension files that don't match `Dockerfile` / `Makefile` / `Jenkinsfile`)
 - emits the normalized CLI patterns as `excludePatterns` for retained incremental-refresh state
+- always emits a boolean `degraded`; `true` means enumeration or a source read was incomplete, while full scans remain best-effort
 - counts `filteredByIgnore` as the user-provided-rule delta beyond hardcoded defaults; final `!`-negation from `.understandignore` or `--exclude` correctly re-includes files
 - emits `Warning: scan-project: <path> — <reason> — file skipped from output` on stderr for per-file failures (permission denied, malformed unicode, vanished file). Capture these and append to phase warnings.
 - emits `scan-project: filesScanned=… filteredByIgnore=… complexity=…` as the final stderr summary line; informational only.
@@ -162,6 +164,7 @@ The output JSON has shape:
 ```json
 {
   "scriptCompleted": true,
+  "degraded": false,
   "stats": { "filesScanned": 314, "filesWithImports": 142, "totalEdges": 487 },
   "importMap": {
     "src/index.ts": ["src/utils.ts", "src/config.ts"],
@@ -174,7 +177,7 @@ The output JSON has shape:
 
 Read the output JSON and merge the `importMap` field directly into your final scan-result.json (under the same key — `importMap`). The format matches the project-scanner contract: every input file has an entry; non-code files have empty arrays; resolved internal paths only (external packages are dropped).
 
-**Capture stderr** when you run the bundled script. Any line starting with `Warning:` should be appended to phase warnings — the SKILL.md orchestrator captures these for the final report. The script also writes a one-line summary `extract-import-map: filesScanned=… filesWithImports=… totalEdges=…` on completion; you can ignore that line or surface it as informational.
+**Capture stderr** when you run the bundled script. Any line starting with `Warning:` should be appended to phase warnings — the SKILL.md orchestrator captures these for the final report. The output always includes a boolean `degraded`; full scans may retain best-effort results when it is `true`, while deterministic incremental refresh rejects such partial output. The script also writes a one-line summary `extract-import-map: filesScanned=… filesWithImports=… totalEdges=…` on completion; you can ignore that line or surface it as informational.
 
 **Languages supported.** The bundled script natively handles import resolution for: TypeScript, JavaScript (including CJS `require()`), Python (relative + absolute + `__init__.py`), Go (go.mod prefix stripping), Rust (`use crate::`, `use super::`, `use self::`, and `mod x;` declarations), Java, Kotlin, Scala (dotted FQN + selector lists + package objects), C#, Ruby (`require` + `require_relative`), PHP (composer.json PSR-4 autoload), C, and C++ (`#include` with relative + include/ + src/ probes). Languages outside this set get empty arrays — there is no LLM-based fallback.
 
@@ -189,7 +192,7 @@ After Steps A + B + C have all completed, read:
 
 Do NOT re-walk the file tree, re-count lines, or re-derive categories — trust `scan-project.mjs` entirely. Do NOT re-implement import resolution — trust `extract-import-map.mjs` entirely.
 
-**IMPORTANT:** The final output must NOT contain the `scriptCompleted` or `stats` fields from either bundled script, nor your transient `rawDescription` / `readmeHead` work-strings. Strip them when assembling the final JSON. The final `importMap` MUST equal the `importMap` field from `extract-import-map.mjs` verbatim (do not edit, re-sort, or filter it). The final `files` array and `excludePatterns` array MUST equal their Step B values verbatim (do not re-order, drop, or augment them).
+**IMPORTANT:** The final output must NOT contain the transient `scriptCompleted`, `degraded`, or `stats` fields from either bundled script, nor your transient `rawDescription` / `readmeHead` work-strings. Strip them when assembling the final JSON. The final `importMap` MUST equal the `importMap` field from `extract-import-map.mjs` verbatim (do not edit, re-sort, or filter it). The final `files` array and `excludePatterns` array MUST equal their Step B values verbatim (do not re-order, drop, or augment them).
 
 Your only synthesis task in this phase is the final `description` field:
 

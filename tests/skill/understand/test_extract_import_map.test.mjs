@@ -1,5 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -48,6 +55,63 @@ function runScript(projectRoot, input, extraNodeArgs = []) {
   return { status: result.status, stdout: result.stdout, stderr: result.stderr, output };
 }
 
+describe('extract-import-map.mjs — canonical input containment', () => {
+  let projectRoot;
+  let outsideRoot;
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+    if (outsideRoot) rmSync(outsideRoot, { recursive: true, force: true });
+  });
+
+  it('rejects an input alias whose canonical target is outside the project', () => {
+    projectRoot = setupTree({ 'src/safe.ts': 'export const safe = true;\n' });
+    outsideRoot = setupTree({ 'outside.ts': 'export const SECRET_EXTERNAL = true;\n' });
+    symlinkSync(
+      outsideRoot,
+      join(projectRoot, 'linked'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'linked/outside.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toBeNull();
+    expect(result.stderr).toMatch(/input file.*outside project root/i);
+    expect(result.stderr).not.toContain('SECRET_EXTERNAL');
+    expect(result.stderr).not.toContain(outsideRoot);
+  });
+
+  it('rejects an input alias whose canonical target is a reserved data root', () => {
+    projectRoot = setupTree({
+      '.ua/private.ts': 'export const SECRET_RESERVED = true;\n',
+      'src/safe.ts': 'export const safe = true;\n',
+    });
+    symlinkSync(
+      join(projectRoot, '.ua'),
+      join(projectRoot, 'storage-alias'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'storage-alias/private.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toBeNull();
+    expect(result.stderr).toMatch(/input file.*reserved data root/i);
+    expect(result.stderr).not.toContain('SECRET_RESERVED');
+  });
+});
+
 describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
   let projectRoot;
 
@@ -78,6 +142,7 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
 
     expect(result.status).toBe(0);
     expect(result.output.scriptCompleted).toBe(true);
+    expect(result.output.degraded).toBe(false);
     expect(result.output.importMap['src/index.ts']).toEqual([
       'src/config.ts',
       'src/utils.ts',
@@ -758,6 +823,7 @@ describe('extract-import-map.mjs — Go resolver', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.output.degraded).toBe(true);
     expect(result.output.importMap['orphan/main.go']).toEqual([]);
     const goModWarnings = result.stderr
       .split('\n')
@@ -1469,6 +1535,7 @@ describe('extract-import-map.mjs — per-file failure resilience', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.output.degraded).toBe(true);
     // Script completed cleanly
     expect(result.output.scriptCompleted).toBe(true);
     // Real files resolved
@@ -1479,6 +1546,24 @@ describe('extract-import-map.mjs — per-file failure resilience', () => {
     // A warning was emitted on stderr for the missing file
     expect(result.stderr).toMatch(/Warning: extract-import-map: import resolution failed for src\/missing\.ts/);
     expect(result.stderr).toMatch(/importMap\[src\/missing\.ts\]=\[\]/);
+  });
+
+  it('marks output degraded when a discovered config file vanishes before loading', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const ok = true;\n',
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.degraded).toBe(true);
+    expect(result.output.importMap['src/index.ts']).toEqual([]);
   });
 
   it('emits a stats summary on stderr', () => {
@@ -1778,6 +1863,7 @@ describe('extract-import-map.mjs — composer.json malformed', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.output.degraded).toBe(true);
     // Warning fired on stderr (with the parse error context).
     expect(result.stderr).toMatch(
       /Warning: extract-import-map: composer\.json at .* failed to parse/,
@@ -1818,6 +1904,7 @@ describe('extract-import-map.mjs — tsconfig parse resilience', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.output.degraded).toBe(true);
     expect(result.stderr).toMatch(
       /Warning: extract-import-map: tsconfig\.json at .* failed to parse/,
     );
@@ -1895,6 +1982,7 @@ describe('extract-import-map.mjs — Rust crate root missing', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.output.degraded).toBe(true);
     // Importer file gets the warning exactly once even though there are two
     // unresolvable `use crate::` statements.
     const crateRootWarnings = result.stderr
@@ -1965,6 +2053,7 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
     expect(result.status).toBe(0);
     // Script completed cleanly with the documented degraded output.
     expect(result.output.scriptCompleted).toBe(true);
+    expect(result.output.degraded).toBe(true);
     expect(result.stderr).toMatch(
       /Warning: extract-import-map: tree-sitter init failed/,
     );

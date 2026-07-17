@@ -20,7 +20,11 @@ import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
-import { main as refreshScanResult } from './refresh-scan-result.mjs';
+import {
+  main as refreshScanResult,
+  readPendingInventoryJournal,
+} from './refresh-scan-result.mjs';
+import { collectProjectMembership } from './scan-project.mjs';
 
 /**
  * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
@@ -52,7 +56,15 @@ import louvain from 'graphology-communities-louvain';
  *
  * Returns Map<path, string[]>.
  */
-async function extractExports(projectRoot, codeFiles) {
+async function extractExports(projectRoot, codeFiles, verifiedRealPaths = null) {
+  const readPaths = new Map();
+  for (const file of codeFiles) {
+    if (verifiedRealPaths && !verifiedRealPaths.has(file.path)) {
+      throw new Error('verified project membership is missing an inventory path');
+    }
+    readPaths.set(file.path, verifiedRealPaths?.get(file.path) ?? join(projectRoot, file.path));
+  }
+
   let registry;
   try {
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
@@ -84,7 +96,7 @@ async function extractExports(projectRoot, codeFiles) {
     // captured in-place so a single bad file does not abort the chunk.
     const reads = await Promise.all(
       slice.map(async (file) => {
-        const abs = join(projectRoot, file.path);
+        const abs = readPaths.get(file.path);
         try {
           const content = await readFile(abs, 'utf-8');
           return { file, content, readError: null };
@@ -245,9 +257,11 @@ function buildBatchOfMap(allBatches) {
   return m;
 }
 
-function normalizeRelativePathForMatch(pathText) {
-  return pathText
-    .replace(/\\/g, '/')
+export function normalizeRelativePathForMatch(pathText, platform = process.platform) {
+  const platformPath = platform === 'win32'
+    ? pathText.replace(/\\/g, '/')
+    : pathText;
+  return platformPath
     .replace(/^\.\/+/, '')
     .replace(/\/+/g, '/');
 }
@@ -257,8 +271,10 @@ function resolveChangedProjectFile(projectRoot, normalizedPath) {
     !normalizedPath
     || normalizedPath.includes('\0')
     || isAbsolute(normalizedPath)
-    || win32.isAbsolute(normalizedPath)
-    || /^[A-Za-z]:/.test(normalizedPath)
+    || (
+      process.platform === 'win32'
+      && (win32.isAbsolute(normalizedPath) || /^[A-Za-z]:/.test(normalizedPath))
+    )
   ) {
     return null;
   }
@@ -270,22 +286,60 @@ function resolveChangedProjectFile(projectRoot, normalizedPath) {
     || roundTrip === '..'
     || roundTrip.startsWith('../')
     || isAbsolute(roundTrip)
-    || win32.isAbsolute(roundTrip)
+    || (process.platform === 'win32' && win32.isAbsolute(roundTrip))
   ) {
     return null;
   }
   return absolutePath;
 }
 
-function collectValidInventoryPaths(projectRoot, scan) {
+function isReservedDataPath(path) {
+  const [rootSegment] = path.split('/', 1);
+  const comparable = process.platform === 'win32'
+    ? rootSegment.toLowerCase()
+    : rootSegment;
+  return comparable === '.ua' || comparable === '.understand-anything';
+}
+
+function collectStrictInventoryPaths(projectRoot, scan) {
+  if (!scan || !Array.isArray(scan.files)) {
+    throw new Error('retained scan files must be an array');
+  }
+
   const paths = new Set();
-  for (const file of scan.files || []) {
-    const normalizedPath = normalizeRelativePathForMatch(file.path);
-    if (resolveChangedProjectFile(projectRoot, normalizedPath)) {
-      paths.add(normalizedPath);
+  for (const file of scan.files) {
+    const path = file?.path;
+    if (
+      typeof path !== 'string'
+      || path.length === 0
+      || normalizeRelativePathForMatch(path) !== path
+      || !resolveChangedProjectFile(projectRoot, path)
+      || isReservedDataPath(path)
+    ) {
+      throw new Error(`invalid retained inventory path: ${path}`);
     }
+    if (paths.has(path)) throw new Error(`duplicate retained inventory path: ${path}`);
+    paths.add(path);
   }
   return paths;
+}
+
+function collectRetainedExcludePatterns(scan) {
+  if (scan.excludePatterns === undefined) return [];
+  if (
+    !Array.isArray(scan.excludePatterns)
+    || scan.excludePatterns.some(pattern => (
+      typeof pattern !== 'string'
+      || pattern.length === 0
+      || pattern.trim() !== pattern
+      || pattern.includes(',')
+    ))
+  ) {
+    throw new Error(
+      'retained scan excludePatterns must be an array of normalized non-empty strings',
+    );
+  }
+  return scan.excludePatterns;
 }
 
 export function isChangedPathFile(absolutePath, stat = statSync) {
@@ -317,20 +371,11 @@ function isWithinRealProjectRoot(realProjectRoot, absolutePath) {
   return realRelative !== '..'
     && !realRelative.startsWith('../')
     && !isAbsolute(realRelative)
-    && !win32.isAbsolute(realRelative);
+    && (process.platform !== 'win32' || !win32.isAbsolute(realRelative));
 }
 
-function findStructuralDrift(projectRoot, uaDir, inventoryPaths, changedFiles) {
-  const activeUaPath = relative(projectRoot, uaDir).split(sep).join('/');
-  const activeIgnorePath = normalizeRelativePathForMatch(
-    `${activeUaPath}/.understandignore`,
-  );
+function validateChangedPathContainment(projectRoot, changedFiles) {
   const realProjectRoot = resolveRealPathForContainment(projectRoot, 'project root');
-  let reason = changedFiles.has('.understandignore')
-    || changedFiles.has(activeIgnorePath)
-    ? 'ignore rules changed'
-    : null;
-
   for (const changedPath of changedFiles) {
     const absolutePath = resolveChangedProjectFile(projectRoot, changedPath);
     if (!absolutePath) continue;
@@ -339,11 +384,52 @@ function findStructuralDrift(projectRoot, uaDir, inventoryPaths, changedFiles) {
     if (existsOnDisk && !isWithinRealProjectRoot(realProjectRoot, absolutePath)) {
       throw new Error('changed path resolves outside project root');
     }
-    if (!reason && existsOnDisk !== inventoryPaths.has(changedPath)) {
-      reason = existsOnDisk ? 'file added' : 'file removed';
+  }
+}
+
+function validateRetainedInventoryContainment(projectRoot, inventoryPaths) {
+  const realProjectRoot = resolveRealPathForContainment(projectRoot, 'project root');
+  for (const inventoryPath of inventoryPaths) {
+    const absolutePath = resolveChangedProjectFile(projectRoot, inventoryPath);
+    if (!absolutePath || !isChangedPathFile(absolutePath)) continue;
+
+    const realPath = resolveRealPathForContainment(
+      absolutePath,
+      'retained inventory path',
+    );
+    const realRelative = relative(realProjectRoot, realPath).split(sep).join('/');
+    if (
+      realRelative === '..'
+      || realRelative.startsWith('../')
+      || isAbsolute(realRelative)
+      || (process.platform === 'win32' && win32.isAbsolute(realRelative))
+    ) {
+      throw new Error('retained inventory path resolves outside project root');
+    }
+    if (isReservedDataPath(realRelative)) {
+      throw new Error('retained inventory path resolves into a reserved data root');
     }
   }
-  return reason;
+}
+
+function compareMembership(inventoryPaths, currentPaths) {
+  const removed = [...inventoryPaths].filter(path => !currentPaths.has(path));
+  const added = [...currentPaths].filter(path => !inventoryPaths.has(path));
+  return { removed, added };
+}
+
+function describeMembershipDrift(projectRoot, uaDir, changedFiles, delta) {
+  const activeUaPath = relative(projectRoot, uaDir).split(sep).join('/');
+  const activeIgnorePath = normalizeRelativePathForMatch(
+    `${activeUaPath}/.understandignore`,
+  );
+  if (
+    changedFiles.has('.understandignore')
+    || changedFiles.has(activeIgnorePath)
+  ) {
+    return 'ignore rules changed';
+  }
+  return delta.removed.length > 0 ? 'file removed' : 'file added';
 }
 
 function refreshScanInventory(projectRoot, reason) {
@@ -492,7 +578,10 @@ async function main() {
       const lines = content
         .split(nulDelimited ? '\0' : '\n')
         .map(line => normalizeRelativePathForMatch(nulDelimited ? line : line.trim()))
-        .filter(line => resolveChangedProjectFile(projectRoot, line));
+        .filter(Boolean);
+      if (lines.some(line => !resolveChangedProjectFile(projectRoot, line))) {
+        throw new Error('invalid changed path');
+      }
       changedFiles = new Set(lines);
     }
   }
@@ -506,26 +595,52 @@ async function main() {
 
   let scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
   let effectiveChangedFiles = null;
+  let verifiedRealPaths = null;
   if (changedFiles) {
     effectiveChangedFiles = new Set(changedFiles);
-    if (changedFiles.size > 0) {
-      const inventoryBeforeRefresh = collectValidInventoryPaths(projectRoot, scan);
-      const driftReason = findStructuralDrift(
+    const inventoryBeforeRefresh = collectStrictInventoryPaths(projectRoot, scan);
+    validateChangedPathContainment(projectRoot, changedFiles);
+    validateRetainedInventoryContainment(projectRoot, inventoryBeforeRefresh);
+    const pendingJournal = readPendingInventoryJournal(
+      projectRoot,
+      uaDir,
+      inventoryBeforeRefresh,
+    );
+    for (const path of pendingJournal?.paths ?? []) {
+      effectiveChangedFiles.add(path);
+    }
+    const excludePatterns = collectRetainedExcludePatterns(scan);
+    const membership = collectProjectMembership(projectRoot, excludePatterns);
+    if (membership.degraded) {
+      throw new Error('current project membership is incomplete');
+    }
+    const currentPaths = new Set(membership.paths);
+    verifiedRealPaths = membership.realPaths;
+    const delta = compareMembership(inventoryBeforeRefresh, currentPaths);
+    if (delta.removed.length > 0 || delta.added.length > 0) {
+      const driftReason = describeMembershipDrift(
         projectRoot,
         uaDir,
-        inventoryBeforeRefresh,
         changedFiles,
+        delta,
       );
-      if (driftReason) {
-        refreshScanInventory(projectRoot, driftReason);
-        scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
-        const inventoryAfterRefresh = collectValidInventoryPaths(projectRoot, scan);
-        for (const path of inventoryBeforeRefresh) {
-          if (!inventoryAfterRefresh.has(path)) effectiveChangedFiles.add(path);
-        }
-        for (const path of inventoryAfterRefresh) {
-          if (!inventoryBeforeRefresh.has(path)) effectiveChangedFiles.add(path);
-        }
+      refreshScanInventory(projectRoot, driftReason);
+      scan = JSON.parse(readFileSync(scanPath, 'utf-8'));
+      const inventoryAfterRefresh = collectStrictInventoryPaths(projectRoot, scan);
+      const refreshedDelta = compareMembership(inventoryAfterRefresh, currentPaths);
+      if (refreshedDelta.removed.length > 0 || refreshedDelta.added.length > 0) {
+        throw new Error('refreshed inventory does not match current project membership');
+      }
+      const refreshedJournal = readPendingInventoryJournal(
+        projectRoot,
+        uaDir,
+        inventoryAfterRefresh,
+      );
+      if (!refreshedJournal) {
+        throw new Error('inventory refresh did not persist pending changes');
+      }
+      for (const path of refreshedJournal.paths) {
+        effectiveChangedFiles.add(path);
       }
     }
   }
@@ -536,7 +651,7 @@ async function main() {
 
   process.stderr.write(`Loaded ${files.length} files (${codeFiles.length} code).\n`);
 
-  const exportsByPath = await extractExports(projectRoot, codeFiles);
+  const exportsByPath = await extractExports(projectRoot, codeFiles, verifiedRealPaths);
 
   let algorithm = 'louvain';
   let perFileCommunity;
