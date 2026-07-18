@@ -312,6 +312,7 @@ const config: DashboardViteConfig = {
   },
 
   build: {
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         manualChunks(id) {

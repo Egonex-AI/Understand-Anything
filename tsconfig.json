@@ -12,5 +12,11 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
-  }
+  },
+  "files": [],
+  "references": [
+    { "path": "./understand-anything-plugin" },
+    { "path": "./understand-anything-plugin/packages/core" },
+    { "path": "./understand-anything-plugin/packages/dashboard" }
+  ]
 }
