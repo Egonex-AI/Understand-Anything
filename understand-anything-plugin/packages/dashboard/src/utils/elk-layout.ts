@@ -140,28 +140,7 @@ export function repairElkInput(
     maybeThrow(strict, issue);
   }
 
-  // 4. dropOrphanEdges
-  let orphanEdges = 0;
-  const edges = input.edges.filter((e) => {
-    const ok = e.sources.every((s) => allIds.has(s)) &&
-      e.targets.every((t) => allIds.has(t));
-    if (!ok) {
-      orphanEdges++;
-      return false;
-    }
-    return true;
-  });
-  if (orphanEdges > 0) {
-    const issue = makeIssue(
-      "dropped",
-      "elk-orphan-edge",
-      `Dropped ${orphanEdges} edge(s) referencing nonexistent nodes.`,
-    );
-    issues.push(issue);
-    maybeThrow(strict, issue);
-  }
-
-  // 5. dropCircularContainment
+  // 4. dropCircularContainment
   const parentOf = new Map<string, string>();
   const fillParents = (children: ElkChild[], parent?: string) => {
     for (const c of children) {
@@ -200,6 +179,53 @@ export function repairElkInput(
       "dropped",
       "elk-containment-cycle",
       `Dropped ${cyclesRemoved} node(s) in containment cycles.`,
+    );
+    issues.push(issue);
+    maybeThrow(strict, issue);
+  }
+
+  // 5. dropOrphanEdges — this is the single reconciliation point that validates
+  // edges against the FINAL child tree (childrenD). It therefore drops edges
+  // pointing at nodes removed by ANY prior pass: original ghost endpoints, the
+  // orphan-child pass (step 3, which carries dropped parents' whole c.children
+  // subtrees out), and the containment-cycle pass (step 4). Per-pass drop
+  // attribution (which pass removed the endpoint) is deliberately NOT tracked
+  // here; if that traceability is ever needed, the orphan-child/cycle passes
+  // would each return { children, removedIds } and filter their own edges.
+  const finalIds = new Set<string>();
+  const walkFinal = (children: ElkChild[]) => {
+    for (const c of children) {
+      finalIds.add(c.id);
+      if (c.children) walkFinal(c.children);
+    }
+  };
+  walkFinal(childrenD);
+  let orphanEdges = 0;
+  const droppedEdgeIds: string[] = [];
+  const edges = input.edges.filter((e) => {
+    const ok = e.sources.every((s) => finalIds.has(s)) &&
+      e.targets.every((t) => finalIds.has(t));
+    if (!ok) {
+      orphanEdges++;
+      droppedEdgeIds.push(e.id);
+      return false;
+    }
+    return true;
+  });
+  if (orphanEdges > 0) {
+    // Include the dropped edge ids so distinct losses across re-layouts produce
+    // distinct messages — store.ts appendLayoutIssues dedupes by `level|message`,
+    // so a generic count would swallow a fresh single-edge drop on a later run.
+    const MAX_LISTED = 20;
+    const listed = droppedEdgeIds.slice(0, MAX_LISTED).join(", ");
+    const suffix =
+      droppedEdgeIds.length > MAX_LISTED
+        ? `${listed}, …(+${droppedEdgeIds.length - MAX_LISTED} more)`
+        : listed;
+    const issue = makeIssue(
+      "dropped",
+      "elk-orphan-edge",
+      `Dropped ${orphanEdges} edge(s) referencing nonexistent nodes: ${suffix}.`,
     );
     issues.push(issue);
     maybeThrow(strict, issue);
