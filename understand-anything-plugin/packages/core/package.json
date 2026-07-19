@@ -13,6 +13,10 @@
       "types": "./dist/search.d.ts",
       "default": "./dist/search.js"
     },
+    "./embedding-search": {
+      "types": "./dist/embedding-search.d.ts",
+      "default": "./dist/embedding-search.js"
+    },
     "./types": {
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"

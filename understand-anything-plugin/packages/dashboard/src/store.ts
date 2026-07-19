@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { SearchEngine } from "@understand-anything/core/search";
 import type { SearchResult } from "@understand-anything/core/search";
+import {
+  HashingEmbedder,
+  SemanticSearchEngine,
+  embedGraphNodes,
+} from "@understand-anything/core/embedding-search";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import type {
   GraphNode,
@@ -110,6 +115,14 @@ interface DashboardStore {
   searchQuery: string;
   searchResults: SearchResult[];
   searchEngine: SearchEngine | null;
+  /**
+   * Lazy-built semantic search engine over a `HashingEmbedder` index of the
+   * graph nodes. Set when a graph is loaded; cleared on graph replacement.
+   * Falls back to `null` when there are no nodes to index.
+   */
+  semanticEngine: SemanticSearchEngine | null;
+  /** Same embedder used to seed the index — re-used to embed search queries. */
+  embedder: HashingEmbedder | null;
   searchMode: "fuzzy" | "semantic";
   setSearchMode: (mode: "fuzzy" | "semantic") => void;
 
@@ -287,6 +300,28 @@ function layerResetIfChanged(
   };
 }
 
+/**
+ * Run a search query through the right engine for the requested mode.
+ *
+ * Semantic mode falls back to fuzzy when the semantic index isn't ready
+ * (no embedder, no engine, or no nodes) so the UI never silently returns
+ * zero results just because of a startup race.
+ */
+function runSearch(
+  query: string,
+  mode: "fuzzy" | "semantic",
+  fuzzyEngine: SearchEngine | null,
+  semanticEngine: SemanticSearchEngine | null,
+  embedder: HashingEmbedder | null,
+): SearchResult[] {
+  if (!fuzzyEngine) return [];
+  if (mode === "semantic" && semanticEngine && embedder) {
+    const queryVec = embedder.embed(query);
+    return semanticEngine.search(queryVec);
+  }
+  return fuzzyEngine.search(query);
+}
+
 export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   graph: null,
   nodesById: new Map<string, GraphNode>(),
@@ -296,6 +331,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   searchQuery: "",
   searchResults: [],
   searchEngine: null,
+  semanticEngine: null,
+  embedder: null,
   searchMode: "fuzzy",
 
   navigationLevel: "overview",
@@ -365,8 +402,21 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   setGraph: (graph) => {
     const searchEngine = new SearchEngine(graph.nodes);
+
+    // Build the semantic index in-memory: hash each node's text once and
+    // hand the resulting vectors to SemanticSearchEngine. The same embedder
+    // is kept on the store so search queries can be vectorised identically.
+    const embedder = graph.nodes.length > 0 ? new HashingEmbedder() : null;
+    const semanticEngine = embedder
+      ? new SemanticSearchEngine(graph.nodes, embedGraphNodes(graph.nodes, embedder))
+      : null;
+
     const query = get().searchQuery;
-    const searchResults = query.trim() ? searchEngine.search(query) : [];
+    const mode = get().searchMode;
+    const searchResults = query.trim()
+      ? runSearch(query, mode, searchEngine, semanticEngine, embedder)
+      : [];
+
     const { viewMode, domainGraph, activeDomainId } = get();
     // Preserve domain view if a domain graph is already loaded
     const keepDomainView = viewMode === "domain" && domainGraph !== null;
@@ -377,6 +427,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       nodeIdToLayerId,
       nodeIdToLayerIds,
       searchEngine,
+      semanticEngine,
+      embedder,
       searchResults,
       navigationLevel: "overview",
       activeLayerId: null,
@@ -529,18 +581,28 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       expandedContainers: new Set(),
       pendingFocusContainer: null,
     }),
-  setSearchMode: (mode) => set({ searchMode: mode }),
+  setSearchMode: (mode) => {
+    // Switching modes re-runs the current query so results stay in sync
+    // with the new mode without the user having to retype.
+    const { searchQuery, searchEngine, semanticEngine, embedder } = get();
+    const results = searchQuery.trim()
+      ? runSearch(searchQuery, mode, searchEngine, semanticEngine, embedder)
+      : [];
+    set({ searchMode: mode, searchResults: results });
+  },
   setSearchQuery: (query) => {
-    const engine = get().searchEngine;
-    const mode = get().searchMode;
-    if (!engine || !query.trim()) {
+    const { searchEngine, semanticEngine, embedder, searchMode } = get();
+    if (!searchEngine || !query.trim()) {
       set({ searchQuery: query, searchResults: [] });
       return;
     }
-    // Currently both modes use the same fuzzy engine
-    // When embeddings are available, "semantic" mode will use SemanticSearchEngine
-    void mode;
-    const searchResults = engine.search(query);
+    const searchResults = runSearch(
+      query,
+      searchMode,
+      searchEngine,
+      semanticEngine,
+      embedder,
+    );
     set({ searchQuery: query, searchResults });
   },
 
