@@ -887,6 +887,277 @@ class LinkTestsTests(unittest.TestCase):
                 self.assertEqual(prod["tags"], ["tested"])
 
 
+# ── Cross-dir basename fallback (issue #302) ──────────────────────────────
+
+
+class CrossDirBasenameFallbackTests(unittest.TestCase):
+    """The Pass-2b fallback that bridges flat `tests/` ↔ `src/<subdir>/`
+    layouts via a basename index.
+
+    The exact-path candidate list emitted by `production_candidates` cannot
+    enumerate every production subdir from a test path. These tests cover
+    the layouts that would otherwise produce zero supplemental edges even
+    though the basename mapping is unambiguous (issue #302).
+    """
+
+    # ── Python ────────────────────────────────────────────────────────
+
+    def test_python_flat_tests_to_src_pkg(self) -> None:
+        # Canonical Python layout: production code under `src/<pkg>/` and a
+        # flat `tests/` directory at the project root. Previously this
+        # produced 0 supplemental edges; the basename fallback should now
+        # pair them correctly.
+        nodes_by_id = {
+            "file:src/pkg/foo.py": _file_node("src/pkg/foo.py"),
+            "file:tests/test_foo.py": _file_node("tests/test_foo.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (1, 0, 1, 0))
+        tested_by = [e for e in edges if e["type"] == "tested_by"]
+        self.assertEqual(len(tested_by), 1)
+        self.assertEqual(tested_by[0]["source"], "file:src/pkg/foo.py")
+        self.assertEqual(tested_by[0]["target"], "file:tests/test_foo.py")
+        self.assertEqual(tested_by[0]["direction"], "forward")
+        self.assertIn("tested", nodes_by_id["file:src/pkg/foo.py"]["tags"])
+
+    def test_python_flat_tests_suffix_form(self) -> None:
+        # The `foo_test.py` suffix form should pair the same way as `test_foo.py`.
+        nodes_by_id = {
+            "file:src/pkg/foo.py": _file_node("src/pkg/foo.py"),
+            "file:tests/foo_test.py": _file_node("tests/foo_test.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/pkg/foo.py")
+        self.assertEqual(edges[0]["target"], "file:tests/foo_test.py")
+
+    def test_python_flat_tests_to_pkg_without_src(self) -> None:
+        # No `src/` prefix — production package sits at the project root.
+        # `pkg/foo.py` ↔ `tests/test_foo.py`. The exact-path candidate list
+        # only produces `tests/foo.py`, `foo.py`, `src/foo.py`, `app/foo.py`,
+        # `lib/foo.py` — none of which match.
+        nodes_by_id = {
+            "file:pkg/foo.py": _file_node("pkg/foo.py"),
+            "file:tests/test_foo.py": _file_node("tests/test_foo.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:pkg/foo.py")
+        self.assertEqual(edges[0]["target"], "file:tests/test_foo.py")
+
+    def test_python_exact_path_still_preferred_over_fallback(self) -> None:
+        # If both `src/pkg/foo.py` and `foo.py` exist (and there's a test
+        # `tests/test_foo.py`), the existing exact-path candidate
+        # `foo.py` (or `src/foo.py`) wins over the basename-fallback
+        # `src/pkg/foo.py`. Tier 1 must run before Tier 2.
+        nodes_by_id = {
+            "file:foo.py": _file_node("foo.py"),
+            "file:src/pkg/foo.py": _file_node("src/pkg/foo.py"),
+            "file:tests/test_foo.py": _file_node("tests/test_foo.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        # The exact-path candidate `foo.py` (mirrored to project root)
+        # should win over the basename-fallback subdir match.
+        self.assertEqual(edges[0]["source"], "file:foo.py")
+
+    def test_python_no_production_at_all_no_edge(self) -> None:
+        # Pure test file with no plausible production counterpart. Even
+        # the basename fallback must not invent edges.
+        nodes_by_id = {
+            "file:tests/test_missing.py": _file_node("tests/test_missing.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (0, 0))
+
+    def test_python_basename_collision_prefers_src(self) -> None:
+        # Two production files have the same basename `foo.py` — one under
+        # `src/pkg/`, one elsewhere. The fallback should prefer the one
+        # under `src/` (recognized production root).
+        nodes_by_id = {
+            "file:src/pkg/foo.py": _file_node("src/pkg/foo.py"),
+            "file:scripts/foo.py": _file_node("scripts/foo.py"),
+            "file:tests/test_foo.py": _file_node("tests/test_foo.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/pkg/foo.py")
+
+    def test_python_basename_collision_tie_breaker_is_deterministic(self) -> None:
+        # Two production files both under `src/` with the same basename —
+        # the fallback must pick one deterministically (alphabetical on
+        # equal scores).
+        nodes_by_id = {
+            "file:src/aaa/foo.py": _file_node("src/aaa/foo.py"),
+            "file:src/zzz/foo.py": _file_node("src/zzz/foo.py"),
+            "file:tests/test_foo.py": _file_node("tests/test_foo.py"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, _tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual(added, 1)
+        # Lexicographic tie-break — `src/aaa/...` wins over `src/zzz/...`.
+        self.assertEqual(edges[0]["source"], "file:src/aaa/foo.py")
+
+    # ── Go (same-dir _test.go must keep working) ──────────────────────
+
+    def test_go_same_dir_test_pairs_via_exact_path(self) -> None:
+        # Go's `pkg/foo.go` ↔ `pkg/foo_test.go` was always covered by the
+        # exact-path sibling rule. The fallback addition must not regress
+        # this — assert the edge is produced exactly once.
+        nodes_by_id = {
+            "file:pkg/foo.go": _file_node("pkg/foo.go"),
+            "file:pkg/foo_test.go": _file_node("pkg/foo_test.go"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:pkg/foo.go")
+        self.assertEqual(edges[0]["target"], "file:pkg/foo_test.go")
+
+    def test_go_nested_pkg_with_test_in_separate_top_dir(self) -> None:
+        # Less idiomatic for Go but possible: `internal/svc/foo.go` paired
+        # with `tests/foo_test.go`. The exact-path list won't enumerate
+        # `internal/svc/...` from a flat test path — basename fallback
+        # should pick it up.
+        nodes_by_id = {
+            "file:internal/svc/foo.go": _file_node("internal/svc/foo.go"),
+            "file:tests/foo_test.go": _file_node("tests/foo_test.go"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:internal/svc/foo.go")
+
+    # ── TypeScript / JavaScript ───────────────────────────────────────
+
+    def test_ts_underscore_tests_to_src_pkg(self) -> None:
+        # JS/TS convention: `src/pkg/foo.ts` ↔ `__tests__/foo.test.ts`
+        # at the project root. The existing mirror logic only produces
+        # `src/foo.ts`, `app/foo.ts`, `lib/foo.ts`, `foo.ts` — it can't
+        # see the `pkg/` subdir from the test path.
+        nodes_by_id = {
+            "file:src/pkg/foo.ts": _file_node("src/pkg/foo.ts"),
+            "file:__tests__/foo.test.ts": _file_node("__tests__/foo.test.ts"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/pkg/foo.ts")
+        self.assertEqual(edges[0]["target"], "file:__tests__/foo.test.ts")
+
+    def test_ts_flat_tests_dir_to_src_pkg(self) -> None:
+        # `tests/foo.test.ts` ↔ `src/pkg/foo.ts` — same problem as
+        # `__tests__/`. Both top-level test dirs should hit the fallback.
+        nodes_by_id = {
+            "file:src/pkg/foo.ts": _file_node("src/pkg/foo.ts"),
+            "file:tests/foo.test.ts": _file_node("tests/foo.test.ts"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/pkg/foo.ts")
+
+    def test_ts_sibling_test_still_works(self) -> None:
+        # The `src/foo.test.ts` (test alongside source) pattern was always
+        # covered. The fallback must not regress sibling pairings.
+        nodes_by_id = {
+            "file:src/foo.ts": _file_node("src/foo.ts"),
+            "file:src/foo.test.ts": _file_node("src/foo.test.ts"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/foo.ts")
+
+    def test_ts_extension_family_fallback_picks_tsx(self) -> None:
+        # A `foo.test.ts` may test a `foo.tsx` file. When the basename
+        # fallback runs, it should still respect the JS/TS extension family
+        # priority — prefer `.ts` (matches test's extension), then `.tsx`,
+        # etc. Here only `.tsx` exists, so it should match.
+        nodes_by_id = {
+            "file:src/components/Button.tsx": _file_node("src/components/Button.tsx"),
+            "file:__tests__/Button.test.ts": _file_node("__tests__/Button.test.ts"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/components/Button.tsx")
+
+    def test_ts_does_not_link_test_to_test_via_fallback(self) -> None:
+        # If only test files share a basename, the fallback must not link
+        # them — `is_test_path` classification keeps production-only in
+        # the basename index.
+        nodes_by_id = {
+            "file:tests/foo.test.ts": _file_node("tests/foo.test.ts"),
+            "file:__tests__/foo.test.ts": _file_node("__tests__/foo.test.ts"),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, tagged), (0, 0))
+
+    # ── Coexistence with Pass 1 (LLM-emitted edges) ───────────────────
+
+    def test_fallback_skipped_when_llm_already_paired(self) -> None:
+        # If Pass 1 already covers the test (via swap or canonical edge),
+        # Pass 2b must NOT emit a duplicate basename-based edge.
+        nodes_by_id = {
+            "file:src/pkg/foo.py": _file_node("src/pkg/foo.py"),
+            "file:tests/test_foo.py": _file_node("tests/test_foo.py"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:tests/test_foo.py",
+                "target": "file:src/pkg/foo.py",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.7,
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, swapped, tagged), (0, 0, 1, 1))
+        tested_by = [e for e in edges if e["type"] == "tested_by"]
+        self.assertEqual(len(tested_by), 1)
+        # The swapped LLM edge survived; no duplicate from the fallback.
+        self.assertEqual(tested_by[0]["source"], "file:src/pkg/foo.py")
+        self.assertEqual(tested_by[0]["weight"], 0.7)
+
+
 # ── merge_and_normalize integration ───────────────────────────────────────
 
 class MergeIntegrationTests(unittest.TestCase):
