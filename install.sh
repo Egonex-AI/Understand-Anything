@@ -9,8 +9,8 @@
 #   ./install.sh --help
 #
 # Curl-pipe usage:
-#   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/Lum1104/Understand-Anything/main/install.sh | bash -s codex
+#   curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
 #
 # Environment:
 #   UA_REPO_URL  Override clone URL (default: official GitHub repo)
@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-REPO_URL="${UA_REPO_URL:-https://github.com/Lum1104/Understand-Anything.git}"
+REPO_URL="${UA_REPO_URL:-https://github.com/Egonex-AI/Understand-Anything.git}"
 REPO_DIR="${UA_DIR:-$HOME/.understand-anything/repo}"
 PLUGIN_LINK="$HOME/.understand-anything-plugin"
 
@@ -39,6 +39,9 @@ vscode|$HOME/.copilot/skills|per-skill
 hermes|$HOME/.hermes/skills|folder
 cline|$HOME/.cline/skills|folder
 kimi|$HOME/.kimi/skills|folder
+trae|$HOME/.trae/skills|per-skill
+nanobot|$HOME/.nanobot/workspace/skills|per-skill
+kiro|$HOME/.kiro/skills|per-skill
 EOF
 }
 
@@ -188,11 +191,46 @@ cmd_install() {
   printf -- '→ Linking universal plugin root\n'
   link_plugin_root
 
+  if [[ "$id" == "kiro" ]]; then
+    printf -- '→ Creating Kiro agent configuration\n'
+    mkdir -p "$HOME/.kiro/agents"
+    local plugin_root="$REPO_DIR/understand-anything-plugin"
+
+    # Build the "resources" list dynamically from the agent definitions in the
+    # repo so it never drifts as agents are added or removed. Deterministic
+    # order via LC_ALL=C sort; no external deps (no jq) so it runs anywhere.
+    local resources="" agent_md
+    while IFS= read -r agent_md; do
+      [[ -n "$agent_md" ]] || continue
+      [[ -n "$resources" ]] && resources+=$',\n'
+      resources+="    \"file://$agent_md\""
+    done < <(find "$plugin_root/agents" -maxdepth 1 -type f -name '*.md' | LC_ALL=C sort)
+
+    cat > "$HOME/.kiro/agents/understand.json" <<KIROEOF
+{
+  "name": "understand",
+  "description": "Analyze codebase into interactive knowledge graph — Understand Anything",
+  "prompt": "file://$plugin_root/skills/understand/SKILL.md",
+  "tools": ["read", "write", "shell", "grep", "glob", "code", "subagent"],
+  "resources": [
+$resources
+  ]
+}
+KIROEOF
+    printf '  ✓ %s\n' "$HOME/.kiro/agents/understand.json"
+  fi
+
   printf '\n✓ Installed Understand-Anything for %s\n' "$id"
   printf '  Restart your CLI or IDE to pick up the skills.\n'
+  if [[ "$id" == "codex" ]]; then
+    printf '\n  Tip: Codex invokes skills with $ instead of / — type $understand, not /understand.\n'
+  fi
   if [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'
     printf '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.\n'
+  fi
+  if [[ "$id" == "kiro" ]]; then
+    printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
   fi
 }
 
@@ -205,6 +243,10 @@ cmd_uninstall() {
 
   printf -- '→ Removing skill links for %s\n' "$id"
   unlink_skills "$target" "$style"
+  if [[ "$id" == "kiro" && -f "$HOME/.kiro/agents/understand.json" ]]; then
+    rm -f "$HOME/.kiro/agents/understand.json"
+    printf '  ✓ removed %s\n' "$HOME/.kiro/agents/understand.json"
+  fi
   if [[ -L "$PLUGIN_LINK" ]]; then
     rm -f "$PLUGIN_LINK"
     printf '  ✓ removed %s\n' "$PLUGIN_LINK"

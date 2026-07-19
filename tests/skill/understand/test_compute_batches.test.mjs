@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -10,9 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(__dirname, '../../../understand-anything-plugin/skills/understand/compute-batches.mjs');
 const FIXTURES = resolve(__dirname, 'fixtures');
 
-function runScript(projectRoot, extraArgs = []) {
+function runScript(projectRoot, extraArgs = [], env = process.env) {
   return spawnSync('node', [SCRIPT, projectRoot, ...extraArgs], {
     encoding: 'utf-8',
+    env,
   });
 }
 
@@ -25,9 +26,51 @@ function setupProject(fixtureName) {
   return root;
 }
 
+// Variant of setupProject that seeds the fixture into an arbitrary data
+// directory name (`.ua` for fresh projects, `.understand-anything` for legacy).
+function setupProjectInDir(fixtureName, dirName) {
+  const root = mkdtempSync(join(tmpdir(), 'ua-cb-dir-test-'));
+  mkdirSync(join(root, dirName, 'intermediate'), { recursive: true });
+  const fixturePath = join(FIXTURES, fixtureName);
+  writeFileSync(
+    join(root, dirName, 'intermediate', 'scan-result.json'),
+    readFileSync(fixturePath, 'utf-8'),
+  );
+  return root;
+}
+
 function readBatches(projectRoot) {
   const p = join(projectRoot, '.understand-anything', 'intermediate', 'batches.json');
   return JSON.parse(readFileSync(p, 'utf-8'));
+}
+
+function setupAmbiguousRingProject() {
+  const root = mkdtempSync(join(tmpdir(), 'ua-cb-ring-'));
+  mkdirSync(join(root, '.understand-anything', 'intermediate'), { recursive: true });
+
+  const paths = ['zeta', 'äther', 'åland']
+    .flatMap(dir => ['a', 'b', 'c', 'd'].map(name => `src/${dir}/${name}.ts`));
+  for (const path of paths) {
+    const absolutePath = join(root, ...path.split('/'));
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, 'export {};\n');
+  }
+
+  const importMap = Object.fromEntries(paths.map((path, index) => [
+    path,
+    [paths[(index + 1) % paths.length]],
+  ]));
+  const files = paths.map(path => ({
+    path,
+    language: 'typescript',
+    sizeLines: 1,
+    fileCategory: 'code',
+  }));
+  writeFileSync(
+    join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
+    JSON.stringify({ files, importMap }),
+  );
+  return root;
 }
 
 describe('compute-batches.mjs — Louvain basic', () => {
@@ -77,6 +120,130 @@ describe('compute-batches.mjs — Louvain basic', () => {
     );
 
     expect(json1).toBe(json2);
+  });
+});
+
+describe('compute-batches.mjs - deterministic Louvain', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('writes byte-identical batches for an ambiguous ring across fresh subprocesses', () => {
+    projectRoot = setupAmbiguousRingProject();
+    const outputPath = join(
+      projectRoot,
+      '.understand-anything',
+      'intermediate',
+      'batches.json',
+    );
+    const locales = ['en_US.UTF-8', 'sv_SE.UTF-8'];
+    const outputs = [];
+
+    for (let run = 0; run < 8; run++) {
+      const locale = locales[run % locales.length];
+      const result = runScript(projectRoot, [], {
+        ...process.env,
+        LANG: locale,
+        LC_ALL: locale,
+      });
+      expect(result.status).toBe(0);
+      outputs.push(readFileSync(outputPath, 'utf-8'));
+    }
+
+    expect(new Set(outputs).size).toBe(1);
+  }, 20_000);
+});
+
+describe('compute-batches.mjs — explicit benchmark paths', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('reads and writes outside the project data directory when requested', () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'ua-cb-explicit-'));
+    const scanPath = join(projectRoot, 'benchmark-input', 'scan-result.json');
+    const outputPath = join(projectRoot, 'benchmark-output', 'batches.json');
+    mkdirSync(dirname(scanPath), { recursive: true });
+    writeFileSync(
+      scanPath,
+      readFileSync(join(FIXTURES, 'scan-result-3-cliques.json'), 'utf-8'),
+    );
+
+    const result = runScript(projectRoot, [
+      `--scan-result=${scanPath}`,
+      `--output=${outputPath}`,
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(join(projectRoot, '.ua'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.understand-anything'))).toBe(false);
+
+    const batches = JSON.parse(readFileSync(outputPath, 'utf-8'));
+    expect(batches.totalFiles).toBe(9);
+    expect(batches.totalBatches).toBe(3);
+  });
+});
+
+describe('compute-batches.mjs - invalid benchmark path options', () => {
+  let testRoot;
+
+  afterEach(() => {
+    if (testRoot) rmSync(testRoot, { recursive: true, force: true });
+  });
+
+  const scanOption = '--scan-result={scan}';
+  const outputOption = '--output={output}';
+  const changedOption = '--changed-files={changed}';
+  const invalidCases = [
+    ['an unknown option', [scanOption, '--ouput={output}']],
+    ['an unexpected positional argument', [scanOption, outputOption, 'unexpected']],
+    ['an empty --changed-files value', [scanOption, outputOption, '--changed-files=']],
+    ['an empty --scan-result value', ['--scan-result=', scanOption, outputOption]],
+    ['an empty --output value', [scanOption, '--output=']],
+    ['split --changed-files form', [scanOption, outputOption, '--changed-files', '{changed}']],
+    ['split --scan-result form', ['--scan-result', '{scan}', scanOption, outputOption]],
+    ['split --output form', [scanOption, '--output', '{output}']],
+    ['duplicate --changed-files options', [
+      scanOption, outputOption, changedOption, changedOption,
+    ]],
+    ['duplicate --scan-result options', [scanOption, scanOption, outputOption]],
+    ['duplicate --output options', [scanOption, outputOption, '--output={secondOutput}']],
+  ];
+
+  it.each(invalidCases)('rejects %s without creating a subject data directory', (
+    _name,
+    argTemplates,
+  ) => {
+    testRoot = mkdtempSync(join(tmpdir(), 'ua-cb-invalid-'));
+    const projectRoot = join(testRoot, 'subject-项目');
+    const scanPath = join(testRoot, 'input data', 'scan-result.json');
+    const outputPath = join(testRoot, 'output data', 'batches.json');
+    const secondOutputPath = join(testRoot, 'other output', 'batches.json');
+    const changedPath = join(testRoot, 'changed files.txt');
+    mkdirSync(projectRoot, { recursive: true });
+    mkdirSync(dirname(scanPath), { recursive: true });
+    writeFileSync(scanPath, JSON.stringify({ files: [], importMap: {} }));
+    writeFileSync(changedPath, 'src/example.ts\n');
+
+    const paths = {
+      changed: changedPath,
+      scan: scanPath,
+      output: outputPath,
+      secondOutput: secondOutputPath,
+    };
+    const args = argTemplates.map(arg =>
+      arg.replace(/\{(\w+)\}/g, (_match, key) => paths[key]));
+    const result = runScript(projectRoot, args);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/Error: compute-batches: (invalid|duplicate) option/);
+    expect(existsSync(join(projectRoot, '.ua'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.understand-anything'))).toBe(false);
   });
 });
 
@@ -577,20 +744,22 @@ describe('compute-batches.mjs — --changed-files', () => {
     if (root) rmSync(root, { recursive: true, force: true });
   });
 
-  it('emits only batches containing changed files', () => {
+  it('emits only changed files from retained batches with Windows-style changed-file paths', () => {
     root = setupProject('scan-result-3-cliques.json');
     const changedPath = join(root, 'changed.txt');
-    // Only the auth clique is changed
-    writeFileSync(changedPath, ['src/auth/login.ts', 'src/auth/tokens.ts'].join('\n'));
+    // Only two files in the auth clique are changed. Use CRLF plus one
+    // backslash path to cover Windows git diff/path-list inputs.
+    writeFileSync(changedPath, ['src\\auth\\login.ts', 'src/auth/tokens.ts'].join('\r\n'));
 
     const result = runScript(root, [`--changed-files=${changedPath}`]);
     expect(result.status).toBe(0);
 
     const out = readBatches(root);
-    // Auth files are in batches; other cliques' batches must be omitted
+    // Auth files are retained, but the unchanged auth file from the original
+    // full-graph batch must not be analyzed in changed-files mode.
     const allPaths = out.batches.flatMap(b => b.files.map(f => f.path));
-    expect(allPaths).toContain('src/auth/login.ts');
-    expect(allPaths).toContain('src/auth/tokens.ts');
+    expect(allPaths.sort()).toEqual(['src/auth/login.ts', 'src/auth/tokens.ts']);
+    expect(allPaths).not.toContain('src/auth/session.ts');
     expect(allPaths).not.toContain('src/api/handlers.ts');
     expect(allPaths).not.toContain('src/db/users.ts');
 
@@ -598,5 +767,153 @@ describe('compute-batches.mjs — --changed-files', () => {
     const loginBatch = out.batches.find(b =>
       b.files.some(f => f.path === 'src/auth/login.ts'));
     expect(loginBatch).toBeDefined();
+  });
+
+  it('does not emit unchanged same-community files as analysis targets', () => {
+    root = setupProject('scan-result-3-cliques.json');
+    const changedPath = join(root, 'changed.txt');
+    writeFileSync(changedPath, 'src/auth/login.ts\n');
+
+    const result = runScript(root, [`--changed-files=${changedPath}`]);
+    expect(result.status).toBe(0);
+
+    const out = readBatches(root);
+    expect(out.totalBatches).toBe(1);
+    expect(out.batches).toHaveLength(1);
+
+    const [batch] = out.batches;
+    expect(batch.files.map(f => f.path)).toEqual(['src/auth/login.ts']);
+    expect(Object.keys(batch.batchImportData)).toEqual(['src/auth/login.ts']);
+    expect(batch.batchImportData['src/auth/login.ts'].sort()).toEqual([
+      'src/auth/session.ts',
+      'src/auth/tokens.ts',
+    ]);
+    expect((batch.neighborMap['src/auth/login.ts'] || []).map(n => n.path).sort()).toEqual([
+      'src/auth/session.ts',
+      'src/auth/tokens.ts',
+    ]);
+  });
+
+  it('emits only changed files inside retained batches while preserving unchanged neighbor context', () => {
+    root = mkdtempSync(join(tmpdir(), 'ua-cb-changed-nbr-'));
+    mkdirSync(join(root, '.understand-anything', 'intermediate'), { recursive: true });
+    mkdirSync(join(root, 'src', 'a'), { recursive: true });
+    mkdirSync(join(root, 'src', 'b'), { recursive: true });
+
+    writeFileSync(join(root, 'src', 'a', 'core.ts'),
+      'export function findUser(id: string) { return null; }\nexport class User {}\n');
+    writeFileSync(join(root, 'src', 'a', 'helper1.ts'),
+      'import { findUser } from "./core";\nexport const h1 = () => findUser("x");\n');
+    writeFileSync(join(root, 'src', 'a', 'helper2.ts'),
+      'import { User } from "./core";\nimport { h1 } from "./helper1";\nexport const h2 = () => h1();\n');
+
+    writeFileSync(join(root, 'src', 'b', 'entry.ts'),
+      'import { findUser } from "../a/core";\nexport const entry = () => findUser("y");\n');
+    writeFileSync(join(root, 'src', 'b', 'middle.ts'),
+      'import { entry } from "./entry";\nexport const middle = () => entry();\n');
+    writeFileSync(join(root, 'src', 'b', 'leaf.ts'),
+      'import { middle } from "./middle";\nexport const leaf = () => middle();\n');
+
+    const files = [
+      { path: 'src/a/core.ts',    language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/a/helper1.ts', language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/a/helper2.ts', language: 'typescript', sizeLines: 3, fileCategory: 'code' },
+      { path: 'src/b/entry.ts',   language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/b/middle.ts',  language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+      { path: 'src/b/leaf.ts',    language: 'typescript', sizeLines: 2, fileCategory: 'code' },
+    ];
+    const scan = {
+      name: 'changed-neighbor-test', description: '',
+      languages: ['typescript'], frameworks: [],
+      files,
+      totalFiles: 6, filteredByIgnore: 0, estimatedComplexity: 'small',
+      importMap: {
+        'src/a/core.ts': [],
+        'src/a/helper1.ts': ['src/a/core.ts'],
+        'src/a/helper2.ts': ['src/a/core.ts', 'src/a/helper1.ts'],
+        'src/b/entry.ts': ['src/a/core.ts'],
+        'src/b/middle.ts': ['src/b/entry.ts'],
+        'src/b/leaf.ts': ['src/b/middle.ts'],
+      },
+    };
+    writeFileSync(
+      join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
+      JSON.stringify(scan));
+
+    const changedPath = join(root, 'changed.txt');
+    writeFileSync(changedPath, 'src/b/entry.ts\n');
+
+    const result = runScript(root, [`--changed-files=${changedPath}`]);
+    expect(result.status).toBe(0);
+
+    const out = readBatches(root);
+    expect(out.totalBatches).toBe(1);
+    expect(out.batches).toHaveLength(1);
+
+    const [batch] = out.batches;
+    expect(batch.files.map(f => f.path)).toEqual(['src/b/entry.ts']);
+    expect(Object.keys(batch.batchImportData)).toEqual(['src/b/entry.ts']);
+    expect(Object.keys(batch.neighborMap)).toEqual(['src/b/entry.ts']);
+
+    const neighbors = batch.neighborMap['src/b/entry.ts'];
+    expect(neighbors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: 'src/a/core.ts',
+        symbols: expect.arrayContaining(['findUser', 'User']),
+      }),
+      expect.objectContaining({
+        path: 'src/b/middle.ts',
+        symbols: expect.arrayContaining(['middle']),
+      }),
+    ]));
+    expect(neighbors.find(n => n.path === 'src/a/core.ts').batchIndex).not.toBe(batch.batchIndex);
+    expect(neighbors.find(n => n.path === 'src/b/middle.ts').batchIndex).toBe(batch.batchIndex);
+  });
+});
+
+describe('compute-batches.mjs — data-dir resolution (.ua vs legacy)', () => {
+  let root;
+
+  afterEach(() => {
+    if (root) rmSync(root, { recursive: true, force: true });
+  });
+
+  it('fresh project reads scan-result from .ua/ and writes batches.json there', () => {
+    root = setupProjectInDir('scan-result-3-cliques.json', '.ua');
+    const result = runScript(root);
+    expect(result.status).toBe(0);
+
+    // Output landed in .ua/, and the legacy dir was never created.
+    expect(existsSync(join(root, '.ua', 'intermediate', 'batches.json'))).toBe(true);
+    expect(existsSync(join(root, '.understand-anything'))).toBe(false);
+
+    const batches = JSON.parse(
+      readFileSync(join(root, '.ua', 'intermediate', 'batches.json'), 'utf-8'),
+    );
+    expect(batches.totalFiles).toBe(9);
+    expect(batches.batches.length).toBe(3);
+  });
+
+  it('legacy project keeps using .understand-anything/ (no migration)', () => {
+    // Legacy-compat regression: an existing .understand-anything/ dir wins for
+    // both read and write even though .ua/ is the new default.
+    root = setupProjectInDir('scan-result-3-cliques.json', '.understand-anything');
+    const result = runScript(root);
+    expect(result.status).toBe(0);
+
+    expect(existsSync(join(root, '.understand-anything', 'intermediate', 'batches.json'))).toBe(true);
+    expect(existsSync(join(root, '.ua'))).toBe(false);
+  });
+
+  it('legacy dir wins when both .understand-anything/ and .ua/ exist', () => {
+    root = setupProjectInDir('scan-result-3-cliques.json', '.understand-anything');
+    // A stray empty .ua/ must not divert reads/writes away from the legacy dir.
+    mkdirSync(join(root, '.ua', 'intermediate'), { recursive: true });
+
+    const result = runScript(root);
+    expect(result.status).toBe(0);
+
+    expect(existsSync(join(root, '.understand-anything', 'intermediate', 'batches.json'))).toBe(true);
+    expect(existsSync(join(root, '.ua', 'intermediate', 'batches.json'))).toBe(false);
   });
 });

@@ -112,6 +112,38 @@ describe("PluginRegistry", () => {
     expect(result).toBeNull();
   });
 
+  it("analyzeFileFull delegates when the plugin implements it", () => {
+    const registry = new PluginRegistry();
+    const plugin = createMockPlugin("ts-plugin", ["typescript"]);
+    plugin.analyzeFileFull = () => ({
+      structure: {
+        ...emptyAnalysis,
+        functions: [{ name: "hello", lineRange: [1, 5], params: [] }],
+      },
+      callGraph: [{ caller: "hello", callee: "world", lineNumber: 2 }],
+    });
+    registry.register(plugin);
+
+    const result = registry.analyzeFileFull("src/test.ts", "const x = 1;");
+    expect(result).not.toBeNull();
+    expect(result!.structure.functions).toHaveLength(1);
+    expect(result!.callGraph).toHaveLength(1);
+  });
+
+  it("analyzeFileFull returns null when the plugin lacks the method (caller falls back)", () => {
+    const registry = new PluginRegistry();
+    registry.register(createMockPlugin("ts-plugin", ["typescript"]));
+    const result = registry.analyzeFileFull("src/test.ts", "const x = 1;");
+    expect(result).toBeNull();
+  });
+
+  it("analyzeFileFull returns null for unsupported files", () => {
+    const registry = new PluginRegistry();
+    registry.register(createMockPlugin("ts-plugin", ["typescript"]));
+    const result = registry.analyzeFileFull("main.py", "print('hello')");
+    expect(result).toBeNull();
+  });
+
   it("unregister rebuilds language map correctly", () => {
     const registry = new PluginRegistry();
     const plugin1 = createMockPlugin("plugin1", ["typescript", "javascript"]);

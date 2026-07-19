@@ -1,7 +1,7 @@
 ---
 name: understand-dashboard
 description: Launch the interactive web dashboard to visualize a codebase's knowledge graph
-argument-hint: [project-path]
+argument-hint: "[project-path]"
 ---
 
 # /understand-dashboard
@@ -10,13 +10,43 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Instructions
 
-1. Determine the project directory:
+1. Determine the project directory and data directory:
    - If `$ARGUMENTS` contains a path, use that as the project directory
    - Otherwise, use the current working directory
+   - Prefer the legacy `.understand-anything/` data directory when it exists, otherwise use `.ua/`
 
-2. Check that `.understand-anything/knowledge-graph.json` exists in the project directory. If not, tell the user:
+   Use the Bash tool to resolve:
+   ```bash
+   PROJECT_ARG="$ARGUMENTS"
+   if [ -n "$PROJECT_ARG" ]; then
+     PROJECT_DIR=$(cd "$PROJECT_ARG" 2>/dev/null && pwd -P)
+   else
+     PROJECT_DIR=$(pwd -P)
+   fi
+
+   if [ -z "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR" ]; then
+     echo "Error: Project directory not found: ${PROJECT_ARG:-$PWD}"
+     exit 1
+   fi
+
+   if [ -d "$PROJECT_DIR/.understand-anything" ]; then
+     UA_DIR="$PROJECT_DIR/.understand-anything"
+   else
+     UA_DIR="$PROJECT_DIR/.ua"
+   fi
+   ```
+
+2. Check that `$UA_DIR/knowledge-graph.json` exists in the project directory. If not, tell the user:
    ```
    No knowledge graph found. Run /understand first to analyze this project.
+   ```
+
+   Use the Bash tool to check:
+   ```bash
+   if [ ! -f "$UA_DIR/knowledge-graph.json" ]; then
+     echo "No knowledge graph found. Run /understand first to analyze this project."
+     exit 1
+   fi
    ```
 
 3. Find the dashboard code. The dashboard is at `packages/dashboard/` relative to this plugin's root directory. Check these paths in order and use the first that exists:
@@ -66,33 +96,52 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
      echo "Make sure you followed the installation instructions for your platform."
      exit 1
    fi
+
+   DASHBOARD_DIR="$PLUGIN_ROOT/packages/dashboard"
    ```
 
-4. Install dependencies and build if needed:
+4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball; run it pinned to the installed plugin version:
    ```bash
-   cd <dashboard-dir> && pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
+   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
+   PLUGIN_VERSION=$(node -p "require('$PLUGIN_ROOT/package.json').version")
+   VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
+   npx --yes "$VIEWER_URL" "$PROJECT_DIR"
+   ```
+   Run this in the background. It prints the same `🔑  Dashboard URL` line as the dev server:
+   - If the line appears, **skip steps 5-6** and continue at step 7.
+   - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
+
+5. Fallback: install dependencies and build if needed:
+   ```bash
+   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
+   DASHBOARD_DIR="${DASHBOARD_DIR:-$PLUGIN_ROOT/packages/dashboard}"
+   cd "$DASHBOARD_DIR" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
    ```
    Then ensure the core package is built (the dashboard depends on it):
    ```bash
-   cd <plugin-root> && pnpm --filter @understand-anything/core build
+   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
+   cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
    ```
 
-5. Start the Vite dev server pointing at the project's knowledge graph:
+6. Fallback: start the Vite dev server pointing at the project's knowledge graph:
    ```bash
-   cd <dashboard-dir> && GRAPH_DIR=<project-dir> npx vite --host 127.0.0.1
+   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
+   : "${DASHBOARD_DIR:?Run step 5 first so DASHBOARD_DIR is set}"
+   cd "$DASHBOARD_DIR" && GRAPH_DIR="$PROJECT_DIR" npx vite --host 127.0.0.1
    ```
    Run this in the background so the user can continue working.
 
-6. **Capture the access token URL from the server output.** The Vite server prints a line like:
+7. **Capture the access token URL from the server output.** The server (viewer or Vite) prints a line like:
    ```
    🔑  Dashboard URL: http://127.0.0.1:<PORT>?token=<TOKEN>
    ```
    Extract the full URL including the `?token=` parameter. The token is required to access the knowledge graph data — without it the dashboard will show an "Access Token Required" gate.
 
-7. Report to the user, including the full tokenized URL:
+8. Report to the user, including the full tokenized URL:
    ```
    Dashboard started at http://127.0.0.1:<PORT>?token=<TOKEN>
-   Viewing: <project-dir>/.understand-anything/knowledge-graph.json
+   Viewing: $UA_DIR/knowledge-graph.json
 
    The dashboard is running in the background. Press Ctrl+C in the terminal to stop it.
    ```
@@ -100,6 +149,7 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Notes
 
-- The dashboard auto-opens in the default browser via `--open`
-- If port 5173 is already in use, Vite will pick the next available port
-- The `GRAPH_DIR` environment variable tells the dashboard where to find the knowledge graph
+- The fast path (step 4) downloads a version-pinned, self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs
+- The dashboard auto-opens in the default browser (both the viewer and Vite's `--open`)
+- If port 5173 is already in use, the next available port is picked (both paths)
+- In the fallback, the `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph

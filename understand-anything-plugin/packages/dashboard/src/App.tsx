@@ -15,6 +15,7 @@ import PersonaSelector from "./components/PersonaSelector";
 import ProjectOverview from "./components/ProjectOverview";
 import FileExplorer from "./components/FileExplorer";
 import WarningBanner from "./components/WarningBanner";
+import StalenessBanner from "./components/StalenessBanner";
 import TokenGate from "./components/TokenGate";
 import MobileLayout from "./components/MobileLayout";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -24,6 +25,12 @@ import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
 import type { ThemeConfig } from "./themes/index.ts";
 import { I18nProvider, useI18n } from "./contexts/I18nContext.tsx";
+import {
+  requestFreshnessReport,
+  shouldRequestFreshness,
+  startFreshnessRefresh,
+  type DashboardFreshnessReport,
+} from "./freshness";
 
 // Lazy-load heavy / optional components so they ship in separate chunks.
 const CodeViewer = lazy(() => import("./components/CodeViewer"));
@@ -55,9 +62,12 @@ function dataUrl(fileName: string, token: string | null): string {
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
       "config.json": import.meta.env.VITE_CONFIG_URL,
+      "staleness.json": import.meta.env.VITE_STALENESS_URL,
     };
     const url = envMap[fileName];
     if (url) return url;
+    const base = import.meta.env.BASE_URL || "/";
+    return `${base.endsWith("/") ? base : `${base}/`}${fileName}`;
   }
   const path = `/${fileName}`;
   return token ? `${path}?token=${encodeURIComponent(token)}` : path;
@@ -111,6 +121,8 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [graphIssues, setGraphIssues] = useState<GraphIssue[]>([]);
+  const [graphFreshness, setGraphFreshness] =
+    useState<DashboardFreshnessReport | null>(null);
   const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
   const [outputLanguage, setOutputLanguage] = useState<string | undefined>();
 
@@ -163,6 +175,28 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setGraph]);
 
   useEffect(() => {
+    if (
+      !shouldRequestFreshness(
+        DEMO_MODE,
+        import.meta.env.VITE_STALENESS_URL,
+      )
+    ) {
+      setGraphFreshness(null);
+      return;
+    }
+
+    return startFreshnessRefresh({
+      target: window,
+      load: (signal) =>
+        requestFreshnessReport(
+          dataUrl("staleness.json", accessToken),
+          signal,
+        ),
+      onResult: setGraphFreshness,
+    });
+  }, [accessToken]);
+
+  useEffect(() => {
     fetch(dataUrl("diff-overlay.json", accessToken))
       .then((res) => {
         if (!res.ok) return null;
@@ -211,6 +245,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
           accessToken={accessToken}
           loadError={loadError}
           graphIssues={graphIssues}
+          graphFreshness={graphFreshness}
         />
       </ThemeProvider>
     </I18nProvider>
@@ -221,10 +256,12 @@ function DashboardContent({
   accessToken,
   loadError,
   graphIssues,
+  graphFreshness,
 }: {
   accessToken: string;
   loadError: string | null;
   graphIssues: GraphIssue[];
+  graphFreshness: DashboardFreshnessReport | null;
 }) {
   const graph = useDashboardStore((s) => s.graph);
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
@@ -433,6 +470,7 @@ function DashboardContent({
         setShowKeyboardHelp={setShowKeyboardHelp}
         loadError={loadError}
         allIssues={allIssues}
+        graphFreshness={graphFreshness}
         shortcuts={shortcuts}
       />
     );
@@ -618,6 +656,9 @@ function DashboardContent({
 
       {/* Search */}
       <SearchBar />
+
+      {/* Graph freshness warning banner */}
+      {!loadError && <StalenessBanner freshness={graphFreshness} />}
 
       {/* Validation warning banner */}
       {allIssues.length > 0 && !loadError && (

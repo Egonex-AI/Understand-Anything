@@ -7,6 +7,7 @@ import {
   rmSync,
   chmodSync,
   existsSync,
+  symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
@@ -60,12 +61,13 @@ const _runScriptOutputDirs = [];
  * { status, stdout, stderr, output } where `output` is the parsed JSON
  * written by the script (or null on failure).
  */
-function runScript(projectRoot) {
+function runScript(projectRoot, extraArgs = [], envOverrides = {}) {
   const outputDir = mkdtempSync(join(tmpdir(), 'ua-scan-out-'));
   _runScriptOutputDirs.push(outputDir);
   const outputPath = join(outputDir, 'scan-output.json');
-  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath], {
+  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath, ...extraArgs], {
     encoding: 'utf-8',
+    env: { ...process.env, ...envOverrides },
   });
   let output = null;
   try {
@@ -123,7 +125,7 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'f.cjs').language).toBe('javascript');
   });
 
-  it('maps Python, Go, Rust, Java, Kotlin, C# to their language ids', () => {
+  it('maps Python, Go, Rust, Java, Kotlin, C#, Swift to their language ids', () => {
     projectRoot = setupTree({
       'a.py': 'x = 1\n',
       'b.go': 'package main\n',
@@ -131,6 +133,7 @@ describe('scan-project.mjs — language detection', () => {
       'd.java': 'class D {}\n',
       'e.kt': 'fun main() {}\n',
       'f.cs': 'class F {}\n',
+      'g.swift': 'struct G {}\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
@@ -140,6 +143,22 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'd.java').language).toBe('java');
     expect(byPath(r.output, 'e.kt').language).toBe('kotlin');
     expect(byPath(r.output, 'f.cs').language).toBe('csharp');
+    expect(byPath(r.output, 'g.swift').language).toBe('swift');
+  });
+
+  it('maps Scala extensions to scala (with .sbt categorized as config)', () => {
+    projectRoot = setupTree({
+      'src/main/scala/App.scala': 'object App\n',
+      'scripts/task.sc': 'println(1)\n',
+      'build.sbt': 'name := "demo"\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/main/scala/App.scala').language).toBe('scala');
+    expect(byPath(r.output, 'src/main/scala/App.scala').fileCategory).toBe('code');
+    expect(byPath(r.output, 'scripts/task.sc').language).toBe('scala');
+    expect(byPath(r.output, 'build.sbt').language).toBe('scala');
+    expect(byPath(r.output, 'build.sbt').fileCategory).toBe('config');
   });
 
   it('maps Ruby, PHP, C, C++ to their language ids', () => {
@@ -241,12 +260,13 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     }
   });
 
-  it('assigns code to TypeScript, JavaScript, Python, Go, Rust source files', () => {
+  it('assigns code to TypeScript, JavaScript, Python, Go, Rust, Swift source files', () => {
     projectRoot = setupTree({
       'src/a.ts': 'export const a = 1;\n',
       'src/b.py': 'def b(): pass\n',
       'src/c.go': 'package main\n',
       'src/d.rs': 'fn main() {}\n',
+      'src/e.swift': 'struct E {}\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
@@ -254,6 +274,7 @@ describe('scan-project.mjs — category assignment (project-scanner.md Step 4)',
     expect(byPath(r.output, 'src/b.py').fileCategory).toBe('code');
     expect(byPath(r.output, 'src/c.go').fileCategory).toBe('code');
     expect(byPath(r.output, 'src/d.rs').fileCategory).toBe('code');
+    expect(byPath(r.output, 'src/e.swift').fileCategory).toBe('code');
   });
 
   it('assigns config to JSON/YAML/TOML/INI/XML', () => {
@@ -456,6 +477,84 @@ describe('scan-project.mjs — .understandignore handling', () => {
   });
 });
 
+describe('scan-project.mjs — data-dir resolution (.ua vs legacy)', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('honors .ua/.understandignore in a fresh project (no legacy dir)', () => {
+    // scan-project delegates ignore handling to core's createIgnoreFilter,
+    // which reads <resolveUaDir>/.understandignore — .ua/ for fresh projects.
+    projectRoot = setupTree({
+      '.ua/.understandignore': 'fixtures/\n',
+      'src/index.ts': 'export const x = 1;\n',
+      'fixtures/snap1.json': '{ "a": 1 }\n',
+      'fixtures/snap2.json': '{ "b": 2 }\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'fixtures/snap1.json')).toBeUndefined();
+    expect(byPath(r.output, 'fixtures/snap2.json')).toBeUndefined();
+    // Counted as user-driven drops (dual-filter accounting saw the ua ignore).
+    expect(r.output.filteredByIgnore).toBe(2);
+  });
+
+  it('honors legacy .understand-anything/.understandignore (legacy-compat)', () => {
+    // Legacy-compat regression: projects with an existing
+    // .understand-anything/ keep using it for the .understandignore lookup.
+    projectRoot = setupTree({
+      '.understand-anything/.understandignore': 'fixtures/\n',
+      'src/index.ts': 'export const x = 1;\n',
+      'fixtures/snap1.json': '{ "a": 1 }\n',
+      'fixtures/snap2.json': '{ "b": 2 }\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'fixtures/snap1.json')).toBeUndefined();
+    expect(byPath(r.output, 'fixtures/snap2.json')).toBeUndefined();
+    expect(r.output.filteredByIgnore).toBe(2);
+  });
+
+  it('can exclude persistent analysis data for isolated benchmark scans', () => {
+    projectRoot = setupTree({
+      '.ua/knowledge-graph.json': '{ "nodes": [] }\n',
+      '.understand-anything/meta.json': '{ "version": 1 }\n',
+      'src/index.ts': 'export const x = 1;\n',
+    });
+
+    const r = runScript(projectRoot, ['--exclude-analysis-data']);
+
+    expect(r.status).toBe(0);
+    expect(r.output.files.map(file => file.path)).toEqual(['src/index.ts']);
+  });
+
+  it('composes CLI exclusions for benchmark scans regardless of flag order', () => {
+    projectRoot = setupTree({
+      '.ua/knowledge-graph.json': '{ "nodes": [] }\n',
+      '.understand-anything/meta.json': '{ "version": 1 }\n',
+      'generated/client.ts': 'export const generated = true;\n',
+      'src/index.ts': 'export const x = 1;\n',
+    });
+
+    for (const args of [
+      ['--exclude', 'generated/', '--exclude-analysis-data'],
+      ['--exclude-analysis-data', '--exclude', 'generated/'],
+    ]) {
+      const r = runScript(projectRoot, args);
+
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.output.files.map(file => file.path)).toEqual(['src/index.ts']);
+      expect(r.output.filteredByIgnore).toBe(1);
+      expect(r.output.contentDigest).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
+});
+
 describe('scan-project.mjs — special-file recognition', () => {
   let projectRoot;
 
@@ -503,6 +602,105 @@ describe('scan-project.mjs — determinism', () => {
     expect(r1.status).toBe(0);
     expect(r2.status).toBe(0);
     expect(JSON.stringify(r1.output)).toBe(JSON.stringify(r2.output));
+  });
+
+  it('keeps Unicode and space-containing paths stable across process locales', () => {
+    projectRoot = setupTree({
+      '!bang.ts': 'export const bang = true;\n',
+      '_under.ts': 'export const under = true;\n',
+      'space dir/å.ts': 'export const nested = true;\n',
+      'ä.ts': 'export const umlaut = true;\n',
+      '中.ts': 'export const cjk = true;\n',
+    });
+
+    const cLocale = runScript(projectRoot, [], { LANG: 'C', LC_ALL: 'C' });
+    const swedishLocale = runScript(projectRoot, [], {
+      LANG: 'sv_SE.UTF-8',
+      LC_ALL: 'sv_SE.UTF-8',
+    });
+    const expectedPaths = [
+      '!bang.ts',
+      '_under.ts',
+      'space dir/å.ts',
+      'ä.ts',
+      '中.ts',
+    ];
+
+    expect(cLocale.status).toBe(0);
+    expect(swedishLocale.status).toBe(0);
+    expect(cLocale.output.files.map(file => file.path)).toEqual(expectedPaths);
+    expect(swedishLocale.output.files.map(file => file.path)).toEqual(expectedPaths);
+    expect(JSON.stringify(cLocale.output)).toBe(JSON.stringify(swedishLocale.output));
+  });
+
+  it('emits a top-level lowercase SHA-256 content fingerprint as contentDigest', () => {
+    projectRoot = setupTree({
+      'src/value.ts': 'export const value = 1;\n',
+    });
+
+    const result = runScript(projectRoot);
+
+    expect(result.status).toBe(0);
+    expect(result.output.contentDigest).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('changes the content fingerprint when bytes change but metadata does not', () => {
+    projectRoot = setupTree({
+      'src/value.ts': 'export const value = "aa";\n',
+    });
+    const before = runScript(projectRoot);
+
+    writeFileSync(
+      join(projectRoot, 'src/value.ts'),
+      'export const value = "bb";\n',
+      'utf-8',
+    );
+    const after = runScript(projectRoot);
+
+    expect(before.status).toBe(0);
+    expect(after.status).toBe(0);
+    expect(byPath(before.output, 'src/value.ts').sizeLines).toBe(1);
+    expect(byPath(after.output, 'src/value.ts').sizeLines).toBe(1);
+    expect(after.output.files).toEqual(before.output.files);
+    expect(after.output.contentDigest).not.toBe(before.output.contentDigest);
+  });
+
+  it('omits a Git-tracked outbound symlink and never fingerprints its target bytes', () => {
+    projectRoot = setupTree({
+      'src/inside.ts': 'export const inside = true;\n',
+    });
+    const externalRoot = mkdtempSync(join(tmpdir(), 'ua-scan-external-'));
+    const externalFile = join(externalRoot, 'secret.ts');
+
+    try {
+      writeFileSync(externalFile, 'export const secret = "first";\n', 'utf-8');
+      try {
+        symlinkSync(externalFile, join(projectRoot, 'outbound-link.ts'), 'file');
+      } catch (error) {
+        if (process.platform === 'win32') return;
+        throw error;
+      }
+      const add = spawnSync('git', ['add', '--', 'outbound-link.ts'], {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+      });
+      expect(add.status).toBe(0);
+
+      const before = runScript(projectRoot);
+      writeFileSync(externalFile, 'export const secret = "second";\n', 'utf-8');
+      const after = runScript(projectRoot);
+
+      expect(before.status).toBe(0);
+      expect(after.status).toBe(0);
+      expect(byPath(before.output, 'src/inside.ts')).toBeDefined();
+      expect(byPath(before.output, 'outbound-link.ts')).toBeUndefined();
+      expect(before.stderr).toMatch(
+        /Warning: scan-project: outbound-link\.ts — symbolic link skipped — file skipped from output/,
+      );
+      expect(after.output.contentDigest).toBe(before.output.contentDigest);
+    } finally {
+      rmSync(externalRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -704,6 +902,7 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(typeof out.totalFiles).toBe('number');
     expect(out.totalFiles).toBe(out.files.length);
     expect(typeof out.filteredByIgnore).toBe('number');
+    expect(out.contentDigest).toMatch(/^[0-9a-f]{64}$/);
     expect(['small', 'moderate', 'large', 'very-large']).toContain(
       out.estimatedComplexity,
     );
@@ -713,6 +912,9 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(typeof out.stats.byLanguage).toBe('object');
     // Per-file shape
     for (const f of out.files) {
+      expect(Object.keys(f).sort()).toEqual([
+        'fileCategory', 'language', 'path', 'sizeLines',
+      ]);
       expect(typeof f.path).toBe('string');
       expect(typeof f.language).toBe('string');
       expect(typeof f.sizeLines).toBe('number');
@@ -722,17 +924,17 @@ describe('scan-project.mjs — output schema invariants', () => {
     }
   });
 
-  it('files[] is sorted by path.localeCompare', () => {
+  it('files[] is sorted by a locale-independent code-unit order', () => {
     projectRoot = setupTree({
-      'zzz.ts': '\n',
-      'aaa.ts': '\n',
-      'mmm.ts': '\n',
-      'subdir/file.ts': '\n',
+      '!bang.ts': '\n',
+      '0.ts': '\n',
+      '_under.ts': '\n',
+      'a.ts': '\n',
+      'ä.ts': '\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     const paths = r.output.files.map(f => f.path);
-    const sortedPaths = [...paths].sort((a, b) => a.localeCompare(b));
-    expect(paths).toEqual(sortedPaths);
+    expect(paths).toEqual(['!bang.ts', '0.ts', '_under.ts', 'a.ts', 'ä.ts']);
   });
 });

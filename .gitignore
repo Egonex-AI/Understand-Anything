@@ -6,11 +6,16 @@ dist
 .env
 .env.*
 coverage/
+benchmark-results/
 *.log
 __pycache__/
 .claude/
 .worktrees/
 homepage/public/demo/
 .private/
-__pycache__/
+.venv/
+venv/
 *.pyc
+*.pyo
+Thumbs.db
+*.tgz

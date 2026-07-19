@@ -170,10 +170,11 @@ The script must write this exact JSON structure to the output file:
 
 ### Executing the Script
 
-After writing the script, execute it:
+After writing the script, execute it. First resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` below:
 
 ```bash
-node $PROJECT_ROOT/.understand-anything/tmp/ua-graph-validate.js "<graph-file-path>" "$PROJECT_ROOT/.understand-anything/tmp/ua-review-results.json"
+UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .understand-anything || echo .ua)"
+node $UA_DIR/tmp/ua-graph-validate.js "<graph-file-path>" "$UA_DIR/tmp/ua-review-results.json"
 ```
 
 If the script exits with a non-zero code, read stderr, diagnose the issue, fix the script, and re-run. You have up to 2 retry attempts.
@@ -182,7 +183,7 @@ If the script exits with a non-zero code, read stderr, diagnose the issue, fix t
 
 ## Phase 2 -- Review and Decision
 
-After the script completes, read `$PROJECT_ROOT/.understand-anything/tmp/ua-review-results.json`. Do NOT re-read the original graph file -- trust the script's results entirely.
+After the script completes, read `$UA_DIR/tmp/ua-review-results.json`. Do NOT re-read the original graph file -- trust the script's results entirely.
 
 Review the `issues` and `warnings` arrays and render your decision:
 
@@ -232,7 +233,7 @@ Produce the final validation report JSON:
 
 After producing the final JSON:
 
-1. Write the JSON to: `<project-root>/.understand-anything/intermediate/review.json`
+1. Write the JSON to `$UA_DIR/intermediate/review.json` inside the project's data directory (`.ua/`, or the legacy `.understand-anything/` when that directory is present). Use the exact output path given in your dispatch prompt if one was provided.
 2. The project root will be provided in your prompt.
 3. Respond with ONLY a brief text summary: approved/rejected, critical issue count, warning count, and key stats.
 

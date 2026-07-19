@@ -30,19 +30,34 @@ The knowledge graph JSON has this structure:
 
 ## Instructions
 
-1. Check that `.understand-anything/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
+1. **Resolve the data directory `$UA_DIR`.** Run `UA_DIR=$([ -d .understand-anything ] && echo .understand-anything || echo .ua)` — this is the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Check that `$UA_DIR/knowledge-graph.json` exists. If not, tell the user to run `/understand` first.
 
-2. **Read project metadata** — use Grep or Read with a line limit to extract the `"project"` section (name, description, languages, frameworks).
+2. **Check graph freshness before using graph-derived context**:
+   - Read `project.gitCommitHash` from the graph metadata as `GRAPH_COMMIT_RAW`. Resolve it as a commit before using it in any Git diff, then compare it with `git rev-parse HEAD` and inspect project-scoped committed and working-tree changes from the project root:
+     ```bash
+     GRAPH_COMMIT=$(git rev-parse --verify --end-of-options "${GRAPH_COMMIT_RAW}^{commit}" 2>/dev/null)
+     git rev-parse HEAD
+     git diff --name-only "$GRAPH_COMMIT" HEAD -- .
+     git diff --cached --name-only -- .
+     git diff --name-only -- .
+     git ls-files --others --exclude-standard -- .
+     ```
+   - The `-- .` pathspec is required: commits that only touch a sibling monorepo project must not make this graph stale. A hash mismatch alone is not stale when the project diff is empty.
+   - Ignore the selected data directory (`.ua/` or legacy `.understand-anything/`) in every command's output because it contains generated graph artifacts, not project source drift.
+   - If the committed diff or any working-tree command reports project files, warn before generating the guide that onboarding content may omit those changes. Suggest: Run `/understand` to refresh the graph.
+   - Run the commit diff only when `GRAPH_COMMIT_RAW` resolves successfully. If the graph commit or Git metadata is missing, invalid, or unavailable, give a brief best-effort warning and continue instead of blocking.
 
-3. **Read layers** — Grep for `"layers"` to get the full layers array. These define the architecture and will structure the guide.
+3. **Read project metadata** — use Grep or Read with a line limit to extract the `"project"` section (name, description, languages, frameworks).
 
-4. **Read the tour** — Grep for `"tour"` to get the guided walkthrough steps. These provide the recommended learning path.
+4. **Read layers** — Grep for `"layers"` to get the full layers array. These define the architecture and will structure the guide.
 
-5. **Read file-level structural nodes only** — use Grep to find nodes with file-level types (`file`, `config`, `document`, `service`, `pipeline`, `table`, `schema`, `resource`, `endpoint`) in the knowledge graph. Skip function-level and class-level nodes to keep the guide high-level. Extract each node's `name`, `filePath`, `summary`, and `complexity`.
+5. **Read the tour** — Grep for `"tour"` to get the guided walkthrough steps. These provide the recommended learning path.
 
-6. **Identify complexity hotspots** — from the file-level nodes, find those with the highest `complexity` values. These are areas new developers should approach carefully.
+6. **Read file-level structural nodes only** — use Grep to find nodes with file-level types (`file`, `config`, `document`, `service`, `pipeline`, `table`, `schema`, `resource`, `endpoint`) in the knowledge graph. Skip function-level and class-level nodes to keep the guide high-level. Extract each node's `name`, `filePath`, `summary`, and `complexity`.
 
-7. **Generate the onboarding guide** with these sections:
+7. **Identify complexity hotspots** — from the file-level nodes, find those with the highest `complexity` values. These are areas new developers should approach carefully.
+
+8. **Generate the onboarding guide** with these sections:
    - **Project Overview**: name, languages, frameworks, description (from project metadata)
    - **Architecture Layers**: each layer's name, description, and key files (from layers + file nodes)
    - **Key Concepts**: important patterns and design decisions (from node summaries and tags)
@@ -50,6 +65,6 @@ The knowledge graph JSON has this structure:
    - **File Map**: what each key file does (from file-level nodes, organized by layer)
    - **Complexity Hotspots**: areas to approach carefully (from complexity values)
 
-8. Format as clean markdown
-9. Offer to save the guide to `docs/ONBOARDING.md` in the project
-10. Suggest the user commit it to the repo for the team
+9. Format as clean markdown
+10. Offer to save the guide to `docs/ONBOARDING.md` in the project
+11. Suggest the user commit it to the repo for the team

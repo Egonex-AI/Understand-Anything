@@ -1,17 +1,39 @@
 name: CI
 
 on:
+  # Run on every PR so a contributor's first push gets feedback.
   pull_request:
+  # Also run on direct pushes to main so the "main is green" signal is real.
+  # Without this, main can silently break for days when someone bypasses
+  # review. (#249)
+  push:
+    branches: [main]
+
+# Cancel any in-flight CI for the same ref when a new commit is pushed —
+# saves runner minutes and keeps the latest commit's status the only one
+# anyone reads. `github.ref` is a controlled value (refs/heads/* or
+# refs/pull/*/merge), not user-controlled input, so it's safe to interpolate.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -29,8 +51,14 @@ jobs:
       - name: Build skill
         run: pnpm --filter @understand-anything/skill build
 
+      - name: Build viewer
+        run: pnpm --filter understand-anything-viewer build
+
       - name: Test core
         run: pnpm --filter @understand-anything/core test
 
       - name: Test skill
         run: pnpm test
+
+      - name: Test Python skill helpers
+        run: python -m unittest tests.skill.understand.test_merge_batch_graphs tests.skill.understand.test_merge_subdomain_graphs tests.skill.knowledge.test_parse_knowledge_base -v

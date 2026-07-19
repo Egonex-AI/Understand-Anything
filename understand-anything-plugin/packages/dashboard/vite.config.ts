@@ -1,10 +1,16 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import type { IncomingMessage, ServerResponse } from "http";
+import {
+  getGraphFreshnessBatch,
+  type GraphFreshnessInput,
+  type GraphFreshnessResult,
+} from "../core/src/staleness";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -12,15 +18,20 @@ import crypto from "crypto";
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
+// Legacy directory first — projects analyzed before the `.ua` rename keep
+// their existing `.understand-anything/` data.
+const UA_DIR_CANDIDATES = [".understand-anything", ".ua"];
+
 function graphFileCandidates(fileName: string): string[] {
   const graphDir = process.env.GRAPH_DIR;
-  return [
-    ...(graphDir
-      ? [path.resolve(graphDir, `.understand-anything/${fileName}`)]
-      : []),
-    path.resolve(process.cwd(), `.understand-anything/${fileName}`),
-    path.resolve(process.cwd(), `../../../.understand-anything/${fileName}`),
+  const roots = [
+    ...(graphDir ? [graphDir] : []),
+    process.cwd(),
+    path.resolve(process.cwd(), "../../.."),
   ];
+  return roots.flatMap((root) =>
+    UA_DIR_CANDIDATES.map((dir) => path.resolve(root, dir, fileName)),
+  );
 }
 
 function findGraphFile(fileName: string): string | null {
@@ -148,12 +159,26 @@ function readSourceFile(url: URL) {
     return rejectFileRequest("File is not in the knowledge graph", 404);
   }
 
-  // Resolve symlinks and re-confirm the real path stays inside the project.
-  // The textual checks above only see the requested (in-root) path; a symlink
-  // committed in an indexed repo (e.g. src/config.txt -> ~/.ssh/id_rsa) is
-  // textually in-root and present in the graph, so without this guard the
-  // statSync/readFileSync below would follow it and disclose a file outside
-  // the project root.
+  // Reject symlink nodes outright. New graphs no longer contain symlink
+  // entries (the scanner skips them), but a graph generated before that
+  // change can still allowlist a symlink node (e.g. src/config.txt -> .env)
+  // whose in-root target was never itself allowlisted; the
+  // statSync/readFileSync below would follow it and serve the target.
+  let linkStat: fs.Stats;
+  try {
+    linkStat = fs.lstatSync(absoluteFile);
+  } catch {
+    return rejectFileRequest("File not found", 404);
+  }
+  if (linkStat.isSymbolicLink()) {
+    return rejectFileRequest("Symbolic links cannot be previewed");
+  }
+
+  // Resolve symlinked parent directories and re-confirm the real path stays
+  // inside the project root. The textual checks above only see the requested
+  // (in-root) path; a directory symlink committed in an indexed repo could
+  // point outside the project root (e.g. src -> /etc) and the reads below
+  // would follow it.
   let realFile: string;
   let realRoot: string;
   try {
@@ -170,6 +195,17 @@ function readSourceFile(url: URL) {
     path.isAbsolute(realRelative)
   ) {
     return rejectFileRequest("Path must stay inside the project");
+  }
+
+  // A directory symlink can also stay inside the root yet remap the request
+  // to a file that was never allowlisted (e.g. docs -> secrets-dir). When
+  // resolution changes the path, the resolved path must be allowlisted too.
+  const realSafeRelative = realRelative.split(path.sep).join("/");
+  if (
+    realSafeRelative !== safeRelativePath &&
+    !graphFilePathSet(graphFile, projectRoot).has(realSafeRelative)
+  ) {
+    return rejectFileRequest("File is not in the knowledge graph", 404);
   }
 
   let stat: fs.Stats;
@@ -200,7 +236,109 @@ function readSourceFile(url: URL) {
   };
 }
 
-export default defineConfig({
+export interface DashboardFreshnessReport {
+  graphs: {
+    knowledge: GraphFreshnessResult;
+    domain?: GraphFreshnessResult;
+  };
+}
+
+function readGraphMetadata(graphFile: string): GraphFreshnessInput {
+  const graph = JSON.parse(fs.readFileSync(graphFile, "utf-8")) as {
+    project?: {
+      gitCommitHash?: unknown;
+      analyzedAt?: unknown;
+    };
+  };
+  return {
+    graphCommitHash:
+      typeof graph.project?.gitCommitHash === "string"
+        ? graph.project.gitCommitHash
+        : undefined,
+    lastAnalyzedAt:
+      typeof graph.project?.analyzedAt === "string"
+        ? graph.project.analyzedAt
+        : undefined,
+  };
+}
+
+export async function readGraphFreshness() {
+  const graphFile = findGraphFile("knowledge-graph.json");
+  if (!graphFile) {
+    return rejectFileRequest("No knowledge graph found. Run /understand first.", 404);
+  }
+
+  const domainGraphFile = path.join(path.dirname(graphFile), "domain-graph.json");
+  let knowledgeInput: GraphFreshnessInput;
+  let domainInput: GraphFreshnessInput | undefined;
+  try {
+    knowledgeInput = readGraphMetadata(graphFile);
+    domainInput = fs.existsSync(domainGraphFile)
+      ? readGraphMetadata(domainGraphFile)
+      : undefined;
+  } catch {
+    return rejectFileRequest("Failed to read graph file", 500);
+  }
+
+  const projectRoot = projectRootFromGraphFile(graphFile);
+  let graphs: DashboardFreshnessReport["graphs"];
+  if (domainInput) {
+    graphs = await getGraphFreshnessBatch(projectRoot, {
+      knowledge: knowledgeInput,
+      domain: domainInput,
+    });
+  } else {
+    const result = await getGraphFreshnessBatch(projectRoot, {
+      knowledge: knowledgeInput,
+    });
+    graphs = { knowledge: result.knowledge };
+  }
+
+  return {
+    statusCode: 200,
+    payload: { graphs } satisfies DashboardFreshnessReport,
+  };
+}
+
+type DashboardDataMiddleware = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  next: () => void,
+) => void;
+
+export function createDashboardDataMiddleware(
+  accessToken: string,
+): DashboardDataMiddleware {
+  return (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
+    if (url.pathname !== "/staleness.json") {
+      next();
+      return;
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+
+    if (url.searchParams.get("token") !== accessToken) {
+      sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
+      return;
+    }
+
+    void readGraphFreshness()
+      .then((result) => sendJson(res, result.statusCode, result.payload))
+      .catch(() => {
+        sendJson(res, 500, { error: "Failed to read graph freshness" });
+      });
+  };
+}
+
+type DashboardViteConfig = UserConfig & {
+  test: {
+    environment: "node";
+    include: string[];
+  };
+};
+
+const config: DashboardViteConfig = {
   test: {
     environment: "node",
     include: ["src/**/__tests__/**/*.test.ts"],
@@ -267,6 +405,8 @@ export default defineConfig({
             `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
           );
         });
+
+        server.middlewares.use(createDashboardDataMiddleware(ACCESS_TOKEN));
 
         server.middlewares.use((req, res, next) => {
           const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
@@ -383,4 +523,6 @@ export default defineConfig({
       },
     },
   ],
-});
+};
+
+export default defineConfig(config);
