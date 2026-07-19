@@ -340,6 +340,21 @@ The `/understand` command orchestrates 5 specialized agents, and `/understand-do
 
 File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
 
+### Model cost tiers (per phase)
+
+Not every phase needs the strongest model. `file-analyzer` fans out across every batch (dozens to hundreds of dispatches on a real codebase) and does mostly templated work on top of tree-sitter facts the bundled scripts already extracted — defaulting it to the same model as the rare synthesis steps (`architecture-analyzer`, `tour-builder`) drains premium budgets disproportionately (issue [#314](https://github.com/Lum1104/Understand-Anything/issues/314)).
+
+| Agent | Suggested tier | Why |
+|---|---|---|
+| `project-scanner` | Cheap / mid (Haiku · Sonnet) | Mostly deterministic; LLM just writes a short narrative blurb from README + manifest |
+| `file-analyzer` (**high fan-out**) | Cheap / mid (Haiku · Sonnet) | Largest cost lever — one dispatch per batch, templated outputs grounded in pre-extracted structure |
+| `assemble-reviewer` | Mid (Sonnet) | One dispatch; reviews already-merged graph |
+| `architecture-analyzer` | Strong (Opus) | One dispatch; synthesis over the whole graph |
+| `tour-builder` | Strong (Opus) | One dispatch; pedagogy over the whole graph |
+| `graph-reviewer` (only with `--review`) | Mid / strong | Default path uses a deterministic Node script — most runs never invoke the LLM here |
+
+These recommendations live in [`understand/SKILL.md`](understand-anything-plugin/skills/understand/SKILL.md#model-cost-tier-recommendations-per-phase) (and as inline reminders at each phase's dispatch step) rather than in agent frontmatter, because `model:` in frontmatter is platform-specific — `model: inherit` was a Claude Code-only keyword that broke opencode and other orchestrators (issue [#167](https://github.com/Lum1104/Understand-Anything/issues/167), PR [#200](https://github.com/Lum1104/Understand-Anything/pull/200)). Orchestrators that support per-dispatch model selection are expected to apply the table above; platforms that cannot route per-agent fall back to the session model with no behaviour change.
+
 ---
 
 ## 🎥 Community

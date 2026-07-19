@@ -52,6 +52,8 @@ No additional scanning is needed. Proceed to Phase 3.
 
 ### Phase 3: ANALYZE
 
+> **Cost tier:** Cheap (Haiku) or mid (Sonnet). This is a high-fan-out phase — one dispatch per batch of 10-15 articles, with up to 3 concurrent. Each dispatch performs structured extraction (entities/claims/implicit links) over preprocessed content, so the LLM workload per dispatch is modest. Reserve the strongest model for one-shot synthesis steps in other skills (e.g., `architecture-analyzer`, `tour-builder`). See `skills/understand/SKILL.md` "Model Cost-Tier Recommendations" for the rationale and the constraint that prevents us from encoding this in agent frontmatter (issues #167, #314).
+
 Dispatch `article-analyzer` subagents to extract implicit knowledge:
 
 1. Read the scan-manifest.json to get the article list
