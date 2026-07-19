@@ -115,6 +115,13 @@ const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
 
 /**
  * Parses a .gitignore file and returns active patterns (no comments, no blanks).
+ *
+ * Negation (`!`) lines are intentionally dropped: a `!pattern` force-INCLUDES a
+ * path and is only meaningful relative to the project's own .gitignore ignore
+ * stack, which understand-anything does not apply. Surfacing it under the
+ * "uncomment to exclude" suggestion section would invert its semantics, so it is
+ * omitted rather than presented as a candidate exclusion. The header still
+ * documents the general `!` mechanism for users who want to author one by hand.
  */
 function parseGitignorePatterns(gitignorePath: string): string[] {
   if (!existsSync(gitignorePath)) return [];
@@ -122,15 +129,23 @@ function parseGitignorePatterns(gitignorePath: string): string[] {
   return content
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith("#"));
+    .filter(
+      (line) => line.length > 0 && !line.startsWith("#") && !line.startsWith("!"),
+    );
 }
 
 /**
  * Returns true if a gitignore pattern is already covered by the hardcoded defaults.
- * Normalizes trailing slashes for comparison.
+ * Normalizes leading anchors (root "/", "./", and globstar) and trailing slashes
+ * for comparison so that anchored forms like `/node_modules`, `./dist/`, and a
+ * leading globstar `node_modules` match the defaults `node_modules/`, `dist/`.
  */
 function isCoveredByDefaults(pattern: string): boolean {
-  const normalize = (p: string) => p.replace(/\/+$/, "");
+  const normalize = (p: string) =>
+    p
+      .replace(/^\.?\/+/, "")
+      .replace(/^\*\*\/+/, "")
+      .replace(/\/+$/, "");
   const normalized = normalize(pattern);
   return DEFAULT_IGNORE_PATTERNS.some((d) => normalize(d) === normalized);
 }
