@@ -1,6 +1,6 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { findChild, findChildren } from "./base-extractor.js";
+import { findChild } from "./base-extractor.js";
 
 /**
  * Recursively unwrap nested declarators (pointer_declarator, reference_declarator,
@@ -26,6 +26,24 @@ function unwrapDeclaratorName(node: TreeSitterNode): string | null {
 }
 
 /**
+ * Strip template arguments from a qualified-name scope node to recover the
+ * bare class name.
+ *
+ * For `void Box<int>::get()` the `scope` field of the qualified_identifier is a
+ * `template_type` node whose `.text` is `"Box<int>"`. The class is registered in
+ * `methodsByClass` under the bare name `"Box"`, so we read the `type_identifier`
+ * child of the `template_type` ("Box") rather than the full templated text. For a
+ * plain (non-templated) scope we return the node text unchanged.
+ */
+function scopeQualifierName(scope: TreeSitterNode): string {
+  if (scope.type === "template_type") {
+    const base = findChild(scope, "type_identifier");
+    if (base) return base.text;
+  }
+  return scope.text;
+}
+
+/**
  * Extract the function/method name from a function_declarator node.
  *
  * The declarator field can be:
@@ -33,8 +51,16 @@ function unwrapDeclaratorName(node: TreeSitterNode): string | null {
  * - `field_identifier` for in-class declarations/definitions: `void start();`
  * - `qualified_identifier` for out-of-class definitions: `void Server::start()`
  *
- * For qualified_identifier, we extract just the final name (e.g., "start"),
- * but also return the qualifier (e.g., "Server") to associate methods with classes.
+ * For qualified_identifier, we extract just the final (leaf) name and return the
+ * immediately-enclosing scope as the qualifier:
+ * - `Server::start` => name "start", qualifier "Server".
+ * - For deeply nested qualified_identifiers (`net::Server::start`) the grammar
+ *   nests them, so we walk down the `name` field to the leaf identifier ("start")
+ *   and keep the *immediate* enclosing scope as the qualifier ("Server", not
+ *   "net"). This keeps the call-graph caller name aligned with the
+ *   function-node name (both use this same leaf-name choice).
+ * - Templated qualifiers (`Box<int>::get`) are stripped to the bare class name
+ *   ("Box") so the method resolves against the class registered under "Box".
  */
 function extractFuncDeclName(
   funcDecl: TreeSitterNode,
@@ -47,13 +73,20 @@ function extractFuncDeclName(
   }
 
   if (declNode.type === "qualified_identifier") {
-    const nameNode = declNode.childForFieldName("name");
-    // The qualifier is the namespace_identifier before ::
-    const nsNode = findChild(declNode, "namespace_identifier");
-    return {
-      name: nameNode ? nameNode.text : declNode.text,
-      qualifier: nsNode ? nsNode.text : null,
-    };
+    // qualified_identifiers nest for deeply scoped names like
+    // `net::Server::start`. Walk down the `name` field to the leaf identifier,
+    // tracking the immediately-enclosing scope as the qualifier (e.g. "Server"
+    // for `net::Server::start`, not "net").
+    let cur: TreeSitterNode = declNode;
+    let qualifier: string | null = null;
+    while (cur.type === "qualified_identifier") {
+      const scope = cur.childForFieldName("scope");
+      if (scope) qualifier = scopeQualifierName(scope);
+      const next = cur.childForFieldName("name");
+      if (!next) break;
+      cur = next;
+    }
+    return { name: cur.text, qualifier };
   }
 
   return { name: declNode.text, qualifier: null };
@@ -70,14 +103,27 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
   if (!paramsNode) return [];
   const params: string[] = [];
 
-  const decls = findChildren(paramsNode, "parameter_declaration");
-  for (const decl of decls) {
+  // Iterate over all params in source order. Different parameter shapes parse
+  // to different node types:
+  //   `int a`        => parameter_declaration
+  //   `int b = 10`   => optional_parameter_declaration (default value)
+  //   `Ts... xs`     => variadic_parameter_declaration (parameter pack); its
+  //                     `declarator` field is a variadic_declarator whose
+  //                     identifier child unwrapDeclaratorName recovers ("xs").
+  for (let i = 0; i < paramsNode.childCount; i++) {
+    const decl = paramsNode.child(i);
+    if (!decl) continue;
+    if (
+      decl.type !== "parameter_declaration" &&
+      decl.type !== "optional_parameter_declaration" &&
+      decl.type !== "variadic_parameter_declaration"
+    ) {
+      continue;
+    }
     const declNode = decl.childForFieldName("declarator");
     if (declNode) {
       const name = unwrapDeclaratorName(declNode);
-      if (name) {
-        params.push(name);
-      }
+      if (name) params.push(name);
     }
   }
 
@@ -239,6 +285,23 @@ export class CppExtractor implements LanguageExtractor {
           break;
         }
 
+        case "template_declaration": {
+          // Templated functions/classes are wrapped in a template_declaration
+          // whose body holds the inner function_definition / class_specifier /
+          // struct_specifier. Out-of-class member templates nest a second
+          // template_declaration (e.g. `template<class T> template<class U>
+          // void Box<T>::set(U)`), so recurse into the inner one before
+          // dispatching the leaf declaration through the existing handlers.
+          this.extractTemplateDeclaration(
+            node,
+            functions,
+            classes,
+            exports,
+            methodsByClass,
+          );
+          break;
+        }
+
         case "declaration": {
           // A top-level ";" terminated statement — could be a class/struct with a trailing ;
           // e.g., `class Foo { ... };` parses the class_specifier as a child of a
@@ -253,6 +316,54 @@ export class CppExtractor implements LanguageExtractor {
           }
           break;
         }
+      }
+    }
+  }
+
+  /**
+   * Dispatch the leaf declaration of a template_declaration.
+   *
+   * The direct (named) children of a template_declaration are the
+   * template_parameter_list and a single inner declaration. The inner
+   * declaration is one of:
+   * - `function_definition` — templated free function or out-of-class method def
+   * - `class_specifier` / `struct_specifier` — templated class/struct
+   * - `template_declaration` — a nested template (out-of-class member template,
+   *   e.g. `template<class T> template<class U> void Box<T>::set(U)`); recurse.
+   *
+   * In-class member templates are handled separately by extractClassOrStruct's
+   * member loop.
+   */
+  private extractTemplateDeclaration(
+    node: TreeSitterNode,
+    functions: StructuralAnalysis["functions"],
+    classes: StructuralAnalysis["classes"],
+    exports: StructuralAnalysis["exports"],
+    methodsByClass: Map<string, string[]>,
+  ): void {
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (!child) continue;
+
+      switch (child.type) {
+        case "template_declaration":
+          this.extractTemplateDeclaration(
+            child,
+            functions,
+            classes,
+            exports,
+            methodsByClass,
+          );
+          break;
+        case "function_definition":
+          this.extractFunctionDef(child, functions, exports, methodsByClass);
+          break;
+        case "class_specifier":
+          this.extractClassOrStruct(child, "class", classes, functions, exports);
+          break;
+        case "struct_specifier":
+          this.extractClassOrStruct(child, "struct", classes, functions, exports);
+          break;
       }
     }
   }
@@ -371,29 +482,49 @@ export class CppExtractor implements LanguageExtractor {
 
         if (member.type === "function_definition") {
           // Inline method definition
-          const funcDecl = member.childForFieldName("declarator");
-          if (funcDecl && funcDecl.type === "function_declarator") {
-            const info = extractFuncDeclName(funcDecl);
-            if (info) {
-              methods.push(info.name);
+          this.extractClassMethodDef(
+            member,
+            currentAccess,
+            methods,
+            functions,
+            exports,
+          );
+        }
 
-              // Also add to functions list with params/return type
-              const paramsNode = funcDecl.childForFieldName("parameters");
-              functions.push({
-                name: info.name,
-                lineRange: [
-                  member.startPosition.row + 1,
-                  member.endPosition.row + 1,
-                ],
-                params: extractParams(paramsNode),
-                returnType: extractReturnType(member),
-              });
-
-              if (currentAccess === "public") {
-                exports.push({
-                  name: info.name,
-                  lineNumber: member.startPosition.row + 1,
-                });
+        if (member.type === "template_declaration") {
+          // In-class member template, e.g.
+          //   class Foo { template<class T> void bar(T); };
+          // The inner declaration is either a `declaration` (declaration only,
+          // no body) or a `function_definition` (inline body), each carrying a
+          // function_declarator. Handle both so the templated method is not
+          // silently dropped.
+          const inner =
+            findChild(member, "declaration") ??
+            findChild(member, "function_definition");
+          if (inner) {
+            const funcDecl = findChild(inner, "function_declarator");
+            if (funcDecl) {
+              if (inner.type === "function_definition") {
+                this.extractClassMethodDef(
+                  inner,
+                  currentAccess,
+                  methods,
+                  functions,
+                  exports,
+                );
+              } else {
+                // Declaration-only member template: record the method name and
+                // (if public) export it, matching plain method declarations.
+                const info = extractFuncDeclName(funcDecl);
+                if (info) {
+                  methods.push(info.name);
+                  if (currentAccess === "public") {
+                    exports.push({
+                      name: info.name,
+                      lineNumber: member.startPosition.row + 1,
+                    });
+                  }
+                }
               }
             }
           }
@@ -416,6 +547,45 @@ export class CppExtractor implements LanguageExtractor {
       name: className,
       lineNumber: node.startPosition.row + 1,
     });
+  }
+
+  /**
+   * Record an inline in-class method definition (function_definition with a
+   * body inside a class/struct body) into the class's methods, the functions
+   * list (with params/return type), and exports when public.
+   *
+   * Shared by the plain `function_definition` member arm and the in-class
+   * member-template arm.
+   */
+  private extractClassMethodDef(
+    member: TreeSitterNode,
+    currentAccess: string,
+    methods: string[],
+    functions: StructuralAnalysis["functions"],
+    exports: StructuralAnalysis["exports"],
+  ): void {
+    const funcDecl = member.childForFieldName("declarator");
+    if (!funcDecl || funcDecl.type !== "function_declarator") return;
+
+    const info = extractFuncDeclName(funcDecl);
+    if (!info) return;
+
+    methods.push(info.name);
+
+    const paramsNode = funcDecl.childForFieldName("parameters");
+    functions.push({
+      name: info.name,
+      lineRange: [member.startPosition.row + 1, member.endPosition.row + 1],
+      params: extractParams(paramsNode),
+      returnType: extractReturnType(member),
+    });
+
+    if (currentAccess === "public") {
+      exports.push({
+        name: info.name,
+        lineNumber: member.startPosition.row + 1,
+      });
+    }
   }
 
   /**
