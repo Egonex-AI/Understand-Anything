@@ -149,7 +149,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         if (result.success && result.data) {
           setGraph(result.data);
           setGraphIssues(result.issues);
-          if ((data as Record<string, unknown>).kind === "knowledge") {
+          if (result.data.kind === "knowledge") {
             useDashboardStore.getState().setViewMode("knowledge");
             useDashboardStore.getState().setIsKnowledgeGraph(true);
           }
