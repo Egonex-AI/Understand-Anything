@@ -57,13 +57,17 @@ SKILL_REAL=$(realpath ~/.agents/skills/understand-domain 2>/dev/null || readlink
 SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-domain 2>/dev/null || readlink -f ~/.copilot/skills/understand-domain 2>/dev/null || echo "")
 COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+GROK_SKILL_REAL=$(realpath ~/.grok/skills/understand-domain 2>/dev/null || readlink -f ~/.grok/skills/understand-domain 2>/dev/null || echo "")
+GROK_SELF_RELATIVE=$([ -n "$GROK_SKILL_REAL" ] && cd "$GROK_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 
 PLUGIN_ROOT=""
 for candidate in \
   "${CLAUDE_PLUGIN_ROOT}" \
+  "${GROK_PLUGIN_ROOT}" \
   "$HOME/.understand-anything-plugin" \
   "$SELF_RELATIVE" \
   "$COPILOT_SELF_RELATIVE" \
+  "$GROK_SELF_RELATIVE" \
   "$HOME/.codex/understand-anything/understand-anything-plugin" \
   "$HOME/.opencode/understand-anything/understand-anything-plugin" \
   "$HOME/.pi/understand-anything/understand-anything-plugin" \
@@ -78,9 +82,11 @@ if [ -z "$PLUGIN_ROOT" ]; then
   echo "Error: Cannot find the understand-anything plugin root."
   echo "Checked:"
   echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
+  echo "  - ${GROK_PLUGIN_ROOT:-<unset GROK_PLUGIN_ROOT>}"
   echo "  - $HOME/.understand-anything-plugin"
   echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-domain>}"
   echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-domain>}"
+  echo "  - ${GROK_SELF_RELATIVE:-<unresolved path derived from ~/.grok/skills/understand-domain>}"
   echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
   echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
   echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
