@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react";
 import { validateGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
+import { fetchAndValidateGraph } from "./utils/fetchAndValidateGraph";
 import { useDashboardStore } from "./store";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
@@ -142,14 +143,12 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, []);
 
   useEffect(() => {
-    fetch(dataUrl("knowledge-graph.json", accessToken))
-      .then((res) => res.json())
-      .then((data: unknown) => {
-        const result = validateGraph(data);
-        if (result.success && result.data) {
-          setGraph(result.data);
+    fetchAndValidateGraph(dataUrl("knowledge-graph.json", accessToken))
+      .then((result) => {
+        if (result.status === "loaded") {
+          setGraph(result.graph);
           setGraphIssues(result.issues);
-          if ((data as Record<string, unknown>).kind === "knowledge") {
+          if (result.isKnowledge) {
             useDashboardStore.getState().setViewMode("knowledge");
             useDashboardStore.getState().setIsKnowledgeGraph(true);
           }
@@ -160,17 +159,21 @@ function Dashboard({ accessToken }: { accessToken: string }) {
               console.error(`[graph] dropped: ${issue.message}`);
             }
           }
-        } else if (result.fatal) {
-          console.error("Knowledge graph validation failed:", result.fatal);
-          setLoadError(`Invalid knowledge graph: ${result.fatal}`);
+        } else if (
+          result.status === "http-error" ||
+          result.status === "network-error" ||
+          result.status === "parse-error"
+        ) {
+          // Guard on res.ok (issue #288): surface a clear HTTP/network/parse
+          // error instead of letting a 404 body fall through to graph
+          // validation, which produced a misleading "Missing or invalid
+          // project metadata".
+          console.error("Failed to load knowledge graph:", result.error);
+          setLoadError(`Failed to load knowledge graph: ${result.error}`);
         } else {
-          console.error("Knowledge graph validation failed: unknown error");
-          setLoadError("Invalid knowledge graph: unknown validation error");
+          console.error("Knowledge graph validation failed:", result.error);
+          setLoadError(`Invalid knowledge graph: ${result.error}`);
         }
-      })
-      .catch((err) => {
-        console.error("Failed to load knowledge graph:", err);
-        setLoadError(`Failed to load knowledge graph: ${err instanceof Error ? err.message : String(err)}`);
       });
   }, [setGraph]);
 
