@@ -105,6 +105,7 @@ Apunta `/understand-knowledge` a un [wiki LLM con patrón Karpathy](https://gist
 ```bash
 /plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 > **¿Usas un modelo local?** Para configuraciones de privacidad o empresariales, apunta tu plataforma a un proveedor de modelos local como [Ollama](https://docs.ollama.com/integrations) — sigue su guía de integración para cambiar el proveedor de modelo.

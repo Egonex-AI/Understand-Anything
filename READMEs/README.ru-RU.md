@@ -106,6 +106,7 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 ```bash
 /plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 > **Используете локальную модель?** Для приватных или корпоративных сценариев направьте свою платформу на локального провайдера моделей, например [Ollama](https://docs.ollama.com/integrations) — следуйте его руководству по интеграции, чтобы сменить провайдера модели.
