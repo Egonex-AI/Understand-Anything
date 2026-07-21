@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "UA_DIR=.understand-anything; [ -d \"$UA_DIR\" ] || UA_DIR=.ua; printf '%s' \"$TOOL_INPUT\" | grep -qE 'git\\s+(commit|merge|cherry-pick|rebase)' && [ -f $UA_DIR/config.json ] && grep -q '\"autoUpdate\".*true' $UA_DIR/config.json && [ -f $UA_DIR/knowledge-graph.json ] && echo \"[understand-anything] Commit detected with auto-update enabled. You MUST read the file at ${CLAUDE_PLUGIN_ROOT}/hooks/auto-update-prompt.md and execute its instructions to incrementally update the knowledge graph. Do not ask the user for confirmation — just do it.\" || true"
+            "command": "UA_DIR=.understand-anything; [ -d \"$UA_DIR\" ] || UA_DIR=.ua; INPUT=$(cat); CMD=$(printf '%s' \"$INPUT\" | node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{process.stdout.write(JSON.parse(d).tool_input?.command||'')}catch{}})\" 2>/dev/null); printf '%s' \"$CMD\" | grep -qE 'git\\s+(commit|merge|cherry-pick|rebase)' && [ -f $UA_DIR/config.json ] && grep -q '\"autoUpdate\".*true' $UA_DIR/config.json && [ -f $UA_DIR/knowledge-graph.json ] && echo \"[understand-anything] Commit detected with auto-update enabled. You MUST read the file at ${CLAUDE_PLUGIN_ROOT}/hooks/auto-update-prompt.md and execute its instructions to incrementally update the knowledge graph. Do not ask the user for confirmation — just do it.\" || true"
           }
         ]
       }
