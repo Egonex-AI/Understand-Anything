@@ -156,6 +156,19 @@ const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
       "**/rails_helper.rb",
     ],
   },
+  {
+    // Apple's XCTest and the newer Swift Testing framework both use a
+    // dominant `<ClassName>Tests.swift` naming convention. SPM's `Tests/`
+    // package directory is already caught by the case-insensitive `tests`
+    // dir rule, but individual test files sometimes leak elsewhere
+    // (Xcode-style `<AppName>Tests/` folders that use no leading dot,
+    // fixture-adjacent extension test files under Sources/).
+    label: "Swift",
+    patterns: [
+      "**/*Tests.swift",
+      "**/*Test.swift",
+    ],
+  },
 ];
 
 /**
