@@ -284,12 +284,28 @@ describe("generateStarterIgnoreFile", () => {
       expect(content).toContain("# **/rails_helper.rb");
     });
 
+    it("includes Swift XCTest / Swift Testing file patterns", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# Swift");
+      // Dominant Apple convention — one <ClassName>Tests.swift per unit.
+      expect(content).toContain("# **/*Tests.swift");
+      // Singular variant seen in some older codebases.
+      expect(content).toContain("# **/*Test.swift");
+    });
+
+    it("includes Swift Quick/Nimble BDD *Spec.swift files", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      // Quick is the Swift RSpec-equivalent — dominant in codebases that
+      // adopted BDD styling before Swift Testing shipped.
+      expect(content).toContain("# **/*Spec.swift");
+    });
+
     it("groups patterns under the JS / TS sub-header", () => {
       const content = generateStarterIgnoreFile(testDir);
       expect(content).toContain("# JS / TS");
     });
 
-    it("emits language groups in stable order: JS, C#, Java, Go, C++, Python, Rust, Ruby", () => {
+    it("emits language groups in stable order: JS, C#, Java, Go, C++, Python, Rust, Ruby, Swift", () => {
       const content = generateStarterIgnoreFile(testDir);
       const jsIdx = content.indexOf("# JS / TS");
       const csIdx = content.indexOf("# C# / .NET");
@@ -299,6 +315,7 @@ describe("generateStarterIgnoreFile", () => {
       const pyIdx = content.indexOf("# Python");
       const rustIdx = content.indexOf("# Rust");
       const rubyIdx = content.indexOf("# Ruby");
+      const swiftIdx = content.indexOf("# Swift");
       expect(jsIdx).toBeGreaterThan(-1);
       expect(csIdx).toBeGreaterThan(jsIdx);
       expect(javaIdx).toBeGreaterThan(csIdx);
@@ -307,6 +324,7 @@ describe("generateStarterIgnoreFile", () => {
       expect(pyIdx).toBeGreaterThan(cppIdx);
       expect(rustIdx).toBeGreaterThan(pyIdx);
       expect(rubyIdx).toBeGreaterThan(rustIdx);
+      expect(swiftIdx).toBeGreaterThan(rubyIdx);
     });
 
     it("keeps all suggestions commented even with no detected dirs and no .gitignore", () => {
