@@ -162,6 +162,12 @@ describe("generateStarterIgnoreFile", () => {
       const content = generateStarterIgnoreFile(testDir);
       expect(content).toContain("# bench/");
     });
+
+    it("suggests benches/ directories (Cargo convention)", () => {
+      mkdirSync(join(testDir, "benches"), { recursive: true });
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# benches/");
+    });
   });
 
   describe("language-grouped test file patterns", () => {
@@ -208,23 +214,71 @@ describe("generateStarterIgnoreFile", () => {
       expect(content).toContain("# **/*Benchmark.cpp");
     });
 
+    it("includes Python pytest / unittest file patterns", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# Python");
+      // pytest / unittest default discovery — file must start with test_.
+      expect(content).toContain("# **/test_*.py");
+      // Alternate convention used by tensorflow, google-style, etc.
+      expect(content).toContain("# **/*_test.py");
+    });
+
+    it("includes Django's single-file tests.py convention", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# **/tests.py");
+    });
+
+    it("includes pytest conftest.py convention", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# **/conftest.py");
+    });
+
+    it("includes Rust tests.rs per-module extraction convention", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      expect(content).toContain("# Rust");
+      // Rust Book ch. 11.3 pattern — extracted sibling test module.
+      expect(content).toContain("# **/tests.rs");
+    });
+
+    it("includes Rust workspace-style *_test.rs and test_*.rs conventions", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      // Dominant in large workspaces (polkadot-sdk, rust-lang/rust,
+      // solana-labs/solana) where tests colocate with source rather
+      // than living inside inline `#[cfg(test)] mod tests`.
+      expect(content).toContain("# **/test_*.rs");
+      expect(content).toContain("# **/*_test.rs");
+    });
+
+    it("includes Rust criterion / test::Bencher file patterns", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      // Defensive: most Cargo benches live under `benches/` (covered by
+      // the dir rule) but a small fraction of workspaces name benchmark
+      // files with these prefixes/suffixes outside that directory.
+      expect(content).toContain("# **/bench_*.rs");
+      expect(content).toContain("# **/*_bench.rs");
+    });
+
     it("groups patterns under the JS / TS sub-header", () => {
       const content = generateStarterIgnoreFile(testDir);
       expect(content).toContain("# JS / TS");
     });
 
-    it("emits language groups in stable order: JS, C#, Java, Go, C++", () => {
+    it("emits language groups in stable order: JS, C#, Java, Go, C++, Python, Rust", () => {
       const content = generateStarterIgnoreFile(testDir);
       const jsIdx = content.indexOf("# JS / TS");
       const csIdx = content.indexOf("# C# / .NET");
       const javaIdx = content.indexOf("# Java / Kotlin");
       const goIdx = content.indexOf("# Go");
       const cppIdx = content.indexOf("# C++");
+      const pyIdx = content.indexOf("# Python");
+      const rustIdx = content.indexOf("# Rust");
       expect(jsIdx).toBeGreaterThan(-1);
       expect(csIdx).toBeGreaterThan(jsIdx);
       expect(javaIdx).toBeGreaterThan(csIdx);
       expect(goIdx).toBeGreaterThan(javaIdx);
       expect(cppIdx).toBeGreaterThan(goIdx);
+      expect(pyIdx).toBeGreaterThan(cppIdx);
+      expect(rustIdx).toBeGreaterThan(pyIdx);
     });
 
     it("keeps all suggestions commented even with no detected dirs and no .gitignore", () => {

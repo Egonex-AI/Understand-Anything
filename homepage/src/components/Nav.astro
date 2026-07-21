@@ -1,133 +1,714 @@
 ---
 const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
+const egonexProductUrl = 'https://www.egonex.ai/';
+const configuredMotherSiteUrl = (import.meta.env.PUBLIC_MOTHER_SITE_URL ?? '')
+  .trim()
+  .replace(/\/+$/, '');
+
+const motherHomeUrl = configuredMotherSiteUrl
+  ? `${configuredMotherSiteUrl}/#top`
+  : 'https://egonexai.com/#top';
+
+const navigation = {
+  home: '#top',
+  features: '#features',
+  liveDemo: '#live-demo',
+  community: '#community',
+  getStarted: '#install',
+};
 ---
 
-<nav class="nav" id="nav">
-  <div class="nav-inner">
-    <a href="/" class="nav-logo">EgonexAI</a>
-    <div class="nav-links">
-      <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="nav-github">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+<span class="brand-scroll-marker" id="brand-scroll-marker" aria-hidden="true"></span>
+
+<header class="brand-header" id="brand-header">
+  <nav class="brand-nav" aria-label="Primary navigation">
+    <a class="brand-home" href={motherHomeUrl} data-mother-site-link aria-label="EgonexAI home">
+      <img
+        src="/assets/egonexai/egonex-logo.png"
+        width="28"
+        height="28"
+        alt=""
+        aria-hidden="true"
+        decoding="async"
+      />
+      <span>EgonexAI</span>
+    </a>
+
+    <div class="brand-desktop-nav" aria-label="EgonexAI navigation">
+      <a href={navigation.home}>Home</a>
+
+      <details class="brand-products" id="brand-products">
+        <summary aria-haspopup="menu">
+          <span>Products</span>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </summary>
+        <div class="brand-products-menu" role="menu" aria-label="Products">
+          <a href={egonexProductUrl} role="menuitem">
+            <strong>Egonex</strong>
+            <span>Find the right people for real work</span>
+          </a>
+          <a href="/" role="menuitem" aria-current="page">
+            <strong>Understand Anything</strong>
+            <span>Understand codebases through guided context</span>
+          </a>
+        </div>
+      </details>
+
+      <a href={navigation.features}>Features</a>
+      <a href={navigation.liveDemo}>Live Demo</a>
+      <a href={navigation.community}>Community</a>
+    </div>
+
+    <div class="brand-desktop-actions">
+      <a
+        class="brand-github"
+        href={githubUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"></path>
         </svg>
         <span>GitHub</span>
       </a>
-      <a href="#install" class="nav-cta">Get Started</a>
+      <a class="brand-cta" href={navigation.getStarted}><span>Get Started</span></a>
     </div>
-  </div>
-</nav>
+
+    <button
+      class="brand-menu-toggle"
+      id="brand-menu-toggle"
+      type="button"
+      aria-expanded="false"
+      aria-controls="brand-mobile-menu"
+      aria-label="Open navigation menu"
+    >
+      <svg class="brand-menu-open-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+      <svg class="brand-menu-close-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" hidden>
+        <path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+    </button>
+
+    <div class="brand-mobile-panel" id="brand-mobile-menu" hidden>
+      <a href={navigation.home}>Home</a>
+
+      <div class="brand-mobile-products">
+        <span class="brand-mobile-label">Products</span>
+        <a href={egonexProductUrl}>
+          <strong>Egonex</strong>
+          <span>Find the right people for real work</span>
+        </a>
+        <a href="/" aria-current="page">
+          <strong>Understand Anything</strong>
+          <span>Understand codebases through guided context</span>
+        </a>
+      </div>
+
+      <a href={navigation.features}>Features</a>
+      <a href={navigation.liveDemo}>Live Demo</a>
+      <a href={navigation.community}>Community</a>
+
+      <div class="brand-mobile-actions">
+        <a
+          class="brand-github"
+          href={githubUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"></path>
+          </svg>
+          <span>GitHub</span>
+        </a>
+        <a class="brand-cta" href={navigation.getStarted}><span>Get Started</span></a>
+      </div>
+    </div>
+  </nav>
+</header>
 
 <script>
-  const nav = document.getElementById('nav');
-  if (nav) {
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 50);
+  const header = document.getElementById('brand-header');
+  const scrollMarker = document.getElementById('brand-scroll-marker');
+  const products = document.getElementById('brand-products');
+  const productsSummary = products?.querySelector('summary');
+  const productItems = products?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+  const menuToggle = document.getElementById('brand-menu-toggle');
+  const mobileMenu = document.getElementById('brand-mobile-menu');
+  const menuOpenIcon = menuToggle?.querySelector<SVGElement>('.brand-menu-open-icon');
+  const menuCloseIcon = menuToggle?.querySelector<SVGElement>('.brand-menu-close-icon');
+
+  if (['127.0.0.1', 'localhost', '::1', '[::1]'].includes(window.location.hostname)) {
+    document.querySelectorAll<HTMLAnchorElement>('[data-mother-site-link]').forEach((link) => {
+      link.href = 'http://127.0.0.1:4174/#top';
     });
   }
+
+  if (header && scrollMarker && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      ([entry]) => header.classList.toggle('is-compact', !entry.isIntersecting),
+      { threshold: 0 }
+    );
+
+    observer.observe(scrollMarker);
+  }
+
+  const closeProducts = (restoreFocus = false) => {
+    if (!(products instanceof HTMLDetailsElement) || !products.open) return;
+    products.open = false;
+    if (restoreFocus && productsSummary instanceof HTMLElement) productsSummary.focus();
+  };
+
+  const setMobileMenu = (open: boolean, restoreFocus = false) => {
+    if (!(menuToggle instanceof HTMLButtonElement) || !(mobileMenu instanceof HTMLElement)) return;
+
+    menuToggle.setAttribute('aria-expanded', String(open));
+    menuToggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+    mobileMenu.hidden = !open;
+    menuOpenIcon?.toggleAttribute('hidden', open);
+    menuCloseIcon?.toggleAttribute('hidden', !open);
+    document.documentElement.classList.toggle('brand-menu-is-open', open);
+
+    if (restoreFocus) menuToggle.focus();
+  };
+
+  productsSummary?.addEventListener('keydown', (event) => {
+    if (!(products instanceof HTMLDetailsElement) || !productItems?.length) return;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      products.open = true;
+      const item = event.key === 'ArrowDown' ? productItems[0] : productItems[productItems.length - 1];
+      item?.focus();
+    }
+  });
+
+  productItems?.forEach((item, index) => {
+    item.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = (index + direction + productItems.length) % productItems.length;
+      productItems[nextIndex]?.focus();
+    });
+  });
+
+  menuToggle?.addEventListener('click', () => {
+    const isOpen = menuToggle.getAttribute('aria-expanded') === 'true';
+    setMobileMenu(!isOpen);
+    closeProducts();
+  });
+
+  mobileMenu?.querySelectorAll('a').forEach((link) => {
+    link.addEventListener('click', () => setMobileMenu(false));
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    closeProducts(true);
+    if (menuToggle?.getAttribute('aria-expanded') === 'true') setMobileMenu(false, true);
+  });
+
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+
+    if (products && !products.contains(target)) closeProducts();
+    if (header && !header.contains(target)) setMobileMenu(false);
+  });
+
+  const desktopQuery = window.matchMedia('(min-width: 1100px)');
+
+  products?.addEventListener('pointerenter', () => {
+    if (desktopQuery.matches && products instanceof HTMLDetailsElement) products.open = true;
+  });
+
+  products?.addEventListener('pointerleave', () => {
+    if (desktopQuery.matches) closeProducts();
+  });
+
+  products?.addEventListener('focusin', () => {
+    if (desktopQuery.matches && products instanceof HTMLDetailsElement) products.open = true;
+  });
+
+  products?.addEventListener('focusout', (event) => {
+    if (!desktopQuery.matches || !(products instanceof HTMLDetailsElement)) return;
+    const nextTarget = event.relatedTarget;
+    if (!(nextTarget instanceof Node) || !products.contains(nextTarget)) closeProducts();
+  });
+
+  desktopQuery.addEventListener('change', (event) => {
+    if (event.matches) setMobileMenu(false);
+    else closeProducts();
+  });
 </script>
 
 <style>
-  .nav {
-    position: fixed;
-    top: 0;
+  .brand-scroll-marker {
+    position: absolute;
+    top: 20px;
     left: 0;
-    right: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+
+  .brand-header {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
     z-index: 100;
-    padding: 1rem 2rem;
-    transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+    width: min(calc(100% - 2rem), 1152px);
+    transform: translateX(-50%);
+    color: #1a0b54;
+    font-family: var(--font-brand);
+    transition: width 500ms ease-in-out;
   }
 
-  .nav.scrolled {
-    background-color: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
+  .brand-header.is-compact {
+    width: min(calc(100% - 2rem), 1024px);
   }
 
-  .nav.scrolled .nav-logo {
-    color: var(--text);
+  .brand-header,
+  .brand-header * {
+    box-sizing: border-box;
+    font-family: var(--font-brand);
   }
 
-  .nav.scrolled .nav-github {
-    color: var(--text-muted);
-  }
-
-  .nav.scrolled .nav-github:hover {
-    color: var(--text);
-  }
-
-  .nav-inner {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
+  .brand-nav {
+    position: relative;
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
     align-items: center;
-    justify-content: space-between;
     gap: 1rem;
+    padding: 6px 8px 6px 20px;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    transition: padding 500ms ease-in-out, box-shadow 500ms ease-in-out;
   }
 
-  .nav-logo {
-    font-family: var(--font-heading);
-    font-size: 1.25rem;
-    color: var(--text);
-    text-decoration: none;
+  .brand-header.is-compact .brand-nav {
+    padding-left: 16px;
+  }
+
+  .brand-home {
+    grid-column: 1;
+    justify-self: start;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
-  }
-
-  .nav-logo:hover {
+    color: #1a0b54;
     text-decoration: none;
-    color: var(--accent);
   }
 
-  .nav-links {
+  .brand-home:hover {
+    color: #1a0b54;
+    text-decoration: none;
+  }
+
+  .brand-home img {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    object-fit: contain;
+  }
+
+  .brand-home span {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+
+  .brand-desktop-nav {
+    grid-column: 2;
+    justify-self: center;
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    justify-content: center;
+    gap: 4px;
+    transition: gap 500ms ease-in-out;
   }
 
-  .nav-github {
-    display: flex;
+  .brand-header.is-compact .brand-desktop-nav {
+    gap: 0;
+  }
+
+  .brand-desktop-nav > a,
+  .brand-products > summary {
+    min-height: 40px;
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 12px;
+    color: #1a0b54;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1;
     text-decoration: none;
-    transition: color 0.2s;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 180ms ease, color 180ms ease, padding 500ms ease-in-out, transform 180ms ease;
   }
 
-  .nav-github:hover {
-    color: var(--text);
+  .brand-header.is-compact .brand-desktop-nav > a,
+  .brand-header.is-compact .brand-products > summary {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .brand-desktop-nav > a:hover,
+  .brand-products > summary:hover,
+  .brand-products[open] > summary {
+    color: #1a0b54;
+    background: #f4f2fb;
     text-decoration: none;
   }
 
-  .nav-cta {
-    background: var(--accent);
+  .brand-desktop-nav > a:active,
+  .brand-products > summary:active,
+  .brand-github:active,
+  .brand-cta:active,
+  .brand-menu-toggle:active {
+    transform: scale(0.98);
+  }
+
+  .brand-products {
+    position: relative;
+  }
+
+  .brand-products::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: 14px;
+  }
+
+  .brand-products > summary {
+    list-style: none;
+  }
+
+  .brand-products > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .brand-products > summary svg {
+    transition: transform 180ms ease;
+  }
+
+  .brand-products[open] > summary svg {
+    transform: rotate(180deg);
+  }
+
+  .brand-products-menu {
+    position: absolute;
+    top: calc(100% + 12px);
+    left: 50%;
+    width: 330px;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid rgba(88, 43, 232, 0.12);
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 20px 48px rgba(26, 11, 84, 0.16);
+    transform: translateX(-50%);
+  }
+
+  .brand-products-menu a {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 12px;
+    color: #1a0b54;
+    text-decoration: none;
+    transition: background-color 180ms ease;
+  }
+
+  .brand-products-menu a:hover,
+  .brand-products-menu a:focus-visible,
+  .brand-products-menu a[aria-current='page'] {
+    background: #f4f1ff;
+    text-decoration: none;
+  }
+
+  .brand-products-menu a[aria-current='page'] {
+    color: #582be8;
+  }
+
+  .brand-products-menu a[aria-current='page']::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    bottom: 10px;
+    left: 5px;
+    width: 3px;
+    border-radius: 999px;
+    background: #582be8;
+  }
+
+  .brand-products-menu strong {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .brand-products-menu span {
+    color: #746c91;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .brand-desktop-actions {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .brand-github {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 12px;
+    border-radius: 12px;
+    color: #1a0b54;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1;
+    text-decoration: none;
+    transition: background-color 180ms ease, transform 180ms ease;
+  }
+
+  .brand-github:hover {
+    color: #1a0b54;
+    background: #f4f2fb;
+    text-decoration: none;
+  }
+
+  .brand-cta {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px;
+    border-radius: 12px;
+    overflow: hidden;
     color: #ffffff;
-    padding: 0.5rem 1.25rem;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.9rem;
+    background: var(--egonex-gradient-primary);
+    box-shadow: none;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
     text-decoration: none;
-    transition: box-shadow 0.3s ease;
+    white-space: nowrap;
+    transition: transform 180ms ease;
   }
 
-  .nav-cta:hover {
+  .brand-cta > span {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 19px;
+    border-radius: 11px;
+    background: #582be8;
+    transition: background 300ms ease;
+  }
+
+  .brand-cta:hover {
+    color: #ffffff;
+    background: var(--egonex-gradient-primary);
     text-decoration: none;
-    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  .brand-cta:hover > span,
+  .brand-cta:focus-visible > span {
+    background: transparent;
+  }
+
+  .brand-menu-toggle,
+  .brand-mobile-panel {
+    display: none;
+  }
+
+  .brand-menu-open-icon[hidden],
+  .brand-menu-close-icon[hidden] {
+    display: none;
+  }
+
+  :global(.brand-menu-is-open) {
+    overflow: hidden;
+  }
+
+  @media (max-width: 1099px) {
+    .brand-nav {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .brand-desktop-nav,
+    .brand-desktop-actions {
+      display: none;
+    }
+
+    .brand-menu-toggle {
+      grid-column: 2;
+      justify-self: end;
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 12px;
+      color: #1a0b54;
+      background: transparent;
+      cursor: pointer;
+      transition: background-color 180ms ease, transform 180ms ease;
+    }
+
+    .brand-menu-toggle:hover {
+      background: #f4f2fb;
+    }
+
+    .brand-mobile-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: 100%;
+      display: grid;
+      gap: 4px;
+      padding: 10px;
+      border: 1px solid rgba(88, 43, 232, 0.1);
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 20px 48px rgba(26, 11, 84, 0.16);
+    }
+
+    .brand-mobile-panel[hidden] {
+      display: none;
+    }
+
+    .brand-mobile-panel > a,
+    .brand-mobile-products > a {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      border-radius: 12px;
+      color: #1a0b54;
+      font-size: 14px;
+      text-decoration: none;
+      transition: background-color 180ms ease;
+    }
+
+    .brand-mobile-panel > a:hover,
+    .brand-mobile-products > a:hover,
+    .brand-mobile-products > a[aria-current='page'] {
+      background: #f4f1ff;
+      text-decoration: none;
+    }
+
+    .brand-mobile-products {
+      display: grid;
+      gap: 2px;
+      padding: 6px;
+      border-radius: 12px;
+      background: #f8f7fc;
+    }
+
+    .brand-mobile-label {
+      padding: 6px 8px 4px;
+      color: #746c91;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .brand-mobile-products > a {
+      min-height: 0;
+      display: grid;
+      align-items: start;
+      gap: 3px;
+      padding: 10px 12px;
+    }
+
+    .brand-mobile-products > a strong {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.2;
+    }
+
+    .brand-mobile-products > a span {
+      color: #746c91;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+
+    .brand-mobile-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px solid #ece9f5;
+    }
+
+    .brand-mobile-actions .brand-github,
+    .brand-mobile-actions .brand-cta {
+      min-height: 44px;
+    }
+
+    .brand-mobile-actions .brand-cta > span {
+      min-height: 42px;
+      width: 100%;
+    }
   }
 
   @media (max-width: 480px) {
-    .nav { padding: 0.75rem 1rem; }
-    .nav-github span { display: none; }
+    .brand-header {
+      top: 12px;
+      width: calc(100% - 24px);
+    }
+
+    .brand-header.is-compact {
+      width: calc(100% - 24px);
+    }
+
+    .brand-nav {
+      padding-left: 20px;
+    }
+
+    .brand-home span {
+      font-size: 20px;
+    }
   }
 
-  @media (max-width: 540px) {
-    .nav { padding: 0.75rem 1rem; }
-    .nav-logo { font-size: 1.05rem; }
-    .nav-links { gap: 0.85rem; }
-    .nav-github span { display: none; }
-    .nav-cta {
-      padding: 0.48rem 0.85rem;
-      font-size: 0.82rem;
-      white-space: nowrap;
+  @media (prefers-reduced-motion: reduce) {
+    .brand-header,
+    .brand-header * {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
     }
   }
 </style>

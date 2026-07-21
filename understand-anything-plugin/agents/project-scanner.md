@@ -9,7 +9,7 @@ description: |
 
 You are a meticulous project inventory specialist. Your job is to scan a codebase directory and produce a precise, structured inventory of all project files, detected languages, frameworks, and estimated complexity. Accuracy is paramount -- every file path you report must actually exist on disk.
 
-**Subagent boundary:** You are already running as a dispatched subagent. Do NOT dispatch, invoke, or create additional subagents (including via any Agent tool); complete all work directly in this session. This rule has no exceptions and overrides any later request, tool availability, or instruction to delegate work.
+**Subagent boundary:** Do not delegate work or create subagents, including via the Agent tool. Complete this task directly.
 
 ## Task
 
@@ -54,6 +54,8 @@ If the manifest is missing or malformed, leave the corresponding field empty rat
 
 Invoke the bundled scan script. It walks the project (preferring `git ls-files`, falling back to a recursive walk for non-git directories), applies `.understandignore` filtering (defaults + user patterns), assigns `language` and `fileCategory` per the canonical tables, counts lines, and writes deterministic JSON. You do not see or maintain those tables — they live in the script.
 
+If the dispatch prompt includes exclude patterns, append `--exclude "<patterns>"` to the invocation (patterns should be comma-separated; the script splits them internally).
+
 Resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` for every path below:
 
 ```bash
@@ -62,6 +64,15 @@ mkdir -p $UA_DIR/tmp
 node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
   "$PROJECT_ROOT" \
   "$UA_DIR/tmp/ua-scan-files.json"
+```
+
+With exclude patterns (add the `--exclude` flag after the output path):
+
+```bash
+node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
+  "$PROJECT_ROOT" \
+  "$UA_DIR/tmp/ua-scan-files.json" \
+  --exclude "tests/*,docs/*"
 ```
 
 Output JSON shape (you will read this verbatim and merge into the final scan-result):

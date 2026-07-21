@@ -3,7 +3,7 @@ const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 const egonexUrl = 'https://egonex.ai';
 ---
 
-<section class="hero">
+<section class="hero" id="top">
   <div class="hero-bg">
     <img src="/images/hero.jpg" alt="" class="hero-bg-img" loading="eager" />
     <div class="hero-overlay"></div>
@@ -38,8 +38,8 @@ const egonexUrl = 'https://egonex.ai';
     </div>
 
     <div class="hero-actions anim anim-6">
-      <a href="#install" class="hero-cta">Get Started</a>
-      <a href="/demo/" class="hero-demo">Live Demo &rarr;</a>
+      <a href="#install" class="hero-cta"><span>Get Started</span></a>
+      <a href="#live-demo" class="hero-demo">Live Demo &rarr;</a>
       <a href={githubUrl} target="_blank" rel="noopener noreferrer" class="hero-secondary">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 .587l3.668 7.568L24 9.306l-6 5.986 1.416 8.421L12 19.897l-7.416 3.816L6 15.292 0 9.306l8.332-1.151z"/></svg>
         Star on GitHub
@@ -83,12 +83,6 @@ const egonexUrl = 'https://egonex.ai';
       />
     </a>
 
-    <a href={egonexUrl} target="_blank" rel="noopener noreferrer" class="hero-company anim anim-6">
-      <span class="hero-company-label">Company</span>
-      <span class="hero-company-divider">&middot;</span>
-      <span class="hero-company-site">egonex.ai</span>
-      <span class="hero-company-arrow">&rarr;</span>
-    </a>
   </div>
 </section>
 
@@ -289,22 +283,34 @@ const egonexUrl = 'https://egonex.ai';
   }
 
   .hero-cta {
-    background: linear-gradient(135deg, var(--accent), var(--accent-3));
+    background: var(--egonex-gradient-primary);
     color: #ffffff;
-    padding: 0.85rem 2.5rem;
+    padding: 1px;
     border-radius: 999px;
     font-weight: 600;
     font-size: 1.05rem;
     text-decoration: none;
-    box-shadow: 0 16px 34px rgba(88, 43, 232, 0.22);
-    transition: box-shadow 0.3s ease, transform 0.2s ease, filter 0.2s ease;
+    box-shadow: none;
+    transition: transform 0.2s ease;
+  }
+
+  .hero-cta span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.85rem 2.5rem;
+    border-radius: 999px;
+    background: #582be8;
+    transition: background 0.3s ease;
   }
 
   .hero-cta:hover {
     text-decoration: none;
-    box-shadow: 0 22px 44px rgba(88, 43, 232, 0.28);
-    transform: translateY(-2px);
-    filter: brightness(1.02);
+  }
+
+  .hero-cta:hover span,
+  .hero-cta:focus-visible span {
+    background: transparent;
   }
 
   .hero-demo {
@@ -321,9 +327,14 @@ const egonexUrl = 'https://egonex.ai';
 
   .hero-demo:hover {
     background: #ffffff;
-    box-shadow: 0 16px 34px rgba(88, 43, 232, 0.12);
+    box-shadow: 0 12px 28px rgba(88, 43, 232, 0.18);
     transform: translateY(-2px);
     text-decoration: none;
+  }
+
+  .hero-cta:active,
+  .hero-demo:active {
+    transform: scale(0.98);
   }
 
   .hero-secondary {
@@ -435,61 +446,6 @@ const egonexUrl = 'https://egonex.ai';
     white-space: nowrap;
   }
 
-  .hero-company {
-    margin-top: 1.25rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.45rem 1.1rem;
-    border: 1px solid rgba(88, 43, 232, 0.18);
-    border-radius: 100px;
-    background: rgba(255, 255, 255, 0.68);
-    box-shadow: var(--shadow-card);
-    backdrop-filter: blur(18px) saturate(1.12);
-    text-decoration: none;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease,
-      background-color 0.25s ease;
-  }
-
-  .hero-company:hover {
-    border-color: rgba(88, 43, 232, 0.3);
-    background: #ffffff;
-    box-shadow: 0 18px 38px rgba(88, 43, 232, 0.14);
-    transform: translateY(-1px);
-    text-decoration: none;
-  }
-
-  .hero-company-label {
-    font-family: var(--font-code);
-    font-size: 0.7rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-
-  .hero-company-divider {
-    color: rgba(88, 43, 232, 0.36);
-    font-size: 0.85rem;
-    line-height: 1;
-  }
-
-  .hero-company-site {
-    font-family: var(--font-code);
-    font-size: 0.82rem;
-    color: var(--text-soft);
-  }
-
-  .hero-company-arrow {
-    color: var(--accent);
-    font-size: 0.95rem;
-    line-height: 1;
-    transition: transform 0.2s ease;
-  }
-
-  .hero-company:hover .hero-company-arrow {
-    transform: translateX(3px);
-  }
-
   /* Staggered entrance */
   @keyframes heroIn {
     from {
@@ -576,16 +532,13 @@ const egonexUrl = 'https://egonex.ai';
       padding: 0.85rem 1.5rem;
       justify-content: center;
     }
+
+    .hero-cta span {
+      width: 100%;
+      padding: 0.85rem 1.5rem;
+    }
     .hero-pillars { flex-direction: column; gap: 0.4rem; }
     .pillar-dot { display: none; }
-    .hero-company {
-      flex-direction: column;
-      gap: 0.25rem;
-      padding: 0.6rem 1.25rem;
-      max-width: 100%;
-    }
-    .hero-company-divider { display: none; }
-    .hero-company-site { font-size: 0.78rem; }
   }
 
   @media (max-width: 480px) {

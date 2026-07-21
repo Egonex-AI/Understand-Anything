@@ -30,14 +30,14 @@ function setupTree(files) {
  * `extraNodeArgs` is prepended to the node argv before the script path, so
  * tests can pass `--import` loader hooks to force specific failure modes.
  */
-function runScript(projectRoot, input, extraNodeArgs = []) {
+function runScript(projectRoot, input, extraNodeArgs = [], env = process.env) {
   const inputPath = join(projectRoot, 'ua-eim-input.json');
   const outputPath = join(projectRoot, 'ua-eim-output.json');
   writeFileSync(inputPath, JSON.stringify(input), 'utf-8');
   const result = spawnSync(
     'node',
     [...extraNodeArgs, SCRIPT, inputPath, outputPath],
-    { encoding: 'utf-8' },
+    { encoding: 'utf-8', env },
   );
   let output = null;
   try {
@@ -45,7 +45,13 @@ function runScript(projectRoot, input, extraNodeArgs = []) {
   } catch {
     /* output missing on hard failure */
   }
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr, output };
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    output,
+    outputText: output ? readFileSync(outputPath, 'utf-8') : null,
+  };
 }
 
 describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
@@ -89,6 +95,44 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.stats.filesScanned).toBe(4);
     expect(result.output.stats.filesWithImports).toBe(1);
     expect(result.output.stats.totalEdges).toBe(2);
+  });
+
+  it('orders Unicode import targets by locale-independent UTF-16 code units', () => {
+    projectRoot = setupTree({
+      'src/index.ts': `import './ä';\nimport './Z';\nimport './a';\n`,
+      'src/ä.ts': 'export const umlaut = true;\n',
+      'src/Z.ts': 'export const upper = true;\n',
+      'src/a.ts': 'export const lower = true;\n',
+    });
+    const input = {
+      projectRoot,
+      files: [
+        { path: 'src/ä.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/a.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/Z.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    };
+
+    const cLocale = runScript(projectRoot, input, [], {
+      ...process.env,
+      LANG: 'C',
+      LC_ALL: 'C',
+    });
+    const swedishLocale = runScript(projectRoot, input, [], {
+      ...process.env,
+      LANG: 'sv_SE.UTF-8',
+      LC_ALL: 'sv_SE.UTF-8',
+    });
+
+    expect(cLocale.status, cLocale.stderr).toBe(0);
+    expect(swedishLocale.status, swedishLocale.stderr).toBe(0);
+    expect(cLocale.output.importMap['src/index.ts']).toEqual([
+      'src/Z.ts',
+      'src/a.ts',
+      'src/ä.ts',
+    ]);
+    expect(swedishLocale.outputText).toBe(cLocale.outputText);
   });
 
   it('resolves tsconfig paths aliases', () => {

@@ -20,9 +20,15 @@ import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { buildResult as buildExtractResult } from './extract-structure-result.mjs';
+import {
+  analyzeFileWithOutcomes,
+  buildResult as buildExtractResult,
+} from './extract-structure-result.mjs';
 
-export { buildResult } from './extract-structure-result.mjs';
+export {
+  analyzeFileWithOutcomes,
+  buildResult,
+} from './extract-structure-result.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // skills/understand/ -> plugin root is two dirs up
@@ -77,6 +83,10 @@ async function main() {
 
   const results = [];
   const filesSkipped = [];
+  const analysisOutcomes = {
+    structure: { succeeded: 0, failed: 0 },
+    callGraph: { succeeded: 0, failed: 0, skipped: 0 },
+  };
 
   for (const file of batchFiles) {
     const absolutePath = join(projectRoot, file.path);
@@ -97,56 +107,16 @@ async function main() {
     const totalLines = content.endsWith('\n') ? Math.max(0, lines.length - 1) : lines.length;
     const nonEmptyLines = lines.filter(l => l.trim().length > 0).length;
 
-    const wantsCallGraph =
-      file.fileCategory === 'code' || file.fileCategory === 'script';
+    const { analysis, callGraph, structureOutcome, callGraphOutcome } =
+      analyzeFileWithOutcomes(registry, file, content);
 
-    const mapCallGraph = cg =>
-      cg && cg.length > 0
-        ? cg.map(entry => ({
-            caller: entry.caller,
-            callee: entry.callee,
-            lineNumber: entry.lineNumber,
-          }))
-        : null;
-
-    let analysis = null;
-    let callGraph = null;
-
-    // Single-parse fast path: when both structure and call graph are needed,
-    // analyzeFileFull parses the file once instead of analyzeFile +
-    // extractCallGraph parsing it twice (~40% less parse work on code files).
-    // Falls back to the two separate calls (preserving their independent
-    // degradation) when the registry/plugin lacks the combined method or it
-    // throws.
-    let full = null;
-    if (wantsCallGraph && typeof registry.analyzeFileFull === 'function') {
-      try {
-        full = registry.analyzeFileFull(file.path, content);
-      } catch {
-        full = null;
-      }
+    if (structureOutcome === 'skipped') {
+      filesSkipped.push(file.path);
+      continue;
     }
 
-    if (full) {
-      analysis = full.structure;
-      callGraph = mapCallGraph(full.callGraph);
-    } else {
-      // Structural analysis via registry
-      try {
-        analysis = registry.analyzeFile(file.path, content);
-      } catch {
-        // If analysis throws, treat as degraded — still include basic metrics
-      }
-
-      // Call graph extraction (code files only)
-      if (wantsCallGraph) {
-        try {
-          callGraph = mapCallGraph(registry.extractCallGraph(file.path, content));
-        } catch {
-          // Call graph extraction failed — non-fatal
-        }
-      }
-    }
+    analysisOutcomes.structure[structureOutcome] += 1;
+    analysisOutcomes.callGraph[callGraphOutcome] += 1;
 
     // Build result object
     const result = buildExtractResult(file, totalLines, nonEmptyLines, analysis, callGraph, batchImportData);
@@ -158,6 +128,7 @@ async function main() {
     scriptCompleted: true,
     filesAnalyzed: results.length,
     filesSkipped,
+    analysisOutcomes,
     results,
   };
 

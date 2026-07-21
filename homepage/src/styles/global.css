@@ -1,5 +1,21 @@
 /* Font declarations — self-hosted, no external CDN dependency */
 @font-face {
+  font-family: 'Mazzard H';
+  src: url('/fonts/MazzardH-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Mazzard H';
+  src: url('/fonts/MazzardH-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Geist Variable';
   src: url('/fonts/GeistVariable.woff2') format('woff2');
   font-weight: 100 900;
@@ -55,10 +71,19 @@
   --surface-dark: #10131d;
   --border: #e8e1ff;
   --border-soft: #eceef4;
+  --egonex-violet-deep: #35138f;
+  --egonex-violet: #582be8;
+  --egonex-violet-bright: #744bef;
+  --egonex-violet-light: #a996ff;
+  --egonex-violet-mist: #c2b6ff;
+  --egonex-gradient-primary: linear-gradient(90deg, #35138f 0%, #582be8 52%, #744bef 100%);
+  --egonex-gradient-on-dark: linear-gradient(90deg, #a996ff 0%, #8064f4 45%, #c2b6ff 100%);
+  --egonex-button-glow: 0 12px 28px rgba(88, 43, 232, 0.24);
+  --egonex-button-glow-hover: 0 16px 36px rgba(88, 43, 232, 0.34);
   --accent: #582be8;
-  --accent-2: #6236ff;
-  --accent-3: #8b5cf6;
-  --accent-deep: #4520c8;
+  --accent-2: #582be8;
+  --accent-3: #744bef;
+  --accent-deep: #35138f;
   --accent-soft: #f1ecff;
   --accent-glow: rgba(88, 43, 232, 0.18);
   --text: #0f1020;
@@ -69,15 +94,16 @@
   --shadow-soft: 0 30px 80px rgba(88, 43, 232, 0.12), 0 10px 30px rgba(15, 16, 32, 0.08);
   --shadow-card: 0 18px 42px rgba(80, 70, 120, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.86);
 
-  /* Egonex sweep: violet -> purple */
-  --grad-cool: #8b5cf6;
-  --grad-mid: #6236ff;
-  --grad-warm: #582be8;
-  --gradient: linear-gradient(135deg, var(--grad-cool), var(--grad-mid), var(--grad-warm));
+  /* Egonex sweep: deep violet -> brand violet -> bright violet */
+  --grad-cool: #35138f;
+  --grad-mid: #582be8;
+  --grad-warm: #744bef;
+  --gradient: var(--egonex-gradient-primary);
 
-  --font-heading: 'Geist Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-body: 'Geist Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-code: 'Geist Mono Variable', 'JetBrains Mono', 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --font-heading: 'Mazzard H', sans-serif;
+  --font-body: 'Mazzard H', sans-serif;
+  --font-code: 'Mazzard H', sans-serif;
+  --font-brand: 'Mazzard H', sans-serif;
 }
 
 /* Reset & base */
@@ -89,6 +115,19 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select {
+  font-family: 'Mazzard H', sans-serif;
+}
+
+section[id] {
+  scroll-margin-top: 6rem;
 }
 
 body {
@@ -156,4 +195,19 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

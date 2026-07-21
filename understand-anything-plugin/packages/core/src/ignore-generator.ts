@@ -34,6 +34,7 @@ const EXACT_DIR_NAMES = [
   "bench",
   "benchmark",
   "benchmarks",
+  "benches",
 ];
 
 // Directory-name suffixes matched case-insensitively via String.endsWith.
@@ -92,6 +93,44 @@ const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
       "**/*_browsertest.cc",
       "**/*_benchmark.cc",
       "**/*Benchmark.cpp",
+    ],
+  },
+  {
+    // Python testing conventions are bimodal. Most projects (django,
+    // flask, pandas, numpy) cluster tests inside a top-level tests/ dir,
+    // where the existing directory rules already catch them. But Google-
+    // style codebases (tensorflow, jax, some Meta libs) interleave
+    // *_test.py directly alongside the module under test — e.g. tensor-
+    // flow/python/ops/array_ops.py + array_ops_test.py — so file-pattern
+    // rules add the majority of the token savings for that half of the
+    // ecosystem.
+    label: "Python",
+    patterns: [
+      "**/test_*.py",
+      "**/*_test.py",
+      "**/tests.py",
+      "**/conftest.py",
+    ],
+  },
+  {
+    // Rust testing is bimodal, similar to Python. Library-scale crates
+    // (ripgrep, alacritty, helix, cargo) keep unit tests inline in
+    // `#[cfg(test)] mod tests { ... }` blocks that no file-pattern
+    // rule can catch, so the group barely moves the needle for them.
+    // Workspace monorepos (paritytech/polkadot-sdk, solana-labs/solana,
+    // rust-lang/rust) colocate a `foo_test.rs` beside `foo.rs` at
+    // scale — measurement showed *_test.rs alone accounts for the
+    // majority of hits (232 files / −15% on polkadot-sdk analysed
+    // budget). Integration tests already live under tests/ and Cargo
+    // benches under benches/ (both dir-covered), so the file globs
+    // here target the colocated shape specifically.
+    label: "Rust",
+    patterns: [
+      "**/tests.rs",
+      "**/test_*.rs",
+      "**/*_test.rs",
+      "**/bench_*.rs",
+      "**/*_bench.rs",
     ],
   },
 ];

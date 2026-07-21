@@ -1,6 +1,8 @@
 export const en = {
   common: {
     loading: "Loading project...",
+    computingGraphLayout: "Computing graph layout...",
+    forceLayoutFallback: "Force layout unavailable; showing a fallback grid.",
     noGraphLoaded: "No graph loaded",
     selectNode: "Select a node to see details",
     back: "Back",

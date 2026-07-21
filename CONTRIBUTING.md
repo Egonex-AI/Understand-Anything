@@ -110,6 +110,13 @@ Then open a Pull Request on GitHub with:
 
 ## 🧪 Testing Guidelines
 
+### Large Repository Benchmarks
+
+Use the [large monorepo benchmark](docs/benchmarks/large-monorepo.md) to collect
+reproducible scale, timing, and memory reports from projects that are too large
+for CI fixtures. The guide includes a pinned TensorFlow example and explains
+which deterministic stages are measured.
+
 ### Writing Tests
 
 - Use Vitest for testing

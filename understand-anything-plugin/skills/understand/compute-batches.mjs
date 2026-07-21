@@ -7,15 +7,26 @@
  *
  * Usage:
  *   node compute-batches.mjs <project-root> [--changed-files=<path>]
+ *     [--scan-result=<path>] [--output=<path>]
  *
  * Input/output live under the project's data dir (`.ua/`, or legacy
  * `.understand-anything/` when that directory already exists — resolved by
  * core's resolveUaDir):
  *   Input:  <ua-dir>/intermediate/scan-result.json
  *   Output: <ua-dir>/intermediate/batches.json
+ *
+ * `--scan-result` and `--output` let read-only tooling (for example the
+ * large-repository benchmark runner) keep intermediate artifacts outside the
+ * analyzed project. Omitting them preserves the normal /understand paths.
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -252,6 +263,13 @@ function normalizeRelativePathForMatch(pathText) {
     .replace(/\/+/g, '/');
 }
 
+// ECMAScript string comparison uses a stable UTF-16 code-unit order and does
+// not depend on the host locale or ICU version.
+function comparePaths(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 /**
  * Returns Map<path, communityId> via Louvain. May throw — caller must catch
  * and fall back if it does. Honors UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW=1
@@ -262,15 +280,18 @@ function runLouvain(codeFiles, importMap) {
     throw new Error('forced throw via UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW');
   }
   const g = new Graph({ type: 'undirected', allowSelfLoops: false });
-  for (const f of codeFiles) g.addNode(f.path);
-  for (const [src, targets] of Object.entries(importMap)) {
+  const sortedCodePaths = codeFiles.map(f => f.path).sort(comparePaths);
+  for (const path of sortedCodePaths) g.addNode(path);
+  const sortedImports = Object.entries(importMap)
+    .sort(([a], [b]) => comparePaths(a, b));
+  for (const [src, targets] of sortedImports) {
     if (!g.hasNode(src)) continue;
-    for (const tgt of targets) {
+    for (const tgt of [...targets].sort(comparePaths)) {
       if (!g.hasNode(tgt) || src === tgt || g.hasEdge(src, tgt)) continue;
       g.addEdge(src, tgt);
     }
   }
-  const cs = louvain(g);  // { nodeId: communityId }
+  const cs = louvain(g, { randomWalk: false });  // { nodeId: communityId }
   return new Map(Object.entries(cs));
 }
 
@@ -331,7 +352,7 @@ function mergeSmallBatches(bareBatches) {
   // Pool and sort deterministically by path so repeated runs match byte-for-byte.
   const pooledFiles = smallMergeable
     .flatMap(b => b.files)
-    .sort((a, b) => a.path.localeCompare(b.path));
+    .sort((a, b) => comparePaths(a.path, b.path));
 
   const miscBatches = [];
   for (let i = 0; i < pooledFiles.length; i += MAX_MERGE_TARGET) {
@@ -361,34 +382,55 @@ function mergeSmallBatches(bareBatches) {
 async function main() {
   const projectRoot = process.argv[2];
   if (!projectRoot) {
-    process.stderr.write('Usage: node compute-batches.mjs <project-root> [--changed-files=<path>]\n');
+    process.stderr.write(
+      'Usage: node compute-batches.mjs <project-root> [--changed-files=<path>] ' +
+      '[--scan-result=<path>] [--output=<path>]\n',
+    );
     process.exit(1);
   }
 
-  let changedFiles = null;
+  const helperOptions = new Map();
   for (const arg of process.argv.slice(3)) {
-    const m = arg.match(/^--changed-files=(.+)$/);
-    if (m) {
-      const p = m[1];
-      let content;
-      try {
-        content = readFileSync(p, 'utf-8');
-      } catch (err) {
-        process.stderr.write(
-          `Error: compute-batches: --changed-files path not readable: ${p} (${err.message})\n`,
-        );
-        process.exit(1);
-      }
-      const lines = content
-        .split('\n')
-        .map(normalizeRelativePathForMatch)
-        .filter(Boolean);
-      changedFiles = new Set(lines);
+    const match = arg.match(/^--(changed-files|scan-result|output)=(.+)$/);
+    if (!match) {
+      process.stderr.write(`Error: compute-batches: invalid option: ${arg}\n`);
+      process.exit(1);
     }
+    const [, optionName, optionValue] = match;
+    if (helperOptions.has(optionName)) {
+      process.stderr.write(`Error: compute-batches: duplicate option: --${optionName}\n`);
+      process.exit(1);
+    }
+    helperOptions.set(optionName, optionValue);
   }
 
+  let changedFiles = null;
+  const changedFilesPath = helperOptions.get('changed-files');
+  if (changedFilesPath) {
+    let content;
+    try {
+      content = readFileSync(changedFilesPath, 'utf-8');
+    } catch (err) {
+      process.stderr.write(
+        `Error: compute-batches: --changed-files path not readable: ${changedFilesPath} ` +
+        `(${err.message})\n`,
+      );
+      process.exit(1);
+    }
+    const lines = content
+      .split('\n')
+      .map(normalizeRelativePathForMatch)
+      .filter(Boolean);
+    changedFiles = new Set(lines);
+  }
+
+  const scanResultValue = helperOptions.get('scan-result');
+  const outputValue = helperOptions.get('output');
+  const scanResultPath = scanResultValue ? resolve(scanResultValue) : null;
+  const outputPath = outputValue ? resolve(outputValue) : null;
+
   const uaDir = resolveUaDir(projectRoot);
-  const scanPath = join(uaDir, 'intermediate', 'scan-result.json');
+  const scanPath = scanResultPath ?? join(uaDir, 'intermediate', 'scan-result.json');
   if (!existsSync(scanPath)) {
     process.stderr.write(`Error: scan-result.json not found at ${scanPath}\n`);
     process.exit(1);
@@ -458,7 +500,7 @@ async function main() {
       if (b[1].length !== a[1].length) return b[1].length - a[1].length;
       const minA = [...a[1]].sort()[0];
       const minB = [...b[1]].sort()[0];
-      return minA.localeCompare(minB);
+      return comparePaths(minA, minB);
     });
 
   // Build per-batch file list with full file metadata from scan
@@ -541,7 +583,7 @@ async function main() {
       if (rawCount > MAX_NEIGHBORS) {
         kept.sort((a, b2) => (NEIGHBOR_DEGREE.get(b2.path) || 0)
                             - (NEIGHBOR_DEGREE.get(a.path) || 0)
-                            || a.path.localeCompare(b2.path));  // deterministic tiebreak
+                            || comparePaths(a.path, b2.path));  // deterministic tiebreak
         const beforeSlice = kept.length;
         kept = kept.slice(0, MAX_NEIGHBORS);
         process.stderr.write(
@@ -586,7 +628,8 @@ async function main() {
     batches: finalBatches,
   };
 
-  const outPath = join(uaDir, 'intermediate', 'batches.json');
+  const outPath = outputPath ?? join(uaDir, 'intermediate', 'batches.json');
+  mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
   const batchSizes = finalBatches.map(b => b.files.length);
   const maxSize = batchSizes.length ? Math.max(...batchSizes) : 0;
