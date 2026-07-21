@@ -19,6 +19,7 @@ Input/output live under the project's data dir (`.ua/`, or legacy
 
 import json
 import os
+import posixpath
 import re
 import sys
 from collections import Counter
@@ -288,6 +289,336 @@ def normalize_complexity(value: Any) -> tuple[str, str]:
             return "complex", "mapped"
     # None or other type — default but flag it
     return "moderate", "unknown"
+
+
+# ── Deterministic Python call linker ──────────────────────────────────────
+
+def _normalized_project_path(path: str) -> str | None:
+    """Return a relative POSIX project path, or None if it escapes the root."""
+    posix_path = path.replace("\\", "/")
+    if posix_path.startswith("/") or re.match(r"^[A-Za-z]:/", posix_path):
+        return None
+    normalized = posixpath.normpath(posix_path)
+    if normalized in ("", ".", "..") or normalized.startswith("../"):
+        return None
+    return normalized
+
+
+def python_module_candidates(source_file: str, module: str) -> tuple[str, ...]:
+    """Map a Python import module to possible project-relative source files."""
+    source_path = _normalized_project_path(source_file)
+    if source_path is None or not isinstance(module, str):
+        return ()
+
+    match = re.fullmatch(r"(\.*)([^\s./]+(?:\.[^\s./]+)*)?", module)
+    if match is None:
+        return ()
+    leading_dots, dotted_module = match.groups()
+    module_parts = dotted_module.split(".") if dotted_module else []
+    if any(not part.isidentifier() for part in module_parts):
+        return ()
+
+    if leading_dots:
+        base_parts = [
+            part for part in posixpath.dirname(source_path).split("/") if part
+        ]
+        parent_levels = len(leading_dots) - 1
+        if parent_levels and parent_levels >= len(base_parts):
+            return ()
+        if parent_levels:
+            base_parts = base_parts[:-parent_levels]
+        path_parts = base_parts + module_parts
+    else:
+        if not module_parts:
+            return ()
+        path_parts = module_parts
+
+    module_path = "/".join(path_parts)
+    if not module_path:
+        return ()
+    if dotted_module:
+        return (f"{module_path}.py", f"{module_path}/__init__.py")
+    return (f"{module_path}/__init__.py",)
+
+
+def _python_imported_submodule(source: str, imported_name: str) -> str | None:
+    """Build the module path for `from source import imported_name` used as a package."""
+    if not imported_name or not imported_name.isidentifier():
+        return None
+    if not source:
+        return imported_name
+    if source.startswith("."):
+        # `from . import helper` → `.helper`; `from .pkg import helper` → `.pkg.helper`
+        if source.replace(".", "") == "":
+            return source + imported_name
+        return f"{source}.{imported_name}"
+    return f"{source}.{imported_name}"
+
+
+def _matching_function_ids(
+    functions_by_file_and_name: dict[tuple[str, str], list[str]],
+    files: tuple[str, ...],
+    name: str,
+) -> list[str]:
+    matches: list[str] = []
+    for path in files:
+        for node_id in functions_by_file_and_name.get((path, name), []):
+            if node_id not in matches:
+                matches.append(node_id)
+    return matches
+
+
+def _python_import_binds(import_record: dict[str, Any], callee: str) -> bool:
+    """Return whether an import record binds the called local name."""
+    local_name = callee.split(".", 1)[0]
+    aliases = import_record.get("aliases")
+    if isinstance(aliases, dict) and local_name in aliases:
+        return True
+    specifiers = import_record.get("specifiers")
+    if not isinstance(specifiers, list):
+        return False
+    if local_name in specifiers:
+        return True
+    source = import_record.get("source")
+    return (
+        "." in callee
+        and isinstance(source, str)
+        and source in specifiers
+        and source.split(".", 1)[0] == local_name
+    )
+
+
+def _active_python_import(
+    imports: list[Any],
+    callee: str,
+    call_line: Any,
+) -> tuple[dict[str, Any] | None, bool]:
+    """Return the latest binding before a call and whether ordering is ambiguous."""
+    matching = [
+        (index, record)
+        for index, record in enumerate(imports)
+        if isinstance(record, dict) and _python_import_binds(record, callee)
+    ]
+    if not matching:
+        return None, False
+    if not isinstance(call_line, int) or isinstance(call_line, bool):
+        return None, True
+
+    applicable: list[tuple[int, int, dict[str, Any]]] = []
+    for index, record in matching:
+        import_line = record.get("lineNumber")
+        if not isinstance(import_line, int) or isinstance(import_line, bool):
+            return None, True
+        if import_line == call_line:
+            return None, True
+        if import_line < call_line:
+            applicable.append((import_line, index, record))
+    if not applicable:
+        return None, False
+    return max(applicable, key=lambda item: (item[0], item[1]))[2], False
+
+
+def _resolve_imported_python_targets(
+    functions_by_file_and_name: dict[tuple[str, str], list[str]],
+    source_file: str,
+    callee: str,
+    active_import: dict[str, Any],
+) -> list[str]:
+    """Resolve a callee through one active import binding to function node ids."""
+    source = active_import.get("source")
+    specifiers = active_import.get("specifiers")
+    aliases = active_import.get("aliases")
+    if not isinstance(source, str) or not isinstance(specifiers, list):
+        return []
+
+    aliases = aliases if isinstance(aliases, dict) else {}
+    module_files = python_module_candidates(source_file, source)
+    original = aliases.get(callee)
+    if callee in specifiers and callee not in aliases:
+        return _matching_function_ids(
+            functions_by_file_and_name, module_files, callee
+        )
+    if (
+        isinstance(original, str)
+        and original != source
+        and callee in specifiers
+    ):
+        return _matching_function_ids(
+            functions_by_file_and_name, module_files, original
+        )
+
+    qualifier, dot, member = callee.rpartition(".")
+    if not dot or not member.isidentifier():
+        return []
+
+    aliased_module = aliases.get(qualifier)
+    is_module_binding = aliased_module == source and qualifier in specifiers
+    is_unaliased_module = qualifier == source and source in specifiers
+    if is_module_binding or is_unaliased_module:
+        return _matching_function_ids(
+            functions_by_file_and_name, module_files, member
+        )
+
+    # `from package import helper; helper.expand()` — helper is a submodule
+    if qualifier not in specifiers:
+        return []
+    parent_symbol = aliases[qualifier] if qualifier in aliases else qualifier
+    if not isinstance(parent_symbol, str) or parent_symbol == source:
+        return []
+
+    # If the imported name is itself a function in the parent module, this is
+    # attribute access on a function — not a submodule call. Prefer skip.
+    if _matching_function_ids(
+        functions_by_file_and_name, module_files, parent_symbol
+    ):
+        return []
+
+    submodule = _python_imported_submodule(source, parent_symbol)
+    if submodule is None:
+        return []
+    return _matching_function_ids(
+        functions_by_file_and_name,
+        python_module_candidates(source_file, submodule),
+        member,
+    )
+
+
+def link_python_calls(
+    nodes_by_id: dict[str, dict[str, Any]],
+    edges: list[dict[str, Any]],
+    extraction_results: list[dict[str, Any]],
+) -> tuple[int, int]:
+    """Append calls edges only when Python caller and callee resolve uniquely."""
+    functions_by_file_and_name: dict[tuple[str, str], list[str]] = {}
+    for node_id, node in nodes_by_id.items():
+        if node.get("type") not in ("function", "func"):
+            continue
+        path = node.get("filePath")
+        name = node.get("name")
+        if not isinstance(path, str) or not isinstance(name, str) or not name:
+            continue
+        normalized_path = _normalized_project_path(path)
+        if normalized_path is None:
+            continue
+        functions_by_file_and_name.setdefault((normalized_path, name), []).append(node_id)
+
+    existing = {
+        (
+            edge.get("source"),
+            edge.get("target"),
+            edge.get("type"),
+            edge.get("direction", "forward"),
+        )
+        for edge in edges
+    }
+    added = 0
+    skipped = 0
+
+    for result in extraction_results:
+        if not isinstance(result, dict) or result.get("language") != "python":
+            continue
+        path = result.get("path")
+        calls = result.get("callGraph")
+        imports = result.get("imports")
+        if not isinstance(path, str) or not isinstance(calls, list):
+            continue
+        path = _normalized_project_path(path)
+        if path is None:
+            skipped += len(calls)
+            continue
+        imports = imports if isinstance(imports, list) else []
+
+        for call in calls:
+            if not isinstance(call, dict):
+                skipped += 1
+                continue
+            caller = call.get("caller")
+            callee = call.get("callee")
+            if (
+                not isinstance(caller, str)
+                or not isinstance(callee, str)
+                or not caller
+                or not callee
+            ):
+                skipped += 1
+                continue
+
+            caller_ids = functions_by_file_and_name.get((path, caller), [])
+            if len(caller_ids) != 1:
+                skipped += 1
+                continue
+
+            same_file = functions_by_file_and_name.get((path, callee), [])
+            if same_file:
+                target_ids = same_file
+            else:
+                active_import, binding_ambiguous = _active_python_import(
+                    imports, callee, call.get("lineNumber")
+                )
+                if binding_ambiguous:
+                    skipped += 1
+                    continue
+                target_ids = (
+                    _resolve_imported_python_targets(
+                        functions_by_file_and_name, path, callee, active_import
+                    )
+                    if active_import is not None
+                    else []
+                )
+
+            unique_targets = list(dict.fromkeys(target_ids))
+            if len(unique_targets) != 1:
+                skipped += 1
+                continue
+
+            key = (caller_ids[0], unique_targets[0], "calls", "forward")
+            if key in existing:
+                continue
+            edges.append({
+                "source": caller_ids[0],
+                "target": unique_targets[0],
+                "type": "calls",
+                "direction": "forward",
+                "weight": 0.8,
+                "description": "Python call graph (deterministic)",
+            })
+            existing.add(key)
+            added += 1
+
+    return added, skipped
+
+
+def load_python_extraction_results(
+    ua_dir: Path,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Load file extraction records; malformed or missing artifacts are non-fatal."""
+    artifact_paths = sorted(
+        (ua_dir / "tmp").glob("ua-file-extract-results-*.json")
+    )
+    if not artifact_paths:
+        return [], [
+            "  Python extraction artifacts not found in "
+            f"{ua_dir / 'tmp'}"
+        ]
+
+    results: list[dict[str, Any]] = []
+    report: list[str] = []
+    for artifact_path in artifact_paths:
+        try:
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            report.append(
+                f"  {artifact_path.name}: could not parse extraction artifact: {error}"
+            )
+            continue
+        artifact_results = artifact.get("results") if isinstance(artifact, dict) else None
+        if not isinstance(artifact_results, list):
+            report.append(
+                f"  {artifact_path.name}: ignored extraction artifact with no results array"
+            )
+            continue
+        results.extend(result for result in artifact_results if isinstance(result, dict))
+    return results, report
 
 
 # ── Deterministic tested_by linker ────────────────────────────────────────
@@ -781,7 +1112,10 @@ def link_tests(
 
 # ── Main merge + normalize ────────────────────────────────────────────────
 
-def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:
+def merge_and_normalize(
+    batches: list[dict[str, Any]],
+    extraction_results: list[dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], list[str]]:
     """Merge batch results and normalize. Returns (assembled_graph, report_lines)."""
 
     # ── Pattern counters for "Fixed" report ──────────────────────────
@@ -862,7 +1196,12 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             duplicate_count += 1
         nodes_by_id[nid] = node
 
-    # ── Step 5b: Deterministic tested_by linker ──────────────────────
+    # ── Step 5b: Deterministic Python call linker ────────────────────
+    python_calls_added, python_calls_skipped = link_python_calls(
+        nodes_by_id, all_edges, extraction_results or []
+    )
+
+    # ── Step 5c: Deterministic tested_by linker ──────────────────────
     # See module-level "Deterministic tested_by linker" section above.
     tested_by_added, tested_by_dropped, tested_by_tagged, tested_by_swapped = link_tests(
         nodes_by_id, all_edges
@@ -936,6 +1275,13 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         report.append("Tested-by linker:")
         report.append(f"  {tested_by_added:>4} × tested_by edges produced (path-convention supplement, production → test)")
         report.append(f"  {tested_by_tagged:>4} × production nodes tagged \"tested\"")
+
+    report.append("")
+    report.append("Python call linker:")
+    report.append(f"  {python_calls_added:>4} × calls edges produced")
+    report.append(
+        f"  {python_calls_skipped:>4} × unresolved or ambiguous calls skipped"
+    )
 
     # Could not fix section — unknown patterns (grouped) + individual details
     unfixable_total = (
@@ -1176,7 +1522,11 @@ def main() -> None:
         sys.exit(1)
 
     # Merge and normalize
-    assembled, report = merge_and_normalize(batches)
+    ua_dir = resolve_ua_dir(project_root)
+    extraction_results, extraction_report = load_python_extraction_results(ua_dir)
+    assembled, report = merge_and_normalize(batches, extraction_results)
+    if extraction_report:
+        report.extend(extraction_report)
 
     # Surface missing multi-part files to the phase report (parallel to
     # unrecognized-filename handling below). Stderr lines emitted during

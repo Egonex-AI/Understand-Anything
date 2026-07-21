@@ -60,6 +60,433 @@ def _file_node(path: str, **extra: Any) -> dict[str, Any]:
     return node
 
 
+def _function_node(path: str, name: str, **extra: Any) -> dict[str, Any]:
+    """Build a minimal normalized function node."""
+    node: dict[str, Any] = {
+        "id": f"function:{path}:{name}",
+        "type": "function",
+        "name": name,
+        "filePath": path,
+        "summary": "",
+        "tags": [],
+        "complexity": "simple",
+    }
+    node.update(extra)
+    return node
+
+
+def _extraction_record(
+    path: str,
+    caller: str,
+    callee: str,
+    imports: list[dict[str, Any]] | None = None,
+    call_line: int = 10,
+) -> dict[str, Any]:
+    """Build a minimal Python extraction record containing one call."""
+    return {
+        "path": path,
+        "language": "python",
+        "callGraph": [{"caller": caller, "callee": callee, "lineNumber": call_line}],
+        "imports": imports or [],
+    }
+
+
+# ── deterministic Python call linker ─────────────────────────────────────
+
+class PythonCallLinkerTests(unittest.TestCase):
+    def test_links_same_file_call(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:service.py:expand": _function_node("service.py", "expand"),
+        }
+        extracted = [_extraction_record("service.py", "run", "expand")]
+        edges: list[dict[str, Any]] = []
+
+        added, skipped = mbg.link_python_calls(nodes, edges, extracted)
+
+        self.assertEqual((added, skipped), (1, 0))
+        self.assertEqual(edges, [{
+            "source": "function:service.py:run",
+            "target": "function:service.py:expand",
+            "type": "calls",
+            "direction": "forward",
+            "weight": 0.8,
+            "description": "Python call graph (deterministic)",
+        }])
+
+    def test_links_direct_import(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "expand",
+            [{"source": "package.helper", "specifiers": ["expand"], "lineNumber": 1}],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:package/helper.py:expand")
+
+    def test_links_aliased_direct_import(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "fill",
+            [{
+                "source": "package.helper",
+                "specifiers": ["fill"],
+                "aliases": {"fill": "expand"},
+                "lineNumber": 1,
+            }],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:package/helper.py:expand")
+
+    def test_links_module_qualified_import(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "helper.expand",
+            [{
+                "source": "package.helper",
+                "specifiers": ["helper"],
+                "aliases": {"helper": "package.helper"},
+                "lineNumber": 1,
+            }],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:package/helper.py:expand")
+
+    def test_skips_ambiguous_function_targets(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+            "function:package/helper/__init__.py:expand": _function_node(
+                "package/helper/__init__.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "expand",
+            [{"source": "package.helper", "specifiers": ["expand"], "lineNumber": 1}],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 1))
+        self.assertEqual(edges, [])
+
+    def test_skips_absent_caller_node(self) -> None:
+        nodes = {
+            "function:service.py:expand": _function_node("service.py", "expand"),
+        }
+        extracted = [_extraction_record("service.py", "run", "expand")]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 1))
+        self.assertEqual(edges, [])
+
+    def test_suppresses_duplicate_pre_existing_calls_edge(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:service.py:expand": _function_node("service.py", "expand"),
+        }
+        extracted = [_extraction_record("service.py", "run", "expand")]
+        edges: list[dict[str, Any]] = [{
+            "source": "function:service.py:run",
+            "target": "function:service.py:expand",
+            "type": "calls",
+            "direction": "forward",
+            "weight": 0.5,
+        }]
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 0))
+        self.assertEqual(len(edges), 1)
+
+    def test_latest_import_binding_wins(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:a.py:expand": _function_node("a.py", "expand"),
+            "function:b.py:expand": _function_node("b.py", "expand"),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "expand",
+            [
+                {"source": "a", "specifiers": ["expand"], "lineNumber": 1},
+                {"source": "b", "specifiers": ["expand"], "lineNumber": 2},
+            ],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:b.py:expand")
+
+    def test_does_not_link_shadowed_target_when_active_binding_is_absent(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:a.py:expand": _function_node("a.py", "expand"),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "expand",
+            [
+                {"source": "a", "specifiers": ["expand"], "lineNumber": 1},
+                {"source": "b", "specifiers": ["expand"], "lineNumber": 2},
+            ],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 1))
+        self.assertEqual(edges, [])
+
+    def test_import_after_call_does_not_rebind_call_site(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:a.py:expand": _function_node("a.py", "expand"),
+            "function:b.py:expand": _function_node("b.py", "expand"),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "expand",
+            [
+                {"source": "a", "specifiers": ["expand"], "lineNumber": 1},
+                {"source": "b", "specifiers": ["expand"], "lineNumber": 20},
+            ],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:a.py:expand")
+
+    def test_skips_when_matching_import_order_is_unknown(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:a.py:expand": _function_node("a.py", "expand"),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "expand",
+            [{"source": "a", "specifiers": ["expand"]}],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 1))
+        self.assertEqual(edges, [])
+
+    def test_links_from_import_submodule_attribute_call(self) -> None:
+        """from package import helper; helper.expand()"""
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "helper.expand",
+            [{"source": "package", "specifiers": ["helper"], "lineNumber": 1}],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:package/helper.py:expand")
+
+    def test_links_relative_from_import_submodule_attribute_call(self) -> None:
+        """from . import helper; helper.expand()"""
+        nodes = {
+            "function:package/service.py:run": _function_node(
+                "package/service.py", "run"
+            ),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "package/service.py",
+            "run",
+            "helper.expand",
+            [{"source": ".", "specifiers": ["helper"], "lineNumber": 1}],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (1, 0))
+        self.assertEqual(edges[0]["target"], "function:package/helper.py:expand")
+
+    def test_skips_submodule_call_when_imported_name_is_a_function(self) -> None:
+        """from package import helper; helper.expand() when helper is a function."""
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:package/__init__.py:helper": _function_node(
+                "package/__init__.py", "helper"
+            ),
+            "function:package/helper.py:expand": _function_node(
+                "package/helper.py", "expand"
+            ),
+        }
+        extracted = [_extraction_record(
+            "service.py",
+            "run",
+            "helper.expand",
+            [{"source": "package", "specifiers": ["helper"], "lineNumber": 1}],
+        )]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 1))
+        self.assertEqual(edges, [])
+
+    def test_skips_empty_caller_or_callee_names(self) -> None:
+        nodes = {
+            "function:service.py:run": _function_node("service.py", "run"),
+            "function:service.py:expand": _function_node("service.py", "expand"),
+        }
+        extracted = [{
+            "path": "service.py",
+            "language": "python",
+            "callGraph": [
+                {"caller": "", "callee": "expand", "lineNumber": 10},
+                {"caller": "run", "callee": "", "lineNumber": 11},
+            ],
+            "imports": [],
+        }]
+        edges: list[dict[str, Any]] = []
+
+        self.assertEqual(mbg.link_python_calls(nodes, edges, extracted), (0, 2))
+        self.assertEqual(edges, [])
+
+
+class PythonModuleCandidatesTests(unittest.TestCase):
+    def test_resolves_absolute_and_relative_modules(self) -> None:
+        self.assertEqual(
+            mbg.python_module_candidates("ai/service.py", "package.helper"),
+            ("package/helper.py", "package/helper/__init__.py"),
+        )
+        self.assertEqual(
+            mbg.python_module_candidates("ai/post/service.py", ".helper"),
+            ("ai/post/helper.py", "ai/post/helper/__init__.py"),
+        )
+        self.assertEqual(
+            mbg.python_module_candidates("ai/post/service.py", "..shared.helper"),
+            ("ai/shared/helper.py", "ai/shared/helper/__init__.py"),
+        )
+        self.assertEqual(
+            mbg._python_imported_submodule("package", "helper"),
+            "package.helper",
+        )
+        self.assertEqual(
+            mbg._python_imported_submodule(".", "helper"),
+            ".helper",
+        )
+        self.assertEqual(
+            mbg._python_imported_submodule(".pkg", "helper"),
+            ".pkg.helper",
+        )
+
+    def test_rejects_relative_module_escaping_project_root(self) -> None:
+        self.assertEqual(
+            mbg.python_module_candidates("service.py", "..shared.helper"),
+            (),
+        )
+        self.assertEqual(
+            mbg.python_module_candidates("ai/service.py", "..shared.helper"),
+            (),
+        )
+
+    def test_rejects_absolute_source_paths(self) -> None:
+        self.assertEqual(
+            mbg.python_module_candidates("/tmp/service.py", "package.helper"),
+            (),
+        )
+
+
+class PythonExtractionLoaderTests(unittest.TestCase):
+    def test_loads_results_and_reports_malformed_artifacts(self) -> None:
+        import json as _json
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="ua-python-calls-") as tmp:
+            ua_dir = Path(tmp)
+            artifact_dir = ua_dir / "tmp"
+            artifact_dir.mkdir()
+            (artifact_dir / "ua-file-extract-results-1.json").write_text(
+                _json.dumps({"results": [{"path": "service.py"}]}),
+                encoding="utf-8",
+            )
+            (artifact_dir / "ua-file-extract-results-2.json").write_text(
+                _json.dumps({"notResults": []}),
+                encoding="utf-8",
+            )
+            (artifact_dir / "ua-file-extract-results-3.json").write_text(
+                "{broken",
+                encoding="utf-8",
+            )
+
+            results, report = mbg.load_python_extraction_results(ua_dir)
+
+        self.assertEqual(results, [{"path": "service.py"}])
+        self.assertTrue(any("no results array" in line for line in report))
+        self.assertTrue(any("could not parse" in line for line in report))
+
+    def test_missing_artifacts_are_non_fatal_and_reported(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="ua-python-calls-") as tmp:
+            results, report = mbg.load_python_extraction_results(Path(tmp))
+
+        self.assertEqual(results, [])
+        self.assertTrue(any("not found" in line for line in report))
+
+
+class PythonCallMergeIntegrationTests(unittest.TestCase):
+    def test_linker_runs_after_node_deduplication_and_reports_counts(self) -> None:
+        batch = {
+            "nodes": [
+                _function_node("service.py", "run"),
+                _function_node("service.py", "expand"),
+            ],
+            "edges": [],
+        }
+        extracted = [_extraction_record("service.py", "run", "expand")]
+
+        assembled, report = mbg.merge_and_normalize([batch], extracted)
+
+        calls = [edge for edge in assembled["edges"] if edge["type"] == "calls"]
+        self.assertEqual(len(calls), 1)
+        self.assertIn("Python call linker:", report)
+        self.assertTrue(any("1 × calls edges produced" in line for line in report))
+        self.assertTrue(
+            any("0 × unresolved or ambiguous calls skipped" in line for line in report)
+        )
+
+
 # ── is_test_path ──────────────────────────────────────────────────────────
 
 class IsTestPathTests(unittest.TestCase):

@@ -246,6 +246,24 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
     }));
   }
 
+  if (analysis.imports?.length) {
+    base.imports = analysis.imports.map(imp => {
+      const aliasEntries = imp.aliases
+        ? Object.entries(imp.aliases).filter(
+            ([key, value]) => typeof key === "string" && typeof value === "string",
+          )
+        : [];
+      return {
+        source: imp.source,
+        specifiers: Array.isArray(imp.specifiers) ? [...imp.specifiers] : [],
+        ...(aliasEntries.length
+          ? { aliases: Object.fromEntries(aliasEntries) }
+          : {}),
+        lineNumber: imp.lineNumber,
+      };
+    });
+  }
+
   if (analysis.exports && analysis.exports.length > 0) {
     base.exports = analysis.exports.map(exp => ({
       name: exp.name,
