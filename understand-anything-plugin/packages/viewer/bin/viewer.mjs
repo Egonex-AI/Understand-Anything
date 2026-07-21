@@ -173,6 +173,47 @@ function readSourceFile(url) {
     return reject("File is not in the knowledge graph", 404);
   }
 
+  // Mirrors the dashboard dev-server guard (vite.config.ts): reject symlink
+  // nodes outright — a graph generated before the scanner skipped symlinks
+  // can allowlist a symlink whose target was never itself allowlisted.
+  let linkStat;
+  try {
+    linkStat = fs.lstatSync(absoluteFile);
+  } catch {
+    return reject("File not found", 404);
+  }
+  if (linkStat.isSymbolicLink()) {
+    return reject("Symbolic links cannot be previewed");
+  }
+
+  // Resolve symlinked parent directories: the real path must stay inside the
+  // project root, and when resolution changes the path it must land on an
+  // allowlisted file.
+  let realFile;
+  let realRoot;
+  try {
+    realFile = fs.realpathSync(absoluteFile);
+    realRoot = fs.realpathSync(projectRoot);
+  } catch {
+    return reject("File not found", 404);
+  }
+  const realRelative = path.relative(realRoot, realFile);
+  if (
+    !realRelative ||
+    realRelative === ".." ||
+    realRelative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(realRelative)
+  ) {
+    return reject("Path must stay inside the project");
+  }
+  const realSafeRelative = realRelative.split(path.sep).join("/");
+  if (
+    realSafeRelative !== safeRelativePath &&
+    !graphFilePathSet().has(realSafeRelative)
+  ) {
+    return reject("File is not in the knowledge graph", 404);
+  }
+
   let stat;
   try {
     stat = fs.statSync(absoluteFile);

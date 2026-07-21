@@ -159,6 +159,55 @@ function readSourceFile(url: URL) {
     return rejectFileRequest("File is not in the knowledge graph", 404);
   }
 
+  // Reject symlink nodes outright. New graphs no longer contain symlink
+  // entries (the scanner skips them), but a graph generated before that
+  // change can still allowlist a symlink node (e.g. src/config.txt -> .env)
+  // whose in-root target was never itself allowlisted; the
+  // statSync/readFileSync below would follow it and serve the target.
+  let linkStat: fs.Stats;
+  try {
+    linkStat = fs.lstatSync(absoluteFile);
+  } catch {
+    return rejectFileRequest("File not found", 404);
+  }
+  if (linkStat.isSymbolicLink()) {
+    return rejectFileRequest("Symbolic links cannot be previewed");
+  }
+
+  // Resolve symlinked parent directories and re-confirm the real path stays
+  // inside the project root. The textual checks above only see the requested
+  // (in-root) path; a directory symlink committed in an indexed repo could
+  // point outside the project root (e.g. src -> /etc) and the reads below
+  // would follow it.
+  let realFile: string;
+  let realRoot: string;
+  try {
+    realFile = fs.realpathSync(absoluteFile);
+    realRoot = fs.realpathSync(projectRoot);
+  } catch {
+    return rejectFileRequest("File not found", 404);
+  }
+  const realRelative = path.relative(realRoot, realFile);
+  if (
+    !realRelative ||
+    realRelative === ".." ||
+    realRelative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(realRelative)
+  ) {
+    return rejectFileRequest("Path must stay inside the project");
+  }
+
+  // A directory symlink can also stay inside the root yet remap the request
+  // to a file that was never allowlisted (e.g. docs -> secrets-dir). When
+  // resolution changes the path, the resolved path must be allowlisted too.
+  const realSafeRelative = realRelative.split(path.sep).join("/");
+  if (
+    realSafeRelative !== safeRelativePath &&
+    !graphFilePathSet(graphFile, projectRoot).has(realSafeRelative)
+  ) {
+    return rejectFileRequest("File is not in the knowledge graph", 404);
+  }
+
   let stat: fs.Stats;
   try {
     stat = fs.statSync(absoluteFile);
