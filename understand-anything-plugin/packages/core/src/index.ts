@@ -128,3 +128,4 @@ export {
   type IgnoreFilter,
 } from "./ignore-filter.js";
 export { generateStarterIgnoreFile } from "./ignore-generator.js";
+export { computeDiffOverlay } from "./diff-overlay.js";
