@@ -6,6 +6,7 @@ dist
 .env
 .env.*
 coverage/
+benchmark-results/
 *.log
 __pycache__/
 .claude/

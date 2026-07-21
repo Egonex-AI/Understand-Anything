@@ -34,6 +34,8 @@ const EXACT_DIR_NAMES = [
   "bench",
   "benchmark",
   "benchmarks",
+  "benches",
+  "spec",
 ];
 
 // Directory-name suffixes matched case-insensitively via String.endsWith.
@@ -109,6 +111,49 @@ const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
       "**/*_test.py",
       "**/tests.py",
       "**/conftest.py",
+    ],
+  },
+  {
+    // Rust testing is bimodal, similar to Python. Library-scale crates
+    // (ripgrep, alacritty, helix, cargo) keep unit tests inline in
+    // `#[cfg(test)] mod tests { ... }` blocks that no file-pattern
+    // rule can catch, so the group barely moves the needle for them.
+    // Workspace monorepos (paritytech/polkadot-sdk, solana-labs/solana,
+    // rust-lang/rust) colocate a `foo_test.rs` beside `foo.rs` at
+    // scale — measurement showed *_test.rs alone accounts for the
+    // majority of hits (232 files / −15% on polkadot-sdk analysed
+    // budget). Integration tests already live under tests/ and Cargo
+    // benches under benches/ (both dir-covered), so the file globs
+    // here target the colocated shape specifically.
+    label: "Rust",
+    patterns: [
+      "**/tests.rs",
+      "**/test_*.rs",
+      "**/*_test.rs",
+      "**/bench_*.rs",
+      "**/*_bench.rs",
+    ],
+  },
+  {
+    // Ruby clusters tests aggressively, matching the C++ shape rather
+    // than Rust's inline convention. Measurement across 10 major Ruby
+    // repos (rails, discourse, homebrew, jekyll, fastlane, rubocop,
+    // ruby, liquid, kamal, rspec-rails) showed a 51% weighted-total
+    // reduction — the highest of any language group. Almost all of
+    // that comes from the newly-added `spec/` dir rule (RSpec's home);
+    // the file globs below add another 5 pp on top by catching
+    // `*_spec.rb` in gem-repo `lib/` trees, Minitest files that leak
+    // outside `test/` in Rails engines, and the ubiquitous
+    // `spec_helper.rb` / `test_helper.rb` / `rails_helper.rb` bootstrap
+    // trio. Hero projects: rubocop (67%), discourse (60%, −5.53M tok).
+    label: "Ruby",
+    patterns: [
+      "**/*_spec.rb",
+      "**/*_test.rb",
+      "**/test_*.rb",
+      "**/spec_helper.rb",
+      "**/test_helper.rb",
+      "**/rails_helper.rb",
     ],
   },
 ];

@@ -23,6 +23,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getGraphFreshnessBatch } from "./dist/staleness.js";
 
 const DIST_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
@@ -230,6 +231,55 @@ function serveGraphJson(res, fileName) {
   }
 }
 
+function readGraphMetadata(fileName) {
+  const graph = JSON.parse(
+    fs.readFileSync(path.join(graphDir, fileName), "utf-8"),
+  );
+  return {
+    graphCommitHash:
+      typeof graph.project?.gitCommitHash === "string"
+        ? graph.project.gitCommitHash
+        : undefined,
+    lastAnalyzedAt:
+      typeof graph.project?.analyzedAt === "string"
+        ? graph.project.analyzedAt
+        : undefined,
+  };
+}
+
+async function readGraphFreshness() {
+  const knowledgeGraph = path.join(graphDir, "knowledge-graph.json");
+  if (!fs.existsSync(knowledgeGraph)) {
+    return {
+      statusCode: 404,
+      payload: { error: "No knowledge graph found. Run /understand first." },
+    };
+  }
+
+  const domainGraph = path.join(graphDir, "domain-graph.json");
+  let inputs;
+  try {
+    inputs = {
+      knowledge: readGraphMetadata("knowledge-graph.json"),
+      ...(fs.existsSync(domainGraph)
+        ? { domain: readGraphMetadata("domain-graph.json") }
+        : {}),
+    };
+  } catch {
+    return {
+      statusCode: 500,
+      payload: { error: "Failed to read graph file" },
+    };
+  }
+
+  return {
+    statusCode: 200,
+    payload: {
+      graphs: await getGraphFreshnessBatch(projectRoot, inputs),
+    },
+  };
+}
+
 const CONTENT_TYPES = {
   ".css": "text/css", ".html": "text/html", ".ico": "image/x-icon",
   ".js": "text/javascript", ".json": "application/json", ".map": "application/json",
@@ -263,11 +313,16 @@ const PROTECTED = new Set([
   "/meta.json",
   "/config.json",
   "/file-content.json",
+  "/staleness.json",
 ]);
 
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const pathname = url.pathname;
+
+  if (pathname === "/staleness.json") {
+    res.setHeader("Cache-Control", "no-store");
+  }
 
   if (!PROTECTED.has(pathname)) {
     serveStatic(res, pathname);
@@ -282,6 +337,15 @@ const server = createServer((req, res) => {
   if (pathname === "/file-content.json") {
     const result = readSourceFile(url);
     sendJson(res, result.statusCode, result.payload);
+    return;
+  }
+
+  if (pathname === "/staleness.json") {
+    void readGraphFreshness()
+      .then((result) => sendJson(res, result.statusCode, result.payload))
+      .catch(() => {
+        sendJson(res, 500, { error: "Failed to read graph freshness" });
+      });
     return;
   }
 

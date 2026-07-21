@@ -7,6 +7,7 @@ import {
   rmSync,
   chmodSync,
   existsSync,
+  symlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
@@ -60,12 +61,13 @@ const _runScriptOutputDirs = [];
  * { status, stdout, stderr, output } where `output` is the parsed JSON
  * written by the script (or null on failure).
  */
-function runScript(projectRoot) {
+function runScript(projectRoot, extraArgs = [], envOverrides = {}) {
   const outputDir = mkdtempSync(join(tmpdir(), 'ua-scan-out-'));
   _runScriptOutputDirs.push(outputDir);
   const outputPath = join(outputDir, 'scan-output.json');
-  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath], {
+  const result = spawnSync('node', [SCRIPT, projectRoot, outputPath, ...extraArgs], {
     encoding: 'utf-8',
+    env: { ...process.env, ...envOverrides },
   });
   let output = null;
   try {
@@ -517,6 +519,40 @@ describe('scan-project.mjs — data-dir resolution (.ua vs legacy)', () => {
     expect(byPath(r.output, 'fixtures/snap2.json')).toBeUndefined();
     expect(r.output.filteredByIgnore).toBe(2);
   });
+
+  it('can exclude persistent analysis data for isolated benchmark scans', () => {
+    projectRoot = setupTree({
+      '.ua/knowledge-graph.json': '{ "nodes": [] }\n',
+      '.understand-anything/meta.json': '{ "version": 1 }\n',
+      'src/index.ts': 'export const x = 1;\n',
+    });
+
+    const r = runScript(projectRoot, ['--exclude-analysis-data']);
+
+    expect(r.status).toBe(0);
+    expect(r.output.files.map(file => file.path)).toEqual(['src/index.ts']);
+  });
+
+  it('composes CLI exclusions for benchmark scans regardless of flag order', () => {
+    projectRoot = setupTree({
+      '.ua/knowledge-graph.json': '{ "nodes": [] }\n',
+      '.understand-anything/meta.json': '{ "version": 1 }\n',
+      'generated/client.ts': 'export const generated = true;\n',
+      'src/index.ts': 'export const x = 1;\n',
+    });
+
+    for (const args of [
+      ['--exclude', 'generated/', '--exclude-analysis-data'],
+      ['--exclude-analysis-data', '--exclude', 'generated/'],
+    ]) {
+      const r = runScript(projectRoot, args);
+
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.output.files.map(file => file.path)).toEqual(['src/index.ts']);
+      expect(r.output.filteredByIgnore).toBe(1);
+      expect(r.output.contentDigest).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
 });
 
 describe('scan-project.mjs — special-file recognition', () => {
@@ -566,6 +602,105 @@ describe('scan-project.mjs — determinism', () => {
     expect(r1.status).toBe(0);
     expect(r2.status).toBe(0);
     expect(JSON.stringify(r1.output)).toBe(JSON.stringify(r2.output));
+  });
+
+  it('keeps Unicode and space-containing paths stable across process locales', () => {
+    projectRoot = setupTree({
+      '!bang.ts': 'export const bang = true;\n',
+      '_under.ts': 'export const under = true;\n',
+      'space dir/å.ts': 'export const nested = true;\n',
+      'ä.ts': 'export const umlaut = true;\n',
+      '中.ts': 'export const cjk = true;\n',
+    });
+
+    const cLocale = runScript(projectRoot, [], { LANG: 'C', LC_ALL: 'C' });
+    const swedishLocale = runScript(projectRoot, [], {
+      LANG: 'sv_SE.UTF-8',
+      LC_ALL: 'sv_SE.UTF-8',
+    });
+    const expectedPaths = [
+      '!bang.ts',
+      '_under.ts',
+      'space dir/å.ts',
+      'ä.ts',
+      '中.ts',
+    ];
+
+    expect(cLocale.status).toBe(0);
+    expect(swedishLocale.status).toBe(0);
+    expect(cLocale.output.files.map(file => file.path)).toEqual(expectedPaths);
+    expect(swedishLocale.output.files.map(file => file.path)).toEqual(expectedPaths);
+    expect(JSON.stringify(cLocale.output)).toBe(JSON.stringify(swedishLocale.output));
+  });
+
+  it('emits a top-level lowercase SHA-256 content fingerprint as contentDigest', () => {
+    projectRoot = setupTree({
+      'src/value.ts': 'export const value = 1;\n',
+    });
+
+    const result = runScript(projectRoot);
+
+    expect(result.status).toBe(0);
+    expect(result.output.contentDigest).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('changes the content fingerprint when bytes change but metadata does not', () => {
+    projectRoot = setupTree({
+      'src/value.ts': 'export const value = "aa";\n',
+    });
+    const before = runScript(projectRoot);
+
+    writeFileSync(
+      join(projectRoot, 'src/value.ts'),
+      'export const value = "bb";\n',
+      'utf-8',
+    );
+    const after = runScript(projectRoot);
+
+    expect(before.status).toBe(0);
+    expect(after.status).toBe(0);
+    expect(byPath(before.output, 'src/value.ts').sizeLines).toBe(1);
+    expect(byPath(after.output, 'src/value.ts').sizeLines).toBe(1);
+    expect(after.output.files).toEqual(before.output.files);
+    expect(after.output.contentDigest).not.toBe(before.output.contentDigest);
+  });
+
+  it('omits a Git-tracked outbound symlink and never fingerprints its target bytes', () => {
+    projectRoot = setupTree({
+      'src/inside.ts': 'export const inside = true;\n',
+    });
+    const externalRoot = mkdtempSync(join(tmpdir(), 'ua-scan-external-'));
+    const externalFile = join(externalRoot, 'secret.ts');
+
+    try {
+      writeFileSync(externalFile, 'export const secret = "first";\n', 'utf-8');
+      try {
+        symlinkSync(externalFile, join(projectRoot, 'outbound-link.ts'), 'file');
+      } catch (error) {
+        if (process.platform === 'win32') return;
+        throw error;
+      }
+      const add = spawnSync('git', ['add', '--', 'outbound-link.ts'], {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+      });
+      expect(add.status).toBe(0);
+
+      const before = runScript(projectRoot);
+      writeFileSync(externalFile, 'export const secret = "second";\n', 'utf-8');
+      const after = runScript(projectRoot);
+
+      expect(before.status).toBe(0);
+      expect(after.status).toBe(0);
+      expect(byPath(before.output, 'src/inside.ts')).toBeDefined();
+      expect(byPath(before.output, 'outbound-link.ts')).toBeUndefined();
+      expect(before.stderr).toMatch(
+        /Warning: scan-project: outbound-link\.ts — symbolic link skipped — file skipped from output/,
+      );
+      expect(after.output.contentDigest).toBe(before.output.contentDigest);
+    } finally {
+      rmSync(externalRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -767,6 +902,7 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(typeof out.totalFiles).toBe('number');
     expect(out.totalFiles).toBe(out.files.length);
     expect(typeof out.filteredByIgnore).toBe('number');
+    expect(out.contentDigest).toMatch(/^[0-9a-f]{64}$/);
     expect(['small', 'moderate', 'large', 'very-large']).toContain(
       out.estimatedComplexity,
     );
@@ -776,6 +912,9 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(typeof out.stats.byLanguage).toBe('object');
     // Per-file shape
     for (const f of out.files) {
+      expect(Object.keys(f).sort()).toEqual([
+        'fileCategory', 'language', 'path', 'sizeLines',
+      ]);
       expect(typeof f.path).toBe('string');
       expect(typeof f.language).toBe('string');
       expect(typeof f.sizeLines).toBe('number');
@@ -785,17 +924,17 @@ describe('scan-project.mjs — output schema invariants', () => {
     }
   });
 
-  it('files[] is sorted by path.localeCompare', () => {
+  it('files[] is sorted by a locale-independent code-unit order', () => {
     projectRoot = setupTree({
-      'zzz.ts': '\n',
-      'aaa.ts': '\n',
-      'mmm.ts': '\n',
-      'subdir/file.ts': '\n',
+      '!bang.ts': '\n',
+      '0.ts': '\n',
+      '_under.ts': '\n',
+      'a.ts': '\n',
+      'ä.ts': '\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     const paths = r.output.files.map(f => f.path);
-    const sortedPaths = [...paths].sort((a, b) => a.localeCompare(b));
-    expect(paths).toEqual(sortedPaths);
+    expect(paths).toEqual(['!bang.ts', '0.ts', '_under.ts', 'a.ts', 'ä.ts']);
   });
 });
