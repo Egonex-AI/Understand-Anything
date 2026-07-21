@@ -293,6 +293,13 @@ describe("generateStarterIgnoreFile", () => {
       expect(content).toContain("# **/*Test.swift");
     });
 
+    it("includes Swift Quick/Nimble BDD *Spec.swift files", () => {
+      const content = generateStarterIgnoreFile(testDir);
+      // Quick is the Swift RSpec-equivalent — dominant in codebases that
+      // adopted BDD styling before Swift Testing shipped.
+      expect(content).toContain("# **/*Spec.swift");
+    });
+
     it("groups patterns under the JS / TS sub-header", () => {
       const content = generateStarterIgnoreFile(testDir);
       expect(content).toContain("# JS / TS");

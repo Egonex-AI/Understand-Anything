@@ -167,6 +167,7 @@ const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
     patterns: [
       "**/*Tests.swift",
       "**/*Test.swift",
+      "**/*Spec.swift",
     ],
   },
 ];
