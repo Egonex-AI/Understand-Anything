@@ -157,12 +157,23 @@ const TEST_PATTERN_GROUPS: Array<{ label: string; patterns: string[] }> = [
     ],
   },
   {
-    // Apple's XCTest and the newer Swift Testing framework both use a
-    // dominant `<ClassName>Tests.swift` naming convention. SPM's `Tests/`
-    // package directory is already caught by the case-insensitive `tests`
-    // dir rule, but individual test files sometimes leak elsewhere
-    // (Xcode-style `<AppName>Tests/` folders that use no leading dot,
-    // fixture-adjacent extension test files under Sources/).
+    // Swift is the opposite of Ruby: the existing case-insensitive
+    // `tests` exact-dir rule already sweeps up nearly every Swift test
+    // file — SPM funnels everything into `Tests/` by convention, and
+    // even Xcode consumer apps (Signal-iOS) keep their unit tests
+    // under nested `test/`/`tests/` dirs. Measurement across 10 major
+    // Swift repos (Apple stdlib, swift-nio, SPM, Alamofire, Vapor,
+    // realm-swift, TCA, Quick/Nimble, Signal-iOS, swift-snapshot-
+    // testing) put the file-glob contribution at ~1% weighted (max
+    // single-repo hero was Signal-iOS at 1% / −0.07M tok, 31 file
+    // hits). What the file globs still earn is the straggler case:
+    // test files scattered inline inside production modules
+    // (Signal-iOS's SignalServiceKit/Cryptography/CryptographyTests
+    // .swift, SPM's in-source *Tests.swift). No dir rules were added
+    // because the measurement showed both Xcode-style dir-suffix
+    // matching (`*tests/`) and a `uitests` exact rule delivered zero
+    // additional hits across the sample while `*tests/` carried real
+    // false-positive risk (Contests/, Requests/, Interests/).
     label: "Swift",
     patterns: [
       "**/*Tests.swift",
