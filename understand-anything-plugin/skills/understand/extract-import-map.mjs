@@ -153,13 +153,53 @@ function dirOf(p) {
  * with the exact tsconfig path that failed; bubbling the error would
  * conceal which file was at fault when many tsconfigs are loaded.
  */
-function parseTsConfigText(raw) {
+function stripJsoncComments(raw) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    const next = raw[i + 1];
+
+    if (inString) {
+      out += c;
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+
+    if (c === '"') {
+      inString = true;
+      out += c;
+      continue;
+    }
+
+    if (c === '/' && next === '*') {
+      i += 2;
+      while (i < raw.length && !(raw[i] === '*' && raw[i + 1] === '/')) i++;
+      i++;
+      continue;
+    }
+
+    if (c === '/' && next === '/') {
+      while (i < raw.length && raw[i] !== '\n') i++;
+      out += '\n';
+      continue;
+    }
+
+    out += c;
+  }
+
+  return out.replace(/,(\s*[}\]])/g, '$1');
+}
+
+export function parseTsConfigText(raw) {
   // tsconfig.json often contains JSONC-style comments; strip line and block
-  // comments before parsing. The strip is naive (it doesn't honor string
-  // contents), so we fall back to the raw text on failure.
-  const stripped = raw
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+  // comments before parsing. Keep comment-looking tokens inside strings, such
+  // as the `/*` in common include globs like `**/*.ts`.
+  const stripped = stripJsoncComments(raw);
   let parsed;
   try {
     parsed = JSON.parse(stripped);
