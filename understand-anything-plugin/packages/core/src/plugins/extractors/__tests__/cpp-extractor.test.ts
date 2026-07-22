@@ -693,4 +693,135 @@ int main() {
       parser.delete();
     });
   });
+
+  // ---- Include guards & templates ----
+  //
+  // Regression: real C/C++ headers wrap their contents in an `#ifndef … #endif`
+  // include guard (a `preproc_ifdef` node) and frequently declare templated
+  // classes/functions (`template_declaration` nodes). Neither was traversed, so
+  // guard-wrapped and/or templated declarations were silently dropped — leaving
+  // most header files with zero extracted symbols.
+
+  describe("extractStructure - include guards and templates", () => {
+    it("extracts declarations wrapped in an #ifndef include guard", () => {
+      const { tree, parser, root } = parse(`
+#ifndef FOO_H
+#define FOO_H
+class Foo {
+public:
+    void bar();
+};
+void freeFn() {}
+#endif
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toContain("Foo");
+      expect(result.classes[0].methods).toContain("bar");
+      expect(result.functions.map((f) => f.name)).toContain("freeFn");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a top-level templated class", () => {
+      const { tree, parser, root } = parse(`
+template <typename T>
+class Vec {
+public:
+    void push(T item);
+    T pop();
+};
+`);
+      const result = extractor.extractStructure(root);
+
+      const vec = result.classes.find((c) => c.name === "Vec");
+      expect(vec).toBeDefined();
+      expect(vec!.methods).toContain("push");
+      expect(vec!.methods).toContain("pop");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a templated class nested in a namespace", () => {
+      const { tree, parser, root } = parse(`
+namespace util {
+template <class T>
+class Queue {
+public:
+    void enqueue(T item);
+    T dequeue();
+};
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toContain("Queue");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a templated member method (definition inside a class)", () => {
+      const { tree, parser, root } = parse(`
+class Logger {
+public:
+    void plain();
+    template <typename T>
+    void log(T msg) {}
+};
+`);
+      const result = extractor.extractStructure(root);
+
+      // The templated method must appear in both the class method list and
+      // the flat functions list (with a body it is a function_definition).
+      expect(result.classes[0].methods).toContain("log");
+      expect(result.functions.map((f) => f.name)).toContain("log");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a top-level templated free function", () => {
+      const { tree, parser, root } = parse(`
+template <typename T>
+T identity(T x) {
+    return x;
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.map((f) => f.name)).toContain("identity");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("combines include guard + namespace + templates (real-header shape)", () => {
+      const { tree, parser, root } = parse(`
+#ifndef QUEUE_H
+#define QUEUE_H
+namespace util {
+template <class T>
+class Queue {
+public:
+    void enqueue(T item);
+    template <typename U>
+    void emplace(U&& u) {}
+};
+}
+#endif
+`);
+      const result = extractor.extractStructure(root);
+
+      const q = result.classes.find((c) => c.name === "Queue");
+      expect(q).toBeDefined();
+      expect(q!.methods).toContain("enqueue");
+      expect(q!.methods).toContain("emplace");
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });
