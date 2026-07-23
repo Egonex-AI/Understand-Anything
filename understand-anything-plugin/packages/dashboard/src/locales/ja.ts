@@ -134,6 +134,10 @@ export const ja = {
     noData: "差分データが読み込まれていません",
     changed: "変更済み",
     affected: "影響あり",
+    filterOn: "フィルターON",
+    filterOff: "フィルターOFF",
+    showFilterOnly: "差分影響ノードのみ表示",
+    showAll: "全ノード表示",
   },
   learnPanel: {
     finish: "完了",

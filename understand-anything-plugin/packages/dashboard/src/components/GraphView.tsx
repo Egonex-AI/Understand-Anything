@@ -242,6 +242,10 @@ function useOverviewGraph() {
   const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
+  const diffMode = useDashboardStore((s) => s.diffMode);
+  const diffFilterOnly = useDashboardStore((s) => s.diffFilterOnly);
+  const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
+  const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
 
   // Build cluster nodes / flow edges / dims synchronously; only the layout
   // call itself is async, so we memo the structural pieces and run ELK in an
@@ -268,12 +272,30 @@ function useOverviewGraph() {
       }
     }
 
+    // Diff-only filter: compute which layers contain changed/affected nodes
+    const diffNodeIds = diffMode ? new Set([...changedNodeIds, ...affectedNodeIds]) : new Set<string>();
+    const diffLayerIds = new Set<string>();
+    if (diffMode && diffFilterOnly && diffNodeIds.size > 0) {
+      for (const nodeId of diffNodeIds) {
+        const lid = nodeIdToLayerId.get(nodeId);
+        if (lid) diffLayerIds.add(lid);
+      }
+    }
+
+    // Filter layers in diff-only mode
+    const visibleLayers = diffMode && diffFilterOnly && diffLayerIds.size > 0
+      ? layers.filter((l) => diffLayerIds.has(l.id))
+      : layers;
+
     // Create cluster nodes. Per-layer aggregation goes through
     // `computeLayerStats`, which iterates `layer.nodeIds` against the
     // `nodesById` index — O(K) per layer instead of the previous
     // O(N) Array.filter that ran `layer.nodeIds.includes(n.id)` (#102).
-    const clusterNodes: LayerClusterFlowNode[] = layers.map((layer, i) => {
+    const clusterNodes: LayerClusterFlowNode[] = visibleLayers.map((layer) => {
       const { aggregateComplexity } = computeLayerStats(layer, nodesById);
+      const isDiffAffected = diffMode && [...diffNodeIds].some(
+        (id) => nodeIdToLayerId.get(id) === layer.id,
+      );
 
       return {
         id: layer.id,
@@ -285,26 +307,32 @@ function useOverviewGraph() {
           layerDescription: layer.description,
           fileCount: layer.nodeIds.length,
           aggregateComplexity,
-          layerColorIndex: i,
+          layerColorIndex: graph.layers.indexOf(layer),
           searchMatchCount: searchMatchByLayer.get(layer.id),
+          isDiffAffected,
+          isDiffFaded: diffMode && !isDiffAffected,
           onDrillIn: drillIntoLayer,
         },
       };
     });
 
+    const visibleLayerIds = new Set(visibleLayers.map((l) => l.id));
+
     // Aggregate edges between layers
     const aggregated = aggregateLayerEdges(graph);
-    const flowEdges: Edge[] = aggregated.map((agg, i) => ({
-      id: `le-${i}`,
-      source: agg.sourceLayerId,
-      target: agg.targetLayerId,
-      label: `${agg.count}`,
-      style: {
-        stroke: "rgba(212,165,116,0.4)",
-        strokeWidth: Math.min(1 + Math.log2(agg.count + 1), 5),
-      },
-      labelStyle: { fill: "#a39787", fontSize: 11, fontWeight: 600 },
-    }));
+    const flowEdges: Edge[] = aggregated
+      .filter((agg) => visibleLayerIds.has(agg.sourceLayerId) && visibleLayerIds.has(agg.targetLayerId))
+      .map((agg, i) => ({
+        id: `le-${i}`,
+        source: agg.sourceLayerId,
+        target: agg.targetLayerId,
+        label: `${agg.count}`,
+        style: {
+          stroke: "rgba(212,165,116,0.4)",
+          strokeWidth: Math.min(1 + Math.log2(agg.count + 1), 5),
+        },
+        labelStyle: { fill: "#a39787", fontSize: 11, fontWeight: 600 },
+      }));
 
     const dims = new Map<string, { width: number; height: number }>();
     for (const n of clusterNodes) {
@@ -312,7 +340,7 @@ function useOverviewGraph() {
     }
 
     return { clusterNodes, flowEdges, dims };
-  }, [graph, nodesById, nodeIdToLayerId, searchResults, drillIntoLayer]);
+  }, [graph, nodesById, nodeIdToLayerId, searchResults, drillIntoLayer, diffMode, diffFilterOnly, changedNodeIds, affectedNodeIds]);
 
   const [overview, setOverview] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],
@@ -399,6 +427,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   const selectNode = useDashboardStore((s) => s.selectNode);
   const persona = useDashboardStore((s) => s.persona);
   const diffMode = useDashboardStore((s) => s.diffMode);
+  const diffFilterOnly = useDashboardStore((s) => s.diffFilterOnly);
   const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
@@ -488,6 +517,22 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       }
       filteredGraphNodes = filteredGraphNodes.filter((n) =>
         focusNeighborIds.has(n.id),
+      );
+      filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
+      filteredGraphEdges = filteredGraphEdges.filter(
+        (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
+      );
+    }
+
+    // Diff-only filter: show only changed/affected nodes and their connecting edges
+    if (diffMode && diffFilterOnly) {
+      const diffNodeIds = new Set([...changedNodeIds, ...affectedNodeIds]);
+      const diffInLayer = new Set<string>();
+      for (const id of diffNodeIds) {
+        if (filteredNodeIds.has(id)) diffInLayer.add(id);
+      }
+      filteredGraphNodes = filteredGraphNodes.filter((n) =>
+        diffInLayer.has(n.id),
       );
       filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
       filteredGraphEdges = filteredGraphEdges.filter(
@@ -665,6 +710,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     activeLayerId,
     persona,
     diffMode,
+    diffFilterOnly,
     changedNodeIds,
     affectedNodeIds,
     focusNodeId,

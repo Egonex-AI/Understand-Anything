@@ -17,6 +17,8 @@ export interface LayerClusterData extends Record<string, unknown> {
   aggregateComplexity: string;
   layerColorIndex: number;
   searchMatchCount?: number;
+  isDiffAffected?: boolean;
+  isDiffFaded?: boolean;
   onDrillIn: (layerId: string) => void;
 }
 
@@ -29,12 +31,18 @@ function LayerClusterNode({
   const complexityColor =
     complexityColors[data.aggregateComplexity] ?? complexityColors.simple;
 
+  const diffClass = data.isDiffAffected
+    ? " ring-2 ring-[var(--color-diff-changed)] diff-changed-glow"
+    : data.isDiffFaded
+      ? " diff-faded"
+      : "";
+
   return (
     <div
-      className="relative rounded-xl bg-elevated border border-border-subtle overflow-hidden cursor-pointer transition-all duration-200 hover:border-gold/40 hover:shadow-lg group"
+      className={`relative rounded-xl bg-elevated border border-border-subtle overflow-hidden cursor-pointer transition-all duration-200 hover:border-gold/40 hover:shadow-lg group${diffClass}`}
       style={{
         width: 300,
-        boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        boxShadow: data.isDiffAffected ? "0 0 16px rgba(224, 82, 82, 0.2)" : "0 4px 16px rgba(0,0,0,0.4)",
       }}
       onClick={() => data.onDrillIn(data.layerId)}
     >

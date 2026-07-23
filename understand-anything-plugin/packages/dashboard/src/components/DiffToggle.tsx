@@ -3,12 +3,15 @@ import { useI18n } from "../contexts/I18nContext";
 
 export default function DiffToggle() {
   const diffMode = useDashboardStore((s) => s.diffMode);
+  const diffFilterOnly = useDashboardStore((s) => s.diffFilterOnly);
   const toggleDiffMode = useDashboardStore((s) => s.toggleDiffMode);
+  const toggleDiffFilterOnly = useDashboardStore((s) => s.toggleDiffFilterOnly);
   const changedNodeIds = useDashboardStore((s) => s.changedNodeIds);
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
   const { t } = useI18n();
 
   const hasDiff = changedNodeIds.size > 0;
+  const canFilter = diffMode && hasDiff;
 
   return (
     <div className="flex items-center gap-2">
@@ -32,6 +35,24 @@ export default function DiffToggle() {
       >
         Diff {diffMode && hasDiff ? "ON" : "OFF"}
       </button>
+
+      {canFilter && (
+        <button
+          onClick={toggleDiffFilterOnly}
+          className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+            diffFilterOnly
+              ? "bg-[var(--color-diff-affected-dim)] text-[var(--color-diff-affected)]"
+              : "bg-elevated text-text-secondary hover:bg-surface"
+          }`}
+          title={
+            diffFilterOnly
+              ? t.diffToggle.showAll
+              : t.diffToggle.showFilterOnly
+          }
+        >
+          Filter {diffFilterOnly ? "ON" : "OFF"}
+        </button>
+      )}
 
       {diffMode && hasDiff && (
         <div className="flex items-center gap-3">

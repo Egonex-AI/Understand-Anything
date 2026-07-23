@@ -134,6 +134,10 @@ export const en = {
     noData: "No diff data loaded",
     changed: "Changed",
     affected: "Affected",
+    filterOn: "Filter ON",
+    filterOff: "Filter OFF",
+    showFilterOnly: "Show only diff-affected nodes",
+    showAll: "Show all nodes",
   },
   learnPanel: {
     finish: "Finish",

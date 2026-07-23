@@ -134,6 +134,10 @@ export const ko = {
     noData: "차분 데이터가 로드되지 않음",
     changed: "변경됨",
     affected: "영향받음",
+    filterOn: "필터 ON",
+    filterOff: "필터 OFF",
+    showFilterOnly: "차분 영향 노드만 표시",
+    showAll: "모든 노드 표시",
   },
   learnPanel: {
     finish: "완료",

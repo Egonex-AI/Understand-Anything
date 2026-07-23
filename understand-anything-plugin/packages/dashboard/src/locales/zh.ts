@@ -134,6 +134,10 @@ export const zh = {
     noData: "未加载差异数据",
     changed: "已修改",
     affected: "受影响",
+    filterOn: "过滤开",
+    filterOff: "过滤关",
+    showFilterOnly: "仅显示差异影响节点",
+    showAll: "显示所有节点",
   },
   learnPanel: {
     finish: "完成",

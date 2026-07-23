@@ -134,6 +134,10 @@ export const ru = {
     noData: "Данные об изменениях не загружены",
     changed: "Изменено",
     affected: "Затронуто",
+    filterOn: "Фильтр ВКЛ",
+    filterOff: "Фильтр ВЫКЛ",
+    showFilterOnly: "Показать только затронутые узлы",
+    showAll: "Показать все узлы",
   },
   learnPanel: {
     finish: "Завершить",

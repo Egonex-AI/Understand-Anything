@@ -134,6 +134,10 @@ export const zhTW = {
     noData: "未載入差異資料",
     changed: "已修改",
     affected: "受影響",
+    filterOn: "篩選開",
+    filterOff: "篩選關",
+    showFilterOnly: "僅顯示差異影響節點",
+    showAll: "顯示所有節點",
   },
   learnPanel: {
     finish: "完成",
