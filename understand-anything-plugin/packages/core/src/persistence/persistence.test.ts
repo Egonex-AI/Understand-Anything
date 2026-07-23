@@ -113,6 +113,22 @@ describe("persistence", () => {
       expect(loaded).not.toBeNull();
       expect(loaded?.version).toBe(123);
     });
+
+    it("does not leak a sibling directory that shares the root's name prefix", () => {
+      // A path beside the project root (e.g. a backup or git worktree) must be
+      // reduced to its basename, not rewritten to a `../<root>-backup/...`
+      // traversal that both leaks the directory layout and escapes the root
+      // (graph filePaths later seed the dashboard's path allowlist).
+      const sibling = `${tempDir}-backup/src/auth.ts`;
+      const graph: KnowledgeGraph = {
+        ...sampleGraph,
+        nodes: [{ ...sampleGraph.nodes[0], id: "sibling-node", filePath: sibling }],
+      };
+      saveGraph(tempDir, graph);
+
+      const loaded = loadGraph(tempDir);
+      expect(loaded?.nodes[0].filePath).toBe("auth.ts");
+    });
   });
 
   describe("saveMeta / loadMeta", () => {
