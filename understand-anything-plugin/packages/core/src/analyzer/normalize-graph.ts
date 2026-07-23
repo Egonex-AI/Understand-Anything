@@ -27,8 +27,17 @@ const TYPE_TO_PREFIX: Record<string, string> = {
 /**
  * Strips all non-valid prefixes from an ID, returning the bare path
  * and the first valid prefix found (if any).
+ *
+ * `expectedPrefix` is the canonical prefix for the node's declared type
+ * (e.g. "file" for a file node). It disambiguates a reserved word that
+ * appears before the expected prefix — a spurious project-name prefix that
+ * happens to collide with a reserved word — from a reserved word that is a
+ * legitimate middle path segment.
  */
-function stripToValidPrefix(id: string): { prefix: string | null; path: string } {
+function stripToValidPrefix(
+  id: string,
+  expectedPrefix?: string,
+): { prefix: string | null; path: string } {
   let remaining = id;
 
   // Peel off colon-separated segments until we find a valid prefix or run out
@@ -38,11 +47,22 @@ function stripToValidPrefix(id: string): { prefix: string | null; path: string }
 
     const segment = remaining.slice(0, colonIdx);
     if (VALID_PREFIXES.has(segment)) {
-      // Check for double valid prefix (e.g., "file:file:src/foo.ts")
+      // Collapse the outer prefix only when the next segment is either:
+      //   - the SAME reserved word — a true duplicate ("file:file:src/foo.ts"), or
+      //   - the node's expected prefix — a spurious project-name prefix that
+      //     collides with a reserved word ("service:file:src/foo.ts" for a file
+      //     node), which must resolve to the canonical "file:src/foo.ts".
+      // A different reserved word that is NOT the expected prefix
+      // ("endpoint:service:x" for an endpoint node) is a real path segment and
+      // must be preserved.
       const rest = remaining.slice(colonIdx + 1);
       const innerColonIdx = rest.indexOf(":");
-      if (innerColonIdx > 0 && VALID_PREFIXES.has(rest.slice(0, innerColonIdx))) {
-        // Double-prefixed — skip the outer, recurse on inner
+      const innerSegment = innerColonIdx > 0 ? rest.slice(0, innerColonIdx) : "";
+      if (
+        innerColonIdx > 0 &&
+        (innerSegment === segment || innerSegment === expectedPrefix)
+      ) {
+        // Skip the outer prefix, recurse on the inner one
         remaining = rest;
         continue;
       }
@@ -69,7 +89,7 @@ export function normalizeNodeId(
   if (!trimmed) return trimmed;
 
   const expectedPrefix = TYPE_TO_PREFIX[node.type];
-  const { prefix, path } = stripToValidPrefix(trimmed);
+  const { prefix, path } = stripToValidPrefix(trimmed, expectedPrefix);
 
   if (prefix) {
     // For step nodes with filePath, reconstruct as step:flowSlug:filePath:stepSlug.
@@ -191,6 +211,67 @@ function inferTypeFromId(id: string): string {
   return "file";
 }
 
+/** True when an ID begins with a valid `prefix:` segment (e.g. "file:src/x.ts"). */
+function startsWithValidPrefix(id: string): boolean {
+  const colonIdx = id.indexOf(":");
+  return colonIdx > 0 && id.slice(0, colonIdx) in PREFIX_TO_TYPE;
+}
+
+/**
+ * Best-effort repair of an edge endpoint that matches no node ID.
+ *
+ * Tries the prefix-inferred type against the full id first (preserving the
+ * common case), then peels each leading reserved-word segment and normalizes
+ * from the suffix that begins at it. This recovers a reserved-word project
+ * prefix — e.g. an edge endpoint `service:file:src/foo.ts` pointing at the
+ * canonical node `file:src/foo.ts`, where `inferTypeFromId` would treat the
+ * spurious `service` as the type and fail to strip it. Normalizing from the
+ * candidate segment (rather than always from the full id) also handles a
+ * *chain* of reserved prefixes, e.g. `service:endpoint:file:src/foo.ts`, where
+ * `stripToValidPrefix` can't collapse the run for the `file` candidate and
+ * every full-id attempt would otherwise leave the edge dangling. Returns the
+ * original id unchanged when nothing resolves to an existing node.
+ *
+ * A leading reserved word is only peeled when what remains is itself a
+ * canonical `prefix:path` id — that is the signature of a spurious outer
+ * prefix sitting in front of the real id. When the remainder is a bare path,
+ * the peeled segment was the endpoint's own prefix (e.g. `func` in
+ * `func:src/a.ts:formatDate`), and reinterpreting the suffix would silently
+ * rewire the edge to a different same-named node (`func:formatDate`) instead
+ * of dropping the missing endpoint as dangling.
+ */
+function resolveEdgeEndpoint(id: string, validNodeIds: Set<string>): string {
+  // Each candidate pairs a node type with the id suffix to normalize from.
+  // The first preserves the common case (inferred type, full id); each peeled
+  // segment then offers its real prefix and the substring that starts there.
+  const candidates: { type: string; fromId: string }[] = [
+    { type: inferTypeFromId(id), fromId: id },
+  ];
+
+  let rest = id;
+  while (true) {
+    const colonIdx = rest.indexOf(":");
+    if (colonIdx <= 0) break;
+    const segment = rest.slice(0, colonIdx);
+    if (!(segment in PREFIX_TO_TYPE)) break;
+    rest = rest.slice(colonIdx + 1);
+    // Only strip `segment` as a spurious outer prefix when the remainder is
+    // still a canonical prefixed id. Otherwise `segment` was the real prefix
+    // and the bare suffix must not be reinterpreted as another node.
+    if (!startsWithValidPrefix(rest)) break;
+    const type = PREFIX_TO_TYPE[segment];
+    if (!candidates.some((c) => c.type === type && c.fromId === rest)) {
+      candidates.push({ type, fromId: rest });
+    }
+  }
+
+  for (const { type, fromId } of candidates) {
+    const normalized = normalizeNodeId(fromId, { type });
+    if (validNodeIds.has(normalized)) return normalized;
+  }
+  return id;
+}
+
 /**
  * Normalizes a merged batch output: fixes node IDs and numeric complexity,
  * rewrites edge references, deduplicates nodes and edges, and drops dangling edges.
@@ -280,18 +361,14 @@ export function normalizeBatchOutput(data: {
     let newSource = idMap.get(oldSource) ?? oldSource;
     let newTarget = idMap.get(oldTarget) ?? oldTarget;
 
-    // Fallback: if endpoint not found in idMap, normalize it directly
-    // (handles cross-variant malformed IDs between nodes and edges).
-    // Try the edge's implied type first (from prefix), then fall back to "file".
+    // Fallback: if an endpoint isn't found in idMap, repair it directly
+    // (handles cross-variant malformed IDs between nodes and edges, including
+    // reserved-word project prefixes that inferTypeFromId alone can't resolve).
     if (!validNodeIds.has(newSource)) {
-      const inferredType = inferTypeFromId(newSource);
-      const normalized = normalizeNodeId(newSource, { type: inferredType });
-      if (validNodeIds.has(normalized)) newSource = normalized;
+      newSource = resolveEdgeEndpoint(newSource, validNodeIds);
     }
     if (!validNodeIds.has(newTarget)) {
-      const inferredType = inferTypeFromId(newTarget);
-      const normalized = normalizeNodeId(newTarget, { type: inferredType });
-      if (validNodeIds.has(normalized)) newTarget = normalized;
+      newTarget = resolveEdgeEndpoint(newTarget, validNodeIds);
     }
 
     if (newSource !== oldSource || newTarget !== oldTarget) {

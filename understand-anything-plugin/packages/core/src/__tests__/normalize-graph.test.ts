@@ -31,6 +31,38 @@ describe("normalizeNodeId", () => {
     ).toBe("file:src/foo.ts");
   });
 
+  it("keeps a real prefix when a different reserved word is a middle segment", () => {
+    // Regression: "endpoint:service:x" is a valid prefix followed by a real
+    // path segment that happens to be a reserved word. The outer "endpoint"
+    // prefix must be preserved, not dropped in favour of "service".
+    expect(
+      normalizeNodeId("endpoint:service:getUser", { type: "endpoint" }),
+    ).toBe("endpoint:service:getUser");
+  });
+
+  it("is idempotent for IDs whose middle segment is a reserved word", () => {
+    const once = normalizeNodeId("endpoint:service:getUser", {
+      type: "endpoint",
+    });
+    expect(normalizeNodeId(once, { type: "endpoint" })).toBe(once);
+  });
+
+  it("strips a project-name prefix that collides with a reserved word", () => {
+    // Regression: when the project name is itself a reserved word ("service")
+    // and the node's real prefix follows ("file"), the spurious outer prefix
+    // must be dropped so the canonical "file:src/foo.ts" form is used — not
+    // left as "service:file:src/foo.ts", which would dangle edges that
+    // reference the canonical ID.
+    expect(
+      normalizeNodeId("service:file:src/foo.ts", { type: "file" }),
+    ).toBe("file:src/foo.ts");
+  });
+
+  it("is idempotent when a reserved-word project prefix is stripped", () => {
+    const once = normalizeNodeId("service:file:src/foo.ts", { type: "file" });
+    expect(normalizeNodeId(once, { type: "file" })).toBe(once);
+  });
+
   it("strips project-name prefix when valid prefix follows", () => {
     expect(
       normalizeNodeId("my-project:file:src/foo.ts", { type: "file" }),
@@ -437,6 +469,139 @@ describe("normalizeBatchOutput", () => {
     expect(result.edges).toHaveLength(1);
     expect(result.edges[0].source).toBe("file:src/bare.ts");
     expect(result.edges[0].target).toBe("file:src/target.ts");
+  });
+
+  it("repairs an edge endpoint whose project prefix collides with a reserved word", () => {
+    // Regression: an edge endpoint "service:file:src/foo.ts" refers to the
+    // canonical node "file:src/foo.ts", but inferTypeFromId reads the spurious
+    // reserved-word project prefix "service" as the type. The fallback must
+    // still resolve it to the existing node rather than drop the edge.
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "file:src/foo.ts",
+          type: "file",
+          name: "foo.ts",
+          filePath: "src/foo.ts",
+          summary: "Target",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/bar.ts",
+          type: "file",
+          name: "bar.ts",
+          filePath: "src/bar.ts",
+          summary: "Source",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "file:src/bar.ts",
+          target: "service:file:src/foo.ts",
+          type: "imports",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0].target).toBe("file:src/foo.ts");
+    expect(result.stats.danglingEdgesDropped).toBe(0);
+  });
+
+  it("repairs an edge endpoint with a chain of reserved-word prefixes", () => {
+    // Regression: an edge endpoint "service:endpoint:file:src/foo.ts" carries
+    // more than one reserved prefix before the real "file" prefix. Normalizing
+    // the full id for each candidate type can't collapse the run, so the repair
+    // must normalize from the candidate prefix segment to resolve it to the
+    // canonical node "file:src/foo.ts" rather than drop the edge.
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "file:src/foo.ts",
+          type: "file",
+          name: "foo.ts",
+          filePath: "src/foo.ts",
+          summary: "Target",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/bar.ts",
+          type: "file",
+          name: "bar.ts",
+          filePath: "src/bar.ts",
+          summary: "Source",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "file:src/bar.ts",
+          target: "service:endpoint:file:src/foo.ts",
+          type: "imports",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(1);
+    expect(result.edges[0].target).toBe("file:src/foo.ts");
+    expect(result.stats.danglingEdgesDropped).toBe(0);
+  });
+
+  it("drops a missing canonical endpoint instead of rewiring it to a same-named node", () => {
+    // Regression: an edge endpoint "func:src/a.ts:formatDate" is a canonical
+    // multi-part ID whose node is missing, while a DIFFERENT function
+    // "func:formatDate" exists. The reserved-prefix peeling must not strip the
+    // real "func" prefix and normalize the bare suffix "src/a.ts:formatDate"
+    // back to "func:formatDate" — that silently rewires the edge to an
+    // unrelated function. The edge must be dropped as dangling instead.
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "func:formatDate",
+          type: "function",
+          name: "formatDate",
+          summary: "A different formatDate",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/a.ts",
+          type: "file",
+          name: "a.ts",
+          filePath: "src/a.ts",
+          summary: "Source",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "file:src/a.ts",
+          target: "func:src/a.ts:formatDate",
+          type: "calls",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(0);
+    expect(result.stats.danglingEdgesDropped).toBe(1);
+    expect(result.stats.droppedEdges[0]).toEqual({
+      source: "file:src/a.ts",
+      target: "func:src/a.ts:formatDate",
+      type: "calls",
+      reason: "missing-target",
+    });
   });
 });
 
