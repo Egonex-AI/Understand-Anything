@@ -779,6 +779,87 @@ def link_tests(
     return added, dropped, tagged, swapped
 
 
+# ── Incremental prune (source-only) ───────────────────────────────────────
+#
+# When Phase 2 runs in `--changed-files` mode, only batches containing changed
+# files are re-analyzed. The existing graph must be pruned of stale nodes
+# belonging to changed files before being merged with the fresh batches.
+#
+# The prune rule is **source-only**: we keep an existing edge iff its
+# `source` node survives the node prune. Edges whose `target` was removed
+# are intentionally retained.
+#
+# Why source-only (not source-OR-target):
+#   When file F is modified, F is re-analyzed and regenerates F's OUTBOUND
+#   edges. But edges INTO F from an unchanged file U (e.g. `U imports F`,
+#   `U calls F`, `U tests F`) are NEVER regenerated because U is not in the
+#   re-analyzed batch set. A naive `source OR target` prune would drop those
+#   inbound edges every incremental run — they would silently erode over the
+#   life of the project until the next full rebuild.
+#
+# Safety net:
+#   Inbound function-level edges into since-deleted functions inside F (e.g.
+#   `function:U.ts:caller → function:F.ts:removedFn`) briefly survive this
+#   prune, but the merge's Step 6 dangling-edge drop removes them once
+#   `function:F.ts:removedFn` does not reappear in the fresh batch. Over-
+#   keeping is the right trade-off: dangling sweep cleans up safely, but a
+#   deleted inbound edge from an unchanged source can never be recovered.
+
+def prune_existing_graph(
+    existing: dict[str, Any],
+    changed_files: set[str],
+) -> dict[str, Any]:
+    """Prune the existing graph for an incremental update.
+
+    Removes nodes whose `filePath` is in `changed_files`, then prunes edges
+    by source-only: keep an edge iff its `source` node survives. Returns a
+    new graph dict (does not mutate `existing`).
+
+    Caller wires the returned graph back into the merge by writing it as
+    `batch-existing.json` in the intermediate directory, where
+    `merge_and_normalize` will combine it with the fresh `batch-*.json`
+    files and handle dedup + dangling-target sweep.
+
+    Edges whose target was a removed node are retained here on purpose —
+    if the target reappears in a fresh batch (file-level node `file:F` or a
+    function that still exists in F), the dedup / dangling-drop in
+    `merge_and_normalize` will resolve it. If it does not reappear (the
+    function was deleted), the dangling sweep drops the edge.
+    """
+    existing_nodes = existing.get("nodes", []) or []
+    existing_edges = existing.get("edges", []) or []
+
+    # Step 1: drop nodes whose filePath matches a changed file. We compare on
+    # `filePath` (not `id`) because function/class nodes share their host
+    # file's filePath but have IDs like `function:src/foo.ts:bar` — we want
+    # to drop those too when src/foo.ts changes.
+    surviving_nodes: list[dict[str, Any]] = []
+    for node in existing_nodes:
+        fp = node.get("filePath")
+        if isinstance(fp, str) and fp in changed_files:
+            continue
+        surviving_nodes.append(node)
+
+    surviving_node_ids: set[str] = {
+        node["id"] for node in surviving_nodes if isinstance(node.get("id"), str)
+    }
+
+    # Step 2: prune edges by source only. Target may reference a removed
+    # node — `merge_and_normalize`'s Step 6 dangling-drop is the safety net.
+    surviving_edges: list[dict[str, Any]] = []
+    for edge in existing_edges:
+        src = edge.get("source")
+        if not isinstance(src, str) or src not in surviving_node_ids:
+            continue
+        surviving_edges.append(edge)
+
+    return {
+        **{k: v for k, v in existing.items() if k not in ("nodes", "edges")},
+        "nodes": surviving_nodes,
+        "edges": surviving_edges,
+    }
+
+
 # ── Main merge + normalize ────────────────────────────────────────────────
 
 def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str]]:

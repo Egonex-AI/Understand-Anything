@@ -189,10 +189,10 @@ Only re-analyze files with structural changes. This is the **only** phase that c
 
 5. **Merge with existing graph:**
    - Remove old nodes whose `filePath` matches any file in `filesToReanalyze` or in the deleted files list
-   - Remove old edges whose `source` or `target` references a removed node
+   - **Prune by source only:** Keep each existing edge iff its `source` node survives. Edges whose `target` was removed are intentionally retained — this preserves inbound edges from unchanged files (`U imports F`, `U calls F`, `U tests F`) that the unchanged U will never regenerate. A naive `source OR target` prune silently erodes inbound edges on every incremental run.
    - Add new nodes and edges from the fresh analysis
    - Deduplicate nodes by ID (keep latest), edges by `source + target + type`
-   - Remove any edge with dangling `source` or `target` references
+   - Remove any edge with dangling `source` or `target` references — this is the safety net that drops inbound function-level edges into since-deleted functions inside changed files
 
 ---
 
