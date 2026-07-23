@@ -1,0 +1,621 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/understand-anything-plugin/skills/understand/schemas/run-report-1.0.0.schema.json",
+  "title": "Understand Anything analysis run report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaUrl",
+    "schemaVersion",
+    "runId",
+    "mode",
+    "status",
+    "startedAt",
+    "finishedAt",
+    "durationMs",
+    "scope",
+    "plan",
+    "stages",
+    "analysisBatches",
+    "usage",
+    "warnings",
+    "warningOverflow",
+    "error"
+  ],
+  "properties": {
+    "schemaUrl": { "const": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/understand-anything-plugin/skills/understand/schemas/run-report-1.0.0.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "runId": { "type": "string", "format": "uuid" },
+    "mode": { "enum": ["full", "incremental", "review"] },
+    "status": { "enum": ["running", "ok", "degraded", "failed", "cancelled", "interrupted"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "$ref": "#/$defs/nullableTimestamp" },
+    "durationMs": { "$ref": "#/$defs/nullableCount" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": { "path": { "$ref": "#/$defs/relativePath" } }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "planId", "inputDigest", "decision", "selectedScope"],
+      "properties": {
+        "path": { "const": "analysis-plan.json" },
+        "planId": { "$ref": "#/$defs/nullableSha256" },
+        "inputDigest": { "$ref": "#/$defs/nullableSha256" },
+        "decision": { "enum": ["pending", "continue", "scoped", "cancelled"] },
+        "selectedScope": {
+          "oneOf": [
+            { "$ref": "#/$defs/relativePath" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scan",
+        "batching",
+        "analysis",
+        "merge",
+        "assemble_review",
+        "architecture",
+        "tour",
+        "review",
+        "save"
+      ],
+      "properties": {
+        "scan": { "$ref": "#/$defs/stage" },
+        "batching": { "$ref": "#/$defs/stage" },
+        "analysis": { "$ref": "#/$defs/stage" },
+        "merge": { "$ref": "#/$defs/stage" },
+        "assemble_review": { "$ref": "#/$defs/stage" },
+        "architecture": { "$ref": "#/$defs/stage" },
+        "tour": { "$ref": "#/$defs/stage" },
+        "review": { "$ref": "#/$defs/stage" },
+        "save": { "$ref": "#/$defs/stage" }
+      }
+    },
+    "analysisBatches": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "completed", "failed", "items"],
+      "properties": {
+        "total": { "$ref": "#/$defs/count" },
+        "completed": { "$ref": "#/$defs/count" },
+        "failed": { "$ref": "#/$defs/count" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/batch" }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "telemetryAvailable",
+        "source",
+        "inputTokens",
+        "outputTokens",
+        "costUsd",
+        "estimatedPhase2InputTokens"
+      ],
+      "properties": {
+        "telemetryAvailable": { "type": "boolean" },
+        "source": { "type": ["string", "null"] },
+        "inputTokens": { "$ref": "#/$defs/nullableCount" },
+        "outputTokens": { "$ref": "#/$defs/nullableCount" },
+        "costUsd": { "$ref": "#/$defs/nullableNumber" },
+        "estimatedPhase2InputTokens": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["lower", "upper", "confidence"],
+              "properties": {
+                "lower": { "$ref": "#/$defs/count" },
+                "upper": { "$ref": "#/$defs/count" },
+                "confidence": { "const": "low" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "message"],
+        "properties": {
+          "stage": { "$ref": "#/$defs/stageName" },
+          "message": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      }
+    },
+    "warningOverflow": { "$ref": "#/$defs/count" },
+    "error": { "type": ["string", "null"], "maxLength": 4096 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "running" } } },
+      "then": {
+        "properties": {
+          "finishedAt": { "type": "null" },
+          "durationMs": { "type": "null" },
+          "error": { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "finishedAt": { "type": "string", "format": "date-time" },
+          "durationMs": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["failed", "cancelled", "interrupted"] } } },
+      "then": { "properties": { "error": { "type": "string", "minLength": 1 } } },
+      "else": {
+        "if": { "properties": { "status": { "enum": ["ok", "degraded"] } } },
+        "then": { "properties": { "error": { "type": "null" } } }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": { "enum": ["full", "incremental"] },
+          "status": { "enum": ["ok", "degraded"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "plan": {
+            "properties": {
+              "planId": { "$ref": "#/$defs/sha256" },
+              "inputDigest": { "$ref": "#/$defs/sha256" },
+              "decision": { "const": "continue" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["ok", "degraded"] } } },
+      "then": {
+        "properties": {
+          "stages": {
+            "properties": {
+              "save": {
+                "properties": { "status": { "enum": ["ok", "degraded"] } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "ok" } } },
+      "then": {
+        "properties": {
+          "stages": {
+            "properties": {
+              "scan": { "$ref": "#/$defs/nonDegradedStage" },
+              "batching": { "$ref": "#/$defs/nonDegradedStage" },
+              "analysis": { "$ref": "#/$defs/nonDegradedStage" },
+              "merge": { "$ref": "#/$defs/nonDegradedStage" },
+              "assemble_review": { "$ref": "#/$defs/nonDegradedStage" },
+              "architecture": { "$ref": "#/$defs/nonDegradedStage" },
+              "tour": { "$ref": "#/$defs/nonDegradedStage" },
+              "review": { "$ref": "#/$defs/nonDegradedStage" },
+              "save": { "$ref": "#/$defs/nonDegradedStage" }
+            }
+          },
+          "analysisBatches": {
+            "properties": {
+              "failed": { "const": 0 },
+              "items": {
+                "items": {
+                  "type": "object",
+                  "properties": { "status": { "const": "ok" } }
+                }
+              }
+            }
+          },
+          "warnings": { "maxItems": 0 },
+          "warningOverflow": { "const": 0 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "mode": { "const": "full" }, "status": { "const": "ok" } }
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "properties": {
+              "scan": { "$ref": "#/$defs/okStage" },
+              "batching": { "$ref": "#/$defs/okStage" },
+              "analysis": { "$ref": "#/$defs/okStage" },
+              "merge": { "$ref": "#/$defs/okStage" },
+              "assemble_review": { "$ref": "#/$defs/okStage" },
+              "architecture": { "$ref": "#/$defs/okStage" },
+              "tour": { "$ref": "#/$defs/okStage" },
+              "review": { "$ref": "#/$defs/okStage" },
+              "save": { "$ref": "#/$defs/okStage" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "mode": { "const": "incremental" }, "status": { "const": "ok" } }
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "properties": {
+              "scan": { "$ref": "#/$defs/nonDegradedStage" },
+              "batching": { "$ref": "#/$defs/okStage" },
+              "analysis": { "$ref": "#/$defs/okStage" },
+              "merge": { "$ref": "#/$defs/okStage" },
+              "assemble_review": { "$ref": "#/$defs/okStage" },
+              "architecture": { "$ref": "#/$defs/okStage" },
+              "tour": { "$ref": "#/$defs/okStage" },
+              "review": { "$ref": "#/$defs/okStage" },
+              "save": { "$ref": "#/$defs/okStage" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "mode": { "const": "review" }, "status": { "const": "ok" } }
+      },
+      "then": {
+        "properties": {
+          "stages": {
+            "properties": {
+              "scan": { "$ref": "#/$defs/skippedStage" },
+              "batching": { "$ref": "#/$defs/skippedStage" },
+              "analysis": { "$ref": "#/$defs/skippedStage" },
+              "merge": { "$ref": "#/$defs/skippedStage" },
+              "assemble_review": { "$ref": "#/$defs/skippedStage" },
+              "architecture": { "$ref": "#/$defs/skippedStage" },
+              "tour": { "$ref": "#/$defs/skippedStage" },
+              "review": { "$ref": "#/$defs/okStage" },
+              "save": { "$ref": "#/$defs/okStage" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "plan": { "properties": { "decision": { "enum": ["scoped", "cancelled"] } } } } },
+      "then": { "properties": { "status": { "const": "cancelled" } } }
+    },
+    {
+      "if": { "properties": { "mode": { "const": "review" } } },
+      "then": {
+        "properties": {
+          "plan": {
+            "properties": {
+              "planId": { "type": "null" },
+              "inputDigest": { "type": "null" },
+              "decision": { "const": "pending" },
+              "selectedScope": { "type": "null" }
+            }
+          },
+          "usage": {
+            "properties": { "estimatedPhase2InputTokens": { "type": "null" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "enum": ["ok", "degraded", "failed", "cancelled", "interrupted"] } } },
+      "then": {
+        "properties": {
+          "stages": {
+            "properties": {
+              "scan": { "$ref": "#/$defs/terminalStage" },
+              "batching": { "$ref": "#/$defs/terminalStage" },
+              "analysis": { "$ref": "#/$defs/terminalStage" },
+              "merge": { "$ref": "#/$defs/terminalStage" },
+              "assemble_review": { "$ref": "#/$defs/terminalStage" },
+              "architecture": { "$ref": "#/$defs/terminalStage" },
+              "tour": { "$ref": "#/$defs/terminalStage" },
+              "review": { "$ref": "#/$defs/terminalStage" },
+              "save": { "$ref": "#/$defs/terminalStage" }
+            }
+          },
+          "analysisBatches": {
+            "properties": {
+              "items": {
+                "items": { "$ref": "#/$defs/terminalBatch" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "usage": { "properties": { "telemetryAvailable": { "const": false } } } } },
+      "then": {
+        "properties": {
+          "usage": {
+            "properties": {
+              "source": { "type": "null" },
+              "inputTokens": { "type": "null" },
+              "outputTokens": { "type": "null" },
+              "costUsd": { "type": "null" }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "usage": {
+            "properties": { "source": { "type": "string", "minLength": 1 } },
+            "anyOf": [
+              { "properties": { "inputTokens": { "type": "number" } } },
+              { "properties": { "outputTokens": { "type": "number" } } },
+              { "properties": { "costUsd": { "type": "number" } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "plan": { "properties": { "decision": { "const": "scoped" } } } } },
+      "then": { "properties": { "plan": { "properties": { "selectedScope": { "$ref": "#/$defs/relativePath" } } } } },
+      "else": { "properties": { "plan": { "properties": { "selectedScope": { "type": "null" } } } } }
+    },
+    {
+      "if": { "properties": { "plan": { "properties": { "decision": { "enum": ["continue", "scoped", "cancelled"] } } } } },
+      "then": {
+        "properties": {
+          "plan": {
+            "properties": {
+              "planId": { "$ref": "#/$defs/sha256" },
+              "inputDigest": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "nullableCount": { "type": ["integer", "null"], "minimum": 0 },
+    "nullableNumber": { "type": ["number", "null"], "minimum": 0 },
+    "nullableTimestamp": { "type": ["string", "null"], "format": "date-time" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableSha256": {
+      "oneOf": [
+        { "$ref": "#/$defs/sha256" },
+        { "type": "null" }
+      ]
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "stageName": {
+      "enum": [
+        "scan",
+        "batching",
+        "analysis",
+        "merge",
+        "assemble_review",
+        "architecture",
+        "tour",
+        "review",
+        "save"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalBatches", "completedBatches", "failedBatches", "filesProcessed"],
+      "properties": {
+        "totalBatches": { "$ref": "#/$defs/nullableCount" },
+        "completedBatches": { "$ref": "#/$defs/nullableCount" },
+        "failedBatches": { "$ref": "#/$defs/nullableCount" },
+        "filesProcessed": { "$ref": "#/$defs/nullableCount" }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "startedAt",
+        "finishedAt",
+        "durationMs",
+        "attempts",
+        "retries",
+        "metrics",
+        "failures",
+        "error"
+      ],
+      "properties": {
+        "status": { "enum": ["pending", "running", "ok", "degraded", "failed", "skipped"] },
+        "startedAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "finishedAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "durationMs": { "$ref": "#/$defs/nullableCount" },
+        "attempts": { "$ref": "#/$defs/count" },
+        "retries": { "$ref": "#/$defs/count" },
+        "metrics": { "$ref": "#/$defs/metrics" },
+        "failures": { "$ref": "#/$defs/failures" },
+        "error": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "pending" } } },
+          "then": {
+            "properties": {
+              "startedAt": { "type": "null" },
+              "finishedAt": { "type": "null" },
+              "durationMs": { "type": "null" },
+              "attempts": { "const": 0 },
+              "retries": { "const": 0 },
+              "error": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "running" } } },
+          "then": {
+            "properties": {
+              "startedAt": { "type": "string", "format": "date-time" },
+              "finishedAt": { "type": "null" },
+              "durationMs": { "type": "null" },
+              "attempts": { "type": "integer", "minimum": 1 },
+              "error": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["ok", "degraded", "failed", "skipped"] } } },
+          "then": {
+            "properties": {
+              "startedAt": { "type": "string", "format": "date-time" },
+              "finishedAt": { "type": "string", "format": "date-time" },
+              "durationMs": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["failed", "skipped"] } } },
+          "then": { "properties": { "error": { "type": "string", "minLength": 1, "maxLength": 4096 } } },
+          "else": {
+            "if": { "properties": { "status": { "enum": ["ok", "degraded"] } } },
+            "then": { "properties": { "error": { "type": "null" } } }
+          }
+        }
+      ]
+    },
+    "batch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batchIndex",
+        "status",
+        "files",
+        "lines",
+        "startedAt",
+        "finishedAt",
+        "durationMs",
+        "attempts",
+        "retries",
+        "failures",
+        "error"
+      ],
+      "properties": {
+        "batchIndex": { "type": "integer", "minimum": 1 },
+        "status": { "enum": ["pending", "running", "ok", "degraded", "failed", "skipped"] },
+        "files": { "$ref": "#/$defs/count" },
+        "lines": { "$ref": "#/$defs/count" },
+        "startedAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "finishedAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "durationMs": { "$ref": "#/$defs/nullableCount" },
+        "attempts": { "$ref": "#/$defs/count" },
+        "retries": { "$ref": "#/$defs/count" },
+        "failures": { "$ref": "#/$defs/failures" },
+        "error": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "pending" } } },
+          "then": {
+            "properties": {
+              "startedAt": { "type": "null" },
+              "finishedAt": { "type": "null" },
+              "durationMs": { "type": "null" },
+              "attempts": { "const": 0 },
+              "retries": { "const": 0 },
+              "error": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "running" } } },
+          "then": {
+            "properties": {
+              "startedAt": { "type": "string", "format": "date-time" },
+              "finishedAt": { "type": "null" },
+              "durationMs": { "type": "null" },
+              "attempts": { "type": "integer", "minimum": 1 },
+              "error": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["ok", "degraded", "failed", "skipped"] } } },
+          "then": {
+            "properties": {
+              "startedAt": { "type": "string", "format": "date-time" },
+              "finishedAt": { "type": "string", "format": "date-time" },
+              "durationMs": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["failed", "skipped"] } } },
+          "then": { "properties": { "error": { "type": "string", "minLength": 1, "maxLength": 4096 } } },
+          "else": {
+            "if": { "properties": { "status": { "enum": ["ok", "degraded"] } } },
+            "then": { "properties": { "error": { "type": "null" } } }
+          }
+        }
+      ]
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attempt", "finishedAt", "error"],
+        "properties": {
+          "attempt": { "type": "integer", "minimum": 1 },
+          "finishedAt": { "type": "string", "format": "date-time" },
+          "error": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        }
+      }
+    },
+    "terminalStage": {
+      "type": "object",
+      "properties": { "status": { "enum": ["ok", "degraded", "failed", "skipped"] } }
+    },
+    "terminalBatch": {
+      "type": "object",
+      "properties": { "status": { "enum": ["ok", "degraded", "failed", "skipped"] } }
+    },
+    "nonDegradedStage": {
+      "type": "object",
+      "properties": { "status": { "enum": ["ok", "skipped"] } }
+    },
+    "okStage": {
+      "type": "object",
+      "properties": { "status": { "const": "ok" } }
+    },
+    "skippedStage": {
+      "type": "object",
+      "properties": { "status": { "const": "skipped" } }
+    }
+  }
+}
