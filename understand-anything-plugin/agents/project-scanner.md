@@ -63,7 +63,8 @@ UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .und
 mkdir -p $UA_DIR/tmp
 node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
   "$PROJECT_ROOT" \
-  "$UA_DIR/tmp/ua-scan-files.json"
+  "$UA_DIR/tmp/ua-scan-files.json" \
+  --exclude-analysis-data
 ```
 
 With exclude patterns (add the `--exclude` flag after the output path):
@@ -72,6 +73,7 @@ With exclude patterns (add the `--exclude` flag after the output path):
 node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
   "$PROJECT_ROOT" \
   "$UA_DIR/tmp/ua-scan-files.json" \
+  --exclude-analysis-data \
   --exclude "tests/*,docs/*"
 ```
 
@@ -121,7 +123,7 @@ The script:
 
 **Priority rule:** most-specific wins. Filename / path rules fire before extension rules — e.g., `docker-compose.yml` is `infra` (not `config`); `.github/workflows/ci.yml` is `infra` (not `config`); `LICENSE` is `code` (not `docs`).
 
-**`.understandignore` behavior:** the bundled script reads `.understandignore` and the data directory's `.understandignore` (`.ua/.understandignore`, or `.understand-anything/.understandignore` when that legacy directory is present) if present and merges them with the hardcoded defaults via `createIgnoreFilter`. `!`-negation overrides defaults (`!dist/` would re-include `dist/` files). The `filteredByIgnore` counter measures only user-driven drops, not baseline default drops.
+**`.understandignore` behavior:** the bundled script reads `.understandignore` and the data directory's `.understandignore` (`.ua/.understandignore`, or `.understand-anything/.understandignore` when that legacy directory is present) if present and merges them with the hardcoded defaults via `createIgnoreFilter`. `!`-negation overrides defaults (`!dist/` would re-include `dist/` files). The `filteredByIgnore` counter measures only user-driven drops, not baseline default drops. Always pass `--exclude-analysis-data` so persistent plans, run reports, and graph artifacts never become input to the next analysis.
 
 If the script exits with a non-zero status, read stderr to diagnose. You have up to 2 retry attempts (re-invocations) before failing the phase. Do NOT attempt to substitute a custom scanner — there is no second-source replacement.
 
@@ -204,6 +206,7 @@ Then assemble the final output JSON:
   "description": "Brief description from README or package.json",
   "languages": ["markdown", "typescript", "yaml"],
   "frameworks": ["React", "Vite", "Vitest", "Docker"],
+  "contentDigest": "<sha256 lowercase hex from Step B>",
   "files": [
     {"path": "src/index.ts", "language": "typescript", "sizeLines": 150, "fileCategory": "code"},
     {"path": "README.md", "language": "markdown", "sizeLines": 45, "fileCategory": "docs"},
@@ -223,6 +226,7 @@ Then assemble the final output JSON:
 - `description` (string): your synthesized 1-2 sentence description
 - `languages` (string[]): from your Step A narrative work (deduplicated, sorted alphabetically; cross-checked against Step B's `stats.byLanguage` keys)
 - `frameworks` (string[]): from your Step A narrative work; only confirmed frameworks (empty array if none detected)
+- `contentDigest` (string): directly from Step B; preserve it verbatim so preflight plans are sensitive to source-content changes
 - `files` (object[]): directly from Step B's `files[]` (verbatim, including `fileCategory`)
 - `totalFiles` (integer): directly from Step B
 - `filteredByIgnore` (integer): directly from Step B
