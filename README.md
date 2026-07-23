@@ -3,7 +3,7 @@
 <p align="center">
   <strong>Turn any codebase, knowledge base, or docs into an interactive knowledge graph you can explore, search, and ask questions about.</strong>
   <br />
-  <em>Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, and more.</em>
+  <em>Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, Grok Build, and more.</em>
 </p>
 
 <p align="center">
@@ -28,6 +28,7 @@
   <a href="#vs-code--github-copilot"><img src="https://img.shields.io/badge/Copilot-24292e" alt="Copilot" /></a>
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
+  <a href="#grok-build"><img src="https://img.shields.io/badge/Grok_Build-000000" alt="Grok Build" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
   <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
@@ -198,7 +199,7 @@ Understand-Anything works across multiple AI coding platforms.
 ```
 
 
-### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Grok Build / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
 
 
 **macOS / Linux:**
@@ -217,9 +218,25 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 
-- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `grok`
 - Update later: `./install.sh --update`
 - Uninstall: `./install.sh --uninstall <platform>`
+
+### Grok Build
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s grok
+```
+
+This symlinks skills into `~/.grok/skills/` (Grok discovers them as slash commands such as `/understand`). Restart Grok Build, then run `/skills` to confirm they appear.
+
+**Plugin install (optional):** install the full plugin package (skills + agents + hooks) instead of skill symlinks:
+
+```bash
+grok plugin install Egonex-AI/Understand-Anything#understand-anything-plugin --trust
+```
+
+Then enable the plugin if it is not already active (`grok plugin enable understand-anything` or via `/plugins` in the TUI).
 
 ### Cursor
 
@@ -272,6 +289,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Trae | ✅ Supported | `install.sh trae` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
+| Grok Build | ✅ Supported | `install.sh grok` |
 
 
 ---

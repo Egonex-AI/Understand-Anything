@@ -185,7 +185,7 @@ Understand-Anything 可在多个 AI 编码平台上运行。
 /plugin install understand-anything
 ```
 
-### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro）
+### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Grok Build / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro）
 
 **macOS / Linux：**
 ```bash
@@ -203,7 +203,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **关于技能调用方式：** 不同平台的调用前缀不同。大多数平台使用斜杠命令（`/understand`），但 **Codex 使用 `$`** —— 请输入 `$understand`，而不是 `/understand`。如果两种前缀都不被识别，直接用自然语言请求即可：*“使用 understand 技能分析这个项目”*。
 
-- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
+- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`、`grok`
 - 后续更新：`./install.sh --update`
 - 卸载：`./install.sh --uninstall <platform>`
 
@@ -257,6 +257,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | KIMI CLI | ✅ 支持 | `install.sh kimi` |
 | Nanobot | ✅ 支持 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 支持 | `install.sh kiro` |
+| Grok Build | ✅ 支持 | `install.sh grok` |
 
 ---
 

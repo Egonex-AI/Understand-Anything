@@ -42,6 +42,7 @@ kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+grok|$HOME/.grok/skills|per-skill
 EOF
 }
 
@@ -117,6 +118,25 @@ list_skills() {
   done
 }
 
+# Replace an existing path with a symlink. macOS `ln -sfn` will nest a
+# symlink *inside* a real directory instead of replacing it, so remove any
+# non-symlink destination first (common when users previously copied skills).
+replace_with_symlink() {
+  local link_path="$1" src_path="$2"
+  if [[ -e "$link_path" || -L "$link_path" ]]; then
+    if [[ -L "$link_path" ]]; then
+      rm -f "$link_path"
+    elif [[ -d "$link_path" ]]; then
+      printf '  • replacing existing directory %s with a symlink\n' "$link_path"
+      rm -rf "$link_path"
+    else
+      printf '  • replacing existing file %s with a symlink\n' "$link_path"
+      rm -f "$link_path"
+    fi
+  fi
+  ln -sfn "$src_path" "$link_path"
+}
+
 link_skills() {
   local target="$1" style="$2"
   local root
@@ -126,12 +146,12 @@ link_skills() {
     per-skill)
       local skill
       while IFS= read -r skill; do
-        ln -sfn "$root/$skill" "$target/$skill"
+        replace_with_symlink "$target/$skill" "$root/$skill"
         printf '  ✓ %s → %s\n' "$target/$skill" "$root/$skill"
       done < <(list_skills)
       ;;
     folder)
-      ln -sfn "$root" "$target/understand-anything"
+      replace_with_symlink "$target/understand-anything" "$root"
       printf '  ✓ %s → %s\n' "$target/understand-anything" "$root"
       ;;
     *)
@@ -231,6 +251,11 @@ KIROEOF
   fi
   if [[ "$id" == "kiro" ]]; then
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
+  fi
+  if [[ "$id" == "grok" ]]; then
+    printf '\n  Tip: Grok Build loads skills from ~/.grok/skills/ as slash commands\n'
+    printf '       (e.g. /understand). Restart Grok, then run /skills to confirm.\n'
+    printf '  Alternative: grok plugin install Egonex-AI/Understand-Anything#understand-anything-plugin --trust\n'
   fi
 }
 

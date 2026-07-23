@@ -51,9 +51,11 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 3. Find the dashboard code. The dashboard is at `packages/dashboard/` relative to this plugin's root directory. Check these paths in order and use the first that exists:
    - `${CLAUDE_PLUGIN_ROOT}/packages/dashboard/` (Claude Code runtime root, highest priority)
+   - `${GROK_PLUGIN_ROOT}/packages/dashboard/` (Grok Build plugin runtime root)
    - `~/.understand-anything-plugin/packages/dashboard/` (universal symlink, all installs)
    - Two levels up from `~/.agents/skills/understand-dashboard` real path (self-relative fallback)
    - Two levels up from `~/.copilot/skills/understand-dashboard` real path (Copilot personal skills fallback)
+   - Two levels up from `~/.grok/skills/understand-dashboard` real path (Grok Build personal skills fallback)
    - Common clone-based install roots:
      - `~/.codex/understand-anything/understand-anything-plugin/packages/dashboard/`
      - `~/.opencode/understand-anything/understand-anything-plugin/packages/dashboard/`
@@ -66,13 +68,17 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
    COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-dashboard 2>/dev/null || readlink -f ~/.copilot/skills/understand-dashboard 2>/dev/null || echo "")
    COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+   GROK_SKILL_REAL=$(realpath ~/.grok/skills/understand-dashboard 2>/dev/null || readlink -f ~/.grok/skills/understand-dashboard 2>/dev/null || echo "")
+   GROK_SELF_RELATIVE=$([ -n "$GROK_SKILL_REAL" ] && cd "$GROK_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 
    PLUGIN_ROOT=""
    for candidate in \
      "${CLAUDE_PLUGIN_ROOT}" \
+     "${GROK_PLUGIN_ROOT}" \
      "$HOME/.understand-anything-plugin" \
      "$SELF_RELATIVE" \
      "$COPILOT_SELF_RELATIVE" \
+     "$GROK_SELF_RELATIVE" \
      "$HOME/.codex/understand-anything/understand-anything-plugin" \
      "$HOME/.opencode/understand-anything/understand-anything-plugin" \
      "$HOME/.pi/understand-anything/understand-anything-plugin" \
@@ -86,9 +92,11 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
      echo "Error: Cannot find the understand-anything plugin root."
      echo "Checked:"
      echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
+     echo "  - ${GROK_PLUGIN_ROOT:-<unset GROK_PLUGIN_ROOT>}"
      echo "  - $HOME/.understand-anything-plugin"
      echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-dashboard>}"
      echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-dashboard>}"
+     echo "  - ${GROK_SELF_RELATIVE:-<unresolved path derived from ~/.grok/skills/understand-dashboard>}"
      echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
      echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
      echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
