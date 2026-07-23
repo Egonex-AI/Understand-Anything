@@ -1,6 +1,6 @@
 ---
 name: understand-query
-description: Use when answering questions about an already-analyzed codebase — business logic, where a feature is implemented, call/impact graphs, or source — via the `ua_query.py` CLI backed by the Understand-Anything API server. Answers are source-verified: code is the only ground truth.
+description: Use when answering questions about an already-analyzed codebase — business logic, where a feature is implemented, call/impact graphs, or source — via the `ua_query.py` CLI backed by the Understand-Anything API server. Answers are source-verified — code is the only ground truth.
 argument-hint: ["<subcommand> [--server URL] [--format json|md] [--verbose] [subcommand-flags...]"]
 ---
 

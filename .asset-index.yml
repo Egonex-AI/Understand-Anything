@@ -1,0 +1,99 @@
+# .asset-index.yml — asset-hub manifest（Understand-Anything 源仓库自治维护）
+# Understand-Anything 是产出 AI 知识库的工具：把代码库/知识库/docs 转成可交互知识图谱。
+# 11 个 understand-* 技能是其能力组件，每个作 file item 单独接入（ADR-0009 sidebar_label = item.name）。
+# repo 字段单段为源仓自治标识；sources.yaml 多段 repo（kb/tools/understand-anything）承载 sidebar
+# 三级分组「知识库 → 工具 → understand-anything」（ADR-0008）。
+schema_version: 1
+repo: understand-anything
+repo_description: 把代码库/知识库/docs 转成可交互知识图谱的 AI 知识库产出工具（11 个 understand 技能组件）
+repo_url: https://git.wemomo.com/ultron/Understand-Anything   # web URL（给人点击下钻，非 clone URL）
+branch: main
+display_name: understand-anything    # sidebar 显示名（留空回退 repo 名）
+
+items:
+  # 仓库 README（file 类，作 understand-anything 组首页）
+  - name: 仓库说明
+    path: README.md
+    kind: file
+    category: doc
+    tags: [tool, knowledge-base, understand-anything]
+    description: Understand-Anything 项目总说明（特性、安装、快速开始、多 IDE 集成）
+
+  # ── 分析/生成类技能：产出知识图谱 ──
+  - name: understand
+    path: understand-anything-plugin/skills/understand/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, analyze]
+    description: 分析代码库生成交互式知识图谱（架构、组件、关系）
+
+  - name: understand-business
+    path: understand-anything-plugin/skills/understand-business/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, analyze]
+    description: 聚合服务端+客户端 wiki 生成统一业务全景（跨 facet 域匹配、交互文档、业务规则）
+
+  - name: understand-domain
+    path: understand-anything-plugin/skills/understand-domain/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, analyze]
+    description: 从代码库提取业务域知识生成交互式域流程图（独立轻量扫描或基于已有 understand 图谱）
+
+  - name: understand-knowledge
+    path: understand-anything-plugin/skills/understand-knowledge/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, analyze]
+    description: 分析 Karpathy 模式 LLM wiki 知识库生成交互式知识图谱（实体抽取、隐式关系、主题聚类）
+
+  - name: understand-wiki
+    path: understand-anything-plugin/skills/understand-wiki/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, analyze]
+    description: 为微服务项目生成可导航的知识库 Wiki（单服务与批量模式、渐进式采纳）
+
+  # ── 消费/查询类技能：基于已有图谱 ──
+  - name: understand-chat
+    path: understand-anything-plugin/skills/understand-chat/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, query]
+    description: 基于知识图谱回答关于代码库的问题或理解代码
+
+  - name: understand-query
+    path: understand-anything-plugin/skills/understand-query/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, query]
+    description: 通过 ua_query.py CLI 查询已分析代码库（业务逻辑、特性定位、调用/影响图、源码——源码验证）
+
+  - name: understand-explain
+    path: understand-anything-plugin/skills/understand-explain/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, query]
+    description: 对特定文件/函数/模块进行深入解释（基于知识图谱的深度说明）
+
+  - name: understand-diff
+    path: understand-anything-plugin/skills/understand-diff/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, query]
+    description: 分析 git diff 或 PR，理解变更内容、受影响组件与风险（基于知识图谱）
+
+  - name: understand-dashboard
+    path: understand-anything-plugin/skills/understand-dashboard/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, query]
+    description: 启动交互式 Web 仪表盘可视化代码库的知识图谱
+
+  - name: understand-onboard
+    path: understand-anything-plugin/skills/understand-onboard/SKILL.md
+    kind: file
+    category: skill
+    tags: [tool, knowledge-base, understand-anything, query]
+    description: 基于项目知识图谱为新成员生成全面的上手指南
