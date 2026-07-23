@@ -101,6 +101,29 @@ func divide(a, b float64) (float64, error) {
       parser.delete();
     });
 
+    it("extracts variadic parameters", () => {
+      const { tree, parser, root } = parse(`package main
+
+func Sprintf(format string, args ...interface{}) string {
+    return ""
+}
+
+func Sum(nums ...int) int {
+    return 0
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(2);
+      expect(result.functions[0].name).toBe("Sprintf");
+      expect(result.functions[0].params).toEqual(["format", "args"]);
+      expect(result.functions[1].name).toBe("Sum");
+      expect(result.functions[1].params).toEqual(["nums"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("reports correct line ranges for multi-line functions", () => {
       const { tree, parser, root } = parse(`package main
 
