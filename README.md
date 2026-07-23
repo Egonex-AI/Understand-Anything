@@ -282,11 +282,12 @@ The graph is just JSON — **commit it once, and teammates skip the pipeline**. 
 
 > **Example:** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) — Go / Java / Python / Node reference with a committed graph.
 
-**What to commit:** everything in `.ua/` *except* `intermediate/` and `diff-overlay.json` (those are local scratch). (Legacy projects use `.understand-anything/` — substitute that directory name below if it's the one present.)
+**What to commit:** everything in `.ua/` *except* `intermediate/`, `diff-overlay.json`, and `.trash-*/` (those are local scratch). (Legacy projects use `.understand-anything/` — substitute that directory name below if it's the one present.)
 
 ```gitignore
 .ua/intermediate/
 .ua/diff-overlay.json
+.ua/.trash-*/
 ```
 
 **Keep it fresh:** enable `/understand --auto-update` — a post-commit hook incrementally patches the graph so each commit lands with a matching graph. Or re-run `/understand` manually before releases.

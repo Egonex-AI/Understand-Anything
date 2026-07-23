@@ -267,11 +267,12 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **Пример:** [GoogleCloudPlatform/microservices-demo (форк)](https://github.com/GoogleCloudPlatform/microservices-demo) — мультиязыковой проект (Go / Java / Python / Node) с уже зафиксированным графом.
 
-**Что коммитить:** всё содержимое `.ua/`, *кроме* `intermediate/` и `diff-overlay.json` (это локальные временные файлы). (Устаревшие проекты используют `.understand-anything/` — подставьте это имя каталога ниже, если присутствует именно он.)
+**Что коммитить:** всё содержимое `.ua/`, *кроме* `intermediate/`, `diff-overlay.json` и `.trash-*/` (это локальные временные файлы). (Устаревшие проекты используют `.understand-anything/` — подставьте это имя каталога ниже, если присутствует именно он.)
 
 ```gitignore
 .ua/intermediate/
 .ua/diff-overlay.json
+.ua/.trash-*/
 ```
 
 **Держите граф в актуальном состоянии:** включите `/understand --auto-update` — post-commit хук будет инкрементально обновлять граф, так что каждый коммит сопровождается соответствующим графом. Либо запускайте `/understand` вручную перед релизами.
