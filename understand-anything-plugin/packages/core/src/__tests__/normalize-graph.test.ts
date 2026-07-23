@@ -555,6 +555,54 @@ describe("normalizeBatchOutput", () => {
     expect(result.edges[0].target).toBe("file:src/foo.ts");
     expect(result.stats.danglingEdgesDropped).toBe(0);
   });
+
+  it("drops a missing canonical endpoint instead of rewiring it to a same-named node", () => {
+    // Regression: an edge endpoint "func:src/a.ts:formatDate" is a canonical
+    // multi-part ID whose node is missing, while a DIFFERENT function
+    // "func:formatDate" exists. The reserved-prefix peeling must not strip the
+    // real "func" prefix and normalize the bare suffix "src/a.ts:formatDate"
+    // back to "func:formatDate" — that silently rewires the edge to an
+    // unrelated function. The edge must be dropped as dangling instead.
+    const result = normalizeBatchOutput({
+      nodes: [
+        {
+          id: "func:formatDate",
+          type: "function",
+          name: "formatDate",
+          summary: "A different formatDate",
+          tags: [],
+          complexity: "simple",
+        },
+        {
+          id: "file:src/a.ts",
+          type: "file",
+          name: "a.ts",
+          filePath: "src/a.ts",
+          summary: "Source",
+          tags: [],
+          complexity: "simple",
+        },
+      ],
+      edges: [
+        {
+          source: "file:src/a.ts",
+          target: "func:src/a.ts:formatDate",
+          type: "calls",
+          direction: "forward",
+          weight: 0.7,
+        },
+      ],
+    });
+
+    expect(result.edges).toHaveLength(0);
+    expect(result.stats.danglingEdgesDropped).toBe(1);
+    expect(result.stats.droppedEdges[0]).toEqual({
+      source: "file:src/a.ts",
+      target: "func:src/a.ts:formatDate",
+      type: "calls",
+      reason: "missing-target",
+    });
+  });
 });
 
 describe("normalizeBatchOutput integration", () => {

@@ -211,6 +211,12 @@ function inferTypeFromId(id: string): string {
   return "file";
 }
 
+/** True when an ID begins with a valid `prefix:` segment (e.g. "file:src/x.ts"). */
+function startsWithValidPrefix(id: string): boolean {
+  const colonIdx = id.indexOf(":");
+  return colonIdx > 0 && id.slice(0, colonIdx) in PREFIX_TO_TYPE;
+}
+
 /**
  * Best-effort repair of an edge endpoint that matches no node ID.
  *
@@ -225,6 +231,14 @@ function inferTypeFromId(id: string): string {
  * `stripToValidPrefix` can't collapse the run for the `file` candidate and
  * every full-id attempt would otherwise leave the edge dangling. Returns the
  * original id unchanged when nothing resolves to an existing node.
+ *
+ * A leading reserved word is only peeled when what remains is itself a
+ * canonical `prefix:path` id — that is the signature of a spurious outer
+ * prefix sitting in front of the real id. When the remainder is a bare path,
+ * the peeled segment was the endpoint's own prefix (e.g. `func` in
+ * `func:src/a.ts:formatDate`), and reinterpreting the suffix would silently
+ * rewire the edge to a different same-named node (`func:formatDate`) instead
+ * of dropping the missing endpoint as dangling.
  */
 function resolveEdgeEndpoint(id: string, validNodeIds: Set<string>): string {
   // Each candidate pairs a node type with the id suffix to normalize from.
@@ -241,6 +255,10 @@ function resolveEdgeEndpoint(id: string, validNodeIds: Set<string>): string {
     const segment = rest.slice(0, colonIdx);
     if (!(segment in PREFIX_TO_TYPE)) break;
     rest = rest.slice(colonIdx + 1);
+    // Only strip `segment` as a spurious outer prefix when the remainder is
+    // still a canonical prefixed id. Otherwise `segment` was the real prefix
+    // and the bare suffix must not be reinterpreted as another node.
+    if (!startsWithValidPrefix(rest)) break;
     const type = PREFIX_TO_TYPE[segment];
     if (!candidates.some((c) => c.type === type && c.fromId === rest)) {
       candidates.push({ type, fromId: rest });
