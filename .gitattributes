@@ -1,0 +1,3 @@
+# Vitest/esbuild leaves a stray carriage return when stripping CRLF shebangs.
+understand-anything-plugin/skills/understand/analysis-plan.mjs text eol=lf
+understand-anything-plugin/skills/understand/run-telemetry.mjs text eol=lf
