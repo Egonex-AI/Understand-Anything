@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
+const serializeFiles = process.platform === 'win32';
+
 // Single-config aggregation for the whole monorepo. Picks up:
 //   - tests/**                                          — relocated skill tests (out-of-plugin so they
 //                                                         do not ship via the marketplace bundle)
@@ -21,5 +23,10 @@ export default defineConfig({
       '**/dist/**',
       'understand-anything-plugin/packages/core/**',
     ],
+    // Several suites spawn Git and Node subprocesses. Parallel file workers can
+    // leave Windows handles busy long enough to trigger EBUSY cleanup failures,
+    // worker RPC timeouts, and misleading follow-on import errors.
+    fileParallelism: !serializeFiles,
+    maxWorkers: serializeFiles ? 1 : undefined,
   },
 });

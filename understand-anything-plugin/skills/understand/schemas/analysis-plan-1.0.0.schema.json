@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/understand-anything-plugin/skills/understand/schemas/analysis-plan-1.0.0.schema.json",
+  "title": "Understand Anything analysis preflight plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaUrl",
+    "schemaVersion",
+    "estimatorVersion",
+    "mode",
+    "scope",
+    "inputDigest",
+    "scale",
+    "batching",
+    "estimates",
+    "risks",
+    "scopeSuggestions",
+    "planId"
+  ],
+  "properties": {
+    "schemaUrl": { "const": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/understand-anything-plugin/skills/understand/schemas/analysis-plan-1.0.0.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "estimatorVersion": { "const": "known-input-v1" },
+    "mode": { "enum": ["full", "incremental"] },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": { "path": { "$ref": "#/$defs/relativePath" } }
+    },
+    "inputDigest": { "$ref": "#/$defs/sha256" },
+    "planId": { "$ref": "#/$defs/sha256" },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectFiles",
+        "analysisFiles",
+        "lines",
+        "sourceBytes",
+        "selectedSourceDigest",
+        "missingFiles",
+        "unsafePaths",
+        "filteredByIgnore",
+        "byLanguage",
+        "byCategory"
+      ],
+      "properties": {
+        "projectFiles": { "$ref": "#/$defs/count" },
+        "analysisFiles": { "$ref": "#/$defs/count" },
+        "lines": { "$ref": "#/$defs/count" },
+        "sourceBytes": { "$ref": "#/$defs/count" },
+        "selectedSourceDigest": { "$ref": "#/$defs/sha256" },
+        "missingFiles": { "$ref": "#/$defs/count" },
+        "unsafePaths": { "$ref": "#/$defs/count" },
+        "filteredByIgnore": { "$ref": "#/$defs/count" },
+        "byLanguage": { "$ref": "#/$defs/countMap" },
+        "byCategory": { "$ref": "#/$defs/countMap" }
+      }
+    },
+    "batching": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "totalBatches",
+        "parallelism",
+        "waves",
+        "duplicateAssignments",
+        "batchSizes",
+        "batches",
+        "serializedBatchContextBytes"
+      ],
+      "properties": {
+        "algorithm": { "type": "string", "minLength": 1 },
+        "totalBatches": { "$ref": "#/$defs/count" },
+        "parallelism": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "waves": { "$ref": "#/$defs/count" },
+        "duplicateAssignments": { "$ref": "#/$defs/count" },
+        "batchSizes": { "$ref": "#/$defs/distribution" },
+        "batches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["batchIndex", "files", "lines"],
+            "properties": {
+              "batchIndex": { "type": "integer", "minimum": 1 },
+              "files": { "$ref": "#/$defs/count" },
+              "lines": { "$ref": "#/$defs/count" }
+            }
+          }
+        },
+        "serializedBatchContextBytes": { "$ref": "#/$defs/count" }
+      }
+    },
+    "estimates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knownInputBytes", "phase2InputTokens", "wallTimeSeconds", "costUsd"],
+      "properties": {
+        "knownInputBytes": { "$ref": "#/$defs/count" },
+        "phase2InputTokens": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "upper", "confidence", "method", "includes", "excludes"],
+          "properties": {
+            "lower": { "$ref": "#/$defs/count" },
+            "upper": { "$ref": "#/$defs/count" },
+            "confidence": { "const": "low" },
+            "method": { "const": "source-plus-dispatch-bytes-envelope" },
+            "includes": { "$ref": "#/$defs/stringList" },
+            "excludes": { "$ref": "#/$defs/stringList" }
+          }
+        },
+        "wallTimeSeconds": { "$ref": "#/$defs/unavailableEstimate" },
+        "costUsd": { "$ref": "#/$defs/unavailableEstimate" }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message", "evidence"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "severity": { "enum": ["low", "medium", "high"] },
+          "message": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "scopeSuggestions": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value", "fileCount", "lines", "estimatedReductionPercent", "reason"],
+        "properties": {
+          "kind": { "enum": ["subdirectory", "exclude"] },
+          "value": { "type": "string", "minLength": 1 },
+          "fileCount": { "$ref": "#/$defs/count" },
+          "lines": { "$ref": "#/$defs/count" },
+          "estimatedReductionPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!\\.\\.(?:[\\\\/]|$))(?!.*[\\\\/]\\.\\.(?:[\\\\/]|$))[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "countMap": {
+      "type": "object",
+      "propertyNames": { "minLength": 1 },
+      "additionalProperties": { "$ref": "#/$defs/count" }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "p50", "p95", "max", "mean"],
+      "properties": {
+        "min": { "$ref": "#/$defs/count" },
+        "p50": { "$ref": "#/$defs/count" },
+        "p95": { "$ref": "#/$defs/count" },
+        "max": { "$ref": "#/$defs/count" },
+        "mean": { "type": "number", "minimum": 0 }
+      }
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "unavailableEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lower", "upper", "confidence", "method", "reason"],
+      "properties": {
+        "lower": { "type": "null" },
+        "upper": { "type": "null" },
+        "confidence": { "const": "unavailable" },
+        "method": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

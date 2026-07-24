@@ -34,6 +34,8 @@ import { performance } from 'node:perf_hooks';
 import { StringDecoder } from 'node:string_decoder';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { estimatedAgentInputBytes } from '../../understand-anything-plugin/skills/understand/analysis-metrics.mjs';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
 export const REPORT_SCHEMA_VERSION = '1.0.0';
@@ -1838,18 +1840,7 @@ export async function runBenchmark(options, hooks = {}) {
     }
     if (batchStage.status === 'failed') throw new BenchmarkStageError(batchStage);
     const batchSizes = batches.batches.map((batch) => batch.files.length);
-    const estimatedAgentInputBytes = batches.batches.reduce(
-      (sum, batch) =>
-        sum +
-        Buffer.byteLength(
-          JSON.stringify({
-            files: batch.files,
-            batchImportData: batch.batchImportData,
-            neighborMap: batch.neighborMap,
-          }),
-        ),
-      0,
-    );
+    const agentInputBytes = estimatedAgentInputBytes(batches.batches);
     report.stages.batching = summarizeStage(
       batchStage,
       fileSizeOrZero(batchesPath),
@@ -1857,7 +1848,7 @@ export async function runBenchmark(options, hooks = {}) {
         algorithm: batches.algorithm,
         totalBatches: batches.totalBatches,
         batchSizes: distribution(batchSizes),
-        estimatedAgentInputBytes,
+        estimatedAgentInputBytes: agentInputBytes,
       },
     );
 
