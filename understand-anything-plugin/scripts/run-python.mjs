@@ -1,6 +1,8 @@
-#!/usr/bin/env node
 /**
  * Run a bundled Python helper with an available Python 3 interpreter.
+ *
+ * Keep this module shebang-free: skill commands always invoke it through
+ * `node`, and Vitest must also be able to import CRLF checkouts on Windows.
  *
  * Skill instructions are consumed on macOS, Linux, and Windows, where the
  * interpreter may be exposed as `python3`, `python`, or the Windows `py -3`
