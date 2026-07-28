@@ -168,7 +168,10 @@ describe("GraphBuilder", () => {
     expect(new Set(nodeIds).size).toBe(nodeIds.length);
     expect(graph.nodes.filter((node) => node.type === "function")).toHaveLength(1);
     expect(graph.nodes.filter((node) => node.type === "class")).toHaveLength(1);
+    expect(graph.nodes.find((node) => node.type === "function")?.lineRange).toEqual([10, 12]);
+    expect(graph.nodes.find((node) => node.type === "class")?.lineRange).toEqual([1, 20]);
     expect(containsEdges).toHaveLength(2);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Duplicate node ID "function:src/Loader.java:load"'),
     );
