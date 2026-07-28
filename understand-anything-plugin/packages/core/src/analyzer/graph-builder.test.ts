@@ -139,8 +139,8 @@ describe("GraphBuilder", () => {
     const builder = new GraphBuilder("test-project", "abc123");
     const analysis: StructuralAnalysis = {
       functions: [
-        { name: "load", lineRange: [10, 12], params: ["String value"], returnType: "void" },
-        { name: "load", lineRange: [14, 16], params: ["int value"], returnType: "void" },
+        { name: "load", lineRange: [10, 12], params: ["value"], returnType: "void" },
+        { name: "load", lineRange: [14, 16], params: ["value"], returnType: "void" },
       ],
       classes: [
         { name: "Loader", lineRange: [1, 20], methods: ["load"], properties: [] },
