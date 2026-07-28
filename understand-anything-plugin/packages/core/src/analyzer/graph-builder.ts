@@ -130,8 +130,7 @@ export class GraphBuilder {
     // Create function nodes with "contains" edges
     for (const fn of analysis.functions) {
       const funcId = `function:${filePath}:${fn.name}`;
-      this.nodeIds.add(funcId);
-      this.nodes.push({
+      this.addChildNode({
         id: funcId,
         type: "function",
         name: fn.name,
@@ -140,22 +139,13 @@ export class GraphBuilder {
         summary: meta.summaries[fn.name] ?? "",
         tags: [],
         complexity: meta.complexity,
-      });
-
-      this.edges.push({
-        source: fileId,
-        target: funcId,
-        type: "contains",
-        direction: "forward",
-        weight: 1,
-      });
+      }, fileId);
     }
 
     // Create class nodes with "contains" edges
     for (const cls of analysis.classes) {
       const classId = `class:${filePath}:${cls.name}`;
-      this.nodeIds.add(classId);
-      this.nodes.push({
+      this.addChildNode({
         id: classId,
         type: "class",
         name: cls.name,
@@ -164,15 +154,7 @@ export class GraphBuilder {
         summary: meta.summaries[cls.name] ?? "",
         tags: [],
         complexity: meta.complexity,
-      });
-
-      this.edges.push({
-        source: fileId,
-        target: classId,
-        type: "contains",
-        direction: "forward",
-        weight: 1,
-      });
+      }, fileId);
     }
   }
 
