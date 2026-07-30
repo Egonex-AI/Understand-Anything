@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-from detect_platforms import build_mobile_services, detect_platform_type
+from detect_platforms import build_mobile_services, build_server_services, detect_platform_type
 
 
 def detect_facets(project_root: Path) -> list[dict]:
@@ -36,6 +36,11 @@ def detect_facets(project_root: Path) -> list[dict]:
                 facet['services'] = services
                 if platform_mapping:
                     facet['platformMapping'] = platform_mapping
+            elif facet_type in ('backend', 'server'):
+                services = build_server_services(
+                    project_root, facet['path'], sub_paths
+                )
+                facet['services'] = services
         facets.append(facet)
     return facets
 
@@ -53,22 +58,80 @@ def _guess_type(d: Path) -> str:
 
 
 def _detect_sub_paths(d: Path, facet_type: str) -> list[str]:
-    """Detect sub-platform directories for facets with multiple clients."""
-    known = {'android', 'ios', 'flutter', 'react-native'}
+    """Detect sub-service directories within a facet.
+
+    For mobile facets: detect known platforms (android/ios/flutter/etc.).
+    For backend/server facets: detect sub-dirs with KG or build files (pom.xml, go.mod, etc.).
+    """
+    known_mobile = {'android', 'ios', 'flutter', 'react-native'}
+    backend_build_files = {'pom.xml', 'build.gradle', 'build.gradle.kts', 'go.mod',
+                           'Cargo.toml', 'requirements.txt', 'pyproject.toml',
+                           'package.json', 'settings.gradle', 'settings.gradle.kts'}
+    skip_dirs = {'node_modules', 'dist', 'build', 'target', '__pycache__'}
     found = []
     for sub in sorted(d.iterdir()):
-        if not sub.is_dir() or sub.name.startswith('.'):
+        if not sub.is_dir() or sub.name.startswith('.') or sub.name in skip_dirs:
             continue
         if facet_type == 'mobile':
-            if sub.name.lower() in known or detect_platform_type(str(sub))["platform"] != "unknown":
+            if sub.name.lower() in known_mobile or detect_platform_type(str(sub))["platform"] != "unknown":
                 found.append(sub.name)
-        elif sub.name.lower() in known:
-            found.append(f'{sub.name}/')
+        else:
+            has_kg = (sub / '.understand-anything' / 'knowledge-graph.json').is_file()
+            has_build = any((sub / f).is_file() for f in backend_build_files)
+            if has_kg or has_build:
+                found.append(sub.name)
     return found
 
 
+def _update_existing_system(system_path: Path, project_root: Path) -> None:
+    """Merge newly discovered sub-services into an existing system.json."""
+    with open(system_path, encoding='utf-8') as f:
+        system = json.load(f)
+
+    changed = False
+    for facet in system.get('facets', []):
+        facet_type = facet.get('type', '')
+        facet_path = facet.get('path', '').rstrip('/')
+        facet_dir = project_root / facet_path
+        if not facet_dir.is_dir():
+            continue
+
+        detected = _detect_sub_paths(facet_dir, facet_type)
+        existing = set(facet.get('subPaths', []))
+        new_subs = [s for s in detected if s not in existing]
+        if not new_subs:
+            continue
+
+        facet.setdefault('subPaths', []).extend(new_subs)
+        facet['subPaths'] = sorted(set(facet['subPaths']))
+
+        if facet_type == 'mobile':
+            services, platform_mapping = build_mobile_services(
+                project_root, facet.get('path', ''), new_subs
+            )
+            facet.setdefault('services', []).extend(services)
+            if platform_mapping:
+                facet.setdefault('platformMapping', {}).update(platform_mapping)
+        elif facet_type in ('backend', 'server'):
+            services = build_server_services(
+                project_root, facet.get('path', ''), new_subs
+            )
+            facet.setdefault('services', []).extend(services)
+
+        changed = True
+        print(f'  Updated facet "{facet_path}": added {len(new_subs)} sub-service(s): {new_subs}')
+
+    if changed:
+        system_path.write_text(json.dumps(system, indent=2, ensure_ascii=False) + '\n')
+        print(f'Updated {system_path}')
+    else:
+        print(f'system.json is up to date, no new sub-services found.')
+
+
 def main():
-    project_root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
+    update_mode = '--update' in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    project_root = Path(args[0]) if args else Path.cwd()
     ua_dir = project_root / '.understand-anything'
     ua_dir.mkdir(parents=True, exist_ok=True)
 
@@ -76,7 +139,10 @@ def main():
     config_path = ua_dir / 'config.json'
 
     if system_path.exists():
-        print(f'system.json already exists at {system_path}, skipping.')
+        if update_mode:
+            _update_existing_system(system_path, project_root)
+        else:
+            print(f'system.json already exists at {system_path}, skipping. Use --update to merge new sub-services.')
     else:
         facets = detect_facets(project_root)
         system = {

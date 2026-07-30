@@ -16,6 +16,8 @@ This script reads all `batch-*.json` files (including `batch-<i>-part-<k>.json` 
 
 The merge script also runs a `tested_by` linker that canonicalizes test-coverage edges in two passes. **Pass 1** walks LLM-emitted `tested_by` edges and flips inverted ones in place; semantically broken edges (test↔test, prod↔prod, orphan endpoints) are dropped. **Pass 2** supplements with path-convention pairings. Production nodes that end up sourcing any `tested_by` edge get a `"tested"` tag. All resulting edges run `production → test`.
 
+After merging, the script also runs **function node recovery** from `structural-analysis.json`. LLM file-analyzer focuses on class-level semantics and typically emits sparse function nodes. The tree-sitter structural extraction exhaustively identifies all functions/methods. This recovery step supplements the merged graph with function nodes from structural extraction that the LLM didn't emit, along with `contains` edges linking them to their parent class or file nodes. LLM-emitted function nodes (with richer summaries) are preserved when they exist.
+
 Output: `$PROJECT_ROOT/.understand-anything/intermediate/assembled-graph.json`
 
 The merge script also writes `$PROJECT_ROOT/.understand-anything/manifest.json` for cross-repo sharing.

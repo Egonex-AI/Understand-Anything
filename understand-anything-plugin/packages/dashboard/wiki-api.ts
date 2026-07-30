@@ -324,10 +324,19 @@ export class WikiDataService {
     const slug = sanitizeSlug(domainName);
     if (!slug) return null;
     const topo = this.discoverWikis();
-    if (!topo.parentWikiDir) return null;
-    return this.readJson<WikiCrossDomain>(
-      path.join(topo.parentWikiDir, "domains", `${slug}.json`),
-    );
+    if (topo.parentWikiDir) {
+      const rootResult = this.readJson<WikiCrossDomain>(
+        path.join(topo.parentWikiDir, "domains", `${slug}.json`),
+      );
+      if (rootResult) return rootResult;
+    }
+    for (const svc of topo.services) {
+      const result = this.readJson<WikiCrossDomain>(
+        path.join(svc.wikiDir, "domains", `${slug}.json`),
+      );
+      if (result) return result;
+    }
+    return null;
   }
 
   getServiceDomain(serviceName: string, domainId: string): WikiDomainPage | null {

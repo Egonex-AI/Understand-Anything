@@ -1367,6 +1367,148 @@ def resolve_unresolved_imports(
     return resolved_count, lines
 
 
+def recover_function_nodes_from_structural(
+    assembled: dict[str, Any],
+    sa_path: Path,
+) -> tuple[int, list[str]]:
+    """Supplement the KG with function nodes from structural-analysis.json.
+
+    LLM file-analyzer focuses on class-level semantics and emits sparse
+    function nodes. tree-sitter structural extraction (extract-structure.mjs)
+    exhaustively identifies all functions/methods. This recovery step adds
+    missing function nodes and their ``contains`` edges, preserving any
+    existing LLM-emitted function nodes (which have richer summaries).
+
+    Returns (added_count, report_lines).
+    """
+    if not sa_path.exists():
+        return 0, ["  Skipped — structural-analysis.json not found"]
+
+    try:
+        sa = json.loads(sa_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return 0, [f"  Skipped — failed to load structural-analysis.json: {e}"]
+
+    node_ids = {n["id"] for n in assembled.get("nodes", []) if "id" in n}
+    file_ids = {n["id"] for n in assembled["nodes"] if n.get("type") == "file"}
+    class_ids = {n["id"] for n in assembled["nodes"] if n.get("type") == "class"}
+
+    added = 0
+    skipped_exists = 0
+    skipped_no_parent = 0
+
+    for file_path, info in sa.items():
+        if not isinstance(info, dict):
+            continue
+        if info.get("fileCategory") != "code":
+            continue
+
+        functions = info.get("functions", [])
+        classes = info.get("classes", [])
+        if not functions:
+            continue
+
+        file_id = f"file:{file_path}"
+        if file_id not in file_ids:
+            skipped_no_parent += len(functions)
+            continue
+
+        module = file_path.split("/")[0] if "/" in file_path else ""
+
+        for func in functions:
+            if not isinstance(func, dict):
+                continue
+            name = func.get("name", "")
+            if not name:
+                continue
+
+            func_id = f"function:{file_path}:{name}"
+            if func_id in node_ids:
+                skipped_exists += 1
+                continue
+
+            start = func.get("startLine", 0)
+            end = func.get("endLine", 0)
+
+            # Find parent class by line range containment
+            parent_class = None
+            for cls in classes:
+                if not isinstance(cls, dict):
+                    continue
+                cs, ce = cls.get("startLine", 0), cls.get("endLine", 0)
+                if cs <= start and end <= ce:
+                    parent_class = cls.get("name")
+                    break
+
+            # Build structural summary: ClassName.method(params) → returnType
+            parts = []
+            if parent_class:
+                parts.append(f"{parent_class}.{name}")
+            else:
+                parts.append(name)
+
+            params = func.get("params", [])
+            if params:
+                param_strs = []
+                for p in params:
+                    if isinstance(p, dict):
+                        pn = p.get("name", "")
+                        pt = p.get("type", "")
+                        param_strs.append(f"{pn}: {pt}" if pt else pn)
+                    elif isinstance(p, str):
+                        param_strs.append(p)
+                if param_strs:
+                    parts.append(f"({', '.join(param_strs)})")
+
+            ret = func.get("returnType", "")
+            if ret:
+                parts.append(f"→ {ret}")
+
+            summary = "".join(parts)
+            tags = [module.lower().replace("_", "-")] if module else []
+            line_span = (end - start) if start and end else 0
+
+            node = {
+                "id": func_id,
+                "type": "function",
+                "name": name,
+                "filePath": file_path,
+                "summary": summary,
+                "tags": tags,
+                "complexity": "simple" if line_span <= 20 else "moderate" if line_span <= 50 else "complex",
+            }
+            if start and end:
+                node["lineRange"] = [start, end]
+
+            assembled["nodes"].append(node)
+            node_ids.add(func_id)
+            added += 1
+
+            # contains edge: parent class → function, or file → function
+            parent_id = file_id
+            if parent_class:
+                class_id = f"class:{file_path}:{parent_class}"
+                if class_id in class_ids:
+                    parent_id = class_id
+
+            assembled["edges"].append({
+                "source": parent_id,
+                "target": func_id,
+                "type": "contains",
+                "direction": "forward",
+                "weight": 0.8,
+            })
+
+    lines = [
+        f"  Added {added} function nodes + {added} contains edges from structural analysis",
+        f"  Skipped {skipped_exists} (already in graph from LLM file-analyzer)",
+    ]
+    if skipped_no_parent:
+        lines.append(f"  Skipped {skipped_no_parent} (parent file node not in graph)")
+
+    return added, lines
+
+
 def recover_imports_from_scan(
     assembled: dict[str, Any],
     scan_result_path: Path,
@@ -2521,6 +2663,19 @@ def main() -> None:
         report.append("")
         report.append("Unresolved import global resolution:")
         report.extend(unresolved_report)
+
+    # Recover function nodes from structural-analysis.json.
+    # LLM file-analyzer focuses on class-level semantics and emits sparse
+    # function nodes. tree-sitter structural extraction exhaustively extracts
+    # all functions/methods. This step supplements the KG with function nodes
+    # from structural extraction that the LLM didn't emit, preserving LLM
+    # nodes where they exist (richer summaries).
+    sa_path = intermediate_dir / "extraction" / "structural-analysis.json"
+    func_recovered, func_report = recover_function_nodes_from_structural(assembled, sa_path)
+    if func_report:
+        report.append("")
+        report.append("Function node recovery from structural analysis:")
+        report.extend(func_report)
 
     batches_path = intermediate_dir / "batches.json"
     _, cross_batch_report = compute_cross_batch_metrics(assembled, batches_path)
