@@ -2,6 +2,7 @@
 name: understand-chat
 description: Use when you need to ask questions about a codebase or understand code using a knowledge graph
 argument-hint: [query]
+disable-model-invocation: true
 ---
 
 # /understand-chat

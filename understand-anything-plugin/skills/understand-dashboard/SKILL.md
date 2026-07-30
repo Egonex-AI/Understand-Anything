@@ -2,6 +2,7 @@
 name: understand-dashboard
 description: Launch the interactive web dashboard to visualize a codebase's knowledge graph
 argument-hint: [project-path]
+disable-model-invocation: true
 ---
 
 # /understand-dashboard

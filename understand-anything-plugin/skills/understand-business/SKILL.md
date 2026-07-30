@@ -2,6 +2,7 @@
 name: understand-business
 description: Aggregate server + client wiki into a unified business-landscape with cross-facet domain matching, interaction documents, and business rules.
 argument-hint: ["[--full] [--cascade] [--cascade=deep] [--dry-run] [--budget <tokens>] [--language <lang>]"]
+disable-model-invocation: true
 ---
 
 # /understand-business

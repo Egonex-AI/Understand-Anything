@@ -2,6 +2,7 @@
 name: understand-wiki
 description: Generate a comprehensive, navigable knowledge base Wiki for a microservice project. Supports single-service and batch modes with progressive adoption.
 argument-hint: '[--workflow] [--batch] [--service=<name>] [--review] [--full] [--force] [--dry-run] [--continue-on-error] [--language <lang>] [--repo-type <type>]'
+disable-model-invocation: true
 ---
 
 # /understand-wiki

@@ -2,6 +2,7 @@
 name: understand-knowledge
 description: Analyze a Karpathy-pattern LLM wiki knowledge base and generate an interactive knowledge graph with entity extraction, implicit relationships, and topic clustering. Supports --full to force regeneration, --clean to remove intermediate files after success, and --scan-only to skip LLM analysis.
 argument-hint: ["[wiki-directory] [--full] [--clean] [--scan-only] [--profile auto|generic|prd-wiki]"]
+disable-model-invocation: true
 ---
 
 # /understand-knowledge
