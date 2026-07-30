@@ -627,3 +627,129 @@ describe("registerAllParsers", () => {
     expect(registry.getSupportedLanguages()).toContain("shell");
   });
 });
+
+describe("brace matching ignores strings and comments", () => {
+  it("terraform: a closing brace in a string does not end the block", () => {
+    const content = `resource "aws_ssm_parameter" "example" {
+  name  = "/app/config"
+  value = "suffix-}-marker"
+  type  = "String"
+}`;
+    const result = new TerraformParser().analyzeFile("main.tf", content);
+    expect(result.resources![0]).toMatchObject({ name: "aws_ssm_parameter.example" });
+    expect(result.resources![0].lineRange).toEqual([1, 5]);
+  });
+
+  it("terraform: a closing brace in a comment does not end the block", () => {
+    const content = `variable "example" {
+  # a brace in a comment: }
+  type    = string
+  default = "x"
+}`;
+    const result = new TerraformParser().analyzeFile("main.tf", content);
+    const def = result.definitions!.find(d => d.name === "example");
+    expect(def!.lineRange).toEqual([1, 5]);
+  });
+
+  it("protobuf: a closing brace in a comment keeps all fields", () => {
+    const content = `message Outer {
+  // a closing brace in a comment: }
+  string note = 1;
+  int32 after_comment = 2;
+}`;
+    const result = new ProtobufParser().analyzeFile("a.proto", content);
+    const msg = result.definitions!.find(d => d.name === "Outer");
+    expect(msg!.lineRange).toEqual([1, 5]);
+    expect(msg!.fields).toEqual(["note", "after_comment"]);
+  });
+
+  it("protobuf: a closing brace in a field option keeps later fields", () => {
+    const content = `message Outer {
+  string tmpl = 1 [(validate.rules).string.pattern = "^[a-z]}$"];
+  int32 after_literal = 2;
+}`;
+    const result = new ProtobufParser().analyzeFile("a.proto", content);
+    const msg = result.definitions!.find(d => d.name === "Outer");
+    expect(msg!.fields).toEqual(["tmpl", "after_literal"]);
+  });
+
+  it("graphql: a closing brace in a default value keeps all fields", () => {
+    const content = `input Config {
+  key: String = "a}b"
+  count: Int
+}`;
+    const result = new GraphQLParser().analyzeFile("schema.graphql", content);
+    const def = result.definitions!.find(d => d.name === "Config");
+    expect(def!.lineRange).toEqual([1, 4]);
+    expect(def!.fields).toEqual(["key", "count"]);
+  });
+
+  it("graphql: a nested brace does not truncate the line range", () => {
+    const content = `type Wrapper {
+  nested: Config @constraint(pattern: "{2,4}")
+  tail: Int
+}`;
+    const result = new GraphQLParser().analyzeFile("schema.graphql", content);
+    const def = result.definitions!.find(d => d.name === "Wrapper");
+    expect(def!.lineRange).toEqual([1, 4]);
+  });
+
+  it("graphql: a scalar without a body stays on its own line", () => {
+    const content = `scalar DateTime
+
+type User {
+  id: ID!
+}`;
+    const result = new GraphQLParser().analyzeFile("schema.graphql", content);
+    const scalar = result.definitions!.find(d => d.name === "DateTime");
+    expect(scalar!.lineRange).toEqual([1, 1]);
+  });
+
+  it("shell: a closing brace in a string does not end the function", () => {
+    const content = `#!/usr/bin/env bash
+render() {
+  echo "closing brace: }"
+  echo "still inside the function"
+}`;
+    const result = new ShellParser().analyzeFile("x.sh", content);
+    const fn = result.functions!.find(f => f.name === "render");
+    expect(fn!.lineRange).toEqual([2, 5]);
+  });
+
+  it("shell: a closing brace in a comment does not end the function", () => {
+    const content = `setup() {
+  # trailing brace in a comment: }
+  echo hi
+}`;
+    const result = new ShellParser().analyzeFile("x.sh", content);
+    const fn = result.functions!.find(f => f.name === "setup");
+    expect(fn!.lineRange).toEqual([1, 4]);
+  });
+
+  it("shell: escaped quotes do not swallow the rest of the file", () => {
+    const content = `first() {
+  echo "an escaped quote \\" and a brace }"
+}
+
+second() {
+  echo hi
+}`;
+    const result = new ShellParser().analyzeFile("x.sh", content);
+    expect(result.functions!.find(f => f.name === "first")!.lineRange).toEqual([1, 3]);
+    expect(result.functions!.find(f => f.name === "second")!.lineRange).toEqual([5, 7]);
+  });
+
+  it("shell: a backslash-continued string keeps later line numbers aligned", () => {
+    const content = `first() {
+  echo "continued \\
+line with a brace }"
+}
+
+second() {
+  echo hi
+}`;
+    const result = new ShellParser().analyzeFile("x.sh", content);
+    expect(result.functions!.find(f => f.name === "first")!.lineRange).toEqual([1, 4]);
+    expect(result.functions!.find(f => f.name === "second")!.lineRange).toEqual([6, 8]);
+  });
+});
