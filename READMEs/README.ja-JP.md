@@ -197,7 +197,7 @@ Understand-Anythingは複数のAIコーディングプラットフォームで�
 /plugin install understand-anything
 ```
 
-### ワンラインインストール（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Grok Build / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro）
+### ワンラインインストール（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro）
 
 **macOS / Linux：**
 ```bash
@@ -215,7 +215,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **スキルの呼び出し方について：** 呼び出しのプレフィックスはプラットフォームごとに異なります。多くのプラットフォームはスラッシュコマンド（`/understand`）を使いますが、**Codexは`$`を使います** — `/understand`ではなく`$understand`と入力してください。どちらのプレフィックスも認識されない場合は、*「understandスキルを使ってこのプロジェクトを分析して」*のように自然言語で依頼できます。
 
-- サポートされる `<platform>` 値：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`、`grok`
+- サポートされる `<platform>` 値：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`
 - 後で更新：`./install.sh --update`
 - アンインストール：`./install.sh --uninstall <platform>`
 
@@ -270,7 +270,6 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Trae | ✅ サポート | `install.sh trae` |
 | Nanobot | ✅ サポート | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ サポート | `install.sh kiro` |
-| Grok Build | ✅ サポート | `install.sh grok` |
 
 ---
 

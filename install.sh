@@ -255,7 +255,6 @@ KIROEOF
   if [[ "$id" == "grok" ]]; then
     printf '\n  Tip: Grok Build loads skills from ~/.grok/skills/ as slash commands\n'
     printf '       (e.g. /understand). Restart Grok, then run /skills to confirm.\n'
-    printf '  Alternative: grok plugin install Egonex-AI/Understand-Anything#understand-anything-plugin --trust\n'
   fi
 }
 

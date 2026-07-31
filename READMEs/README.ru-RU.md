@@ -186,7 +186,7 @@ Understand-Anything работает с несколькими платформ�
 /plugin install understand-anything
 ```
 
-### Установка одной командой (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Grok Build / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
+### Установка одной командой (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
 
 **macOS / Linux:**
 ```bash
@@ -204,7 +204,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **Как вызывать skills:** префикс вызова зависит от платформы. Большинство платформ используют слэш-команды (`/understand`), но **Codex использует `$`** — вводите `$understand`, а не `/understand`. Если ни один префикс не распознаётся, просто попросите обычным языком: *«Используй skill understand, чтобы проанализировать этот проект»*.
 
-- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `grok`
+- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
 - Обновление: `./install.sh --update`
 - Удаление: `./install.sh --uninstall <platform>`
 
@@ -258,7 +258,6 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | KIMI CLI | ✅ Поддерживается | `install.sh kimi` |
 | Nanobot | ✅ Поддерживается | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Поддерживается | `install.sh kiro` |
-| Grok Build | ✅ Поддерживается | `install.sh grok` |
 
 ---
 
