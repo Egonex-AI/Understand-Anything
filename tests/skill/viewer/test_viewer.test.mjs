@@ -2,7 +2,7 @@
 // Spawns the real server against a fixture project and exercises the token
 // gate, graph sanitisation, file-content allowlist, and .ua/legacy resolution.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
@@ -19,12 +19,12 @@ const VIEWER_BIN = join(
 );
 const VIEWER_DIST = join(REPO_ROOT, "understand-anything-plugin", "packages", "viewer", "dist");
 
-function fixtureGraph() {
+function fixtureGraph(gitCommitHash) {
   return {
     version: "1.0.0",
     project: {
       name: "fixture", languages: ["ts"], frameworks: [], description: "d",
-      analyzedAt: "t", gitCommitHash: "",
+      analyzedAt: "2026-07-17T00:00:00.000Z", gitCommitHash,
     },
     nodes: [
       {
@@ -38,14 +38,30 @@ function fixtureGraph() {
   };
 }
 
+function git(projectRoot, ...args) {
+  return execFileSync("git", args, {
+    cwd: projectRoot,
+    encoding: "utf8",
+  }).trim();
+}
+
 function setupProject(dataDirName) {
   const root = mkdtempSync(join(tmpdir(), "ua-viewer-"));
-  const dataDir = join(root, dataDirName);
-  mkdirSync(dataDir, { recursive: true });
-  writeFileSync(join(dataDir, "knowledge-graph.json"), JSON.stringify(fixtureGraph()));
   mkdirSync(join(root, "src"), { recursive: true });
   writeFileSync(join(root, "src", "a.ts"), "export const a = 1;\n");
   writeFileSync(join(root, "secret.txt"), "not in graph\n");
+  git(root, "init");
+  git(root, "config", "user.email", "viewer-tests@example.com");
+  git(root, "config", "user.name", "Viewer Tests");
+  git(root, "add", "--all");
+  git(root, "commit", "-m", "baseline");
+
+  const dataDir = join(root, dataDirName);
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(
+    join(dataDir, "knowledge-graph.json"),
+    JSON.stringify(fixtureGraph(git(root, "rev-parse", "HEAD"))),
+  );
   return root;
 }
 
@@ -112,6 +128,27 @@ describe.skipIf(!existsSync(VIEWER_DIST))("understand-anything-viewer", () => {
     const graph = await res.json();
     expect(graph.nodes).toHaveLength(1);
     expect(graph.nodes[0].filePath).toBe("src/a.ts");
+  });
+
+  it("serves a protected no-store freshness report", async () => {
+    const denied = await fetch(`${base()}/staleness.json`);
+    expect(denied.status).toBe(403);
+    expect(denied.headers.get("cache-control")).toBe("no-store");
+
+    const res = await fetch(
+      `${base()}/staleness.json?token=${viewer.token}`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toMatchObject({
+      graphs: {
+        knowledge: {
+          status: "fresh",
+          graphCommitHash: git(root, "rev-parse", "HEAD"),
+          headCommitHash: git(root, "rev-parse", "HEAD"),
+        },
+      },
+    });
   });
 
   it("serves file content only for files listed in the graph", async () => {

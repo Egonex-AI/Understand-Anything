@@ -239,7 +239,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 설치 스크립트는 저장소를 `~/.understand-anything/repo`에 클론하고 선택한 플랫폼에 맞는 심볼릭 링크를 생성합니다. 설치 후 CLI 또는 IDE를 재시작하세요.
 
-> **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"*처럼 자연어로 요청하면 됩니다.
+> **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"* 처럼 자연어로 요청하면 됩니다.
 
 - 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
 - 이후 업데이트: `./install.sh --update`

@@ -30,11 +30,13 @@
     "prepare": "pnpm --filter @understand-anything/core build",
     "build": "pnpm -r build",
     "test": "vitest run",
+    "benchmark:large-repo": "node scripts/benchmark-large-repo.mjs",
     "dev:dashboard": "pnpm --filter @understand-anything/dashboard dev",
     "lint": "eslint ."
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "ajv": "8.17.1",
     "eslint": "^9.0.0",
     "globals": "^17.6.0",
     "typescript": "^5.7.0",

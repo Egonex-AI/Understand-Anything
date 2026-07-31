@@ -10,9 +10,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(__dirname, '../../../understand-anything-plugin/skills/understand/compute-batches.mjs');
 const FIXTURES = resolve(__dirname, 'fixtures');
 
-function runScript(projectRoot, extraArgs = []) {
+function runScript(projectRoot, extraArgs = [], env = process.env) {
   return spawnSync('node', [SCRIPT, projectRoot, ...extraArgs], {
     encoding: 'utf-8',
+    env,
   });
 }
 
@@ -41,6 +42,35 @@ function setupProjectInDir(fixtureName, dirName) {
 function readBatches(projectRoot) {
   const p = join(projectRoot, '.understand-anything', 'intermediate', 'batches.json');
   return JSON.parse(readFileSync(p, 'utf-8'));
+}
+
+function setupAmbiguousRingProject() {
+  const root = mkdtempSync(join(tmpdir(), 'ua-cb-ring-'));
+  mkdirSync(join(root, '.understand-anything', 'intermediate'), { recursive: true });
+
+  const paths = ['zeta', 'äther', 'åland']
+    .flatMap(dir => ['a', 'b', 'c', 'd'].map(name => `src/${dir}/${name}.ts`));
+  for (const path of paths) {
+    const absolutePath = join(root, ...path.split('/'));
+    mkdirSync(dirname(absolutePath), { recursive: true });
+    writeFileSync(absolutePath, 'export {};\n');
+  }
+
+  const importMap = Object.fromEntries(paths.map((path, index) => [
+    path,
+    [paths[(index + 1) % paths.length]],
+  ]));
+  const files = paths.map(path => ({
+    path,
+    language: 'typescript',
+    sizeLines: 1,
+    fileCategory: 'code',
+  }));
+  writeFileSync(
+    join(root, '.understand-anything', 'intermediate', 'scan-result.json'),
+    JSON.stringify({ files, importMap }),
+  );
+  return root;
 }
 
 describe('compute-batches.mjs — Louvain basic', () => {
@@ -90,6 +120,130 @@ describe('compute-batches.mjs — Louvain basic', () => {
     );
 
     expect(json1).toBe(json2);
+  });
+});
+
+describe('compute-batches.mjs - deterministic Louvain', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('writes byte-identical batches for an ambiguous ring across fresh subprocesses', () => {
+    projectRoot = setupAmbiguousRingProject();
+    const outputPath = join(
+      projectRoot,
+      '.understand-anything',
+      'intermediate',
+      'batches.json',
+    );
+    const locales = ['en_US.UTF-8', 'sv_SE.UTF-8'];
+    const outputs = [];
+
+    for (let run = 0; run < 8; run++) {
+      const locale = locales[run % locales.length];
+      const result = runScript(projectRoot, [], {
+        ...process.env,
+        LANG: locale,
+        LC_ALL: locale,
+      });
+      expect(result.status).toBe(0);
+      outputs.push(readFileSync(outputPath, 'utf-8'));
+    }
+
+    expect(new Set(outputs).size).toBe(1);
+  }, 20_000);
+});
+
+describe('compute-batches.mjs — explicit benchmark paths', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
+  });
+
+  it('reads and writes outside the project data directory when requested', () => {
+    projectRoot = mkdtempSync(join(tmpdir(), 'ua-cb-explicit-'));
+    const scanPath = join(projectRoot, 'benchmark-input', 'scan-result.json');
+    const outputPath = join(projectRoot, 'benchmark-output', 'batches.json');
+    mkdirSync(dirname(scanPath), { recursive: true });
+    writeFileSync(
+      scanPath,
+      readFileSync(join(FIXTURES, 'scan-result-3-cliques.json'), 'utf-8'),
+    );
+
+    const result = runScript(projectRoot, [
+      `--scan-result=${scanPath}`,
+      `--output=${outputPath}`,
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(join(projectRoot, '.ua'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.understand-anything'))).toBe(false);
+
+    const batches = JSON.parse(readFileSync(outputPath, 'utf-8'));
+    expect(batches.totalFiles).toBe(9);
+    expect(batches.totalBatches).toBe(3);
+  });
+});
+
+describe('compute-batches.mjs - invalid benchmark path options', () => {
+  let testRoot;
+
+  afterEach(() => {
+    if (testRoot) rmSync(testRoot, { recursive: true, force: true });
+  });
+
+  const scanOption = '--scan-result={scan}';
+  const outputOption = '--output={output}';
+  const changedOption = '--changed-files={changed}';
+  const invalidCases = [
+    ['an unknown option', [scanOption, '--ouput={output}']],
+    ['an unexpected positional argument', [scanOption, outputOption, 'unexpected']],
+    ['an empty --changed-files value', [scanOption, outputOption, '--changed-files=']],
+    ['an empty --scan-result value', ['--scan-result=', scanOption, outputOption]],
+    ['an empty --output value', [scanOption, '--output=']],
+    ['split --changed-files form', [scanOption, outputOption, '--changed-files', '{changed}']],
+    ['split --scan-result form', ['--scan-result', '{scan}', scanOption, outputOption]],
+    ['split --output form', [scanOption, '--output', '{output}']],
+    ['duplicate --changed-files options', [
+      scanOption, outputOption, changedOption, changedOption,
+    ]],
+    ['duplicate --scan-result options', [scanOption, scanOption, outputOption]],
+    ['duplicate --output options', [scanOption, outputOption, '--output={secondOutput}']],
+  ];
+
+  it.each(invalidCases)('rejects %s without creating a subject data directory', (
+    _name,
+    argTemplates,
+  ) => {
+    testRoot = mkdtempSync(join(tmpdir(), 'ua-cb-invalid-'));
+    const projectRoot = join(testRoot, 'subject-项目');
+    const scanPath = join(testRoot, 'input data', 'scan-result.json');
+    const outputPath = join(testRoot, 'output data', 'batches.json');
+    const secondOutputPath = join(testRoot, 'other output', 'batches.json');
+    const changedPath = join(testRoot, 'changed files.txt');
+    mkdirSync(projectRoot, { recursive: true });
+    mkdirSync(dirname(scanPath), { recursive: true });
+    writeFileSync(scanPath, JSON.stringify({ files: [], importMap: {} }));
+    writeFileSync(changedPath, 'src/example.ts\n');
+
+    const paths = {
+      changed: changedPath,
+      scan: scanPath,
+      output: outputPath,
+      secondOutput: secondOutputPath,
+    };
+    const args = argTemplates.map(arg =>
+      arg.replace(/\{(\w+)\}/g, (_match, key) => paths[key]));
+    const result = runScript(projectRoot, args);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/Error: compute-batches: (invalid|duplicate) option/);
+    expect(existsSync(join(projectRoot, '.ua'))).toBe(false);
+    expect(existsSync(join(projectRoot, '.understand-anything'))).toBe(false);
   });
 });
 

@@ -1,0 +1,657 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/docs/benchmarks/large-repo-report-1.0.0.schema.json",
+  "title": "Understand Anything deterministic large-repository benchmark report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaUrl",
+    "schemaVersion",
+    "pairId",
+    "status",
+    "mode",
+    "run",
+    "tool",
+    "subject",
+    "environment",
+    "configuration",
+    "scale",
+    "stages",
+    "integrity",
+    "determinism",
+    "llm",
+    "warnings",
+    "secondaryErrors",
+    "error"
+  ],
+  "properties": {
+    "schemaUrl": {
+      "const": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/docs/benchmarks/large-repo-report-1.0.0.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "pairId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "status": { "enum": ["ok", "degraded", "failed"] },
+    "mode": { "const": "deterministic" },
+    "run": { "$ref": "#/$defs/run" },
+    "tool": { "$ref": "#/$defs/tool" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "environment": { "$ref": "#/$defs/environment" },
+    "configuration": { "$ref": "#/$defs/configuration" },
+    "scale": {
+      "oneOf": [
+        { "$ref": "#/$defs/scale" },
+        { "type": "null" }
+      ]
+    },
+    "stages": { "$ref": "#/$defs/stages" },
+    "integrity": {
+      "oneOf": [
+        { "$ref": "#/$defs/integrity" },
+        { "type": "null" }
+      ]
+    },
+    "determinism": {
+      "oneOf": [
+        { "$ref": "#/$defs/determinism" },
+        { "type": "null" }
+      ]
+    },
+    "llm": { "$ref": "#/$defs/llm" },
+    "warnings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/warning" }
+    },
+    "secondaryErrors": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/secondaryError" }
+    },
+    "error": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "enum": ["ok", "degraded"] } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "scale": { "$ref": "#/$defs/scale" },
+          "stages": {
+            "type": "object",
+            "required": ["scan", "imports", "batching", "structure"],
+            "properties": {
+              "scan": {
+                "type": "object",
+                "properties": { "status": { "const": "ok" } }
+              },
+              "imports": {
+                "type": "object",
+                "properties": { "status": { "const": "ok" } }
+              },
+              "batching": {
+                "type": "object",
+                "properties": { "status": { "const": "ok" } }
+              },
+              "structure": {
+                "type": "object",
+                "properties": { "status": { "const": "ok" } }
+              }
+            }
+          },
+          "integrity": { "$ref": "#/$defs/successIntegrity" },
+          "determinism": { "$ref": "#/$defs/determinism" },
+          "secondaryErrors": { "type": "array", "maxItems": 0 },
+          "error": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "ok" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "warnings": { "type": "array", "maxItems": 0 },
+          "integrity": {
+            "type": "object",
+            "properties": { "filesSkipped": { "const": 0 } }
+          },
+          "stages": {
+            "type": "object",
+            "properties": {
+              "scan": { "$ref": "#/$defs/noWarningsStage" },
+              "imports": { "$ref": "#/$defs/noWarningsStage" },
+              "batching": { "$ref": "#/$defs/noWarningsStage" },
+              "structure": {
+                "allOf": [
+                  { "$ref": "#/$defs/noWarningsStage" },
+                  {
+                    "type": "object",
+                    "properties": { "filesSkipped": { "const": 0 } }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "degraded" } },
+        "required": ["status"]
+      },
+      "then": {
+        "anyOf": [
+          {
+            "properties": {
+              "warnings": { "type": "array", "minItems": 1 }
+            },
+            "required": ["warnings"]
+          },
+          {
+            "properties": {
+              "integrity": {
+                "type": "object",
+                "properties": {
+                  "filesSkipped": { "type": "integer", "minimum": 1 }
+                },
+                "required": ["filesSkipped"]
+              }
+            },
+            "required": ["integrity"]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "failed" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "error": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nullableString": { "type": ["string", "null"] },
+    "nullableBoolean": { "type": ["boolean", "null"] },
+    "nullableNumber": { "type": ["number", "null"], "minimum": 0 },
+    "count": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["ok", "failed"] },
+    "noWarningsStage": {
+      "type": "object",
+      "properties": {
+        "warningCount": { "const": 0 },
+        "warningMessages": { "type": "array", "maxItems": 0 },
+        "warningMessagesTruncated": { "const": false }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startedAt", "finishedAt", "durationMs"],
+      "properties": {
+        "startedAt": { "type": "string", "format": "date-time" },
+        "finishedAt": { "type": ["string", "null"], "format": "date-time" },
+        "durationMs": { "$ref": "#/$defs/nullableNumber" }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "dirty", "packageVersion"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/nullableString" },
+        "dirty": { "$ref": "#/$defs/nullableBoolean" },
+        "packageVersion": { "type": "string" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "commit", "dirty"],
+      "properties": {
+        "label": { "type": "string" },
+        "commit": { "$ref": "#/$defs/nullableString" },
+        "dirty": { "$ref": "#/$defs/nullableBoolean" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "release",
+        "arch",
+        "nodeVersion",
+        "cpuModel",
+        "logicalCores",
+        "totalMemoryBytes"
+      ],
+      "properties": {
+        "platform": { "type": "string" },
+        "release": { "type": "string" },
+        "arch": { "type": "string" },
+        "nodeVersion": { "type": "string" },
+        "cpuModel": { "type": "string" },
+        "logicalCores": { "type": "integer", "minimum": 1 },
+        "totalMemoryBytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concurrency", "stages"],
+      "properties": {
+        "concurrency": { "type": "integer", "minimum": 1, "maximum": 32 },
+        "stages": {
+          "const": ["scan", "imports", "batching", "structure"]
+        }
+      }
+    },
+    "stringCountMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/count" }
+    },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "lines",
+        "bytes",
+        "missingFiles",
+        "filteredByUserIgnore",
+        "byCategory",
+        "byLanguage"
+      ],
+      "properties": {
+        "files": { "$ref": "#/$defs/count" },
+        "lines": { "$ref": "#/$defs/count" },
+        "bytes": { "$ref": "#/$defs/count" },
+        "missingFiles": { "$ref": "#/$defs/count" },
+        "filteredByUserIgnore": { "$ref": "#/$defs/count" },
+        "byCategory": { "$ref": "#/$defs/stringCountMap" },
+        "byLanguage": { "$ref": "#/$defs/stringCountMap" }
+      }
+    },
+    "scanStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "durationMs",
+        "peakRssBytes",
+        "userCpuTimeMicros",
+        "systemCpuTimeMicros",
+        "warningCount",
+        "warningMessages",
+        "warningMessagesTruncated",
+        "stdoutTruncated",
+        "stderrTruncated",
+        "outputBytes"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "peakRssBytes": { "$ref": "#/$defs/nullableNumber" },
+        "userCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "systemCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "warningCount": { "$ref": "#/$defs/count" },
+        "warningMessages": { "$ref": "#/$defs/warningMessages" },
+        "warningMessagesTruncated": { "type": "boolean" },
+        "stdoutTruncated": { "type": "boolean" },
+        "stderrTruncated": { "type": "boolean" },
+        "outputBytes": { "$ref": "#/$defs/count" },
+        "files": { "$ref": "#/$defs/count" },
+        "lines": { "$ref": "#/$defs/count" },
+        "bytes": { "$ref": "#/$defs/count" },
+        "filteredByUserIgnore": { "$ref": "#/$defs/count" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "ok" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": [
+              "files",
+              "lines",
+              "bytes",
+              "filteredByUserIgnore"
+            ]
+          }
+        }
+      ]
+    },
+    "importsStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "durationMs",
+        "peakRssBytes",
+        "userCpuTimeMicros",
+        "systemCpuTimeMicros",
+        "warningCount",
+        "warningMessages",
+        "warningMessagesTruncated",
+        "stdoutTruncated",
+        "stderrTruncated",
+        "outputBytes"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "peakRssBytes": { "$ref": "#/$defs/nullableNumber" },
+        "userCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "systemCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "warningCount": { "$ref": "#/$defs/count" },
+        "warningMessages": { "$ref": "#/$defs/warningMessages" },
+        "warningMessagesTruncated": { "type": "boolean" },
+        "stdoutTruncated": { "type": "boolean" },
+        "stderrTruncated": { "type": "boolean" },
+        "outputBytes": { "$ref": "#/$defs/count" },
+        "filesScanned": { "$ref": "#/$defs/count" },
+        "filesWithImports": { "$ref": "#/$defs/count" },
+        "edges": { "$ref": "#/$defs/count" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "ok" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["filesScanned", "filesWithImports", "edges"]
+          }
+        }
+      ]
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "p50", "p95", "max", "mean"],
+      "properties": {
+        "min": { "type": "number", "minimum": 0 },
+        "p50": { "type": "number", "minimum": 0 },
+        "p95": { "type": "number", "minimum": 0 },
+        "max": { "type": "number", "minimum": 0 },
+        "mean": { "type": "number", "minimum": 0 }
+      }
+    },
+    "batchingStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "durationMs",
+        "peakRssBytes",
+        "userCpuTimeMicros",
+        "systemCpuTimeMicros",
+        "warningCount",
+        "warningMessages",
+        "warningMessagesTruncated",
+        "stdoutTruncated",
+        "stderrTruncated",
+        "outputBytes"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "peakRssBytes": { "$ref": "#/$defs/nullableNumber" },
+        "userCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "systemCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "warningCount": { "$ref": "#/$defs/count" },
+        "warningMessages": { "$ref": "#/$defs/warningMessages" },
+        "warningMessagesTruncated": { "type": "boolean" },
+        "stdoutTruncated": { "type": "boolean" },
+        "stderrTruncated": { "type": "boolean" },
+        "outputBytes": { "$ref": "#/$defs/count" },
+        "algorithm": { "type": "string" },
+        "totalBatches": { "$ref": "#/$defs/count" },
+        "batchSizes": { "$ref": "#/$defs/distribution" },
+        "estimatedAgentInputBytes": { "$ref": "#/$defs/count" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "ok" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": [
+              "algorithm",
+              "totalBatches",
+              "batchSizes",
+              "estimatedAgentInputBytes"
+            ]
+          }
+        }
+      ]
+    },
+    "entities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "functions",
+        "classes",
+        "exports",
+        "callGraph",
+        "definitions",
+        "services",
+        "endpoints",
+        "steps",
+        "resources"
+      ],
+      "properties": {
+        "functions": { "$ref": "#/$defs/count" },
+        "classes": { "$ref": "#/$defs/count" },
+        "exports": { "$ref": "#/$defs/count" },
+        "callGraph": { "$ref": "#/$defs/count" },
+        "definitions": { "$ref": "#/$defs/count" },
+        "services": { "$ref": "#/$defs/count" },
+        "endpoints": { "$ref": "#/$defs/count" },
+        "steps": { "$ref": "#/$defs/count" },
+        "resources": { "$ref": "#/$defs/count" }
+      }
+    },
+    "structureStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "durationMs",
+        "maxWorkerPeakRssBytes",
+        "userCpuTimeMicros",
+        "systemCpuTimeMicros",
+        "warningCount",
+        "warningMessages",
+        "warningMessagesTruncated",
+        "outputBytes",
+        "failureSamples",
+        "failureSamplesTruncated"
+      ],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "durationMs": { "type": "number", "minimum": 0 },
+        "maxWorkerPeakRssBytes": { "$ref": "#/$defs/nullableNumber" },
+        "userCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "systemCpuTimeMicros": { "$ref": "#/$defs/nullableNumber" },
+        "warningCount": { "$ref": "#/$defs/count" },
+        "warningMessages": { "$ref": "#/$defs/warningMessages" },
+        "warningMessagesTruncated": { "type": "boolean" },
+        "failureSamples": {
+          "type": "array",
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/failureSample" }
+        },
+        "failureSamplesTruncated": { "type": "boolean" },
+        "outputBytes": { "$ref": "#/$defs/count" },
+        "batchesSucceeded": { "$ref": "#/$defs/count" },
+        "batchesFailed": { "$ref": "#/$defs/count" },
+        "filesAnalyzed": { "$ref": "#/$defs/count" },
+        "filesSkipped": { "$ref": "#/$defs/count" },
+        "structureSucceeded": { "$ref": "#/$defs/count" },
+        "structureFailed": { "$ref": "#/$defs/count" },
+        "callGraphSucceeded": { "$ref": "#/$defs/count" },
+        "callGraphFailed": { "$ref": "#/$defs/count" },
+        "callGraphSkipped": { "$ref": "#/$defs/count" },
+        "entities": { "$ref": "#/$defs/entities" },
+        "batchDurationMs": { "$ref": "#/$defs/distribution" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "ok" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": [
+              "batchesSucceeded",
+              "batchesFailed",
+              "filesAnalyzed",
+              "filesSkipped",
+              "structureSucceeded",
+              "structureFailed",
+              "callGraphSucceeded",
+              "callGraphFailed",
+              "callGraphSkipped",
+              "entities",
+              "batchDurationMs"
+            ]
+          }
+        }
+      ]
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scan": { "$ref": "#/$defs/scanStage" },
+        "imports": { "$ref": "#/$defs/importsStage" },
+        "batching": { "$ref": "#/$defs/batchingStage" },
+        "structure": { "$ref": "#/$defs/structureStage" }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allScannedFilesBatched",
+        "missingBatchFiles",
+        "duplicateBatchFiles",
+        "unexpectedBatchFiles",
+        "missingImportTargets",
+        "structureCoverage",
+        "structureFailures",
+        "callGraphFailures",
+        "filesSkipped",
+        "failedBatches",
+        "missingStructurePaths",
+        "duplicateStructurePaths",
+        "unexpectedStructurePaths",
+        "malformedStructureBatches"
+      ],
+      "properties": {
+        "allScannedFilesBatched": { "type": "boolean" },
+        "missingBatchFiles": { "$ref": "#/$defs/count" },
+        "duplicateBatchFiles": { "$ref": "#/$defs/count" },
+        "unexpectedBatchFiles": { "$ref": "#/$defs/count" },
+        "missingImportTargets": { "$ref": "#/$defs/count" },
+        "structureCoverage": { "type": "number", "minimum": 0, "maximum": 1 },
+        "structureFailures": { "$ref": "#/$defs/count" },
+        "callGraphFailures": { "$ref": "#/$defs/count" },
+        "filesSkipped": { "$ref": "#/$defs/count" },
+        "failedBatches": { "$ref": "#/$defs/count" },
+        "missingStructurePaths": { "$ref": "#/$defs/count" },
+        "duplicateStructurePaths": { "$ref": "#/$defs/count" },
+        "unexpectedStructurePaths": { "$ref": "#/$defs/count" },
+        "malformedStructureBatches": { "$ref": "#/$defs/count" }
+      }
+    },
+    "successIntegrity": {
+      "type": "object",
+      "properties": {
+        "allScannedFilesBatched": { "const": true },
+        "missingBatchFiles": { "const": 0 },
+        "duplicateBatchFiles": { "const": 0 },
+        "unexpectedBatchFiles": { "const": 0 },
+        "missingImportTargets": { "const": 0 },
+        "structureCoverage": { "const": 1 },
+        "structureFailures": { "const": 0 },
+        "callGraphFailures": { "const": 0 },
+        "failedBatches": { "const": 0 },
+        "missingStructurePaths": { "const": 0 },
+        "duplicateStructurePaths": { "const": 0 },
+        "unexpectedStructurePaths": { "const": 0 },
+        "malformedStructureBatches": { "const": 0 }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "inputDigest", "outputDigest"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "inputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "outputDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "llm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["invoked", "inputTokens", "outputTokens", "costUsd"],
+      "properties": {
+        "invoked": { "const": false },
+        "inputTokens": { "type": "null" },
+        "outputTokens": { "type": "null" },
+        "costUsd": { "type": "null" }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "count", "messages", "truncated"],
+      "properties": {
+        "stage": { "enum": ["scan", "imports", "batching", "structure"] },
+        "count": { "type": "integer", "minimum": 1 },
+        "messages": { "$ref": "#/$defs/warningMessages" },
+        "truncated": { "type": "boolean" }
+      }
+    },
+    "warningMessages": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "type": "string" }
+    },
+    "failureSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["batchIndex", "message"],
+      "properties": {
+        "batchIndex": { "$ref": "#/$defs/count" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4096 }
+      }
+    },
+    "secondaryError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "message"],
+      "properties": {
+        "stage": { "const": "cleanup" },
+        "message": { "const": "Unable to remove temporary benchmark artifacts" }
+      }
+    }
+  }
+}

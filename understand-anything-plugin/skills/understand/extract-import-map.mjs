@@ -103,6 +103,13 @@ function toPosix(p) {
   return p.split(/[\\/]/).filter(Boolean).join('/');
 }
 
+// ECMAScript relational string comparison is lexicographic over UTF-16 code
+// units, so path ordering is stable across ICU versions, locales, and hosts.
+function comparePaths(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 /**
  * Join a directory with a relative segment, normalizing `.`/`..` segments and
  * returning a forward-slash POSIX path. Anchored at project root (no leading
@@ -483,7 +490,7 @@ async function buildResolutionContext(projectRoot, files) {
     goFilesByDir.get(d).push(p);
   }
   for (const arr of goFilesByDir.values()) {
-    arr.sort((a, b) => a.localeCompare(b));
+    arr.sort(comparePaths);
   }
 
   // Build per-extension suffix indices for dotted-FQN resolvers (Java,
@@ -1029,7 +1036,7 @@ function buildSuffixIndex(files, extPredicate) {
   }
   // Deterministic order within each bucket
   for (const arr of idx.values()) {
-    arr.sort((a, b) => a.localeCompare(b));
+    arr.sort(comparePaths);
   }
   return idx;
 }
@@ -1050,7 +1057,7 @@ function buildPackageIndex(files, extPredicate) {
     }
   }
   for (const arr of idx.values()) {
-    arr.sort((a, b) => a.localeCompare(b));
+    arr.sort(comparePaths);
   }
   return idx;
 }
@@ -1107,7 +1114,7 @@ function buildSwiftModuleIndex(files, packageTargets) {
   const idx = new Map();
   const targetEntries = [...packageTargets.entries()].map(([name, paths]) => [
     name,
-    [...paths].sort((a, b) => a.localeCompare(b)),
+    [...paths].sort(comparePaths),
   ]);
 
   for (const f of files) {
@@ -1130,7 +1137,7 @@ function buildSwiftModuleIndex(files, packageTargets) {
 
   const out = new Map();
   for (const [moduleName, paths] of idx.entries()) {
-    out.set(moduleName, [...paths].sort((a, b) => a.localeCompare(b)));
+    out.set(moduleName, [...paths].sort(comparePaths));
   }
   return out;
 }
@@ -1206,7 +1213,7 @@ export function resolveScalaImport(rawImport, specifiers, _file, ctx) {
 
   if (specs.includes('*')) {
     for (const m of resolveScalaPackage(rawImport, ctx)) out.add(m);
-    return [...out].sort((a, b) => a.localeCompare(b));
+    return [...out].sort(comparePaths);
   }
 
   if (isPlain) {
@@ -1215,7 +1222,7 @@ export function resolveScalaImport(rawImport, specifiers, _file, ctx) {
       const pkg = rawImport.slice(0, -(specs[0].length + 1));
       for (const m of resolveScalaDottedFqn(`${pkg}.package`, ctx)) out.add(m);
     }
-    return [...out].sort((a, b) => a.localeCompare(b));
+    return [...out].sort(comparePaths);
   }
 
   let unresolvedSelector = false;
@@ -1230,7 +1237,7 @@ export function resolveScalaImport(rawImport, specifiers, _file, ctx) {
     for (const m of resolveScalaDottedFqn(`${rawImport}.package`, ctx)) out.add(m);
   }
 
-  return [...out].sort((a, b) => a.localeCompare(b));
+  return [...out].sort(comparePaths);
 }
 
 function resolveScalaDottedFqn(fqn, ctx) {
@@ -1251,7 +1258,7 @@ function compareScalaPackageMembers(a, b) {
   const aPackage = /\/package\.s(?:cala|c)$/.test(a);
   const bPackage = /\/package\.s(?:cala|c)$/.test(b);
   if (dirOf(a) === dirOf(b) && aPackage !== bPackage) return aPackage ? 1 : -1;
-  return a.localeCompare(b);
+  return comparePaths(a, b);
 }
 
 // ---------------------------------------------------------------------------
@@ -1933,7 +1940,7 @@ async function main() {
       resolved = [...resolvedSet].sort((a, b) =>
         file.language === 'scala'
           ? compareScalaPackageMembers(a, b)
-          : a.localeCompare(b),
+          : comparePaths(a, b),
       );
     } catch (err) {
       process.stderr.write(

@@ -271,7 +271,7 @@ Store the file list as `$FILE_LIST` with `fileCategory` metadata for use in Phas
 **Gate check:** If >100 files, inform the user and suggest scoping with a subdirectory argument. Proceed only if user confirms or add guidance that this may take a while.
 
 If the scan result includes `filteredByIgnore > 0`, report:
-> Excluded {filteredByIgnore} files via `.understandignore`.
+> Excluded {filteredByIgnore} files via `.understandignore` and/or `--exclude` rules.
 
 ---
 

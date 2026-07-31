@@ -1,5 +1,218 @@
 // Pure result mapping for extract-structure.mjs.
 // Kept separate from the CLI entrypoint so unit tests do not import a shebang script.
+const REQUIRED_STRUCTURE_ARRAY_FIELDS = [
+  'functions',
+  'classes',
+  'imports',
+  'exports',
+];
+const OPTIONAL_STRUCTURE_ARRAY_FIELDS = [
+  'sections',
+  'definitions',
+  'services',
+  'endpoints',
+  'steps',
+  'resources',
+];
+
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function isStringArray(value) {
+  return Array.isArray(value) && value.every(item => typeof item === 'string');
+}
+
+function isFiniteInteger(value) {
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    Number.isInteger(value);
+}
+
+function isLineRange(value) {
+  return Array.isArray(value) &&
+    value.length === 2 &&
+    value.every(isFiniteInteger);
+}
+
+function hasValidOptionalField(value, field, validator) {
+  return value[field] === undefined || validator(value[field]);
+}
+
+function isValidEntryArray(value, validator) {
+  return Array.isArray(value) &&
+    value.every(entry => isPlainObject(entry) && validator(entry));
+}
+
+const STRUCTURE_ENTRY_VALIDATORS = {
+  functions: entry =>
+    typeof entry.name === 'string' &&
+    isLineRange(entry.lineRange) &&
+    isStringArray(entry.params) &&
+    hasValidOptionalField(entry, 'returnType', value => typeof value === 'string'),
+  classes: entry =>
+    typeof entry.name === 'string' &&
+    isLineRange(entry.lineRange) &&
+    isStringArray(entry.methods) &&
+    isStringArray(entry.properties),
+  imports: entry =>
+    typeof entry.source === 'string' &&
+    isStringArray(entry.specifiers) &&
+    isFiniteInteger(entry.lineNumber),
+  exports: entry =>
+    typeof entry.name === 'string' &&
+    isFiniteInteger(entry.lineNumber) &&
+    hasValidOptionalField(entry, 'isDefault', value => typeof value === 'boolean'),
+  sections: entry =>
+    typeof entry.name === 'string' &&
+    isFiniteInteger(entry.level) &&
+    isLineRange(entry.lineRange),
+  definitions: entry =>
+    typeof entry.name === 'string' &&
+    typeof entry.kind === 'string' &&
+    isLineRange(entry.lineRange) &&
+    isStringArray(entry.fields),
+  services: entry =>
+    typeof entry.name === 'string' &&
+    hasValidOptionalField(entry, 'image', value => typeof value === 'string') &&
+    Array.isArray(entry.ports) &&
+    entry.ports.every(isFiniteInteger) &&
+    hasValidOptionalField(entry, 'lineRange', isLineRange),
+  endpoints: entry =>
+    hasValidOptionalField(entry, 'method', value => typeof value === 'string') &&
+    typeof entry.path === 'string' &&
+    isLineRange(entry.lineRange),
+  steps: entry =>
+    typeof entry.name === 'string' &&
+    isLineRange(entry.lineRange),
+  resources: entry =>
+    typeof entry.name === 'string' &&
+    typeof entry.kind === 'string' &&
+    isLineRange(entry.lineRange),
+};
+
+function isValidStructuralAnalysis(analysis) {
+  if (!isPlainObject(analysis)) {
+    return false;
+  }
+
+  return REQUIRED_STRUCTURE_ARRAY_FIELDS.every(field =>
+    isValidEntryArray(analysis[field], STRUCTURE_ENTRY_VALIDATORS[field])) &&
+    OPTIONAL_STRUCTURE_ARRAY_FIELDS.every(field =>
+      hasValidOptionalField(
+        analysis,
+        field,
+        value => isValidEntryArray(value, STRUCTURE_ENTRY_VALIDATORS[field]),
+      ));
+}
+
+function isValidCallGraph(callGraph) {
+  return Array.isArray(callGraph) && callGraph.every(entry =>
+    isPlainObject(entry) &&
+    typeof entry.caller === 'string' &&
+    typeof entry.callee === 'string' &&
+    isFiniteInteger(entry.lineNumber));
+}
+
+function mapCallGraph(callGraph) {
+  return callGraph && callGraph.length > 0
+    ? callGraph.map(entry => ({
+        caller: entry.caller,
+        callee: entry.callee,
+        lineNumber: entry.lineNumber,
+      }))
+    : null;
+}
+
+export function analyzeFileWithOutcomes(registry, file, content) {
+  const wantsCallGraph =
+    file.fileCategory === 'code' || file.fileCategory === 'script';
+  const selectedPlugin = typeof registry.getPluginForFile === 'function'
+    ? registry.getPluginForFile(file.path)
+    : registry;
+
+  if (selectedPlugin === null) {
+    return {
+      analysis: null,
+      callGraph: null,
+      structureOutcome: 'skipped',
+      callGraphOutcome: 'skipped',
+    };
+  }
+
+  const supportsFullAnalysis =
+    typeof selectedPlugin?.analyzeFileFull === 'function';
+  const supportsSeparateCallGraph =
+    typeof selectedPlugin?.extractCallGraph === 'function';
+
+  if (wantsCallGraph && supportsFullAnalysis) {
+    let full;
+    try {
+      full = registry.analyzeFileFull(file.path, content);
+    } catch {
+      return {
+        analysis: null,
+        callGraph: null,
+        structureOutcome: 'failed',
+        callGraphOutcome: wantsCallGraph ? 'failed' : 'skipped',
+      };
+    }
+
+    const analysis = isValidStructuralAnalysis(full?.structure)
+      ? full.structure
+      : null;
+    const hasValidCallGraph = wantsCallGraph && isValidCallGraph(full?.callGraph);
+    const callGraph = hasValidCallGraph ? mapCallGraph(full.callGraph) : null;
+
+    return {
+      analysis,
+      callGraph,
+      structureOutcome: analysis === null ? 'failed' : 'succeeded',
+      callGraphOutcome: wantsCallGraph
+        ? hasValidCallGraph ? 'succeeded' : 'failed'
+        : 'skipped',
+    };
+  }
+
+  let analysis = null;
+  let callGraph = null;
+  let structureOutcome = 'failed';
+  let callGraphOutcome = wantsCallGraph && supportsSeparateCallGraph
+    ? 'failed'
+    : 'skipped';
+
+  try {
+    const extractedAnalysis = registry.analyzeFile(file.path, content);
+    if (isValidStructuralAnalysis(extractedAnalysis)) {
+      analysis = extractedAnalysis;
+      structureOutcome = 'succeeded';
+    }
+  } catch {
+    analysis = null;
+    structureOutcome = 'failed';
+  }
+
+  if (wantsCallGraph && supportsSeparateCallGraph) {
+    try {
+      const extractedCallGraph = registry.extractCallGraph(file.path, content);
+      if (isValidCallGraph(extractedCallGraph)) {
+        callGraph = mapCallGraph(extractedCallGraph);
+        callGraphOutcome = 'succeeded';
+      }
+    } catch {
+      callGraph = null;
+      callGraphOutcome = 'failed';
+    }
+  }
+
+  return { analysis, callGraph, structureOutcome, callGraphOutcome };
+}
+
 export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph, batchImportData) {
   const base = {
     path: file.path,

@@ -15,6 +15,7 @@ import PersonaSelector from "./components/PersonaSelector";
 import ProjectOverview from "./components/ProjectOverview";
 import FileExplorer from "./components/FileExplorer";
 import WarningBanner from "./components/WarningBanner";
+import StalenessBanner from "./components/StalenessBanner";
 import TokenGate from "./components/TokenGate";
 import MobileLayout from "./components/MobileLayout";
 import { useIsMobile } from "./hooks/useIsMobile";
@@ -24,6 +25,12 @@ import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
 import type { ThemeConfig } from "./themes/index.ts";
 import { I18nProvider, useI18n } from "./contexts/I18nContext.tsx";
+import {
+  requestFreshnessReport,
+  shouldRequestFreshness,
+  startFreshnessRefresh,
+  type DashboardFreshnessReport,
+} from "./freshness";
 
 // Lazy-load heavy / optional components so they ship in separate chunks.
 const CodeViewer = lazy(() => import("./components/CodeViewer"));
@@ -55,6 +62,7 @@ function dataUrl(fileName: string, token: string | null): string {
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
       "config.json": import.meta.env.VITE_CONFIG_URL,
+      "staleness.json": import.meta.env.VITE_STALENESS_URL,
     };
     const url = envMap[fileName];
     if (url) return url;
@@ -113,6 +121,8 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [graphIssues, setGraphIssues] = useState<GraphIssue[]>([]);
+  const [graphFreshness, setGraphFreshness] =
+    useState<DashboardFreshnessReport | null>(null);
   const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
   const [outputLanguage, setOutputLanguage] = useState<string | undefined>();
 
@@ -133,7 +143,26 @@ function Dashboard({ accessToken }: { accessToken: string }) {
 
   useEffect(() => {
     fetch(dataUrl("knowledge-graph.json", accessToken))
-      .then((res) => res.json())
+      .then(async (res) => {
+        // Guard res.ok before parsing (matching the meta.json/config.json/
+        // diff-overlay.json/domain-graph.json fetches in this file). Without
+        // this, a serving/config failure returns a 404 JSON error body that
+        // gets parsed and handed to validateGraph, which fails project-metadata
+        // validation and surfaces the misleading "Invalid knowledge graph:
+        // Missing or invalid project metadata" instead of the real cause
+        // (graph file not found / GRAPH_DIR unset). See issues #288, #406.
+        if (!res.ok) {
+          let detail = `HTTP ${res.status}`;
+          try {
+            const body = await res.json();
+            if (body?.error) detail = body.error;
+          } catch {
+            /* non-JSON error body; keep the status code */
+          }
+          throw new Error(detail);
+        }
+        return res.json();
+      })
       .then((data: unknown) => {
         const result = validateGraph(data);
         if (result.success && result.data) {
@@ -163,6 +192,28 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         setLoadError(`Failed to load knowledge graph: ${err instanceof Error ? err.message : String(err)}`);
       });
   }, [setGraph]);
+
+  useEffect(() => {
+    if (
+      !shouldRequestFreshness(
+        DEMO_MODE,
+        import.meta.env.VITE_STALENESS_URL,
+      )
+    ) {
+      setGraphFreshness(null);
+      return;
+    }
+
+    return startFreshnessRefresh({
+      target: window,
+      load: (signal) =>
+        requestFreshnessReport(
+          dataUrl("staleness.json", accessToken),
+          signal,
+        ),
+      onResult: setGraphFreshness,
+    });
+  }, [accessToken]);
 
   useEffect(() => {
     fetch(dataUrl("diff-overlay.json", accessToken))
@@ -213,6 +264,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
           accessToken={accessToken}
           loadError={loadError}
           graphIssues={graphIssues}
+          graphFreshness={graphFreshness}
         />
       </ThemeProvider>
     </I18nProvider>
@@ -223,10 +275,12 @@ function DashboardContent({
   accessToken,
   loadError,
   graphIssues,
+  graphFreshness,
 }: {
   accessToken: string;
   loadError: string | null;
   graphIssues: GraphIssue[];
+  graphFreshness: DashboardFreshnessReport | null;
 }) {
   const graph = useDashboardStore((s) => s.graph);
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
@@ -435,6 +489,7 @@ function DashboardContent({
         setShowKeyboardHelp={setShowKeyboardHelp}
         loadError={loadError}
         allIssues={allIssues}
+        graphFreshness={graphFreshness}
         shortcuts={shortcuts}
       />
     );
@@ -620,6 +675,9 @@ function DashboardContent({
 
       {/* Search */}
       <SearchBar />
+
+      {/* Graph freshness warning banner */}
+      {!loadError && <StalenessBanner freshness={graphFreshness} />}
 
       {/* Validation warning banner */}
       {allIssues.length > 0 && !loadError && (

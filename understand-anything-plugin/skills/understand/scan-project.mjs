@@ -16,9 +16,9 @@
  *
  * What this script owns:
  *   - File enumeration (git ls-files preferred, recursive walk fallback)
- *   - `.understandignore` filtering (delegated to core's createIgnoreFilter,
- *     which reads the resolved data dir — `.ua/`, or legacy
- *     `.understand-anything/` when that directory already exists)
+ *   - `.understandignore` and CLI exclusion filtering (delegated to core's
+ *     createIgnoreFilter, which reads the resolved data dir — `.ua/`, or
+ *     legacy `.understand-anything/` when that directory already exists)
  *   - Per-file language detection (extension + filename table)
  *   - Per-file category assignment (priority-ordered rules from
  *     project-scanner.md Step 4)
@@ -26,17 +26,20 @@
  *   - Complexity estimation (project-scanner.md Step 7 thresholds)
  *
  * Usage:
- *   node scan-project.mjs <projectRoot> <outputPath> [--exclude <patterns>]
+ *   node scan-project.mjs <projectRoot> <outputPath>
+ *     [--exclude <patterns>] [--exclude-analysis-data]
  *
- *   --exclude <patterns>  Comma-separated glob patterns to additionally exclude.
- *                         These take highest priority over built-in defaults and
- *                         .understandignore rules. Supports gitignore syntax.
+ *   --exclude <patterns>  Comma-separated gitignore-style patterns to
+ *                         additionally exclude from the scan.
+ *   --exclude-analysis-data  Always exclude persistent `.ua/` and legacy
+ *                            `.understand-anything/` analysis data.
  *
  * Output JSON (subset of what project-scanner.md Phase 1 expects — the LLM
  * agent merges this with Step A's narrative fields and Step C's importMap to
  * produce the final scan-result.json):
  *   {
  *     "scriptCompleted": true,
+ *     "contentDigest": "<sha256 lowercase hex>",
  *     "files": [{ "path": "...", "language": "...", "sizeLines": N, "fileCategory": "..." }, ...],
  *     "totalFiles": N,
  *     "filteredByIgnore": M,
@@ -49,16 +52,18 @@
  *   `Warning: scan-project: <path> — <reason> — file skipped from output`
  * to stderr and the file is dropped; the rest of the scan completes.
  *
- * Determinism: files are sorted by `path.localeCompare` before emission, and
- * the underlying enumeration is deterministic (git ls-files returns a stable
- * order; the fallback walker sorts each directory's entries).
+ * Determinism: files are sorted by a locale-independent UTF-16 code-unit
+ * comparison before emission. The content digest uses that same order and
+ * length-frames each UTF-8 relative path plus its raw file bytes.
  */
 
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { dirname, resolve, join, basename, extname, relative, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   existsSync,
+  lstatSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -467,6 +472,17 @@ function toPosix(p) {
 }
 
 /**
+ * Locale-independent string order. ECMAScript relational string comparison
+ * is lexicographic over UTF-16 code units, so the result cannot vary with ICU,
+ * process locale, or operating system settings.
+ */
+function compareStableStrings(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+/**
  * Enumerate all files in `projectRoot` via `git ls-files`. Returns an
  * array of project-relative POSIX paths, or null if the directory is not
  * a git repository (or git is not installed). Caller falls back to the
@@ -539,7 +555,7 @@ function enumerateViaWalk(projectRoot) {
     // Sort deterministically by name; mix files and dirs together so the
     // final output (after the path sort) is identical regardless of
     // OS-specific readdir order.
-    entries.sort((a, b) => a.name.localeCompare(b.name));
+    entries.sort((a, b) => compareStableStrings(a.name, b.name));
     for (const ent of entries) {
       if (ent.isDirectory()) {
         if (HARD_SKIP_DIRS.has(ent.name)) continue;
@@ -576,9 +592,9 @@ function enumerateFiles(projectRoot) {
 // Filter accounting
 //
 // The project-scanner.md contract requires `filteredByIgnore` to count files
-// dropped *specifically* by user `.understandignore` patterns (the delta
-// beyond what the hardcoded defaults would have removed). We accomplish this
-// by building TWO filters:
+// dropped specifically by user `.understandignore` or CLI `--exclude`
+// patterns (the delta beyond what the hardcoded defaults would have removed).
+// We accomplish this by building TWO filters:
 //   - `defaultOnly`: defaults only, no user patterns
 //   - `combined`: defaults + user patterns (createIgnoreFilter)
 // and counting paths that the combined filter excludes but the defaults-only
@@ -629,15 +645,15 @@ function hasUserIgnoreFile(projectRoot) {
 // ---------------------------------------------------------------------------
 
 /**
- * Count newline-delimited lines in a file. Returns the number of `\n`
- * characters; this matches `wc -l` semantics (which counts newlines, not
- * "lines of content"). Files without a trailing newline therefore report
- * one fewer than the visible line count — same behavior as wc.
+ * Read a file once and count its newline-delimited lines. Returns both the raw
+ * bytes and the number of `\n` characters; the caller feeds those same bytes
+ * directly into the content digest without a second read or a whole-repo
+ * content concatenation. The count matches `wc -l` semantics.
  *
  * Per-file failure: emits a Warning: and returns null. Caller decides
  * whether to drop the file or keep it with sizeLines=0.
  */
-function countLines(absPath, posixPath) {
+function readAndCountLines(absPath, posixPath) {
   try {
     const buf = readFileSync(absPath);
     // Manual newline count beats split('\n').length on large files — no
@@ -646,7 +662,7 @@ function countLines(absPath, posixPath) {
     for (let i = 0; i < buf.length; i++) {
       if (buf[i] === 0x0a) count++;
     }
-    return count;
+    return { bytes: buf, sizeLines: count };
   } catch (err) {
     process.stderr.write(
       `Warning: scan-project: ${posixPath} — line count failed ` +
@@ -656,30 +672,77 @@ function countLines(absPath, posixPath) {
   }
 }
 
+const CONTENT_DIGEST_DOMAIN = Buffer.from('understand-anything:scan-content:v1\0', 'utf-8');
+
+/**
+ * Add one scanned regular file to the aggregate fingerprint. Entries arrive
+ * in compareStableStrings path order. Each frame is:
+ *   uint32be(path UTF-8 byte length) || uint64be(content byte length) ||
+ *   UTF-8 path bytes || raw content bytes
+ * Length prefixes make path/content and adjacent-entry boundaries unambiguous.
+ */
+function updateContentDigest(hash, posixPath, contentBytes) {
+  const pathBytes = Buffer.from(posixPath, 'utf-8');
+  const lengths = Buffer.allocUnsafe(12);
+  lengths.writeUInt32BE(pathBytes.length, 0);
+  lengths.writeBigUInt64BE(BigInt(contentBytes.length), 4);
+  hash.update(lengths);
+  hash.update(pathBytes);
+  hash.update(contentBytes);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // Parse CLI arguments: <projectRoot> <outputPath> [--exclude <patterns>]
-  let projectRoot, outputPath, excludePatterns = [];
-  for (let i = 2; i < process.argv.length; i++) {
-    const arg = process.argv[i];
-    if (arg === '--exclude' && i + 1 < process.argv.length) {
-      excludePatterns = process.argv[++i]
-        .split(',')
-        .map(p => p.trim())
-        .filter(Boolean);
-    } else if (!projectRoot) {
-      projectRoot = arg;
-    } else if (!outputPath) {
-      outputPath = arg;
+  const args = process.argv.slice(2);
+  let projectRoot;
+  let outputPath;
+  let excludeAnalysisData = false;
+  const excludePatterns = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--exclude-analysis-data') {
+      excludeAnalysisData = true;
+      continue;
     }
+    if (arg === '--exclude') {
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        process.stderr.write('scan-project.mjs failed: --exclude requires patterns\n');
+        process.exit(1);
+      }
+      excludePatterns.push(
+        ...value
+          .split(',')
+          .map(pattern => pattern.trim())
+          .filter(Boolean),
+      );
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      process.stderr.write(`scan-project.mjs failed: unknown option: ${arg}\n`);
+      process.exit(1);
+    }
+    if (!projectRoot) {
+      projectRoot = arg;
+      continue;
+    }
+    if (!outputPath) {
+      outputPath = arg;
+      continue;
+    }
+    process.stderr.write(`scan-project.mjs failed: unexpected argument: ${arg}\n`);
+    process.exit(1);
   }
 
   if (!projectRoot || !outputPath) {
     process.stderr.write(
-      'Usage: node scan-project.mjs <projectRoot> <outputPath> [--exclude <patterns>]\n',
+      'Usage: node scan-project.mjs <projectRoot> <outputPath> ' +
+      '[--exclude <patterns>] [--exclude-analysis-data]\n',
     );
     process.exit(1);
   }
@@ -699,7 +762,11 @@ async function main() {
   }
 
   // 1. Enumerate. Either git ls-files or recursive walk.
-  const candidates = enumerateFiles(projectRoot);
+  const candidates = enumerateFiles(projectRoot).filter(
+    rel =>
+      !excludeAnalysisData ||
+      (!rel.startsWith('.ua/') && !rel.startsWith('.understand-anything/')),
+  );
 
   const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
   validLanguageIds.add('tsx');
@@ -725,48 +792,62 @@ async function main() {
     // Dropped by combined filter. If defaults-only would have ALSO dropped
     // it, this is a baseline default drop — not counted. If defaults-only
     // would have KEPT it, this drop is attributable to the user's
-    // .understandignore content.
+    // .understandignore content or CLI --exclude patterns.
     if (userIgnoresPresent && !defaultsOnly.isIgnored(rel)) {
       filteredByIgnore++;
     }
   }
 
+  // The per-file pass, output, stats key insertion, and content fingerprint
+  // all consume this one locale-independent path order.
+  kept.sort(compareStableStrings);
+
   // 3. Per-file: language + category + line count.
   //    Drop files that fail line counting (per-file resilience).
   const fileEntries = [];
+  const contentHash = createHash('sha256');
+  contentHash.update(CONTENT_DIGEST_DOMAIN);
   for (const rel of kept) {
     const absPath = join(projectRoot, rel);
-    // Stat first — git ls-files could include paths that vanished between
-    // listing and processing; the walker shouldn't but defensive anyway.
+    // lstat first so Git-enumerated symlinks are rejected before any operation
+    // can follow them to a repository-external target.
     try {
-      const st = statSync(absPath);
+      const st = lstatSync(absPath);
+      if (st.isSymbolicLink()) {
+        process.stderr.write(
+          `Warning: scan-project: ${rel} — symbolic link skipped ` +
+          `— file skipped from output\n`,
+        );
+        continue;
+      }
       if (!st.isFile()) {
-        // Symlinks-to-dir, special files, etc. — skip silently. Not a
-        // warning condition because git wouldn't have tracked it as a file.
+        // Directories and special files are not scanned as regular-file input.
         continue;
       }
     } catch (err) {
       process.stderr.write(
-        `Warning: scan-project: ${rel} — stat failed (${err.message}) ` +
+        `Warning: scan-project: ${rel} — lstat failed (${err.message}) ` +
         `— file skipped from output\n`,
       );
       continue;
     }
-    const sizeLines = countLines(absPath, rel);
-    if (sizeLines === null) {
-      // countLines already emitted the Warning: line.
+    const scanned = readAndCountLines(absPath, rel);
+    if (scanned === null) {
+      // readAndCountLines already emitted the Warning: line.
       continue;
     }
+    updateContentDigest(contentHash, rel, scanned.bytes);
     fileEntries.push({
       path: rel,
       language: detectLanguage(rel, treeSitterExtensionLanguageMap),
-      sizeLines,
+      sizeLines: scanned.sizeLines,
       fileCategory: detectCategory(rel),
     });
   }
 
-  // 4. Determinism: sort by path.localeCompare.
-  fileEntries.sort((a, b) => a.path.localeCompare(b.path));
+  // 4. Determinism: preserve the documented locale-independent path order.
+  fileEntries.sort((a, b) => compareStableStrings(a.path, b.path));
+  const contentDigest = contentHash.digest('hex');
 
   // 5. Stats.
   const byCategory = {};
@@ -780,6 +861,7 @@ async function main() {
 
   const output = {
     scriptCompleted: true,
+    contentDigest,
     files: fileEntries,
     totalFiles: fileEntries.length,
     filteredByIgnore,

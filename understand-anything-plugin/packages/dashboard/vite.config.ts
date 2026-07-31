@@ -1,10 +1,16 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import type { IncomingMessage, ServerResponse } from "http";
+import {
+  getGraphFreshnessBatch,
+  type GraphFreshnessInput,
+  type GraphFreshnessResult,
+} from "../core/src/staleness";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -181,7 +187,109 @@ function readSourceFile(url: URL) {
   };
 }
 
-export default defineConfig({
+export interface DashboardFreshnessReport {
+  graphs: {
+    knowledge: GraphFreshnessResult;
+    domain?: GraphFreshnessResult;
+  };
+}
+
+function readGraphMetadata(graphFile: string): GraphFreshnessInput {
+  const graph = JSON.parse(fs.readFileSync(graphFile, "utf-8")) as {
+    project?: {
+      gitCommitHash?: unknown;
+      analyzedAt?: unknown;
+    };
+  };
+  return {
+    graphCommitHash:
+      typeof graph.project?.gitCommitHash === "string"
+        ? graph.project.gitCommitHash
+        : undefined,
+    lastAnalyzedAt:
+      typeof graph.project?.analyzedAt === "string"
+        ? graph.project.analyzedAt
+        : undefined,
+  };
+}
+
+export async function readGraphFreshness() {
+  const graphFile = findGraphFile("knowledge-graph.json");
+  if (!graphFile) {
+    return rejectFileRequest("No knowledge graph found. Run /understand first.", 404);
+  }
+
+  const domainGraphFile = path.join(path.dirname(graphFile), "domain-graph.json");
+  let knowledgeInput: GraphFreshnessInput;
+  let domainInput: GraphFreshnessInput | undefined;
+  try {
+    knowledgeInput = readGraphMetadata(graphFile);
+    domainInput = fs.existsSync(domainGraphFile)
+      ? readGraphMetadata(domainGraphFile)
+      : undefined;
+  } catch {
+    return rejectFileRequest("Failed to read graph file", 500);
+  }
+
+  const projectRoot = projectRootFromGraphFile(graphFile);
+  let graphs: DashboardFreshnessReport["graphs"];
+  if (domainInput) {
+    graphs = await getGraphFreshnessBatch(projectRoot, {
+      knowledge: knowledgeInput,
+      domain: domainInput,
+    });
+  } else {
+    const result = await getGraphFreshnessBatch(projectRoot, {
+      knowledge: knowledgeInput,
+    });
+    graphs = { knowledge: result.knowledge };
+  }
+
+  return {
+    statusCode: 200,
+    payload: { graphs } satisfies DashboardFreshnessReport,
+  };
+}
+
+type DashboardDataMiddleware = (
+  req: IncomingMessage,
+  res: ServerResponse,
+  next: () => void,
+) => void;
+
+export function createDashboardDataMiddleware(
+  accessToken: string,
+): DashboardDataMiddleware {
+  return (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
+    if (url.pathname !== "/staleness.json") {
+      next();
+      return;
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+
+    if (url.searchParams.get("token") !== accessToken) {
+      sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
+      return;
+    }
+
+    void readGraphFreshness()
+      .then((result) => sendJson(res, result.statusCode, result.payload))
+      .catch(() => {
+        sendJson(res, 500, { error: "Failed to read graph freshness" });
+      });
+  };
+}
+
+type DashboardViteConfig = UserConfig & {
+  test: {
+    environment: "node";
+    include: string[];
+  };
+};
+
+const config: DashboardViteConfig = {
   test: {
     environment: "node",
     include: ["src/**/__tests__/**/*.test.ts"],
@@ -248,6 +356,8 @@ export default defineConfig({
             `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
           );
         });
+
+        server.middlewares.use(createDashboardDataMiddleware(ACCESS_TOKEN));
 
         server.middlewares.use((req, res, next) => {
           const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
@@ -364,4 +474,6 @@ export default defineConfig({
       },
     },
   ],
-});
+};
+
+export default defineConfig(config);
