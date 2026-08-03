@@ -257,6 +257,7 @@ Para habilidades personales (disponibles en todos los proyectos), ejecuta el `in
 | KIMI CLI | ✅ Soportado | `install.sh kimi` |
 | Nanobot | ✅ Soportado | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Soportado | `install.sh kiro` |
+| AdaL CLI | ✅ Soportado | `install.sh adal` |
 
 ---
 

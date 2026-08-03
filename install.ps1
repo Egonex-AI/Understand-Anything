@@ -42,6 +42,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    adal        = @{ Target = (Join-Path $HOME '.adal\skills');               Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -244,6 +245,9 @@ function Cmd-Install([string]$Id) {
     }
     if ($Id -eq 'kiro') {
         Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
+    }
+    if ($Id -eq 'adal') {
+        Write-Host "`n  Tip: AdaL uses /plugin commands — install with /plugin marketplace add Egonex-AI/Understand-Anything and /plugin install understand-anything, or use the install.ps1 above."
     }
 }
 

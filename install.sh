@@ -42,6 +42,7 @@ kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+adal|$HOME/.adal/skills|per-skill
 EOF
 }
 
@@ -231,6 +232,9 @@ KIROEOF
   fi
   if [[ "$id" == "kiro" ]]; then
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
+  fi
+  if [[ "$id" == "adal" ]]; then
+    printf '\n  Tip: AdaL uses /plugin commands — install with /plugin marketplace add Egonex-AI/Understand-Anything and /plugin install understand-anything, or use the install.sh script above.\n'
   fi
 }
 
