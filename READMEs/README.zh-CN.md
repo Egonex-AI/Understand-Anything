@@ -139,7 +139,7 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 
 在项目的**首次运行**时 —— 当你没有传入 `--language` 且尚未存储语言设置时 —— `/understand` 会检测你正在使用的语言。如果检测到非英语，它会询问你确认（或改用其他语言）后再生成；英语对话不受影响。你的选择会保存到 `.ua/config.json` 并在后续运行中复用。
 
-**项目级 tree-sitter 扩展别名：** 如果你的代码库使用自定义文件扩展名，可以在 `.understand-anything/config.json` 中添加：
+**项目级 tree-sitter 扩展别名：** 如果你的代码库使用自定义文件扩展名，可以在 `.ua/config.json` 中添加（如果你的项目仍在使用旧版 `.understand-anything/` 目录，也可以使用该目录下的 `config.json`）：
 
 ```json
 {

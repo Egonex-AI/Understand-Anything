@@ -140,7 +140,7 @@ A multi-agent pipeline scans your project, extracts every file, function, class,
 
 On the **first run** in a project — when you don't pass `--language` and no language is stored yet — `/understand` detects the language you're conversing in. If it isn't English, it asks you to confirm (or override) before generating; English conversations are unaffected. Your choice is saved to `.ua/config.json` and reused on every later run.
 
-**Project-level tree-sitter extension aliases:** If your codebase uses custom file extensions, add them to `.understand-anything/config.json`:
+**Project-level tree-sitter extension aliases:** If your codebase uses custom file extensions, add them to `.ua/config.json` (or the legacy `.understand-anything/config.json` if your project already uses that directory):
 
 ```json
 {

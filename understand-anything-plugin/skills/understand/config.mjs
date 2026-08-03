@@ -1,7 +1,24 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// ---------------------------------------------------------------------------
+// Resolve the config file path. Try the current `.ua/config.json` first
+// (the resolved data directory for new projects and already-analysed
+// projects that use `.ua/`), then fall back to the legacy
+// `.understand-anything/config.json`. This avoids the data-directory
+// switch triggered by `resolveUaDirName()` in core when only a
+// config-only `.understand-anything/` directory exists — the mere
+// presence of that directory would cause all subsequent graph, metadata,
+// and fingerprint reads to look in `.understand-anything/` instead of
+// the existing `.ua/`, silently abandoning incremental state.
+// ---------------------------------------------------------------------------
 export const CONFIG_RELATIVE_PATH = '.understand-anything/config.json';
+
+function resolveConfigPath(projectRoot) {
+  const uaPath = join(projectRoot, '.ua', 'config.json');
+  if (existsSync(uaPath)) return uaPath;
+  return join(projectRoot, CONFIG_RELATIVE_PATH);
+}
 
 function normalizeExtension(rawExtension) {
   if (typeof rawExtension !== 'string') {
@@ -58,7 +75,7 @@ export function readTreeSitterExtensionLanguageMap(
   projectRoot,
   options = {},
 ) {
-  const configPath = join(projectRoot, CONFIG_RELATIVE_PATH);
+  const configPath = resolveConfigPath(projectRoot);
   if (!existsSync(configPath)) return {};
 
   const raw = readFileSync(configPath, 'utf-8');

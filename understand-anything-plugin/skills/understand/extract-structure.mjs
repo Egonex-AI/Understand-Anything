@@ -92,7 +92,9 @@ async function main() {
   // Create registry and register tree-sitter + all non-code parsers
   const languageRegistry = LanguageRegistry.createDefault();
   for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
-    languageRegistry.registerExtensionAlias(ext, languageId);
+    // tsx is a synthetic grammar key for tree-sitter selection — it is
+    // NOT a LanguageRegistry id, so map it to typescript for registration.
+    languageRegistry.registerExtensionAlias(ext, languageId === 'tsx' ? 'typescript' : languageId);
   }
   const registry = new PluginRegistry(languageRegistry);
   registry.register(tsPlugin);

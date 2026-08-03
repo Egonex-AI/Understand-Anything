@@ -140,7 +140,7 @@ Understand Anything は [Claude Code Plugin](https://code.claude.com/docs/en/plu
 
 プロジェクトでの**初回実行時**に `--language` を指定せず、保存済みの言語設定もない場合、`/understand` は会話で使われている言語を検出します。英語以外が検出された場合は、生成前にその言語を使用するか、別の言語へ変更するかを確認します。英語での会話には影響しません。選択結果は `.ua/config.json` に保存され、以降の実行でも再利用されます。
 
-**プロジェクトレベルの tree-sitter 拡張子エイリアス：** コードベースでカスタムファイル拡張子を使用している場合、`.understand-anything/config.json` に追加できます：
+**プロジェクトレベルの tree-sitter 拡張子エイリアス：** コードベースでカスタムファイル拡張子を使用している場合、`.ua/config.json` に追加できます（またはプロジェクトが既存の `.understand-anything/` ディレクトリを使用している場合はそのディレクトリの `config.json`）:
 
 ```json
 {

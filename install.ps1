@@ -204,7 +204,15 @@ function Link-AgentProfiles([string]$Target) {
 
     Get-ChildItem -Path $root -Filter '*.md' -File | Sort-Object Name | ForEach-Object {
         $link = Join-Path $Target $_.Name
-        New-Junction $link $_.FullName
+        # Agent profiles are Markdown FILES — New-Junction creates NTFS
+        # directory junctions which only target directories. Use file
+        # symbolic links instead.
+        if (Test-IsReparse $link) {
+            (Get-Item -LiteralPath $link -Force).Delete()
+        } elseif (Test-Path $link) {
+            Write-Error "Refusing to overwrite $link — it is a real file, not a symlink. Move or remove it first."
+        }
+        New-Item -ItemType SymbolicLink -Path $link -Target $_.FullName | Out-Null
         Write-Host "  ✓ $link → $($_.FullName)"
     }
 }

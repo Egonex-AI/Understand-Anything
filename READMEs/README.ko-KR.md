@@ -139,7 +139,7 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 
 프로젝트에서의 **첫 실행 시** — `--language`를 지정하지 않고 저장된 언어 설정도 없을 때 — `/understand`는 대화에서 사용 중인 언어를 감지합니다. 영어가 아닌 것이 감지되면, 생성 전에 해당 언어를 사용할지 다른 언어로 변경할지 확인합니다. 영어 대화에는 영향이 없습니다. 선택 결과는 `.ua/config.json`에 저장되어 이후 실행에서도 재사용됩니다.
 
-**프로젝트 수준 tree-sitter 확장 별칭:** 코드베이스에서 커스텀 파일 확장자를 사용하는 경우, `.understand-anything/config.json`에 추가할 수 있습니다:
+**프로젝트 수준 tree-sitter 확장 별칭:** 코드베이스에서 커스텀 파일 확장자를 사용하는 경우, `.ua/config.json`에 추가할 수 있습니다 (또는 프로젝트가 기존 `.understand-anything/` 디렉토리를 사용 중이라면 해당 디렉토리의 `config.json`):
 
 ```json
 {

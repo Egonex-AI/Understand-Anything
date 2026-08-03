@@ -85,7 +85,9 @@ async function extractExports(projectRoot, codeFiles) {
     await tsPlugin.init();
     const languageRegistry = LanguageRegistry.createDefault();
     for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
-      languageRegistry.registerExtensionAlias(ext, languageId);
+      // tsx is a synthetic grammar key for tree-sitter selection — it is
+      // NOT a LanguageRegistry id, so map it to typescript.
+      languageRegistry.registerExtensionAlias(ext, languageId === 'tsx' ? 'typescript' : languageId);
     }
     registry = new PluginRegistry(languageRegistry);
     registry.register(tsPlugin);

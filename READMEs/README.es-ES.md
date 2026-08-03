@@ -139,7 +139,7 @@ Un pipeline multi-agente escanea tu proyecto, extrae cada archivo, función, cla
 
 En la **primera ejecución** en un proyecto — cuando no pasas `--language` y no hay un idioma guardado aún — `/understand` detecta el idioma en el que estás conversando. Si no es inglés, te pide confirmar (o cambiar) antes de generar; las conversaciones en inglés no se ven afectadas. Tu elección se guarda en `.ua/config.json` y se reutiliza en cada ejecución posterior.
 
-**Alias de extensiones tree-sitter a nivel de proyecto:** Si tu código usa extensiones de archivo personalizadas, puedes agregarlas a `.understand-anything/config.json`:
+**Alias de extensiones tree-sitter a nivel de proyecto:** Si tu código usa extensiones de archivo personalizadas, puedes agregarlas a `.ua/config.json` (o al legacy `.understand-anything/config.json` si tu proyecto ya usa ese directorio):
 
 ```json
 {
