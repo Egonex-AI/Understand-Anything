@@ -247,7 +247,7 @@ function Cmd-Install([string]$Id) {
         Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
     }
     if ($Id -eq 'adal') {
-        Write-Host "`n  Tip: AdaL uses /plugin commands — install with /plugin marketplace add Egonex-AI/Understand-Anything and /plugin install understand-anything, or use the install.ps1 above."
+        Write-Host "`n  Tip: AdaL uses /plugin commands — install via the marketplace: /plugin marketplace add Egonex-AI/Understand-Anything then /plugin install understand-anything (or run install.ps1 adal)."
     }
 }
 

@@ -234,7 +234,7 @@ KIROEOF
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
   fi
   if [[ "$id" == "adal" ]]; then
-    printf '\n  Tip: AdaL uses /plugin commands — install with /plugin marketplace add Egonex-AI/Understand-Anything and /plugin install understand-anything, or use the install.sh script above.\n'
+    printf '\n  Tip: AdaL uses /plugin commands — install via the marketplace: /plugin marketplace add Egonex-AI/Understand-Anything then /plugin install understand-anything (or run install.sh adal).\n'
   fi
 }
 
