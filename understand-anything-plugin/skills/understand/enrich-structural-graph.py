@@ -144,11 +144,11 @@ def main() -> int:
         return 2
 
     path = Path(sys.argv[1])
-    graph = json.loads(path.read_text())
+    graph = json.loads(path.read_text(encoding="utf-8"))
     stats = enrich(graph)
 
     if "--write" in sys.argv:
-        path.write_text(json.dumps(graph, indent=2, ensure_ascii=False))
+        path.write_text(json.dumps(graph, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Wrote {path}")
     print(f"Enriched nodes: {len(graph.get('nodes', []))}")
     print("Fields added:", dict(stats))
