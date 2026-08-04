@@ -249,8 +249,8 @@ KIROEOF
   fi
   if [[ "$id" == "opencode" ]]; then
     printf '\n  Tip: OpenCode runs /understand as a structural-only analysis (no subagent\n'
-    printf '       dispatch — see docs/platforms/opencode.md upstream). Run it in Claude\n'
-    printf '       Code for the full LLM-enriched graph.\n'
+    printf '       dispatch — see the upstream OpenCode platform documentation). Run it in\n'
+    printf '       Claude Code for the full LLM-enriched graph.\n'
   fi
   if [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'

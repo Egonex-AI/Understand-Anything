@@ -13,7 +13,7 @@ so the LLM subagent phases of `/understand` (file analysis, architecture,
 tour, review) cannot run. This command runs the deterministic pipeline only —
 the result is a structural graph (file nodes + import edges) with
 schema-valid `complexity`, `tags`, and `summary` fields. No LLM summaries,
-layers, or tours. See `docs/platforms/opencode.md` (upstream) for the
+layers, or tours. See the upstream OpenCode platform documentation for the
 compatibility matrix and future directions.
 
 ## Procedure
