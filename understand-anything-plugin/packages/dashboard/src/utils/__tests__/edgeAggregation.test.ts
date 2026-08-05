@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { aggregateContainerEdges } from "../edgeAggregation";
-import type { GraphEdge, EdgeType } from "@understand-anything/core/types";
+import { aggregateContainerEdges, aggregateLayerEdges, computePortals } from "../edgeAggregation";
+import type { GraphEdge, EdgeType, KnowledgeGraph, Layer } from "@understand-anything/core/types";
 
 const ce = (source: string, target: string, type: EdgeType = "calls"): GraphEdge => ({
   source,
@@ -9,6 +9,17 @@ const ce = (source: string, target: string, type: EdgeType = "calls"): GraphEdge
   direction: "forward",
   weight: 1,
 });
+
+function makeGraph(layers: Layer[], edges: GraphEdge[]): KnowledgeGraph {
+  return {
+    version: "1.0",
+    project: { name: "test", languages: [], frameworks: [], description: "", analyzedAt: "", gitCommitHash: "" },
+    nodes: [],
+    edges,
+    layers,
+    tour: [],
+  };
+}
 
 describe("aggregateContainerEdges", () => {
   it("returns empty arrays for empty input", () => {
@@ -75,5 +86,94 @@ describe("aggregateContainerEdges", () => {
     ]);
     const r = aggregateContainerEdges([ce("a", "b"), ce("c", "d")], m);
     expect(r.interContainerAggregated).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// aggregateLayerEdges
+// ---------------------------------------------------------------------------
+describe("aggregateLayerEdges", () => {
+  const layers: Layer[] = [
+    { id: "layer:presentation", name: "Presentation", description: "", nodeIds: ["p1", "p2"] },
+    { id: "layer:api", name: "API", description: "", nodeIds: ["a1"] },
+    { id: "layer:services", name: "Services", description: "", nodeIds: ["s1"] },
+  ];
+
+  it("returns empty array for no cross-layer edges", () => {
+    const g = makeGraph(layers, [ce("p1", "p2")]);
+    expect(aggregateLayerEdges(g)).toEqual([]);
+  });
+
+  it("normalizes edge direction to architectural order (top→bottom)", () => {
+    // Edge from services (index 2) to presentation (index 0) should be
+    // normalized to presentation→services.
+    const g = makeGraph(layers, [ce("s1", "p1")]);
+    const result = aggregateLayerEdges(g);
+    expect(result).toHaveLength(1);
+    expect(result[0].sourceLayerId).toBe("layer:presentation");
+    expect(result[0].targetLayerId).toBe("layer:services");
+  });
+
+  it("merges bidirectional edges into one aggregated edge", () => {
+    const g = makeGraph(layers, [ce("p1", "a1"), ce("a1", "p1")]);
+    const result = aggregateLayerEdges(g);
+    expect(result).toHaveLength(1);
+    expect(result[0].count).toBe(2);
+    expect(result[0].sourceLayerId).toBe("layer:presentation");
+    expect(result[0].targetLayerId).toBe("layer:api");
+  });
+
+  it("collects multiple edge types", () => {
+    const g = makeGraph(layers, [
+      ce("p1", "a1", "calls"),
+      ce("p1", "a1", "imports"),
+    ]);
+    const result = aggregateLayerEdges(g);
+    expect(result).toHaveLength(1);
+    expect(result[0].edgeTypes.sort()).toEqual(["calls", "imports"]);
+  });
+
+  it("ignores intra-layer edges", () => {
+    const g = makeGraph(layers, [ce("p1", "p2"), ce("a1", "a1")]);
+    expect(aggregateLayerEdges(g)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computePortals
+// ---------------------------------------------------------------------------
+describe("computePortals", () => {
+  const layers: Layer[] = [
+    { id: "layer:presentation", name: "Presentation", description: "", nodeIds: ["p1"] },
+    { id: "layer:api", name: "API", description: "", nodeIds: ["a1"] },
+    { id: "layer:services", name: "Services", description: "", nodeIds: ["s1"] },
+  ];
+
+  it("finds connected layers regardless of edge direction", () => {
+    // Edge from services→presentation (reverse architectural order)
+    const g = makeGraph(layers, [ce("s1", "p1")]);
+    const portals = computePortals(g, "layer:presentation");
+    expect(portals).toHaveLength(1);
+    expect(portals[0].layerId).toBe("layer:services");
+    expect(portals[0].connectionCount).toBe(1);
+  });
+
+  it("returns empty for isolated layer", () => {
+    const g = makeGraph(layers, [ce("p1", "a1")]);
+    const portals = computePortals(g, "layer:services");
+    expect(portals).toEqual([]);
+  });
+
+  it("counts connections from precomputed aggregation", () => {
+    const g = makeGraph(layers, [
+      ce("p1", "a1"),
+      ce("p1", "a1", "imports"),
+      ce("p1", "s1"),
+    ]);
+    const agg = aggregateLayerEdges(g);
+    const portals = computePortals(g, "layer:presentation", agg);
+    expect(portals).toHaveLength(2);
+    const apiPortal = portals.find((p) => p.layerId === "layer:api");
+    expect(apiPortal?.connectionCount).toBe(2);
   });
 });
