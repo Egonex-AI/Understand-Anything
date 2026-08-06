@@ -107,6 +107,13 @@ _JS_TS_TEST_EXTS: frozenset[str] = frozenset(_JS_TS_EXTS)
 # mirroring `src/`, `app/`, `lib/`, or the project root.
 _MIRROR_PRODUCTION_ROOTS: tuple[str, ...] = ("src", "app", "lib", "")
 
+# Extensions whose test files carry no basename convention at all, so the
+# only available signal is directory position. Cargo compiles every `.rs`
+# file directly inside a crate's `tests/` directory as an integration-test
+# binary whatever it is named (`smoke_risk.rs`, `sonar_shellout.rs`); Rust
+# unit tests live inline behind `#[cfg(test)]` rather than in their own files.
+_DIR_CONVENTION_TEST_EXTS: frozenset[str] = frozenset({".rs"})
+
 # Per-extension test-name patterns: ext → (prefix_patterns, suffix_patterns).
 # A basename qualifies as a test if its stem starts with any prefix or ends
 # with any suffix listed for its extension. JS/TS family is handled separately
@@ -327,14 +334,27 @@ def _basename(path: str) -> str:
     return path.rsplit("/", 1)[-1] if "/" in path else path
 
 
+def _parent_dir(path: str) -> str:
+    """Name of the directory immediately containing `path` ("" at the root)."""
+    return path.rsplit("/", 2)[-2] if "/" in path else ""
+
+
 def is_test_path(path: str) -> bool:
-    """Return True if `path` looks like a test file by basename convention.
+    """Return True if `path` looks like a test file.
+
+    Most languages are matched by basename convention. Extensions listed in
+    `_DIR_CONVENTION_TEST_EXTS` have no such convention and are matched by
+    directory position instead.
 
     Files inside `tests/`, `__tests__/`, `test/`, or `spec/` directories that
     do NOT carry a recognized test extension are treated as helpers/fixtures
     and classified as non-test (so `__tests__/helpers.ts` is not a test).
     """
     stem, ext = os.path.splitext(_basename(path))
+
+    # No basename convention for this extension: use directory position.
+    if ext in _DIR_CONVENTION_TEST_EXTS:
+        return _parent_dir(path) == "tests"
 
     # JS/TS family: the test marker is an infix on the stem (foo.test.ts has
     # stem "foo.test", ext ".ts"), not a prefix/suffix on the stem itself.
