@@ -282,6 +282,110 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     );
   });
 
+  // ── JSONC tsconfig: comments must not eat the config ────────────────────
+  // tsconfig.json is JSONC, and a real one carries both `//` comments and
+  // glob patterns. The previous regex stripper did not honor string literals,
+  // so the `/*` inside `"@/*"` opened a spurious block comment that the `*/`
+  // inside `"**/*.ts"` closed — deleting every key in between. Such a
+  // tsconfig failed the stripped parse AND the raw parse, so parseTsConfigText
+  // returned null and every alias was silently dropped from the import map.
+
+  it('resolves aliases in a tsconfig with line comments and glob patterns', () => {
+    // Deliberately NOT JSON.stringify: the comments are the point.
+    projectRoot = setupTree({
+      'tsconfig.json': [
+        '{',
+        '  "compilerOptions": {',
+        '    "moduleResolution": "bundler",',
+        '    // Comment sitting between the globs and the alias.',
+        '    "allowImportingTsExtensions": true,',
+        '    "paths": {',
+        '      "@/*": ["./src/*"]',
+        '    }',
+        '  },',
+        '  "include": ["**/*.ts", "**/*.tsx"]',
+        '}',
+        '',
+      ].join('\n'),
+      'src/app.ts': `import { x } from '@/lib/thing';\nconst _ = x;\n`,
+      'src/lib/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('failed to parse');
+    expect(result.output.importMap['src/app.ts']).toContain('src/lib/thing.ts');
+  });
+
+  it('resolves aliases in a tsconfig with a block comment and glob patterns', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': [
+        '{',
+        '  "compilerOptions": {',
+        '    /* Block comment, multi-line.',
+        '       Still a comment. */',
+        '    "paths": { "@/*": ["./src/*"] }',
+        '  },',
+        '  "include": ["**/*.ts"]',
+        '}',
+        '',
+      ].join('\n'),
+      'src/app.ts': `import { x } from '@/lib/thing';\nconst _ = x;\n`,
+      'src/lib/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('src/lib/thing.ts');
+  });
+
+  it('does not treat "//" inside a string value as a comment', () => {
+    // A URL in a tsconfig string must survive the stripper untouched;
+    // otherwise the value is truncated and the JSON becomes unparseable.
+    projectRoot = setupTree({
+      'tsconfig.json': [
+        '{',
+        '  "compilerOptions": {',
+        '    "paths": { "@/*": ["./src/*"] }',
+        '  },',
+        '  "$schema": "https://json.schemastore.org/tsconfig",',
+        '  "include": ["**/*.ts"]',
+        '}',
+        '',
+      ].join('\n'),
+      'src/app.ts': `import { x } from '@/lib/thing';\nconst _ = x;\n`,
+      'src/lib/thing.ts': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('src/lib/thing.ts');
+  });
+
   // ── Issue #214: tsconfig path-alias targets with leading "./" ───────────
   // create-next-app ships `"@/*": ["./*"]` as the default. With a root
   // tsconfig the candidate would stay as "./lib/thing" while ctx.fileSet
