@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understand Anything · Project Infographic (Blueprint)</title>
+<style>
+  :root{
+    --bg:#0a2747; --bg2:#072039; --grid:rgba(255,255,255,.07); --gridM:rgba(160,200,255,.16);
+    --line:rgba(160,200,255,.5); --line2:rgba(160,200,255,.24);
+    --ink:#e6f0ff; --head:#ffffff; --muted:#a9c2e8; --faint:#6f8fc0;
+    --accent:#7fb0ff; --cyan:#9fe0ff; --amber:#ffd27a; --orange:#ff9d5c; --lime:#a8e6b0; --red:#ff9aa6;
+    --mono:"JetBrains Mono","SF Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#041427}
+  .canvas{
+    width:1600px;height:1010px;position:relative;overflow:hidden;color:var(--ink);font-family:var(--sans);
+    background:linear-gradient(180deg,var(--bg),var(--bg2));
+    padding:38px 44px;
+  }
+  /* blueprint grid: minor + major */
+  .canvas::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:
+      linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px),
+      linear-gradient(var(--gridM) 1px,transparent 1px),linear-gradient(90deg,var(--gridM) 1px,transparent 1px);
+    background-size:40px 40px,40px 40px,200px 200px,200px 200px}
+  .canvas::after{content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 160px rgba(0,0,0,.45)}
+  /* corner registration marks */
+  .reg{position:absolute;width:18px;height:18px;border:0;z-index:3;opacity:.8}
+  .reg::before,.reg::after{content:"";position:absolute;background:var(--line)}
+  .reg::before{left:8px;top:0;width:1px;height:18px}.reg::after{top:8px;left:0;height:1px;width:18px}
+  .reg.tl{left:14px;top:14px}.reg.tr{right:14px;top:14px}.reg.bl{left:14px;bottom:14px}.reg.br{right:14px;bottom:14px}
+  .mono{font-family:var(--mono)}
+  .glow-c,.glow-m{text-shadow:none}
+  header{display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:16px;margin-bottom:20px;
+    border-bottom:1px solid var(--line);position:relative;z-index:2}
+  .brand{display:flex;align-items:center;gap:16px}
+  .logo{width:54px;height:54px;border-radius:8px;display:grid;place-items:center;font-family:Georgia,serif;font-weight:700;font-size:30px;color:var(--head);
+    background:rgba(255,255,255,.04);border:1.5px solid var(--line)}
+  h1{font-size:34px;letter-spacing:3px;font-weight:800;color:var(--head)}
+  .tag{color:var(--accent);font-size:14.5px;margin-top:4px;letter-spacing:.6px;font-family:var(--mono)}
+  .stamp{text-align:right;font-family:var(--mono);font-size:12px;color:var(--faint);line-height:1.7;position:relative;z-index:2}
+  .stamp b{color:var(--accent)}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);grid-auto-rows:minmax(0,1fr);gap:16px;height:836px;position:relative;z-index:2}
+  .card{background:rgba(255,255,255,.025);border:1px solid var(--line2);border-radius:6px;padding:18px 20px;position:relative;overflow:hidden}
+  /* drawing corner ticks */
+  .card::before{content:attr(data-id);position:absolute;top:9px;right:12px;font-family:var(--mono);font-size:10px;color:var(--accent);opacity:.85;letter-spacing:1px}
+  .card::after{content:"";position:absolute;left:10px;top:10px;width:10px;height:10px;border-left:1px solid var(--line);border-top:1px solid var(--line);opacity:.6}
+  .ct{font-family:var(--mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:10px;padding-left:16px}
+  .lead{font-size:15px;color:var(--ink);line-height:1.5}
+  .muted{color:var(--muted)}
+  .big{font-size:22px;font-weight:800;letter-spacing:-.2px;color:var(--head)}
+  .s-what{grid-column:span 7;grid-row:span 2}.s-stack{grid-column:span 5;grid-row:span 2}
+  .s-pipe{grid-column:span 12;grid-row:span 2}.s-bot{grid-column:span 4;grid-row:span 3}
+  .s-safe{grid-column:span 4;grid-row:span 3}.s-sec{grid-column:span 4;grid-row:span 2}
+  .s-cost{grid-column:span 4;grid-row:span 1}
+  .flow{display:flex;align-items:stretch;margin-top:6px}
+  .step{flex:1;background:rgba(127,176,255,.06);border:1px solid var(--line2);border-radius:4px;padding:12px;text-align:center}
+  .step .n{font-family:var(--mono);font-size:10px;color:var(--accent)}
+  .step .l{font-size:14px;font-weight:700;margin-top:4px;color:var(--head)}
+  .step .s{font-family:var(--mono);font-size:11px;color:var(--cyan);margin-top:3px}
+  .arrow{display:grid;place-items:center;color:var(--accent);font-size:18px;width:30px;flex:0 0 30px}
+  .chain{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .node{border:1px solid var(--line2);border-radius:4px;padding:10px 12px;background:rgba(127,176,255,.05);position:relative}
+  .node .h{font-weight:700;font-size:14.5px;color:var(--head)}.node .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .node .pill{position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid}
+  .pill.get{color:var(--lime);border-color:rgba(168,230,176,.6)}.pill.post{color:var(--orange);border-color:rgba(255,157,92,.6)}
+  .grp{font-family:var(--mono);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan);margin:12px 0 6px}
+  .grp:first-of-type{margin-top:2px}
+  .modes{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-family:var(--mono);font-size:11px;padding:3px 9px;border:1px solid var(--line);border-radius:3px;color:var(--ink);background:rgba(127,176,255,.05)}
+  .chip.amb{border-color:rgba(255,210,122,.6);color:var(--amber)}
+  .chip.org{border-color:rgba(255,157,92,.6);color:var(--orange)}
+  .layer{display:flex;gap:10px;align-items:flex-start;margin-top:9px}
+  .dot{width:8px;height:8px;border-radius:1px;margin-top:5px;flex:0 0 8px}
+  .layer .t{font-size:13px;color:var(--ink);line-height:1.45}
+  .stackgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+  .scol .sh{font-family:var(--mono);font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .tagrow{display:flex;flex-wrap:wrap;gap:5px}
+  .t2{font-size:11.5px;padding:3px 8px;border-radius:3px;background:rgba(127,176,255,.06);border:1px solid var(--line2);color:#cfe0ff}
+  .sec li{list-style:none;font-size:13px;color:var(--ink);padding:6px 0;border-bottom:1px dashed var(--line2);display:flex;gap:8px}
+  .sec li:last-child{border-bottom:0}.sec .k{color:var(--accent);font-family:var(--mono);font-size:12px;flex:0 0 14px}
+  .sec .src{color:var(--cyan);font-family:var(--mono);font-size:11px;margin-left:auto;white-space:nowrap}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:6px}
+  .stat{text-align:center}
+  .stat .v{font-family:var(--mono);font-size:30px;font-weight:800;color:var(--cyan)}
+  .stat .v.ok{color:var(--lime)}
+  .stat .v.org{color:var(--orange)}
+  .stat .k{font-size:11px;color:var(--muted);margin-top:2px}
+  .cost{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.cost .v{font-family:var(--mono);font-size:15px;color:var(--lime);font-weight:800}
+  footer{position:absolute;bottom:14px;left:44px;right:44px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint);border-top:1px solid var(--line);padding-top:10px;z-index:2}
+</style>
+</head>
+<body>
+<div class="canvas">
+  <span class="reg tl"></span><span class="reg tr"></span><span class="reg bl"></span><span class="reg br"></span>
+  <header style="padding-bottom:12px;margin-bottom:16px">
+    <div class="brand">
+      <div class="logo">U</div>
+      <div>
+        <h1>UNDERSTAND&nbsp;ANYTHING</h1>
+        <div class="tag">Turn any codebase into an interactive knowledge graph</div>
+      </div>
+    </div>
+    <div class="stamp">
+      TECHNICAL&nbsp;SCHEMATIC<br/>
+      layout <b>bento-grid</b> &middot; style <b>blueprint</b><br/>
+      SHEET&nbsp;1 OF 1 &middot; 2026-08-09
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- 01 WHAT IT IS -->
+    <div class="card s-what" data-id="01">
+      <div class="ct">What it is</div>
+      <div class="big">A multi-agent pipeline that turns a repo into a knowledge graph.</div>
+      <div class="lead muted" style="margin-top:10px">
+        Tree-sitter parses source into structural facts (imports, exports, definitions, call sites).
+        LLM agents supply what parsers cannot: plain-English summaries, architectural layers, business
+        domains, guided tours. It all lands in <b style="color:var(--cyan)">.understand-anything/knowledge-graph.json</b>,
+        and a React dashboard makes it clickable. The graph is <b style="color:var(--lime)">just JSON</b>, so a team
+        commits it once and everyone else skips the pipeline.
+      </div>
+    </div>
+
+    <!-- 06 STACK -->
+    <div class="card s-stack" data-id="06">
+      <div class="ct">Stack</div>
+      <div class="stackgrid">
+        <div class="scol"><div class="sh">Dashboard</div>
+          <div class="tagrow"><span class="t2">React 19</span><span class="t2">Vite 6</span><span class="t2">Tailwind 4</span><span class="t2">xyflow</span><span class="t2">zustand</span><span class="t2">graphology</span></div></div>
+        <div class="scol"><div class="sh">Core</div>
+          <div class="tagrow"><span class="t2">TypeScript</span><span class="t2">tree-sitter</span><span class="t2">zod</span><span class="t2">fuse.js</span><span class="t2">pnpm workspace</span><span class="t2">vitest</span></div></div>
+      </div>
+      <div class="lead muted" style="margin-top:10px;font-size:13px">366 TypeScript files and 49 test suites across core, dashboard, and two wasm grammar packages.</div>
+    </div>
+
+    <!-- 02 PIPELINE -->
+    <div class="card s-pipe" data-id="02">
+      <div class="ct">Pipeline &middot; /understand, phase 0 through 7</div>
+      <div class="flow">
+        <div class="step"><div class="n">01</div><div class="l">Scan</div><div class="s">project-scanner</div></div>
+        <div class="arrow">&#9656;</div>
+        <div class="step"><div class="n">02</div><div class="l">Batch</div><div class="s">20 to 30 files</div></div>
+        <div class="arrow">&#9656;</div>
+        <div class="step"><div class="n">03</div><div class="l">Analyze</div><div class="s">5 in parallel</div></div>
+        <div class="arrow">&#9656;</div>
+        <div class="step"><div class="n">04</div><div class="l">Layers</div><div class="s">architecture</div></div>
+        <div class="arrow">&#9656;</div>
+        <div class="step"><div class="n">05</div><div class="l">Tours</div><div class="s">dependency order</div></div>
+        <div class="arrow">&#9656;</div>
+        <div class="step"><div class="n">06</div><div class="l">Save</div><div class="s">graph + meta.json</div></div>
+      </div>
+      <div class="lead muted" style="margin-top:12px;font-size:13px">Phase 3 assemble-review recovers nodes dropped in the batch merge, phase 6 graph-review checks referential integrity, and phase 7 writes a fingerprint baseline before meta.json so the next run can go incremental.</div>
+    </div>
+
+    <!-- 03 COMMANDS -->
+    <div class="card s-bot" data-id="03">
+      <div class="ct">Slash commands &middot; 8</div>
+      <div class="grp">Build and explore</div>
+      <div class="modes"><span class="chip">/understand</span><span class="chip">/understand-dashboard</span></div>
+      <div class="grp">Ask and learn</div>
+      <div class="modes"><span class="chip">/understand-chat</span><span class="chip">/understand-explain</span><span class="chip">/understand-onboard</span></div>
+      <div class="grp">Deeper views</div>
+      <div class="modes"><span class="chip org">/understand-diff</span><span class="chip org">/understand-domain</span><span class="chip amb">/understand-knowledge</span></div>
+      <div class="grp">Install targets &middot; 17</div>
+      <div class="modes"><span class="chip">Claude Code</span><span class="chip">Cursor</span><span class="chip">Copilot</span><span class="chip">Codex</span><span class="chip">Gemini CLI</span><span class="chip">OpenCode</span><span class="chip">Kiro</span></div>
+    </div>
+
+    <!-- 04 AGENTS -->
+    <div class="card s-safe" data-id="04">
+      <div class="ct">Agents &middot; 9</div>
+      <ul class="sec">
+        <li><span class="k">&#9656;</span><div>project-scanner</div><span class="src">scan</span></li>
+        <li><span class="k">&#9656;</span><div>file-analyzer</div><span class="src">nodes + edges</span></li>
+        <li><span class="k">&#9656;</span><div>architecture-analyzer</div><span class="src">layers</span></li>
+        <li><span class="k">&#9656;</span><div>tour-builder</div><span class="src">tours</span></li>
+        <li><span class="k">&#9656;</span><div>graph-reviewer &middot; assemble-reviewer</div><span class="src">validate</span></li>
+        <li><span class="k">&#9656;</span><div>domain-analyzer</div><span class="src">business flows</span></li>
+        <li><span class="k">&#9656;</span><div>article-analyzer &middot; knowledge-graph-guide</div><span class="src">wiki</span></li>
+      </ul>
+    </div>
+
+    <!-- 05 LANGUAGES -->
+    <div class="card s-sec" data-id="05">
+      <div class="ct">Parsers &middot; 41 language configs</div>
+      <div class="modes"><span class="chip">TypeScript</span><span class="chip">JavaScript</span><span class="chip">Python</span><span class="chip">Go</span><span class="chip">Java</span><span class="chip">Rust</span><span class="chip">C</span><span class="chip">C++</span><span class="chip">C#</span><span class="chip">Ruby</span><span class="chip">PHP</span><span class="chip">Swift</span><span class="chip">Kotlin</span><span class="chip">Dart</span><span class="chip amb">Docker</span><span class="chip amb">Kubernetes</span><span class="chip amb">Terraform</span><span class="chip amb">OpenAPI</span></div>
+      <div class="lead muted" style="font-size:12.5px;margin-top:10px">14 are tree-sitter backed (Swift and Dart via wasm). 10 framework detectors cover React, Next, Vue, Django, Rails, Spring, Gin.</div>
+    </div>
+
+    <!-- 07 BY THE NUMBERS -->
+    <div class="card s-sec" data-id="07">
+      <div class="ct">By the numbers</div>
+      <div class="stats">
+        <div class="stat"><div class="v">41</div><div class="k">languages</div></div>
+        <div class="stat"><div class="v">9</div><div class="k">agents</div></div>
+        <div class="stat"><div class="v org">8</div><div class="k">commands</div></div>
+        <div class="stat"><div class="v ok">17</div><div class="k">platforms</div></div>
+      </div>
+      <div class="lead muted" style="font-size:12.5px;margin-top:12px">Later runs are incremental: only files whose tree-sitter fingerprint changed get re-analyzed. Dashboard UI ships in 6 languages across 32 components.</div>
+    </div>
+
+    <!-- 08 SHARE -->
+    <div class="card s-cost" data-id="08">
+      <div class="ct">Share the graph &middot; commit the JSON</div>
+      <div class="cost"><span class="mono" style="color:var(--lime)">--auto-update</span><span class="lead muted" style="font-size:12.5px">post-commit hook <span style="color:var(--accent)">&#9656;</span> incremental patch</span></div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Understand Anything &middot; MIT &middot; Egonex-AI/Understand-Anything &middot; plugin v2.8.2</span>
+    <span>/understand &rarr; .understand-anything/knowledge-graph.json &middot; /understand-dashboard &rarr; vite :5173</span>
+  </footer>
+</div>
+</body>
+</html>
