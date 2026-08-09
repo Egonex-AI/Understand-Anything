@@ -42,6 +42,7 @@ kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+codebuddy|$HOME/.codebuddy/skills|per-skill
 EOF
 }
 
@@ -231,6 +232,10 @@ KIROEOF
   fi
   if [[ "$id" == "kiro" ]]; then
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
+  fi
+  if [[ "$id" == "codebuddy" ]]; then
+    printf '\n  Usage: type /understand (or @command://understand) in CodeBuddy to analyze a project.\n'
+    printf '         Restart the CodeBuddy window if the skills are not picked up immediately.\n'
   fi
 }
 
