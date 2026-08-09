@@ -259,6 +259,8 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 Freebuff reads its skills from `~/.agents/skills/`, so the installer symlinks each understand-* skill there (same layout as `codex`/`gemini`). Restart Freebuff or start a new session to pick up the skills.
 
+On Windows, run the PowerShell installer and choose `freebuff` (or pass it directly: `./install.ps1 freebuff`).
+
 ### Platform Compatibility
 
 | Platform | Status | Install Method |
