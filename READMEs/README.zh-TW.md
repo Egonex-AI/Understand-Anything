@@ -257,6 +257,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | KIMI CLI | ✅ 支援 | `install.sh kimi` |
 | Nanobot | ✅ 支援 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 支援 | `install.sh kiro` |
+| AdaL CLI | ✅ 支援 | `install.sh adal` |
 
 ---
 
