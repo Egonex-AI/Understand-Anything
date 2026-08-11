@@ -36,6 +36,7 @@ $Platforms = [ordered]@{
     antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
     vibe        = @{ Target = (Join-Path $HOME '.vibe\skills');               Style = 'per-skill' }
     vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
+    codebuddy   = @{ Target = (Join-Path $HOME '.codebuddy\skills');          Style = 'per-skill' }
     hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder' }
     cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
     kimi        = @{ Target = (Join-Path $HOME '.kimi\skills');               Style = 'folder' }
@@ -244,6 +245,9 @@ function Cmd-Install([string]$Id) {
     }
     if ($Id -eq 'kiro') {
         Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
+    }
+    if ($Id -eq 'codebuddy') {
+        Write-Host "`n  Usage: In CodeBuddy, run /understand to analyze the current project."
     }
 }
 

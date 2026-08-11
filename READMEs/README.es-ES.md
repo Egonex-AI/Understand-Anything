@@ -185,7 +185,7 @@ Understand-Anything funciona en múltiples plataformas de codificación con IA.
 /plugin install understand-anything
 ```
 
-### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### Instalación de una línea (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro / CodeBuddy)
 
 **macOS / Linux:**
 ```bash
@@ -203,7 +203,7 @@ El instalador clona el repositorio en `~/.understand-anything/repo` y crea los e
 
 > **Nota sobre cómo invocar las skills:** el prefijo de invocación varía según la plataforma. La mayoría usa comandos con barra (`/understand`), pero **Codex usa `$`** — escribe `$understand`, no `/understand`. Si ningún prefijo funciona, pídelo en lenguaje natural: *«Usa la skill understand para analizar este proyecto»*.
 
-- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- Valores soportados de `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`, `codebuddy`
 - Actualizar más adelante: `./install.sh --update`
 - Desinstalar: `./install.sh --uninstall <platform>`
 
@@ -237,6 +237,24 @@ Tras la instalación:
 
 Para habilidades personales (disponibles en todos los proyectos), ejecuta el `install.sh` de arriba con la plataforma `kiro`.
 
+### CodeBuddy
+
+CodeBuddy IDE y CodeBuddy Code detectan automáticamente el plugin a través de `.codebuddy-plugin/plugin.json` (incluido dentro de `understand-anything-plugin/`) cuando se clona este repositorio. No requiere instalación manual: simplemente clona y abre en CodeBuddy.
+
+Alternativamente, instálalo para uso personal (disponible en todos los proyectos) con la instalación de una línea:
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codebuddy
+```
+
+**Windows (PowerShell):**
+```powershell
+.\install.ps1 codebuddy
+```
+
+Tras la instalación, reinicia CodeBuddy y ejecuta `/understand` para analizar tu proyecto.
+
 ### Compatibilidad de Plataformas
 
 | Plataforma | Estado | Método de Instalación |
@@ -257,6 +275,7 @@ Para habilidades personales (disponibles en todos los proyectos), ejecuta el `in
 | KIMI CLI | ✅ Soportado | `install.sh kimi` |
 | Nanobot | ✅ Soportado | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Soportado | `install.sh kiro` |
+| CodeBuddy | ✅ Soportado | `install.sh codebuddy` |
 
 ---
 

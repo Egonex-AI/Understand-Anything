@@ -185,7 +185,7 @@ Understand-Anything 可在多個 AI 編碼平台上執行。
 /plugin install understand-anything
 ```
 
-### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro）
+### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro / CodeBuddy）
 
 **macOS / Linux：**
 ```bash
@@ -203,7 +203,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **關於技能呼叫方式：** 不同平台的呼叫前綴不同。大多數平台使用斜線指令（`/understand`），但 **Codex 使用 `$`** —— 請輸入 `$understand`，而不是 `/understand`。如果兩種前綴都無法辨識，直接用自然語言請求即可：*「使用 understand 技能分析這個專案」*。
 
-- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
+- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`、`codebuddy`
 - 後續更新：`./install.sh --update`
 - 解除安裝：`./install.sh --uninstall <platform>`
 
@@ -237,6 +237,24 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 若需要在所有專案中使用（個人技能），執行上面的 `install.sh` 並選擇 `kiro` 平台即可。
 
+### CodeBuddy
+
+CodeBuddy IDE 與 CodeBuddy Code 會在複製此儲存庫後，透過內建在 `understand-anything-plugin/` 中的 `.codebuddy-plugin/plugin.json` 自動發現外掛程式。無需手動安裝 — 只需複製並在 CodeBuddy 中開啟即可。
+
+也可以執行下面的安裝指令稿，將其作為個人技能安裝（所有專案可用）：
+
+**macOS / Linux：**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codebuddy
+```
+
+**Windows（PowerShell）：**
+```powershell
+.\install.ps1 codebuddy
+```
+
+安裝完成後，重新啟動 CodeBuddy 並執行 `/understand` 分析你的專案。
+
 ### 多平台相容性
 
 | 平台 | 狀態 | 安裝方式 |
@@ -257,6 +275,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | KIMI CLI | ✅ 支援 | `install.sh kimi` |
 | Nanobot | ✅ 支援 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 支援 | `install.sh kiro` |
+| CodeBuddy | ✅ 支援 | `install.sh codebuddy` |
 
 ---
 

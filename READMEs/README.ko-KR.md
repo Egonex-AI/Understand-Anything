@@ -185,7 +185,7 @@ Understand-Anything은 다양한 AI 코딩 플랫폼에서 사용할 수 있습�
 /plugin install understand-anything
 ```
 
-### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro / CodeBuddy)
 
 **macOS / Linux:**
 ```bash
@@ -203,7 +203,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"* 처럼 자연어로 요청하면 됩니다.
 
-- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`, `codebuddy`
 - 이후 업데이트: `./install.sh --update`
 - 제거: `./install.sh --uninstall <platform>`
 
@@ -237,6 +237,24 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 모든 프로젝트에서 사용하는 개인 스킬로 설치하려면 위 `install.sh`를 `kiro` 플랫폼으로 실행하세요.
 
+### CodeBuddy
+
+이 저장소를 클론하면 CodeBuddy IDE와 CodeBuddy Code가 `understand-anything-plugin/`에 번들된 `.codebuddy-plugin/plugin.json`을 통해 플러그인을 자동으로 인식합니다. 수동 설치가 필요 없습니다. 클론 후 CodeBuddy에서 열기만 하면 됩니다.
+
+또는 모든 프로젝트에서 사용할 수 있는 개인 스킬로 한 줄 설치를 사용할 수도 있습니다:
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codebuddy
+```
+
+**Windows (PowerShell):**
+```powershell
+.\install.ps1 codebuddy
+```
+
+설치 후 CodeBuddy를 재시작하고 `/understand`를 실행하여 프로젝트를 분석하세요.
+
 ### 플랫폼 호환성
 
 | 플랫폼 | 상태 | 설치 방법 |
@@ -257,6 +275,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | KIMI CLI | ✅ 지원 | `install.sh kimi` |
 | Nanobot | ✅ 지원 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 지원 | `install.sh kiro` |
+| CodeBuddy | ✅ 지원 | `install.sh codebuddy` |
 
 ---
 
