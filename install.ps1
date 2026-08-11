@@ -42,6 +42,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    freebuff    = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
 }
 
 function Show-Usage {

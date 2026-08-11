@@ -217,7 +217,7 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 
-- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `freebuff`
 - Update later: `./install.sh --update`
 - Uninstall: `./install.sh --uninstall <platform>`
 
@@ -251,6 +251,16 @@ After installation:
 
 For personal skills (available across all projects), run the `install.sh` above with the `kiro` platform.
 
+### Freebuff
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s freebuff
+```
+
+Freebuff reads its skills from `~/.agents/skills/`, so the installer symlinks each understand-* skill there (same layout as `codex`/`gemini`). Restart Freebuff or start a new session to pick up the skills.
+
+On Windows, run the PowerShell installer and choose `freebuff` (or pass it directly: `./install.ps1 freebuff`).
+
 ### Platform Compatibility
 
 | Platform | Status | Install Method |
@@ -272,6 +282,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Trae | ✅ Supported | `install.sh trae` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
+| Freebuff | ✅ Supported | `install.sh freebuff` |
 
 
 ---
