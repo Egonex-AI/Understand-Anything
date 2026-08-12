@@ -42,6 +42,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    grok        = @{ Target = (Join-Path $HOME '.grok\skills');               Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -129,7 +130,16 @@ function New-Junction([string]$LinkPath, [string]$TargetPath) {
         if (Test-IsReparse $LinkPath) {
             (Get-Item -LiteralPath $LinkPath -Force).Delete()
         } else {
-            Write-Error "Refusing to overwrite $LinkPath — it is a real file/directory, not a junction. Move or remove it first."
+            # Previous manual copies of skills leave real directories; replace
+            # them so re-install can switch to a junction into the checkout.
+            $item = Get-Item -LiteralPath $LinkPath -Force
+            if ($item.PSIsContainer) {
+                Write-Host "  • replacing existing directory $LinkPath with a junction"
+                Remove-Item -LiteralPath $LinkPath -Recurse -Force
+            } else {
+                Write-Host "  • replacing existing file $LinkPath with a junction"
+                Remove-Item -LiteralPath $LinkPath -Force
+            }
         }
     }
     New-Item -ItemType Junction -Path $LinkPath -Target $TargetPath | Out-Null
@@ -244,6 +254,11 @@ function Cmd-Install([string]$Id) {
     }
     if ($Id -eq 'kiro') {
         Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
+    }
+    if ($Id -eq 'grok') {
+        Write-Host "`n  Tip: Grok Build loads skills from ~/.grok/skills/ as slash commands"
+        Write-Host '       (e.g. /understand). Restart Grok, then run /skills to confirm.'
+        Write-Host '  Alternative: grok plugin install Egonex-AI/Understand-Anything#understand-anything-plugin --trust'
     }
 }
 
