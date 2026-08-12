@@ -270,6 +270,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Trae | ✅ サポート | `install.sh trae` |
 | Nanobot | ✅ サポート | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ サポート | `install.sh kiro` |
+| AdaL CLI | ✅ サポート | `install.sh adal` |
 
 ---
 

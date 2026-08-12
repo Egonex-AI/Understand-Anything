@@ -258,6 +258,7 @@ Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıda
 | KIMI CLI | ✅ Destekleniyor | `install.sh kimi` |
 | Nanobot | ✅ Destekleniyor | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Destekleniyor | `install.sh kiro` |
+| AdaL CLI | ✅ Destekleniyor | `install.sh adal` |
 
 ---
 

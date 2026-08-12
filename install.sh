@@ -42,6 +42,7 @@ kimi|$HOME/.kimi/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+adal|$HOME/.adal/skills|per-skill
 EOF
 }
 
@@ -178,6 +179,22 @@ link_plugin_root() {
   fi
 }
 
+link_opencode_commands() {
+  local src="$REPO_DIR/understand-anything-plugin/commands/opencode/understand.md"
+  [[ -f "$src" ]] || { printf '  • %s not found, skipping command link\n' "$src"; return 0; }
+  mkdir -p "$HOME/.config/opencode/commands"
+  ln -sfn "$src" "$HOME/.config/opencode/commands/understand.md"
+  printf '  ✓ %s → %s\n' "$HOME/.config/opencode/commands/understand.md" "$src"
+}
+
+unlink_opencode_commands() {
+  local link="$HOME/.config/opencode/commands/understand.md"
+  if [[ -L "$link" ]]; then
+    rm -f "$link"
+    printf '  ✓ removed %s\n' "$link"
+  fi
+}
+
 cmd_install() {
   local id="$1"
   local row target style
@@ -190,6 +207,11 @@ cmd_install() {
   link_skills "$target" "$style"
   printf -- '→ Linking universal plugin root\n'
   link_plugin_root
+
+  if [[ "$id" == "opencode" ]]; then
+    printf -- '→ Linking OpenCode slash command\n'
+    link_opencode_commands
+  fi
 
   if [[ "$id" == "kiro" ]]; then
     printf -- '→ Creating Kiro agent configuration\n'
@@ -225,12 +247,20 @@ KIROEOF
   if [[ "$id" == "codex" ]]; then
     printf '\n  Tip: Codex invokes skills with $ instead of / — type $understand, not /understand.\n'
   fi
+  if [[ "$id" == "opencode" ]]; then
+    printf '\n  Tip: OpenCode runs /understand as a structural-only analysis (no subagent\n'
+    printf '       dispatch — see the upstream OpenCode platform documentation). Run it in\n'
+    printf '       Claude Code for the full LLM-enriched graph.\n'
+  fi
   if [[ "$id" == "vscode" ]]; then
     printf '\n  Tip: VS Code can also auto-discover the plugin by opening this repo\n'
     printf '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.\n'
   fi
   if [[ "$id" == "kiro" ]]; then
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
+  fi
+  if [[ "$id" == "adal" ]]; then
+    printf '\n  Tip: AdaL uses /plugin commands — install via the marketplace: /plugin marketplace add Egonex-AI/Understand-Anything then /plugin install understand-anything (or run install.sh adal).\n'
   fi
 }
 
@@ -243,6 +273,9 @@ cmd_uninstall() {
 
   printf -- '→ Removing skill links for %s\n' "$id"
   unlink_skills "$target" "$style"
+  if [[ "$id" == "opencode" ]]; then
+    unlink_opencode_commands
+  fi
   if [[ "$id" == "kiro" && -f "$HOME/.kiro/agents/understand.json" ]]; then
     rm -f "$HOME/.kiro/agents/understand.json"
     printf '  ✓ removed %s\n' "$HOME/.kiro/agents/understand.json"
