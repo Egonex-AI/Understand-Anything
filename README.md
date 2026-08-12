@@ -198,7 +198,7 @@ Understand-Anything works across multiple AI coding platforms.
 ```
 
 
-### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / CodeBuddy)
 
 
 **macOS / Linux:**
@@ -217,7 +217,7 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 
-- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `codebuddy`
 - Update later: `./install.sh --update`
 - Uninstall: `./install.sh --uninstall <platform>`
 
@@ -272,6 +272,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Trae | ✅ Supported | `install.sh trae` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
+| CodeBuddy | ✅ Supported | `install.sh codebuddy` |
 
 
 ---
