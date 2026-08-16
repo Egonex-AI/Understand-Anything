@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a>
+  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a> | <a href="README.pt-BR.md">Português</a>
 </p>
 
 <p align="center">
@@ -125,7 +125,7 @@ Understand Anything 是一個 [Claude Code Plugin](https://code.claude.com/docs/
 # 產生繁體中文內容（知識圖節點描述和 Dashboard UI）
 /understand --language zh-TW
 
-# 支援的語言：en（預設）、zh、zh-TW、ja、ko、ru
+# 支援的語言：en（預設）、zh、zh-TW、ja、ko、ru、pt
 ```
 
 `--language` 參數會影響：
