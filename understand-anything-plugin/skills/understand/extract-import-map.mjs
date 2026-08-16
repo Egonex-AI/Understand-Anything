@@ -307,6 +307,49 @@ async function loadGoModules(projectRoot, files) {
 }
 
 /**
+ * Index Haskell source modules by their declared module name. Imports refer to
+ * declarations (for example `Spanshot.Capture`), not directly to file paths,
+ * and Cabal source roots are project-specific, so deriving paths from the
+ * dotted name alone is unreliable. Reading module headers gives us an exact,
+ * build-tool-independent project index.
+ *
+ * Multiple paths may declare the same module (commonly app/Main.hs and
+ * test/Main.hs). The resolver disambiguates those candidates relative to the
+ * importing file; arrays remain sorted here to keep tie-breaking stable.
+ */
+async function loadHaskellModules(projectRoot, files) {
+  const modules = new Map();
+  const warnings = [];
+  const candidates = [];
+
+  for (const f of files) {
+    const p = toPosix(f.path);
+    if (!p.endsWith('.hs') && !p.endsWith('.lhs')) continue;
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    candidates.push({ key: p, absPath });
+  }
+
+  const reads = await readFilesParallel(candidates);
+  const moduleRe = /^\s*(?:>\s*)?module\s+([A-Z][A-Za-z0-9_']*(?:\.[A-Z][A-Za-z0-9_']*)*)\b/m;
+  for (const { key: p, raw, err } of reads) {
+    if (err) {
+      warnings.push(`Warning: extract-import-map: could not read Haskell source ${p}\n`);
+      continue;
+    }
+    const declared = raw.match(moduleRe)?.[1];
+    const base = p.slice(p.lastIndexOf('/') + 1).replace(/\.lhs?$/, '');
+    const moduleName = declared || (base === 'Main' ? 'Main' : '');
+    if (!moduleName) continue;
+    if (!modules.has(moduleName)) modules.set(moduleName, []);
+    modules.get(moduleName).push(p);
+  }
+
+  for (const paths of modules.values()) paths.sort(comparePaths);
+  return { modules, warnings };
+}
+
+/**
  * Parse Swift Package.swift target declarations just enough for import-map
  * resolution. Swift imports modules, and SwiftPM target names are module names.
  * The common convention is `Sources/<Target>`, but packages can override the
@@ -454,20 +497,22 @@ async function buildResolutionContext(projectRoot, files) {
   // them to stderr inline. If a loader streamed warnings directly during
   // the concurrent passes, lines from independent loader families could
   // interleave based on I/O timing — that would break the pre-PR
-  // deterministic order (ts → go → php → swift) and make stderr-diff verification
+  // deterministic order (ts → go → php → swift → haskell) and make stderr-diff verification
   // flaky. Drain the buffers in canonical order *after* Promise.all, so
   // a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
-  const [tsResult, goResult, phpResult, swiftResult] = await Promise.all([
+  const [tsResult, goResult, phpResult, swiftResult, haskellResult] = await Promise.all([
     loadTsConfigs(projectRoot, files),
     loadGoModules(projectRoot, files),
     loadPhpAutoloads(projectRoot, files),
     loadSwiftPackageTargets(projectRoot, files),
+    loadHaskellModules(projectRoot, files),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
   for (const w of phpResult.warnings) process.stderr.write(w);
   for (const w of swiftResult.warnings) process.stderr.write(w);
+  for (const w of haskellResult.warnings) process.stderr.write(w);
   const tsConfigs = tsResult.configs;
   const goModules = goResult.modules;
   const phpAutoloads = phpResult.autoloads;
@@ -508,6 +553,7 @@ async function buildResolutionContext(projectRoot, files) {
     scalaPackageIndex,
     csIndex,
     swiftModuleIndex,
+    haskellModules: haskellResult.modules,
     phpAutoloads,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
@@ -1710,6 +1756,33 @@ export function resolveCppImport(rawImport, file, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Haskell resolver
+// ---------------------------------------------------------------------------
+
+function commonDirectoryPrefixLength(a, b) {
+  const aParts = dirOf(a).split('/').filter(Boolean);
+  const bParts = dirOf(b).split('/').filter(Boolean);
+  let length = 0;
+  while (length < aParts.length && length < bParts.length && aParts[length] === bParts[length]) {
+    length += 1;
+  }
+  return length;
+}
+
+export function resolveHaskellImport(rawImport, file, ctx) {
+  if (!rawImport || typeof rawImport !== 'string') return [];
+  const moduleName = rawImport.trim();
+  const importer = toPosix(file.path);
+  const candidates = (ctx.haskellModules?.get(moduleName) ?? [])
+    .filter(candidate => candidate !== importer);
+  if (candidates.length <= 1) return candidates;
+
+  return [candidates
+    .map(path => ({ path, score: commonDirectoryPrefixLength(importer, path) }))
+    .sort((a, b) => b.score - a.score || comparePaths(a.path, b.path))[0].path];
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
@@ -1767,6 +1840,9 @@ function resolveImport(imp, file, ctx) {
   }
   if (lang === 'c' || lang === 'cpp') {
     return resolveCppImport(src, file, ctx);
+  }
+  if (lang === 'haskell') {
+    return resolveHaskellImport(src, file, ctx);
   }
   // Ruby is handled via a dedicated pathway because its tree-sitter
   // extractor flattens require vs require_relative into a single field,

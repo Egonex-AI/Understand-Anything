@@ -49,6 +49,7 @@
     "tree-sitter-c-sharp": "^0.23.1",
     "tree-sitter-cpp": "^0.23.4",
     "tree-sitter-go": "^0.25.0",
+    "tree-sitter-haskell": "^0.23.1",
     "tree-sitter-java": "^0.23.5",
     "tree-sitter-javascript": "^0.25.0",
     "tree-sitter-php": "^0.23.11",

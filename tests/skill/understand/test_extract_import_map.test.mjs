@@ -1057,6 +1057,55 @@ describe('extract-import-map.mjs — Scala resolver', () => {
   });
 });
 
+describe('extract-import-map.mjs — Haskell resolver', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('resolves declared modules and drops package imports', () => {
+    projectRoot = setupTree({
+      'src/App/Main.hs': `module App.Main where\nimport Project.Types\nimport qualified Project.Util as Util\nimport Data.Text (Text)\nmain = Util.run\n`,
+      'src/Project/Types.hs': `module Project.Types (User(..)) where\ndata User = User String\n`,
+      'src/Project/Util.hs': `module Project.Util where\nrun = pure ()\n`,
+    });
+    const files = [
+      { path: 'src/App/Main.hs', language: 'haskell', fileCategory: 'code' },
+      { path: 'src/Project/Types.hs', language: 'haskell', fileCategory: 'code' },
+      { path: 'src/Project/Util.hs', language: 'haskell', fileCategory: 'code' },
+    ];
+
+    const result = runScript(projectRoot, { projectRoot, files });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/App/Main.hs']).toEqual([
+      'src/Project/Types.hs',
+      'src/Project/Util.hs',
+    ]);
+  });
+
+  it('chooses the nearest duplicate Main module deterministically', () => {
+    projectRoot = setupTree({
+      'app/Runner.hs': `module Runner where\nimport Main\nrun = main\n`,
+      'app/Main.hs': `module Main where\nmain = pure ()\n`,
+      'test/Main.hs': `module Main where\nmain = pure ()\n`,
+    });
+    const files = [
+      { path: 'app/Runner.hs', language: 'haskell', fileCategory: 'code' },
+      { path: 'app/Main.hs', language: 'haskell', fileCategory: 'code' },
+      { path: 'test/Main.hs', language: 'haskell', fileCategory: 'code' },
+    ];
+
+    const result = runScript(projectRoot, { projectRoot, files });
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['app/Runner.hs']).toEqual(['app/Main.hs']);
+  });
+});
+
 describe('extract-import-map.mjs — C# resolver', () => {
   let projectRoot;
 

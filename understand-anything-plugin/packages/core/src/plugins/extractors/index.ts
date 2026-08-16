@@ -13,6 +13,7 @@ export { DartExtractor } from "./dart-extractor.js";
 export { KotlinExtractor } from "./kotlin-extractor.js";
 export { SwiftExtractor } from "./swift-extractor.js";
 export { ScalaExtractor } from "./scala-extractor.js";
+export { HaskellExtractor } from "./haskell-extractor.js";
 
 import type { LanguageExtractor } from "./types.js";
 import { TypeScriptExtractor } from "./typescript-extractor.js";
@@ -28,6 +29,7 @@ import { DartExtractor } from "./dart-extractor.js";
 import { KotlinExtractor } from "./kotlin-extractor.js";
 import { SwiftExtractor } from "./swift-extractor.js";
 import { ScalaExtractor } from "./scala-extractor.js";
+import { HaskellExtractor } from "./haskell-extractor.js";
 
 export const builtinExtractors: LanguageExtractor[] = [
   new TypeScriptExtractor(),
@@ -43,4 +45,5 @@ export const builtinExtractors: LanguageExtractor[] = [
   new KotlinExtractor(),
   new SwiftExtractor(),
   new ScalaExtractor(),
+  new HaskellExtractor(),
 ];

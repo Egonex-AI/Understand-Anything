@@ -115,6 +115,11 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTest.scala"))
         self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTests.scala"))
 
+    def test_haskell_test_files(self) -> None:
+        self.assertTrue(mbg.is_test_path("test/Spanshot/CaptureSpec.hs"))
+        self.assertTrue(mbg.is_test_path("test/Spanshot/CaptureTest.hs"))
+        self.assertTrue(mbg.is_test_path("test/Spanshot/CaptureTests.hs"))
+
     def test_csharp_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTests.cs"))
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTest.cs"))
@@ -215,6 +220,10 @@ class ProductionCandidatesTests(unittest.TestCase):
     def test_scala_sbt_layout(self) -> None:
         cands = mbg.production_candidates("src/test/scala/com/foo/BarSpec.scala")
         self.assertIn("src/main/scala/com/foo/Bar.scala", cands)
+
+    def test_haskell_cabal_layout(self) -> None:
+        cands = mbg.production_candidates("test/Spanshot/CaptureSpec.hs")
+        self.assertIn("src/Spanshot/Capture.hs", cands)
 
     def test_scala_multimodule_sbt_layout(self) -> None:
         cands = mbg.production_candidates("modules/core/src/test/scala/com/foo/BarSpec.scala")

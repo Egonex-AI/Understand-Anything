@@ -161,6 +161,32 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'build.sbt').fileCategory).toBe('config');
   });
 
+  it('maps Haskell sources and Cabal manifests', () => {
+    projectRoot = setupTree({
+      'src/Main.hs': 'module Main where\nmain = pure ()\n',
+      'src/Legacy.lhs': '> module Legacy where\n> answer = 42\n',
+      'demo.cabal': 'cabal-version: 3.0\nname: demo\n',
+      'cabal.project': 'packages: .\n',
+      'cabal.project.local': 'optimization: True\n',
+    });
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(byPath(r.output, 'src/Main.hs')).toMatchObject({
+      language: 'haskell',
+      fileCategory: 'code',
+    });
+    expect(byPath(r.output, 'src/Legacy.lhs')).toMatchObject({
+      language: 'haskell',
+      fileCategory: 'code',
+    });
+    for (const path of ['demo.cabal', 'cabal.project', 'cabal.project.local']) {
+      expect(byPath(r.output, path)).toMatchObject({
+        language: 'cabal',
+        fileCategory: 'config',
+      });
+    }
+  });
+
   it('maps Ruby, PHP, C, C++ to their language ids', () => {
     projectRoot = setupTree({
       'a.rb': 'puts 1\n',

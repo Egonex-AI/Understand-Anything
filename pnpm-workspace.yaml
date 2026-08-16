@@ -10,6 +10,7 @@ allowBuilds:
   tree-sitter-c-sharp: true
   tree-sitter-cpp: true
   tree-sitter-go: true
+  tree-sitter-haskell: true
   tree-sitter-java: true
   tree-sitter-javascript: true
   tree-sitter-php: true

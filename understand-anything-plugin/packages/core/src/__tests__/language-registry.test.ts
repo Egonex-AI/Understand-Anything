@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 42 built-in language configs", () => {
+    it("registers all 43 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(42);
+      expect(all.length).toBe(43);
     });
 
     it("maps all expected extensions", () => {
@@ -73,6 +73,8 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".h")?.id).toBe("c");
       expect(registry.getByExtension(".lua")?.id).toBe("lua");
       expect(registry.getByExtension(".js")?.id).toBe("javascript");
+      expect(registry.getByExtension(".hs")?.id).toBe("haskell");
+      expect(registry.getByExtension(".lhs")?.id).toBe("haskell");
     });
 
     it("registers Swift with tree-sitter grammar metadata", () => {
@@ -80,6 +82,14 @@ describe("LanguageRegistry", () => {
       expect(registry.getById("swift")?.treeSitter).toEqual({
         wasmPackage: "@understand-anything/tree-sitter-swift-wasm",
         wasmFile: "tree-sitter-swift.wasm",
+      });
+    });
+
+    it("registers Haskell with tree-sitter grammar metadata", () => {
+      const registry = LanguageRegistry.createDefault();
+      expect(registry.getById("haskell")?.treeSitter).toEqual({
+        wasmPackage: "tree-sitter-haskell",
+        wasmFile: "tree-sitter-haskell.wasm",
       });
     });
 

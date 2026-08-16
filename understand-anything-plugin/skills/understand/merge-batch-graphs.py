@@ -116,6 +116,7 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ".java": ((), ("Test", "Tests", "IT")),
     ".kt": ((), ("Test", "Tests")),
     ".scala": ((), ("Spec", "Suite", "Test", "Tests")),
+    ".hs": ((), ("Spec", "Test", "Tests")),
     ".cs": ((), ("Test", "Tests")),
     ".c": (("test_",), ("_test",)),
     ".cpp": (("test_",), ("_test",)),
@@ -503,6 +504,19 @@ def production_candidates(test_path: str) -> list[str]:
                         _add_unique(candidates, f"{new_dir}/{base_stem}.scala")
                         break
                 _add_unique(candidates, _join(dir_path, f"{base_stem}.scala"))
+                break
+
+    # ── Haskell ─────────────────────────────────────────────────
+    elif ext == ".hs":
+        for suffix in ("Spec", "Tests", "Test"):
+            if stem.endswith(suffix):
+                base_stem = stem[: -len(suffix)]
+                _add_unique(candidates, _join(dir_path, f"{base_stem}.hs"))
+                if dir_segs and dir_segs[0] in ("test", "tests"):
+                    tail_path = "/".join(dir_segs[1:])
+                    for root in ("src", "app", "lib"):
+                        new_dir = "/".join(p for p in (root, tail_path) if p)
+                        _add_unique(candidates, _join(new_dir, f"{base_stem}.hs"))
                 break
 
     # ── C# ────────────────────────────────────────────────────────────
