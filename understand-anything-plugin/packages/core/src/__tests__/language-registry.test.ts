@@ -93,6 +93,20 @@ describe("LanguageRegistry", () => {
       });
     });
 
+    it("registers Haskell source and literate test conventions", () => {
+      const tests = LanguageRegistry.createDefault().getById("haskell")?.filePatterns.tests;
+      expect(tests).toEqual(expect.arrayContaining([
+        "*Spec.hs",
+        "*Tests.hs",
+        "*Spec.lhs",
+        "*Tests.lhs",
+        "test/Main.hs",
+        "tests/Main.hs",
+        "test/Main.lhs",
+        "tests/Main.lhs",
+      ]));
+    });
+
     it("has no duplicate extension mappings across configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();

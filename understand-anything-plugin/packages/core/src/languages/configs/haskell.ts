@@ -23,7 +23,18 @@ export const haskellConfig = {
   filePatterns: {
     entryPoints: ["app/Main.hs", "src/Main.hs", "Main.hs"],
     barrels: [],
-    tests: ["*Spec.hs", "*Test.hs", "test/Main.hs"],
+    tests: [
+      "*Spec.hs",
+      "*Test.hs",
+      "*Tests.hs",
+      "*Spec.lhs",
+      "*Test.lhs",
+      "*Tests.lhs",
+      "test/Main.hs",
+      "tests/Main.hs",
+      "test/Main.lhs",
+      "tests/Main.lhs",
+    ],
     config: ["*.cabal", "cabal.project", "stack.yaml", "package.yaml"],
   },
 } satisfies LanguageConfig;
