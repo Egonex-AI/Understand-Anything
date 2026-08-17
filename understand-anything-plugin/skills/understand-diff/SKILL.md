@@ -80,8 +80,11 @@ The knowledge graph JSON has this structure:
    Two further options, both off unless configured — see `graph-query.py --help`:
    `semantic` and `semantic-traverse` rank nodes by meaning rather than substring when
    `UA_EMBED_URL` points at an embedding endpoint, which helps when a diff touches code
-   the user describes in their own words. `--workspace <manifest.json>` loads several
-   repos into one graph so impact analysis can cross repo boundaries.
+   the user describes in their own words. `--workspace <manifest.json>` keeps one graph
+   per repo and adds a small index of the dependencies between them, so a changed file
+   in one repo can report which other repos are downstream — `blast-radius` then returns
+   `sameRepo` detail plus a `downstreamRepos` list, and `affected-repos` answers the
+   repo-level question on its own.
 
 4. **Find nodes for changed files** — for each changed file path, use Grep to search the knowledge graph for:
    - Nodes with matching `"filePath"` values (e.g., `grep "changed/file/path"`)

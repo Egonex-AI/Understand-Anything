@@ -283,9 +283,16 @@ class SyncTests(GraphQueryTestCase):
 # ── Workspaces ────────────────────────────────────────────────────────────
 
 class WorkspaceTests(GraphQueryTestCase):
+    """Repos stay in separate graphs; only their topology is duplicated.
+
+    The chain is web -> api -> shared, so `shared` has one direct dependent and
+    one that is only reachable transitively.
+    """
+
     def setUp(self) -> None:
         super().setUp()
         for name, pkg, deps in (
+            ("web", "@acme/web", {"@acme/api": "^1.0.0"}),
             ("api", "@acme/api", {"@acme/shared": "^1.0.0"}),
             ("shared", "@acme/shared", {}),
         ):
@@ -296,34 +303,54 @@ class WorkspaceTests(GraphQueryTestCase):
             self.write_graph(_member_graph(name), root=member)
 
         self.manifest = self.root / "workspace.json"
-        self.manifest.write_text(json.dumps({"repos": ["api", "shared"]}))
+        self.manifest.write_text(json.dumps({"repos": ["web", "api", "shared"]}))
 
     def cli_ws(self, *args: str):
         return self.cli_json(*args, "--workspace", str(self.manifest))
 
-    def test_both_members_are_loaded(self) -> None:
+    def test_each_repo_keeps_its_own_graph(self) -> None:
         stats = self.cli_ws("stats")
-        self.assertEqual(stats["repos"], ["api", "shared"])
-        # two real nodes per member, plus one stand-in node per repo
-        self.assertEqual(stats["nodes"], 6)
+        self.assertEqual(sorted(stats["isolatedGraphs"]), ["api", "shared", "web"])
+        for name in ("web", "api", "shared"):
+            self.assertEqual(stats["repos"][name]["nodes"], 2)
+            self.assertEqual(stats["repos"][name]["edges"], 1)
 
-    def test_ids_are_namespaced_per_repo(self) -> None:
-        rows = self.cli_ws("cypher", "--q",
-                           "MATCH (n:Node) WHERE n.id STARTS WITH 'api::' "
-                           "RETURN count(n)")
-        self.assertEqual(rows[0][0], 3)
+    def test_ids_are_never_namespaced(self) -> None:
+        """A repo's ids must read the same inside a workspace as outside one."""
+        per_repo = self.cli_ws("nodes-for-file", "--q", "src/api.ts")
+        self.assertEqual([n["id"] for n in per_repo["api"]],
+                         ["file:src/api.ts", "function:src/api.ts:go"])
 
-    def test_package_manifests_link_the_repos(self) -> None:
-        rows = self.cli_ws("cypher", "--q",
-                           "MATCH (a:Node)-[r]->(b:Node) WHERE a.repo <> b.repo "
-                           "RETURN a.repo, type(r), b.repo")
-        self.assertEqual(rows, [["api", "DEPENDS_ON", "shared"]])
+    def test_repos_are_isolated_from_each_other(self) -> None:
+        """Asking api for a file that lives in shared must return nothing."""
+        per_repo = self.cli_ws("nodes-for-file", "--q", "src/shared.ts")
+        self.assertEqual(per_repo["api"], [])
+        self.assertTrue(per_repo["shared"])
 
-    def test_a_traversal_crosses_the_repo_boundary(self) -> None:
-        rows = self.cli_ws("cypher", "--q",
-                           "MATCH (a:Node {repo:'api'})-[*1..3]->(x:Node) "
-                           "WHERE x.repo = 'shared' RETURN count(x)")
-        self.assertGreater(rows[0][0], 0)
+    def test_index_finds_direct_and_transitive_dependents(self) -> None:
+        self.assertEqual(self.cli_ws("affected-repos", "--repo", "shared"),
+                         ["api", "web"])
+        self.assertEqual(self.cli_ws("affected-repos", "--repo", "api"), ["web"])
+        self.assertEqual(self.cli_ws("affected-repos", "--repo", "web"), [])
+
+    def test_index_respects_the_hop_limit(self) -> None:
+        """One hop from shared reaches api but not web."""
+        self.assertEqual(
+            self.cli_ws("affected-repos", "--repo", "shared", "--hops", "1"),
+            ["api"])
+
+    def test_cross_repo_blast_radius_reports_both_scopes(self) -> None:
+        out = self.cli_ws("blast-radius", "--name", "shared.ts")
+        self.assertEqual(out["definedIn"], ["shared"])
+        self.assertEqual(out["downstreamRepos"], ["api", "web"])
+        self.assertIn("shared", out["sameRepo"])
+
+    def test_workspace_second_run_is_cached(self) -> None:
+        first = self.cli_ws("stats")
+        second = self.cli_ws("stats")
+        for name in ("web", "api", "shared"):
+            self.assertEqual(first["repos"][name]["sync"]["mode"], "full")
+            self.assertEqual(second["repos"][name]["sync"]["mode"], "cached")
 
 
 # ── Graceful failure ──────────────────────────────────────────────────────
