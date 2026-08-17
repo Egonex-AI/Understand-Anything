@@ -58,15 +58,22 @@ The knowledge graph JSON has this structure:
    one call instead:
 
    ```bash
-   python "<SKILL_DIR>/graph-query.py" batch --q '[
+   "${UA_PYTHON:-python}" "<SKILL_DIR>/graph-query.py" batch --q '[
      {"op": "nodes-for-file",  "path": "<changed file path>"},
-     {"op": "blast-radius",    "path": "<changed file path>", "hops": 3}
+     {"op": "blast-radius",    "path": "<changed file path>", "hops": 3},
+     {"op": "layers-for",      "ids":  ["<ids from the two calls above>"]}
    ]'
    ```
 
+   Use `${UA_PYTHON:-python}` rather than a bare `python`. The embedded backend needs
+   Python 3.12 or newer, and a project's default `python` is often older, so a user with
+   a suitable interpreter elsewhere sets `UA_PYTHON` once and the checks below then agree
+   with the calls above. A FalkorDB server via `UA_FALKORDB_URL` works on any version.
+
    `nodes-for-file` returns the file node plus every function and class defined in it,
    which is what step 4 assembles by grepping. `blast-radius` returns the affected node
-   ids from step 5. Put every changed file in one `batch` call rather than calling once
+   ids from step 5, and `layers-for` the architectural layers from step 6 — send it the
+   ids the first two calls returned, which means a second `batch` call once you have them. Put every changed file in one `batch` call rather than calling once
    per file — process startup dominates, the queries themselves are milliseconds.
 
    Pass `blast-radius` a **path**, not a basename. Basenames are not unique — this
@@ -74,7 +81,7 @@ The knowledge graph JSON has this structure:
    name seeds from all of them at once, overstating the impact without saying so. A
    changed path is what git reports anyway.
 
-   To check availability, run `python "<SKILL_DIR>/graph-query.py" stats`. If it exits
+   To check availability, run `"${UA_PYTHON:-python}" "<SKILL_DIR>/graph-query.py" stats`. If it exits
    non-zero the backend is not configured — that is the normal default, so just continue
    with steps 4–6 as written. The backend is read-only, reads the same
    `knowledge-graph.json`, and writes nothing; the JSON remains the source of truth.

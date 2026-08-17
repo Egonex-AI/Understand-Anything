@@ -29,6 +29,7 @@ CLI
   python graph-query.py search             --q auth
   python graph-query.py nodes-for-file     --q src/types.ts
   python graph-query.py neighbors          --id "file:src/a.ts"
+  python graph-query.py layers-for         --ids "file:src/a.ts,file:src/b.ts"
   python graph-query.py blast-radius       --path src/types.ts --hops 3
   python graph-query.py calls-from         --name registerAllParsers
   python graph-query.py calls-to           --name validateGraph
@@ -179,11 +180,16 @@ class Backend:
         try:
             from redislite.falkordb_client import FalkorDB as EmbeddedFalkorDB
         except ImportError:
-            raise SystemExit(
-                "No backend available. Either `pip install falkordblite` "
-                "(embedded, needs Python >= 3.12) or set UA_FALKORDB_URL to a "
-                "running FalkorDB instance."
+            running = ".".join(str(v) for v in sys.version_info[:3])
+            hint = (
+                f"this interpreter is Python {running}, and the embedded backend "
+                "needs 3.12 or newer -- point UA_PYTHON at a newer interpreter, or "
+                "set UA_FALKORDB_URL to use a server on any version"
+                if sys.version_info < (3, 12) else
+                "install it with `pip install falkordblite`, or set UA_FALKORDB_URL "
+                "to point at a FalkorDB server"
             )
+            raise SystemExit(f"No backend available: {hint}.")
 
         anchor_dir.mkdir(parents=True, exist_ok=True)
         self._db = EmbeddedFalkorDB(str(anchor_dir / "falkordb.db"))
@@ -516,6 +522,23 @@ class RepoGraph:
                 "WHERE t.name = $n RETURN DISTINCT d.id ORDER BY d.id", {"n": name})
         return [r[0] for r in rows]
 
+    def layers_for(self, ids: list[str]) -> list[dict]:
+        """Which architectural layers contain any of these nodes (step 6).
+
+        Read straight from the JSON rather than the graph: layers are a flat
+        lookup, not a traversal, and keeping them out of the graph keeps them out
+        of the incremental sync's set of invariants.
+        """
+        wanted = set(ids)
+        out = []
+        for layer in self.raw.get("layers", []):
+            hits = sorted(wanted.intersection(layer.get("nodeIds", [])))
+            if hits:
+                out.append({"id": layer.get("id"), "name": layer.get("name"),
+                            "description": layer.get("description"),
+                            "matched": hits})
+        return out
+
     def has_path(self, path: str) -> bool:
         clean = path.lstrip("/")
         return bool(self.rows(
@@ -729,6 +752,7 @@ PER_REPO_OPS = {
     "search": ("search", ("q", "limit")),
     "nodes-for-file": ("nodes_for_file", ("path",)),
     "neighbors": ("neighbors", ("id",)),
+    "layers-for": ("layers_for", ("ids",)),
     "calls-from": ("calls_from", ("name", "hops")),
     "calls-to": ("calls_to", ("name", "hops")),
     "path": ("path", ("from", "to", "hops")),
@@ -789,8 +813,8 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("command", choices=[
         "stats", "search", "nodes-for-file", "neighbors", "blast-radius",
-        "calls-from", "calls-to", "path", "semantic", "semantic-traverse",
-        "affected-repos", "cypher", "batch",
+        "layers-for", "calls-from", "calls-to", "path", "semantic",
+        "semantic-traverse", "affected-repos", "cypher", "batch",
     ])
     p.add_argument("--root", default=".", help="project root (default: cwd)")
     p.add_argument("--workspace", help="manifest listing several repos")
@@ -798,6 +822,7 @@ def main() -> None:
     p.add_argument("--id", help="node id")
     p.add_argument("--name", help="node name (ambiguous for common basenames)")
     p.add_argument("--path", help="file path (preferred for blast-radius)")
+    p.add_argument("--ids", help="comma-separated node ids (layers-for)")
     p.add_argument("--repo", help="repo name (affected-repos)")
     p.add_argument("--hops", type=int, default=3)
     p.add_argument("--limit", type=int, default=25)
@@ -830,6 +855,7 @@ def main() -> None:
         "q": args.q, "id": args.id, "name": args.name,
         "path": args.path or (args.q if args.command == "nodes-for-file" else None),
         "repo": args.repo, "hops": args.hops, "k": args.k, "limit": args.limit,
+        "ids": [i for i in (args.ids or "").split(",") if i] or None,
         "from": args.src, "to": args.dst,
     }
 

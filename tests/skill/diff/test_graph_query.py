@@ -101,8 +101,14 @@ def _chain_graph() -> dict:
         _edge("function:src/a.ts:runA", "function:src/b.ts:runB", "calls"),
         _edge("function:src/b.ts:runB", "function:src/c.ts:runC", "calls"),
     ]
+    layers = [
+        {"id": "core", "name": "Core", "description": "shared types",
+         "nodeIds": ["file:src/types.ts", "file:src/a.ts"]},
+        {"id": "edge", "name": "Edge", "description": "leaves",
+         "nodeIds": ["file:src/d.ts"]},
+    ]
     return {"version": "1.0.0", "project": {"name": "chain"},
-            "nodes": nodes, "edges": edges}
+            "nodes": nodes, "edges": edges, "layers": layers}
 
 
 def _member_graph(name: str) -> dict:
@@ -231,6 +237,14 @@ class TraversalTests(GraphQueryTestCase):
             "batch", stdin=json.dumps([{"op": "blast-radius", "path": "src/types.ts",
                                         "hops": 1}]))
         self.assertEqual(out[0], ["file:src/a.ts", "file:src/b.ts"])
+
+    def test_layers_for_reports_only_matching_layers(self) -> None:
+        """Step 6 of the skill. Read from the JSON, so no sync involvement."""
+        out = self.cli_json("layers-for", "--ids", "file:src/types.ts,file:src/d.ts")
+        self.assertEqual([l["name"] for l in out], ["Core", "Edge"])
+        self.assertEqual(out[0]["matched"], ["file:src/types.ts"])
+
+        self.assertEqual(self.cli_json("layers-for", "--ids", "file:src/b.ts"), [])
 
     def test_search_honours_an_explicit_limit(self) -> None:
         """A limit passed in a batch spec must reach the query.
