@@ -74,6 +74,15 @@ The knowledge graph JSON has this structure:
    with steps 4–6 as written. The backend is read-only, reads the same
    `knowledge-graph.json`, and writes nothing; the JSON remains the source of truth.
 
+   Re-syncing after a `/understand` refresh is incremental: only files whose nodes
+   actually changed are replaced, so a one-file edit costs one file of work.
+
+   Two further options, both off unless configured — see `graph-query.py --help`:
+   `semantic` and `semantic-traverse` rank nodes by meaning rather than substring when
+   `UA_EMBED_URL` points at an embedding endpoint, which helps when a diff touches code
+   the user describes in their own words. `--workspace <manifest.json>` loads several
+   repos into one graph so impact analysis can cross repo boundaries.
+
 4. **Find nodes for changed files** — for each changed file path, use Grep to search the knowledge graph for:
    - Nodes with matching `"filePath"` values (e.g., `grep "changed/file/path"`)
    - This finds file-level nodes (including non-code types) AND function/class nodes defined in those files
