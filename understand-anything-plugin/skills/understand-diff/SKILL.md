@@ -60,7 +60,7 @@ The knowledge graph JSON has this structure:
    ```bash
    python "<SKILL_DIR>/graph-query.py" batch --q '[
      {"op": "nodes-for-file",  "path": "<changed file path>"},
-     {"op": "blast-radius",    "name": "<changed file basename>", "hops": 3}
+     {"op": "blast-radius",    "path": "<changed file path>", "hops": 3}
    ]'
    ```
 
@@ -68,6 +68,11 @@ The knowledge graph JSON has this structure:
    which is what step 4 assembles by grepping. `blast-radius` returns the affected node
    ids from step 5. Put every changed file in one `batch` call rather than calling once
    per file — process startup dominates, the queries themselves are milliseconds.
+
+   Pass `blast-radius` a **path**, not a basename. Basenames are not unique — this
+   repository has eleven files called `index.ts` and five called `types.ts` — and a
+   name seeds from all of them at once, overstating the impact without saying so. A
+   changed path is what git reports anyway.
 
    To check availability, run `python "<SKILL_DIR>/graph-query.py" stats`. If it exits
    non-zero the backend is not configured — that is the normal default, so just continue

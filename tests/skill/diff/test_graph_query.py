@@ -79,12 +79,18 @@ def _edge(source: str, target: str, edge_type: str) -> dict:
 def _chain_graph() -> dict:
     files = ["types.ts", "a.ts", "b.ts", "c.ts", "d.ts"]
     nodes = [_node(f"file:src/{f}", "file", f, f"src/{f}") for f in files]
+    # A second file with the same basename, imported by e.ts only. Seeding by
+    # name picks up both; seeding by path must not.
+    nodes.append(_node("file:src/nested/types.ts", "file", "types.ts",
+                       "src/nested/types.ts"))
+    nodes.append(_node("file:src/e.ts", "file", "e.ts", "src/e.ts"))
     nodes += [
         _node("function:src/a.ts:runA", "function", "runA", "src/a.ts"),
         _node("function:src/b.ts:runB", "function", "runB", "src/b.ts"),
         _node("function:src/c.ts:runC", "function", "runC", "src/c.ts"),
     ]
     edges = [
+        _edge("file:src/e.ts", "file:src/nested/types.ts", "imports"),
         _edge("file:src/a.ts", "file:src/types.ts", "imports"),
         _edge("file:src/b.ts", "file:src/types.ts", "imports"),
         _edge("file:src/c.ts", "file:src/b.ts", "imports"),
@@ -157,13 +163,34 @@ class TraversalTests(GraphQueryTestCase):
     def test_blast_radius_follows_the_import_chain(self) -> None:
         """a and b import types directly; c and d reach it in 2 and 3 hops."""
         self.assertEqual(
-            self.cli_json("blast-radius", "--name", "types.ts", "--hops", "3"),
+            self.cli_json("blast-radius", "--path", "src/types.ts", "--hops", "3"),
             ["file:src/a.ts", "file:src/b.ts", "file:src/c.ts", "file:src/d.ts"],
         )
 
+    def test_blast_radius_by_path_is_scoped_to_one_file(self) -> None:
+        """Basenames are not unique, so a path must not seed from namesakes.
+
+        Two different files are named types.ts here; seeding by name unions both
+        and overstates the impact.
+        """
+        by_path = self.cli_json("blast-radius", "--path", "src/types.ts", "--hops", "3")
+        self.assertEqual(by_path, ["file:src/a.ts", "file:src/b.ts",
+                                   "file:src/c.ts", "file:src/d.ts"])
+
+        by_name = self.cli_json("blast-radius", "--name", "types.ts", "--hops", "1")
+        self.assertIn("file:src/e.ts", by_name)      # only the namesake reaches this
+        self.assertNotIn("file:src/e.ts",
+                         self.cli_json("blast-radius", "--path", "src/types.ts",
+                                       "--hops", "1"))
+
+    def test_blast_radius_needs_a_path_or_a_name(self) -> None:
+        proc = self.run_cli("blast-radius", expect_success=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("path", proc.stdout + proc.stderr)
+
     def test_blast_radius_respects_the_hop_limit(self) -> None:
         self.assertEqual(
-            self.cli_json("blast-radius", "--name", "types.ts", "--hops", "1"),
+            self.cli_json("blast-radius", "--path", "src/types.ts", "--hops", "1"),
             ["file:src/a.ts", "file:src/b.ts"],
         )
 
@@ -193,7 +220,7 @@ class TraversalTests(GraphQueryTestCase):
 
     def test_batch_answers_several_questions_in_order(self) -> None:
         out = self.cli_json("batch", "--q", json.dumps([
-            {"op": "blast-radius", "name": "types.ts", "hops": 1},
+            {"op": "blast-radius", "path": "src/types.ts", "hops": 1},
             {"op": "calls-from", "name": "runA", "hops": 1},
         ]))
         self.assertEqual(out[0], ["file:src/a.ts", "file:src/b.ts"])
@@ -201,7 +228,7 @@ class TraversalTests(GraphQueryTestCase):
 
     def test_batch_accepts_stdin(self) -> None:
         out = self.cli_json(
-            "batch", stdin=json.dumps([{"op": "blast-radius", "name": "types.ts",
+            "batch", stdin=json.dumps([{"op": "blast-radius", "path": "src/types.ts",
                                         "hops": 1}]))
         self.assertEqual(out[0], ["file:src/a.ts", "file:src/b.ts"])
 
@@ -220,7 +247,7 @@ class TraversalTests(GraphQueryTestCase):
 
     def test_ids_are_not_namespaced_for_a_single_repo(self) -> None:
         """Single-repo ids must stay byte-identical to the JSON's own ids."""
-        for node_id in self.cli_json("blast-radius", "--name", "types.ts"):
+        for node_id in self.cli_json("blast-radius", "--path", "src/types.ts"):
             self.assertNotIn("::", node_id)
 
 
@@ -235,8 +262,8 @@ class SyncTests(GraphQueryTestCase):
 
     def test_first_sync_is_full(self) -> None:
         self.assertEqual(self.baseline["sync"]["mode"], "full")
-        self.assertEqual(self.baseline["nodes"], 8)
-        self.assertEqual(self.baseline["edges"], 9)
+        self.assertEqual(self.baseline["nodes"], 10)
+        self.assertEqual(self.baseline["edges"], 10)
 
     def test_unchanged_graph_is_not_resynced(self) -> None:
         again = self.cli_json("stats")
@@ -267,7 +294,7 @@ class SyncTests(GraphQueryTestCase):
         self.assertEqual(after["edges"], self.baseline["edges"])
         # c.ts -> b.ts is an edge owned by an untouched file.
         self.assertIn("file:src/c.ts",
-                      self.cli_json("blast-radius", "--name", "b.ts", "--hops", "1"))
+                      self.cli_json("blast-radius", "--path", "src/b.ts", "--hops", "1"))
 
     def test_removing_a_file_removes_its_nodes(self) -> None:
         dropped = {n["id"] for n in self.graph["nodes"] if n["filePath"] == "src/d.ts"}
@@ -298,7 +325,8 @@ class SyncTests(GraphQueryTestCase):
         self.assertEqual(after["edges"], self.baseline["edges"] + 1)
         # d.ts now depends on types.ts directly rather than only through c.ts
         self.assertIn("file:src/d.ts",
-                      self.cli_json("blast-radius", "--name", "types.ts", "--hops", "1"))
+                      self.cli_json("blast-radius", "--path", "src/types.ts",
+                                    "--hops", "1"))
 
     def test_removing_only_an_edge_is_synced(self) -> None:
         self.graph["edges"] = [e for e in self.graph["edges"]
@@ -309,7 +337,7 @@ class SyncTests(GraphQueryTestCase):
         after = self.cli_json("stats")
         self.assertEqual(after["edges"], self.baseline["edges"] - 1)
         self.assertNotIn("file:src/a.ts",
-                         self.cli_json("blast-radius", "--name", "types.ts"))
+                         self.cli_json("blast-radius", "--path", "src/types.ts"))
 
     def test_changing_an_edge_property_is_synced(self) -> None:
         for edge in self.graph["edges"]:
@@ -531,7 +559,7 @@ class FailureModeTests(GraphQueryTestCase):
     def test_an_unreachable_embedder_does_not_break_plain_queries(self) -> None:
         """A misconfigured endpoint must warn, not take the whole command down."""
         self.write_graph(_chain_graph())
-        proc = self.run_cli("blast-radius", "--name", "types.ts",
+        proc = self.run_cli("blast-radius", "--path", "src/types.ts",
                             env={"UA_EMBED_URL": "http://127.0.0.1:9/embed"})
         self.assertIn("warning", proc.stderr.lower())
         self.assertEqual(json.loads(proc.stdout),
