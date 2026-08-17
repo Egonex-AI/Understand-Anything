@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -82,6 +83,44 @@ class SafeTypeTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as caught:
             gq.safe_type("a b", "edge")
         self.assertIn("edge", str(caught.exception))
+
+
+class ReexecGuardTests(unittest.TestCase):
+    """The handover must not fire when it would be wrong or looping.
+
+    Only the early-return guards are exercised here: the probing branch ends in
+    os.execve, which would replace the test runner itself.
+    """
+
+    def setUp(self) -> None:
+        self._saved = {k: os.environ.get(k) for k in
+                       (gq.REEXEC_FLAG, "UA_FALKORDB_URL", "UA_PYTHON")}
+        self.addCleanup(self._restore)
+        for key in self._saved:
+            os.environ.pop(key, None)
+
+    def _restore(self) -> None:
+        for key, value in self._saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+    def test_does_nothing_once_already_handed_over(self) -> None:
+        os.environ[gq.REEXEC_FLAG] = "1"
+        self.assertIsNone(gq.reexec_under_capable_interpreter())
+
+    def test_does_nothing_when_a_server_is_configured(self) -> None:
+        """A server needs no local driver, so the interpreter is irrelevant."""
+        os.environ["UA_FALKORDB_URL"] = "redis://localhost:6379"
+        self.assertIsNone(gq.reexec_under_capable_interpreter())
+
+    def test_candidates_are_newest_first(self) -> None:
+        self.assertEqual(list(gq.INTERPRETER_CANDIDATES),
+                         sorted(gq.INTERPRETER_CANDIDATES, reverse=True))
+        for name in gq.INTERPRETER_CANDIDATES:
+            major, minor = name.removeprefix("python").split(".")
+            self.assertGreaterEqual((int(major), int(minor)), (3, 12))
 
 
 class LabelTests(unittest.TestCase):

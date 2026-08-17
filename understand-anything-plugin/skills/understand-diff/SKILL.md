@@ -65,10 +65,10 @@ The knowledge graph JSON has this structure:
    ]'
    ```
 
-   Use `${UA_PYTHON:-python}` rather than a bare `python`. The embedded backend needs
-   Python 3.12 or newer, and a project's default `python` is often older, so a user with
-   a suitable interpreter elsewhere sets `UA_PYTHON` once and the checks below then agree
-   with the calls above. A FalkorDB server via `UA_FALKORDB_URL` works on any version.
+   The embedded backend needs Python 3.12 or newer. If the `python` you invoke is older,
+   the script looks for a newer one on `PATH` and hands over to it by itself, so this
+   usually needs no setup. `UA_PYTHON` overrides that choice when the right interpreter
+   is somewhere unusual, and a FalkorDB server via `UA_FALKORDB_URL` works on any version.
 
    `nodes-for-file` returns the file node plus every function and class defined in it,
    which is what step 4 assembles by grepping. `blast-radius` returns the affected node

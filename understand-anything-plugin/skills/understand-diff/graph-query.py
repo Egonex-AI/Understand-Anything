@@ -52,6 +52,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import urllib.request
 from collections import defaultdict
@@ -71,6 +73,47 @@ DEPENDENCY_EDGES = ("IMPORTS", "DEPENDS_ON")
 
 EMBED_BATCH = 8          # the local TEI server rejects much larger payloads
 EMBED_TEXT_CHARS = 150   # summaries are long; the head of one is enough to rank on
+
+
+REEXEC_FLAG = "UA_GRAPH_QUERY_REEXEC"
+INTERPRETER_CANDIDATES = ("python3.14", "python3.13", "python3.12")
+
+
+def reexec_under_capable_interpreter() -> None:
+    """Re-run under an interpreter that can actually load the backend.
+
+    The embedded backend needs Python 3.12 or newer, but a project's default
+    `python` is frequently older, and a newer one is usually installed alongside
+    it. Rather than making that the user's problem, look for an interpreter that
+    can import the driver and hand over to it. Silent when nothing needs doing.
+    """
+    if os.environ.get(REEXEC_FLAG):
+        return                                   # already handed over once
+    if os.environ.get("UA_FALKORDB_URL"):
+        return                                   # a server needs no local driver
+    try:
+        import redislite.falkordb_client  # noqa: F401
+        return                                   # this interpreter is fine
+    except ImportError:
+        pass
+
+    probe = "import redislite.falkordb_client"
+    candidates = [os.environ["UA_PYTHON"]] if os.environ.get("UA_PYTHON") else []
+    candidates += [c for c in (shutil.which(name) for name in INTERPRETER_CANDIDATES) if c]
+
+    for candidate in candidates:
+        try:
+            ok = subprocess.run([candidate, "-c", probe], capture_output=True,
+                                timeout=30).returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if ok:
+            print(f"note: handing over to {candidate}, which can load the backend",
+                  file=sys.stderr)
+            os.execve(candidate, [candidate, os.path.abspath(__file__), *sys.argv[1:]],
+                      {**os.environ, REEXEC_FLAG: "1"})
+
+    # Nothing suitable found; Backend will explain what to do.
 
 
 def find_graph_json(project_root: Path) -> Path:
@@ -817,6 +860,7 @@ def single_stats(repo: RepoGraph) -> dict:
 
 
 def main() -> None:
+    reexec_under_capable_interpreter()
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("command", choices=[
         "stats", "search", "nodes-for-file", "neighbors", "blast-radius",
