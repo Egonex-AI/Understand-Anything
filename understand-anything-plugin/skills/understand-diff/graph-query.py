@@ -57,7 +57,11 @@ import urllib.request
 from collections import defaultdict
 from pathlib import Path
 
-UA_DIRS = (".ua", ".understand-anything")
+# Legacy first, matching resolveUaDirName in packages/core/src/persistence/index.ts:
+# a project analysed before the `.ua` rename keeps reading its old directory, so
+# checking `.ua` first would make this adapter disagree with the rest of UA about
+# which graph is authoritative.
+UA_DIRS = (".understand-anything", ".ua")
 GRAPH_FILE = "knowledge-graph.json"
 FILE_STAMP = "__ua_file__"
 INDEX_GRAPH = "__ua_workspace__"
@@ -107,6 +111,22 @@ def rel_for(edge_type: str) -> str:
 
 def digest(payload) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def layers_containing(layers: list[dict], ids: list[str]) -> list[dict]:
+    """Layers holding any of these node ids, with the matches named.
+
+    A flat intersection rather than a traversal, so it stays out of the graph and
+    out of the incremental sync's invariants.
+    """
+    wanted = set(ids)
+    out = []
+    for layer in layers or []:
+        hits = sorted(wanted.intersection(layer.get("nodeIds", [])))
+        if hits:
+            out.append({"id": layer.get("id"), "name": layer.get("name"),
+                        "description": layer.get("description"), "matched": hits})
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -523,21 +543,8 @@ class RepoGraph:
         return [r[0] for r in rows]
 
     def layers_for(self, ids: list[str]) -> list[dict]:
-        """Which architectural layers contain any of these nodes (step 6).
-
-        Read straight from the JSON rather than the graph: layers are a flat
-        lookup, not a traversal, and keeping them out of the graph keeps them out
-        of the incremental sync's set of invariants.
-        """
-        wanted = set(ids)
-        out = []
-        for layer in self.raw.get("layers", []):
-            hits = sorted(wanted.intersection(layer.get("nodeIds", [])))
-            if hits:
-                out.append({"id": layer.get("id"), "name": layer.get("name"),
-                            "description": layer.get("description"),
-                            "matched": hits})
-        return out
+        """Which architectural layers contain any of these nodes (step 6)."""
+        return layers_containing(self.raw.get("layers", []), ids)
 
     def has_path(self, path: str) -> bool:
         clean = path.lstrip("/")
