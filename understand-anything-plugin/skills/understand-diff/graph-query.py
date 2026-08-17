@@ -370,11 +370,23 @@ class UAGraph:
         return [dict(zip(("id", "type", "name", "filePath", "summary"), r)) for r in rows]
 
     def nodes_for_file(self, path: str) -> list[dict]:
-        """The file node plus every function and class defined in it."""
+        """The file node plus every function and class defined in it.
+
+        Paths are matched from the right in both directions, because the caller's
+        path and the graph's may be rooted differently. `git diff` reports paths
+        relative to the repository, while graph paths are relative to whatever
+        directory `/understand` was pointed at — which is a subdirectory in a
+        scoped monorepo run. So the caller's path may be either longer or shorter
+        than the stored one.
+        """
+        clean = path.lstrip("/")
         rows = self._rows(
-            "MATCH (n:Node) WHERE n.filePath = $p OR n.filePath ENDS WITH $suffix "
-            "RETURN n.id, n.type, n.name, n.filePath ORDER BY n.id",
-            {"p": path, "suffix": "/" + path.lstrip("/")},
+            "MATCH (n:Node) WHERE n.filePath <> '' AND ("
+            "  n.filePath = $p"
+            "  OR n.filePath ENDS WITH $suffix"          # caller gave a shorter path
+            "  OR $p ENDS WITH ('/' + n.filePath)"       # caller gave a longer path
+            ") RETURN n.id, n.type, n.name, n.filePath ORDER BY n.id",
+            {"p": clean, "suffix": "/" + clean},
         )
         return [dict(zip(("id", "type", "name", "filePath"), r)) for r in rows]
 
