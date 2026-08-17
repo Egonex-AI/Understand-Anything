@@ -269,6 +269,43 @@ class SyncTests(GraphQueryTestCase):
         self.assertEqual(after["nodes"], self.baseline["nodes"] - len(dropped))
         self.assertEqual(self.cli_json("nodes-for-file", "--q", "src/d.ts"), [])
 
+    def test_adding_only_an_edge_is_synced(self) -> None:
+        """A commit that adds an import and changes nothing else must be seen.
+
+        Digests cover each file's incident edges for exactly this reason. When
+        they covered only node fields, this was invisible: every digest matched,
+        sync reported "cached", and the new edge never reached the graph.
+        """
+        self.graph["edges"].append(
+            _edge("file:src/d.ts", "file:src/types.ts", "imports"))
+        self.write_graph(self.graph)
+
+        after = self.cli_json("stats")
+        self.assertEqual(after["sync"]["mode"], "incremental")
+        self.assertEqual(after["edges"], self.baseline["edges"] + 1)
+        # d.ts now depends on types.ts directly rather than only through c.ts
+        self.assertIn("file:src/d.ts",
+                      self.cli_json("blast-radius", "--name", "types.ts", "--hops", "1"))
+
+    def test_removing_only_an_edge_is_synced(self) -> None:
+        self.graph["edges"] = [e for e in self.graph["edges"]
+                               if not (e["source"] == "file:src/a.ts"
+                                       and e["target"] == "file:src/types.ts")]
+        self.write_graph(self.graph)
+
+        after = self.cli_json("stats")
+        self.assertEqual(after["edges"], self.baseline["edges"] - 1)
+        self.assertNotIn("file:src/a.ts",
+                         self.cli_json("blast-radius", "--name", "types.ts"))
+
+    def test_changing_an_edge_property_is_synced(self) -> None:
+        for edge in self.graph["edges"]:
+            if edge["type"] == "imports":
+                edge["weight"] = 0.25
+                break
+        self.write_graph(self.graph)
+        self.assertEqual(self.cli_json("stats")["sync"]["mode"], "incremental")
+
     def test_node_without_a_file_path_still_loads(self) -> None:
         self.graph["nodes"].append({
             "id": "concept:orphan", "type": "concept", "name": "Orphan",
@@ -353,6 +390,62 @@ class WorkspaceTests(GraphQueryTestCase):
             self.assertEqual(second["repos"][name]["sync"]["mode"], "cached")
 
 
+# ── Semantic search ───────────────────────────────────────────────────────
+
+def _embedder_reachable() -> bool:
+    url = os.environ.get("UA_EMBED_URL")
+    if not url:
+        return False
+    import urllib.request
+    try:
+        req = urllib.request.Request(
+            url, data=json.dumps({"inputs": ["probe"], "truncate": True}).encode(),
+            headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+        return True
+    except Exception:
+        return False
+
+
+@unittest.skipUnless(_embedder_reachable(), "UA_EMBED_URL not set or unreachable")
+class SemanticTests(GraphQueryTestCase):
+    """Only runs when an embedding endpoint is configured."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_graph(_chain_graph())
+        self.embed_env = {"UA_EMBED_URL": os.environ["UA_EMBED_URL"]}
+
+    def test_vectors_are_built_during_sync(self) -> None:
+        stats = self.cli_json("stats", env=self.embed_env)
+        self.assertTrue(stats["semantic"])
+        self.assertGreater(stats["embedDimension"], 0)
+
+    def test_semantic_search_returns_ranked_nodes(self) -> None:
+        self.cli_json("stats", env=self.embed_env)
+        hits = self.cli_json("semantic", "--q", "run a function",
+                             "--k", "3", env=self.embed_env)
+        self.assertTrue(hits)
+        self.assertIn("id", hits[0])
+
+    def test_an_embedder_configured_later_backfills(self) -> None:
+        """Enabling the embedder after a plain sync must still index the graph.
+
+        The vector index used to be created only on a first sync, so this path
+        left existing nodes without vectors and raised a raw driver error.
+        """
+        first = self.cli_json("stats")                      # no embedder
+        self.assertFalse(first["semantic"])
+
+        second = self.cli_json("stats", env=self.embed_env)  # embedder appears
+        self.assertTrue(second["semantic"])
+        self.assertEqual(second["sync"]["mode"], "cached")
+        self.assertEqual(second["sync"]["vectorsBackfilled"], first["nodes"])
+
+        # and semantic search now works rather than erroring
+        self.assertTrue(self.cli_json("semantic", "--q", "types", env=self.embed_env))
+
+
 # ── Graceful failure ──────────────────────────────────────────────────────
 
 class FailureModeTests(GraphQueryTestCase):
@@ -376,6 +469,34 @@ class FailureModeTests(GraphQueryTestCase):
         self.assertEqual(json.loads(proc.stdout),
                          ["file:src/a.ts", "file:src/b.ts", "file:src/c.ts",
                           "file:src/d.ts"])
+
+    def test_an_unsafe_node_type_is_refused(self) -> None:
+        """Types become labels, which cannot be parameterised.
+
+        knowledge-graph.json is committed and shared, so a type that is not a
+        plain identifier is rejected rather than interpolated into Cypher.
+        """
+        graph = _chain_graph()
+        graph["nodes"].append({
+            "id": "evil", "type": "file) MATCH (n) DETACH DELETE n //",
+            "name": "evil", "filePath": "evil.ts", "summary": "",
+            "tags": [], "complexity": "simple",
+        })
+        self.write_graph(graph)
+
+        proc = self.run_cli("stats", expect_success=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("unsafe node type", proc.stdout + proc.stderr)
+
+    def test_an_unsafe_edge_type_is_refused(self) -> None:
+        graph = _chain_graph()
+        graph["edges"].append(
+            _edge("file:src/a.ts", "file:src/b.ts", "imports] () //"))
+        self.write_graph(graph)
+
+        proc = self.run_cli("stats", expect_success=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("unsafe edge type", proc.stdout + proc.stderr)
 
     def test_unknown_batch_op_is_rejected(self) -> None:
         self.write_graph(_chain_graph())

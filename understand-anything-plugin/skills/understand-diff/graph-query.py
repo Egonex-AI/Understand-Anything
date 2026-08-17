@@ -50,8 +50,10 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.request
+from collections import defaultdict
 from pathlib import Path
 
 UA_DIRS = (".ua", ".understand-anything")
@@ -78,8 +80,28 @@ def find_graph_json(project_root: Path) -> Path:
     )
 
 
+_SAFE_TYPE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def safe_type(raw: str, kind: str) -> str:
+    """Validate a type before it is interpolated into Cypher.
+
+    Node and edge types become labels and relationship types, which cannot be
+    parameterised. `knowledge-graph.json` is committed to repositories and shared
+    between teammates, so it is not automatically trusted input. Anything that is
+    not a plain identifier is rejected rather than escaped.
+    """
+    if not isinstance(raw, str) or not _SAFE_TYPE.match(raw):
+        raise SystemExit(f"refusing to build graph: unsafe {kind} type {raw!r}")
+    return raw
+
+
 def label_for(node_type: str) -> str:
-    return "".join(part.capitalize() for part in node_type.split("_"))
+    return "".join(part.capitalize() for part in safe_type(node_type, "node").split("_"))
+
+
+def rel_for(edge_type: str) -> str:
+    return safe_type(edge_type, "edge").upper()
 
 
 def digest(payload) -> str:
@@ -199,43 +221,152 @@ class RepoGraph:
         except Exception:
             return {}  # graph does not exist yet
 
+    def _ensure_indexes(self) -> None:
+        """Create the id index, and the vector index whenever an embedder exists.
+
+        Both are attempted every sync rather than only on the first one: an
+        embedder configured after the graph already exists still needs its index.
+        FalkorDB errors on a duplicate index, which is the expected steady state.
+        """
+        for statement, params in (
+            ("CREATE INDEX FOR (n:Node) ON (n.id)", {}),
+            *([(
+                "CREATE VECTOR INDEX FOR (n:Node) ON (n.emb) "
+                "OPTIONS {dimension: $d, similarityFunction: 'cosine'}",
+                {"d": self.embedder.dimension},
+            )] if self.embedder else []),
+        ):
+            try:
+                self.graph.query(statement, params)
+            except Exception:
+                pass  # already indexed
+
+    def _backfill_vectors(self, nodes_by_id: dict[str, dict]) -> int:
+        """Embed any node that has no vector yet.
+
+        Covers the case where the embedder is configured after a plain sync: the
+        nodes are already there and unchanged, so nothing else would revisit them.
+        """
+        if not self.embedder:
+            return 0
+        missing = [r[0] for r in self.rows(
+            "MATCH (n:Node) WHERE n.emb IS NULL RETURN n.id")]
+        pending = [i for i in missing if i in nodes_by_id]
+        if not pending:
+            return 0
+        vectors = self.embedder.encode(
+            [Embedder.text_for(nodes_by_id[i]) for i in pending])
+        self.graph.query(
+            "UNWIND $rows AS r MATCH (n:Node {id: r.id}) SET n.emb = vecf32(r.emb)",
+            {"rows": [{"id": i, "emb": v} for i, v in zip(pending, vectors)]})
+        return len(pending)
+
+    def _write_nodes(self, rows: list[dict], vectors: dict[str, list[float]]) -> None:
+        """Insert nodes in one query per label, rather than one query per node."""
+        grouped: dict[str, list[dict]] = defaultdict(list)
+        for n in rows:
+            grouped[label_for(n["type"])].append(n)
+
+        props = ("id: r.id, type: r.type, name: r.name, filePath: r.filePath, "
+                 "summary: r.summary, tags: r.tags, complexity: r.complexity, "
+                 "lineStart: r.lineStart, lineEnd: r.lineEnd, __key: r.__key")
+        for label, group in grouped.items():
+            # Vectors cannot be applied conditionally inside one UNWIND, so the
+            # group is split by whether a vector is present.
+            plain = [r for r in group if r["id"] not in vectors]
+            embedded = [dict(r, emb=vectors[r["id"]]) for r in group if r["id"] in vectors]
+            if plain:
+                self.graph.query(
+                    f"UNWIND $rows AS r CREATE (x:Node:{label} {{{props}}})",
+                    {"rows": plain})
+            if embedded:
+                self.graph.query(
+                    f"UNWIND $rows AS r "
+                    f"CREATE (x:Node:{label} {{{props}, emb: vecf32(r.emb)}})",
+                    {"rows": embedded})
+
+    def _write_edges(self, edges: list[dict]) -> None:
+        """Insert edges in one query per relationship type."""
+        grouped: dict[str, list[dict]] = defaultdict(list)
+        for e in edges:
+            grouped[rel_for(e["type"])].append({
+                "src": e["source"], "dst": e["target"], "type": e["type"],
+                "direction": e.get("direction", "forward"),
+                "weight": e.get("weight", 0.0),
+            })
+        for rel, group in grouped.items():
+            self.graph.query(
+                "UNWIND $rows AS r MATCH (a:Node {id: r.src}), (b:Node {id: r.dst}) "
+                f"CREATE (a)-[:{rel} {{type: r.type, direction: r.direction, "
+                "weight: r.weight}]->(b)",
+                {"rows": group})
+
+    @staticmethod
+    def _row_for(node: dict, key: str) -> dict:
+        line_range = node.get("lineRange") or []
+        return {
+            "id": node["id"], "type": node["type"], "name": node.get("name", ""),
+            "filePath": node.get("filePath", ""), "summary": node.get("summary", ""),
+            "tags": node.get("tags", []), "complexity": node.get("complexity", ""),
+            "lineStart": line_range[0] if len(line_range) == 2 else -1,
+            "lineEnd": line_range[1] if len(line_range) == 2 else -1,
+            "__key": key,
+        }
+
     def _sync(self) -> dict:
         nodes = self.raw.get("nodes", [])
         edges = self.raw.get("edges", [])
 
         # The file a node belongs to is the unit of replacement.
-        by_key: dict[str, list[dict]] = {}
+        by_key: dict[str, list[dict]] = defaultdict(list)
+        key_of: dict[str, str] = {}
         for n in nodes:
-            by_key.setdefault(n.get("filePath") or n["id"], []).append(n)
+            key = n.get("filePath") or n["id"]
+            by_key[key].append(n)
+            key_of[n["id"]] = key
+
+        # An edge is incident to the files at both of its ends, so adding an
+        # import marks both files changed. Without this, an edge-only change --
+        # the most common thing a commit does -- would leave every digest intact
+        # and never be synced at all.
+        edges_by_key: dict[str, list[dict]] = defaultdict(list)
+        for e in edges:
+            fingerprint = (e["source"], e["target"], e["type"],
+                           e.get("direction", "forward"), e.get("weight", 0.0))
+            for endpoint in (e["source"], e["target"]):
+                key = key_of.get(endpoint)
+                if key is not None:
+                    edges_by_key[key].append(fingerprint)
 
         current = {
-            k: digest([
-                {kk: n.get(kk) for kk in
-                 ("id", "type", "name", "summary", "tags", "complexity")}
-                for n in sorted(v, key=lambda x: x["id"])
-            ])
+            k: digest({
+                "nodes": [
+                    {kk: n.get(kk) for kk in
+                     ("id", "type", "name", "summary", "tags", "complexity",
+                      "filePath", "lineRange")}
+                    for n in sorted(v, key=lambda x: x["id"])
+                ],
+                "edges": sorted(edges_by_key.get(k, [])),
+            })
             for k, v in by_key.items()
         }
 
         stored = self._stored_digests()
         changed = {k for k, d in current.items() if stored.get(k) != d}
         removed = set(stored) - set(current)
+        first_run = not stored
+
+        self._ensure_indexes()
 
         if not changed and not removed:
-            return {"mode": "cached", "files": 0, "nodes": 0}
-
-        first_run = not stored
-        if first_run:
-            self.graph.query("CREATE INDEX FOR (n:Node) ON (n.id)")
-            if self.embedder:
-                self.graph.query(
-                    "CREATE VECTOR INDEX FOR (n:Node) ON (n.emb) "
-                    "OPTIONS {dimension: $d, similarityFunction: 'cosine'}",
-                    {"d": self.embedder.dimension},
-                )
+            backfilled = self._backfill_vectors({n["id"]: n for n in nodes})
+            return {"mode": "cached", "files": 0, "nodes": 0,
+                    **({"vectorsBackfilled": backfilled} if backfilled else {})}
 
         # Drop the nodes of changed/removed files. DETACH also drops edges
-        # arriving from untouched files, so those are re-created below.
+        # arriving from untouched files, so those are re-created below. Stamps go
+        # last, after edges: a crash mid-sync must leave the affected files
+        # unstamped so the next run repairs them instead of reporting "cached".
         for key in changed | removed:
             self.graph.query(
                 "MATCH (n:Node) WHERE n.__key = $k DETACH DELETE n", {"k": key})
@@ -250,44 +381,22 @@ class RepoGraph:
                 self.embedder.encode([Embedder.text_for(n) for n in fresh]),
             ))
 
-        for key in changed:
-            for n in by_key[key]:
-                line_range = n.get("lineRange") or []
-                params = {
-                    "id": n["id"], "type": n["type"], "name": n.get("name", ""),
-                    "filePath": n.get("filePath", ""), "summary": n.get("summary", ""),
-                    "tags": n.get("tags", []), "complexity": n.get("complexity", ""),
-                    "lineStart": line_range[0] if len(line_range) == 2 else -1,
-                    "lineEnd": line_range[1] if len(line_range) == 2 else -1,
-                    "key": key,
-                }
-                props = ("id: $id, type: $type, name: $name, filePath: $filePath, "
-                         "summary: $summary, tags: $tags, complexity: $complexity, "
-                         "lineStart: $lineStart, lineEnd: $lineEnd, __key: $key")
-                if n["id"] in vectors:
-                    params["emb"] = vectors[n["id"]]
-                    props += ", emb: vecf32($emb)"
-                self.graph.query(
-                    f"CREATE (x:Node:{label_for(n['type'])} {{{props}}})", params)
-            self.graph.query(
-                f"CREATE (:{FILE_STAMP} {{key: $k, digest: $d}})",
-                {"k": key, "d": current[key]})
+        self._write_nodes([self._row_for(n, key_of[n["id"]]) for n in fresh], vectors)
 
-        touched = {n["id"] for k in changed for n in by_key[k]}
-        for e in edges:
-            if e["source"] in touched or e["target"] in touched:
-                self.graph.query(
-                    "MATCH (a:Node {id: $src}), (b:Node {id: $dst}) "
-                    f"MERGE (a)-[:{e['type'].upper()} {{type: $type, "
-                    "direction: $direction, weight: $weight}]->(b)",
-                    {"src": e["source"], "dst": e["target"], "type": e["type"],
-                     "direction": e.get("direction", "forward"),
-                     "weight": e.get("weight", 0.0)})
+        touched = {n["id"] for n in fresh}
+        self._write_edges([e for e in edges
+                           if e["source"] in touched or e["target"] in touched])
 
+        self.graph.query(
+            f"UNWIND $rows AS r CREATE (:{FILE_STAMP} {{key: r.key, digest: r.digest}})",
+            {"rows": [{"key": k, "digest": current[k]} for k in changed]})
+
+        backfilled = self._backfill_vectors({n["id"]: n for n in nodes})
         return {
             "mode": "full" if first_run else "incremental",
             "files": len(changed) + len(removed),
             "nodes": len(fresh),
+            **({"vectorsBackfilled": backfilled} if backfilled else {}),
         }
 
     # ---- queries -----------------------------------------------------------
