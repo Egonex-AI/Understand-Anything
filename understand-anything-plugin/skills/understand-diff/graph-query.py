@@ -221,25 +221,71 @@ class RepoGraph:
         except Exception:
             return {}  # graph does not exist yet
 
-    def _ensure_indexes(self) -> None:
-        """Create the id index, and the vector index whenever an embedder exists.
+    def _vector_index_dimension(self) -> int | None:
+        """Dimension of the existing vector index on :Node(emb), if there is one."""
+        try:
+            rows = self.graph.query("CALL db.indexes()").result_set
+        except Exception:
+            return None
+        for label, _props, types, options, *_rest in rows:
+            if label != "Node" or not isinstance(types, dict):
+                continue
+            if "VECTOR" in (types.get("emb") or []):
+                return (options or {}).get("emb", {}).get("dimension")
+        return None
 
-        Both are attempted every sync rather than only on the first one: an
-        embedder configured after the graph already exists still needs its index.
-        FalkorDB errors on a duplicate index, which is the expected steady state.
+    def _ensure_indexes(self) -> dict:
+        """Bring indexes in line with the current configuration.
+
+        Checked on every sync rather than only the first, because the
+        configuration can change under a graph that already exists. Two cases
+        matter: an embedder added after a plain sync needs an index created, and
+        an embedder swapped for a different model needs the index *rebuilt* --
+        writing 384-dimension vectors into a 4-dimension index succeeds silently
+        and only fails later, at query time, with an error that points nowhere.
         """
-        for statement, params in (
-            ("CREATE INDEX FOR (n:Node) ON (n.id)", {}),
-            *([(
-                "CREATE VECTOR INDEX FOR (n:Node) ON (n.emb) "
-                "OPTIONS {dimension: $d, similarityFunction: 'cosine'}",
-                {"d": self.embedder.dimension},
-            )] if self.embedder else []),
-        ):
-            try:
-                self.graph.query(statement, params)
-            except Exception:
-                pass  # already indexed
+        try:
+            self.graph.query("CREATE INDEX FOR (n:Node) ON (n.id)")
+        except Exception:
+            pass  # already indexed
+
+        if not self.embedder:
+            return {}
+
+        existing = self._vector_index_dimension()
+        wanted = self.embedder.dimension
+
+        if existing == wanted:
+            return {}
+
+        if existing is not None:
+            # Stale vectors are unusable at the new dimension, so drop them and
+            # let the backfill re-embed from scratch.
+            self.graph.query("DROP VECTOR INDEX FOR (n:Node) ON (n.emb)")
+            self.graph.query("MATCH (n:Node) WHERE n.emb IS NOT NULL SET n.emb = NULL")
+
+        self.graph.query(
+            "CREATE VECTOR INDEX FOR (n:Node) ON (n.emb) "
+            "OPTIONS {dimension: $d, similarityFunction: 'cosine'}", {"d": wanted})
+
+        if existing is None:
+            return {}
+        return {"vectorIndexRebuilt": {"from": existing, "to": wanted}}
+
+    def _prune_orphan_stamps(self) -> int:
+        """Drop stamps whose files have no nodes left.
+
+        A stamp without nodes would make the next sync believe that file is
+        already present and skip it.
+        """
+        live = {r[0] for r in self.rows("MATCH (n:Node) RETURN DISTINCT n.__key")}
+        stamped = {r[0] for r in self.rows(f"MATCH (s:{FILE_STAMP}) RETURN s.key")}
+        orphans = sorted(stamped - live)
+        if orphans:
+            self.graph.query(
+                f"UNWIND $keys AS k MATCH (s:{FILE_STAMP} {{key: k}}) DELETE s",
+                {"keys": orphans})
+        return len(orphans)
 
     def _backfill_vectors(self, nodes_by_id: dict[str, dict]) -> int:
         """Embed any node that has no vector yet.
@@ -351,16 +397,19 @@ class RepoGraph:
             for k, v in by_key.items()
         }
 
+        index_state = self._ensure_indexes()
+
         stored = self._stored_digests()
+        if stored:
+            self._prune_orphan_stamps()
+            stored = self._stored_digests()
         changed = {k for k, d in current.items() if stored.get(k) != d}
         removed = set(stored) - set(current)
         first_run = not stored
 
-        self._ensure_indexes()
-
         if not changed and not removed:
             backfilled = self._backfill_vectors({n["id"]: n for n in nodes})
-            return {"mode": "cached", "files": 0, "nodes": 0,
+            return {"mode": "cached", "files": 0, "nodes": 0, **index_state,
                     **({"vectorsBackfilled": backfilled} if backfilled else {})}
 
         # Drop the nodes of changed/removed files. DETACH also drops edges
@@ -396,6 +445,7 @@ class RepoGraph:
             "mode": "full" if first_run else "incremental",
             "files": len(changed) + len(removed),
             "nodes": len(fresh),
+            **index_state,
             **({"vectorsBackfilled": backfilled} if backfilled else {}),
         }
 
@@ -530,17 +580,16 @@ class Workspace:
         self.index_edges = self._build_index(members)
 
     def _build_index(self, members: list[tuple[str, Path]]) -> int:
-        """Rebuild the index from package manifests. It is small, so rebuild whole.
+        """Build the index from package manifests, skipping it when unchanged.
+
+        The index is tiny, so it is rebuilt whole rather than diffed -- but only
+        when the manifests it derives from have actually changed, so repeated
+        commands do not pay for it and never observe it half-built.
 
         UA's graph records only resolved intra-repo imports, so file-level
         cross-repo edges would need the scan phase's import map. Package
         manifests give the repo-level dependency reliably.
         """
-        try:
-            self.index.delete()
-        except Exception:
-            pass
-
         owner: dict[str, str] = {}
         declared: dict[str, dict] = {}
         for name, path in members:
@@ -561,6 +610,24 @@ class Workspace:
                 **data.get("peerDependencies", {}),
             }
 
+        # Rebuild only when the manifests differ from what the index was built from.
+        stamp = digest({"repos": sorted(self.repos), "owner": owner,
+                        "declared": {k: sorted(v) for k, v in declared.items()}})
+        try:
+            rows = self.index.query(
+                f"MATCH (s:{FILE_STAMP}) RETURN s.digest LIMIT 1").result_set
+            if rows and rows[0][0] == stamp:
+                edges = self.index.query(
+                    "MATCH ()-[r:DEPENDS_ON]->() RETURN count(r)").result_set
+                return edges[0][0] if edges else 0
+        except Exception:
+            pass  # index graph does not exist yet
+
+        try:
+            self.index.delete()
+        except Exception:
+            pass
+
         for name in self.repos:
             self.index.query("CREATE (:Repo {name: $n})", {"n": name})
 
@@ -574,6 +641,8 @@ class Workspace:
                         "MERGE (a)-[:DEPENDS_ON {via: $via}]->(b)",
                         {"a": name, "b": target, "via": spec})
                     created += 1
+
+        self.index.query(f"CREATE (:{FILE_STAMP} {{digest: $d}})", {"d": stamp})
         return created
 
     # ---- cross-repo ---------------------------------------------------------
@@ -628,7 +697,7 @@ class Workspace:
 # --------------------------------------------------------------------------- #
 
 PER_REPO_OPS = {
-    "search": ("search", ("q",)),
+    "search": ("search", ("q", "limit")),
     "nodes-for-file": ("nodes_for_file", ("path",)),
     "neighbors": ("neighbors", ("id",)),
     "blast-radius": ("blast_radius", ("name", "hops")),
@@ -697,6 +766,7 @@ def main() -> None:
     p.add_argument("--name", help="node name")
     p.add_argument("--repo", help="repo name (affected-repos)")
     p.add_argument("--hops", type=int, default=3)
+    p.add_argument("--limit", type=int, default=25)
     p.add_argument("--k", type=int, default=10)
     p.add_argument("--from", dest="src")
     p.add_argument("--to", dest="dst")
@@ -724,7 +794,7 @@ def main() -> None:
 
     spec_from_flags = {
         "q": args.q, "id": args.id, "name": args.name, "path": args.q,
-        "repo": args.repo, "hops": args.hops, "k": args.k,
+        "repo": args.repo, "hops": args.hops, "k": args.k, "limit": args.limit,
         "from": args.src, "to": args.dst,
     }
 

@@ -205,6 +205,19 @@ class TraversalTests(GraphQueryTestCase):
                                         "hops": 1}]))
         self.assertEqual(out[0], ["file:src/a.ts", "file:src/b.ts"])
 
+    def test_search_honours_an_explicit_limit(self) -> None:
+        """A limit passed in a batch spec must reach the query.
+
+        It used to be dropped, so a caller asking for 2 results silently got 25 --
+        the opposite of what a context-conscious skill wants.
+        """
+        out = self.cli_json("batch", "--q", json.dumps([
+            {"op": "search", "q": "src", "limit": 2},
+            {"op": "search", "q": "src"},
+        ]))
+        self.assertEqual(len(out[0]), 2)
+        self.assertGreater(len(out[1]), 2)
+
     def test_ids_are_not_namespaced_for_a_single_repo(self) -> None:
         """Single-repo ids must stay byte-identical to the JSON's own ids."""
         for node_id in self.cli_json("blast-radius", "--name", "types.ts"):
@@ -306,6 +319,20 @@ class SyncTests(GraphQueryTestCase):
         self.write_graph(self.graph)
         self.assertEqual(self.cli_json("stats")["sync"]["mode"], "incremental")
 
+    def test_a_stamp_without_nodes_is_pruned(self) -> None:
+        """A stamp whose nodes are gone must not mask the file on the next sync.
+
+        Simulates a sync interrupted after stamping: the stamp says the file is
+        present while its nodes are not, which would otherwise be reported as
+        'cached' forever.
+        """
+        self.cli_json("cypher", "--q",
+                      "MATCH (n:Node) WHERE n.__key = 'src/b.ts' DELETE n")
+        after = self.cli_json("stats")
+        self.assertEqual(after["sync"]["mode"], "incremental")
+        self.assertEqual(after["nodes"], self.baseline["nodes"])
+        self.assertEqual(after["edges"], self.baseline["edges"])
+
     def test_node_without_a_file_path_still_loads(self) -> None:
         self.graph["nodes"].append({
             "id": "concept:orphan", "type": "concept", "name": "Orphan",
@@ -382,6 +409,24 @@ class WorkspaceTests(GraphQueryTestCase):
         self.assertEqual(out["downstreamRepos"], ["api", "web"])
         self.assertIn("shared", out["sameRepo"])
 
+    def test_index_is_reused_when_manifests_are_unchanged(self) -> None:
+        """The index is derived from package.json, so it should not be rebuilt
+        on every command — a rebuild also briefly empties it for other readers."""
+        first = self.cli_ws("stats")
+        second = self.cli_ws("stats")
+        self.assertEqual(first["indexEdges"], second["indexEdges"])
+        self.assertEqual(self.cli_ws("affected-repos", "--repo", "shared"),
+                         ["api", "web"])
+
+    def test_index_is_rebuilt_when_a_dependency_changes(self) -> None:
+        self.cli_ws("stats")
+        pkg = self.root / "web" / "package.json"
+        data = json.loads(pkg.read_text())
+        data["dependencies"] = {}          # web no longer depends on api
+        pkg.write_text(json.dumps(data))
+
+        self.assertEqual(self.cli_ws("affected-repos", "--repo", "shared"), ["api"])
+
     def test_workspace_second_run_is_cached(self) -> None:
         first = self.cli_ws("stats")
         second = self.cli_ws("stats")
@@ -427,6 +472,29 @@ class SemanticTests(GraphQueryTestCase):
                              "--k", "3", env=self.embed_env)
         self.assertTrue(hits)
         self.assertIn("id", hits[0])
+
+    def test_a_stale_vector_index_is_rebuilt(self) -> None:
+        """Switching embedding models must not leave a wrong-dimension index.
+
+        Writing 384-dimension vectors into a 4-dimension index used to succeed
+        silently and fail only at query time, with an error naming neither the
+        cause nor the fix.
+        """
+        self.cli_json("stats", env=self.embed_env)
+
+        # Plant the wrong index from processes with no embedder configured, so
+        # they do not repair it on the way in.
+        self.cli_json("cypher", "--q", "DROP VECTOR INDEX FOR (n:Node) ON (n.emb)")
+        self.cli_json("cypher", "--q",
+                      "CREATE VECTOR INDEX FOR (n:Node) ON (n.emb) "
+                      "OPTIONS {dimension: 4, similarityFunction: 'cosine'}")
+
+        rebuilt = self.cli_json("stats", env=self.embed_env)
+        self.assertEqual(rebuilt["sync"]["vectorIndexRebuilt"]["from"], 4)
+        self.assertEqual(rebuilt["sync"]["vectorIndexRebuilt"]["to"],
+                         rebuilt["embedDimension"])
+        # and the query works rather than raising a dimension mismatch
+        self.assertTrue(self.cli_json("semantic", "--q", "types", env=self.embed_env))
 
     def test_an_embedder_configured_later_backfills(self) -> None:
         """Enabling the embedder after a plain sync must still index the graph.
