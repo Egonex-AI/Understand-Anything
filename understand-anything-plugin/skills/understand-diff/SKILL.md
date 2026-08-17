@@ -52,6 +52,28 @@ The knowledge graph JSON has this structure:
    - If the committed diff or any working-tree command reports project files, warn before impact analysis that the graph may omit those changes. Suggest: Run `/understand` to refresh the graph.
    - Run the commit diff only when `GRAPH_COMMIT_RAW` resolves successfully. If the graph commit or Git metadata is missing, invalid, or unavailable, give a brief best-effort warning and continue instead of blocking.
 
+   **Optional fast path for steps 4–6.** Those steps walk the graph by grepping
+   `knowledge-graph.json` once per node id, which pulls a lot of JSON into context on
+   large graphs. If the optional query backend is configured, ask for the same thing in
+   one call instead:
+
+   ```bash
+   python "<SKILL_DIR>/graph-query.py" batch --q '[
+     {"op": "nodes-for-file",  "path": "<changed file path>"},
+     {"op": "blast-radius",    "name": "<changed file basename>", "hops": 3}
+   ]'
+   ```
+
+   `nodes-for-file` returns the file node plus every function and class defined in it,
+   which is what step 4 assembles by grepping. `blast-radius` returns the affected node
+   ids from step 5. Put every changed file in one `batch` call rather than calling once
+   per file — process startup dominates, the queries themselves are milliseconds.
+
+   To check availability, run `python "<SKILL_DIR>/graph-query.py" stats`. If it exits
+   non-zero the backend is not configured — that is the normal default, so just continue
+   with steps 4–6 as written. The backend is read-only, reads the same
+   `knowledge-graph.json`, and writes nothing; the JSON remains the source of truth.
+
 4. **Find nodes for changed files** — for each changed file path, use Grep to search the knowledge graph for:
    - Nodes with matching `"filePath"` values (e.g., `grep "changed/file/path"`)
    - This finds file-level nodes (including non-code types) AND function/class nodes defined in those files
