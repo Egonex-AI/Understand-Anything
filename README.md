@@ -272,6 +272,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Trae | ✅ Supported | `install.sh trae` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
+| Augment Code | ✅ Supported | `install.sh augment` |
 
 
 ---
