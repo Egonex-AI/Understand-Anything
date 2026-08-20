@@ -5,6 +5,8 @@ import {
   autoFixGraph,
   NODE_TYPE_ALIASES,
   EDGE_TYPE_ALIASES,
+  DESIGN_EDGE_TYPE_ALIASES,
+  NON_DESIGN_EDGE_TYPE_ALIASES,
 } from "../schema.js";
 import type { KnowledgeGraph } from "../types.js";
 
@@ -245,6 +247,21 @@ describe("schema validation", () => {
     );
   });
 
+  it('drops "documented_by" edge type because it inverts edge direction', () => {
+    const graph = structuredClone(validGraph);
+    (graph.edges[0] as any).type = "documented_by";
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    // Not rewritten to "documents": that would keep the edge but point it
+    // the wrong way, code -> doc, where canonical "documents" runs doc ->
+    // code. Dropping it puts a visible issue in front of the caller.
+    expect(result.data!.edges.length).toBe(0);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ level: "dropped", category: "invalid-edge" })
+    );
+  });
+
   it("drops truly invalid edge types after normalization", () => {
     const graph = structuredClone(validGraph);
     (graph.edges[0] as any).type = "totally_bogus";
@@ -272,6 +289,26 @@ describe("schema validation", () => {
         EDGE_TYPE_ALIASES,
         `chain detected: ${alias} → ${target} → ${EDGE_TYPE_ALIASES[target]}`,
       ).not.toHaveProperty(target);
+    }
+  });
+
+  // The alias tables only rewrite `type`, they never swap source/target, so
+  // aliasing a converse form silently reverses the edge. Each of these was
+  // either removed after shipping (fd0df15, #653) or deliberately kept out,
+  // and nothing but a comment was stopping the next one from coming back.
+  it("converse edge forms are never alias keys in any edge table", () => {
+    const converseForms = ["tests", "implemented_by", "documented_by"];
+    for (const table of [
+      EDGE_TYPE_ALIASES,
+      DESIGN_EDGE_TYPE_ALIASES,
+      NON_DESIGN_EDGE_TYPE_ALIASES,
+    ]) {
+      for (const form of converseForms) {
+        expect(
+          table,
+          `"${form}" inverts edge direction, so it must not be an alias key`,
+        ).not.toHaveProperty(form);
+      }
     }
   });
 });
