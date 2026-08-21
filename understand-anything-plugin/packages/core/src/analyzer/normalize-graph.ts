@@ -34,6 +34,24 @@ const TYPE_TO_PREFIX: Record<string, string> = {
  * happens to collide with a reserved word — from a reserved word that is a
  * legitimate middle path segment.
  */
+/**
+ * True when `prefix` appears inside the leading run of reserved-word segments
+ * of `id`. Scanning stops at the first segment that is not a reserved word, so
+ * a match means the run really is a chain of prefixes rather than ordinary path
+ * text that happens to contain the word.
+ */
+function chainContainsPrefix(id: string, prefix: string): boolean {
+  let rest = id;
+  while (true) {
+    const colonIdx = rest.indexOf(":");
+    if (colonIdx <= 0) return false;
+    const segment = rest.slice(0, colonIdx);
+    if (segment === prefix) return true;
+    if (!VALID_PREFIXES.has(segment)) return false;
+    rest = rest.slice(colonIdx + 1);
+  }
+}
+
 function stripToValidPrefix(
   id: string,
   expectedPrefix?: string,
@@ -60,7 +78,19 @@ function stripToValidPrefix(
       const innerSegment = innerColonIdx > 0 ? rest.slice(0, innerColonIdx) : "";
       if (
         innerColonIdx > 0 &&
-        (innerSegment === segment || innerSegment === expectedPrefix)
+        (innerSegment === segment ||
+          innerSegment === expectedPrefix ||
+          // A RUN of reserved words can sit in front of the real prefix
+          // ("service:endpoint:file:src/foo.ts" for a file node). Checking only
+          // the immediate inner segment stops at "service" and leaves the ID
+          // uncanonical, which dangles every edge pointing at the canonical
+          // form. Keep peeling while the expected prefix is still ahead in the
+          // run. Guarded on the outer segment not already BEING the expected
+          // prefix, so a real prefix followed by a reserved-word path segment
+          // ("endpoint:file:handler" for an endpoint node) is never stripped.
+          (expectedPrefix !== undefined &&
+            segment !== expectedPrefix &&
+            chainContainsPrefix(rest, expectedPrefix)))
       ) {
         // Skip the outer prefix, recurse on the inner one
         remaining = rest;

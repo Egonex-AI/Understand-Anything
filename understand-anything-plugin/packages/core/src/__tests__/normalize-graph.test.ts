@@ -58,6 +58,33 @@ describe("normalizeNodeId", () => {
     ).toBe("file:src/foo.ts");
   });
 
+  it("collapses a chain of reserved-word prefixes down to the expected one", () => {
+    // Regression: a file node emitted as "service:endpoint:file:src/foo.ts"
+    // carries TWO spurious reserved-word segments before its real prefix.
+    // Collapsing only when the immediate inner segment is the expected prefix
+    // stops at "service", leaving the ID uncanonical, so every canonical edge
+    // pointing at "file:src/foo.ts" dangles. The chain must collapse whole.
+    expect(
+      normalizeNodeId("service:endpoint:file:src/foo.ts", { type: "file" }),
+    ).toBe("file:src/foo.ts");
+  });
+
+  it("is idempotent when a reserved-prefix chain is collapsed", () => {
+    const once = normalizeNodeId("service:endpoint:file:src/foo.ts", {
+      type: "file",
+    });
+    expect(normalizeNodeId(once, { type: "file" })).toBe(once);
+  });
+
+  it("keeps a real prefix even when the expected prefix appears later as a path segment", () => {
+    // The guard for the case above must not over-collapse: an endpoint node
+    // legitimately named "endpoint:file:handler" has "file" as a real middle
+    // segment, not a spurious prefix, so the outer "endpoint" stays.
+    expect(
+      normalizeNodeId("endpoint:file:handler", { type: "endpoint" }),
+    ).toBe("endpoint:file:handler");
+  });
+
   it("is idempotent when a reserved-word project prefix is stripped", () => {
     const once = normalizeNodeId("service:file:src/foo.ts", { type: "file" });
     expect(normalizeNodeId(once, { type: "file" })).toBe(once);
