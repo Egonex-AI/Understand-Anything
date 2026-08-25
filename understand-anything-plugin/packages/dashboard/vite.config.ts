@@ -16,6 +16,7 @@ import {
 // This token is printed to the terminal and must be in the URL
 // to fetch knowledge-graph.json or diff-overlay.json.
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
+const AUTO_AUTH = process.env.UNDERSTAND_AUTO_AUTH === "1";
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
 // Legacy directory first — projects analyzed before the `.ua` rename keep
@@ -300,7 +301,7 @@ const config: DashboardViteConfig = {
   server: {
     host: "127.0.0.1",
     port: 5173,
-    open: `/?token=${ACCESS_TOKEN}`,
+    open: AUTO_AUTH ? "/" : `/?token=${ACCESS_TOKEN}`,
   },
 
   resolve: {
@@ -352,9 +353,23 @@ const config: DashboardViteConfig = {
         server.httpServer?.once("listening", () => {
           const address = server.httpServer?.address();
           const port = typeof address === "object" && address ? address.port : 5173;
+          const dashboardUrl = AUTO_AUTH
+            ? `http://127.0.0.1:${port}/`
+            : `http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}`;
           console.log(
-            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
+            `\n  🔑  Dashboard URL: ${dashboardUrl}\n`
           );
+        });
+
+        server.middlewares.use((req, res, next) => {
+          const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
+          if (AUTO_AUTH && url.pathname === "/" && !url.searchParams.has("token")) {
+            res.statusCode = 302;
+            res.setHeader("Location", `/?token=${encodeURIComponent(ACCESS_TOKEN)}`);
+            res.end();
+            return;
+          }
+          next();
         });
 
         server.middlewares.use(createDashboardDataMiddleware(ACCESS_TOKEN));

@@ -84,6 +84,7 @@ if (!graphDir) {
 }
 
 const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
+const AUTO_AUTH = process.env.UNDERSTAND_AUTO_AUTH === "1";
 
 // ── Helpers (mirroring vite.config.ts) ────────────────────────────────────
 
@@ -320,6 +321,16 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const pathname = url.pathname;
 
+  // Local helpers can make the root URL frictionless without weakening the
+  // protected graph and source-file endpoints. The dashboard consumes the
+  // token once, stores it for this tab, and removes it from the address bar.
+  if (AUTO_AUTH && pathname === "/" && !url.searchParams.has("token")) {
+    res.statusCode = 302;
+    res.setHeader("Location", `/?token=${encodeURIComponent(ACCESS_TOKEN)}`);
+    res.end();
+    return;
+  }
+
   if (pathname === "/staleness.json") {
     res.setHeader("Cache-Control", "no-store");
   }
@@ -378,7 +389,9 @@ function listen(attemptPort, attemptsLeft) {
   server.listen(attemptPort, "127.0.0.1", () => {
     const address = server.address();
     const boundPort = typeof address === "object" && address ? address.port : attemptPort;
-    const dashboardUrl = `http://127.0.0.1:${boundPort}/?token=${ACCESS_TOKEN}`;
+    const dashboardUrl = AUTO_AUTH
+      ? `http://127.0.0.1:${boundPort}/`
+      : `http://127.0.0.1:${boundPort}/?token=${ACCESS_TOKEN}`;
     console.log(`\n  Serving graph from ${graphDir}`);
     console.log(`  🔑  Dashboard URL: ${dashboardUrl}\n`);
     if (openBrowser) {
