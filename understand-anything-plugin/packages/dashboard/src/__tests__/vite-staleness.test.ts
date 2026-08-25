@@ -1,14 +1,10 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
-import {
-  createServer,
-  request as httpRequest,
-  type Server,
-} from "node:http";
+import { createServer, request as httpRequest, type Server } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createDashboardDataMiddleware } from "../../vite.config";
+import { createAutoAuthMiddleware, createDashboardDataMiddleware } from "../../vite.config";
 import { isDashboardFreshnessReport } from "../freshness";
 
 interface HttpResult {
@@ -87,24 +83,61 @@ async function startDashboardServer(accessToken: string): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
+async function startAutoAuthServer(accessToken: string, enabled: boolean): Promise<string> {
+  const middleware = createAutoAuthMiddleware(accessToken, enabled);
+  const server = createServer((req, res) => {
+    middleware(req, res, () => {
+      res.statusCode = 204;
+      res.end();
+    });
+  });
+  servers.push(server);
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Auto-auth test server did not expose a TCP port");
+  }
+  return `http://127.0.0.1:${address.port}`;
+}
+
 function requestJson(baseUrl: string, requestPath: string): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
-    const request = httpRequest(
-      `${baseUrl}${requestPath}`,
-      { agent: false },
-      (response) => {
-        const chunks: Buffer[] = [];
-        response.on("data", (chunk: Buffer) => chunks.push(chunk));
-        response.on("end", () => {
-          const text = Buffer.concat(chunks).toString("utf8");
-          resolve({
-            status: response.statusCode ?? 0,
-            body: text.length > 0 ? JSON.parse(text) : null,
-            cacheControl: response.headers["cache-control"] ?? null,
-          });
+    const request = httpRequest(`${baseUrl}${requestPath}`, { agent: false }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        resolve({
+          status: response.statusCode ?? 0,
+          body: text.length > 0 ? JSON.parse(text) : null,
+          cacheControl: response.headers["cache-control"] ?? null,
         });
-      },
-    );
+      });
+    });
+    request.once("error", reject);
+    request.end();
+  });
+}
+
+function requestWithHost(
+  baseUrl: string,
+  requestPath: string,
+  host: string,
+): Promise<{ status: number; location: string | null }> {
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(`${baseUrl}${requestPath}`, { agent: false, headers: { host } }, (response) => {
+      response.resume();
+      response.on("end", () =>
+        resolve({
+          status: response.statusCode ?? 0,
+          location: response.headers.location ?? null,
+        }),
+      );
+    });
     request.once("error", reject);
     request.end();
   });
@@ -139,128 +172,129 @@ afterEach(async () => {
   });
 });
 
-describe(
-  "dashboard graph freshness endpoint",
-  { timeout: 15_000 },
-  () => {
-    it("rejects an unauthorized request before serving freshness data", async () => {
-      writeGraph("knowledge-graph.json", baselineCommit);
-      const baseUrl = await startDashboardServer("test-token");
+describe("dashboard graph freshness endpoint", { timeout: 15_000 }, () => {
+  it("rejects an unauthorized request before serving freshness data", async () => {
+    writeGraph("knowledge-graph.json", baselineCommit);
+    const baseUrl = await startDashboardServer("test-token");
 
-      await expect(requestJson(baseUrl, "/staleness.json")).resolves.toEqual({
-        status: 403,
-        body: { error: "Forbidden: missing or invalid token" },
-        cacheControl: "no-store",
-      });
+    await expect(requestJson(baseUrl, "/staleness.json")).resolves.toEqual({
+      status: 403,
+      body: { error: "Forbidden: missing or invalid token" },
+      cacheControl: "no-store",
     });
+  });
 
-    it.each([".understand-anything", ".ua"])(
-      "serves a knowledge-only report from %s to an authorized request",
-      async (dataDir) => {
-        writeGraph("knowledge-graph.json", baselineCommit, dataDir);
-        const baseUrl = await startDashboardServer("test-token");
-
-        const response = await requestJson(
-          baseUrl,
-          "/staleness.json?token=test-token",
-        );
-
-        expect(response.status).toBe(200);
-        expect(response.cacheControl).toBe("no-store");
-        expect(isDashboardFreshnessReport(response.body)).toBe(true);
-        expect(response.body).toMatchObject({
-          graphs: {
-            knowledge: {
-              status: "fresh",
-              graphCommitHash: baselineCommit,
-              headCommitHash: baselineCommit,
-            },
-          },
-        });
-        expect(
-          (response.body as { graphs: Record<string, unknown> }).graphs,
-        ).not.toHaveProperty("domain");
-      },
-    );
-
-    it("reports knowledge and domain graph freshness independently", async () => {
-      writeProjectFile("src/index.ts", "export const value = 2;\n");
-      const headCommit = commitAll("project change");
-      writeGraph("knowledge-graph.json", headCommit);
-      writeGraph("domain-graph.json", baselineCommit);
+  it.each([".understand-anything", ".ua"])(
+    "serves a knowledge-only report from %s to an authorized request",
+    async (dataDir) => {
+      writeGraph("knowledge-graph.json", baselineCommit, dataDir);
       const baseUrl = await startDashboardServer("test-token");
 
-      const response = await requestJson(
-        baseUrl,
-        "/staleness.json?token=test-token",
-      );
+      const response = await requestJson(baseUrl, "/staleness.json?token=test-token");
+
+      expect(response.status).toBe(200);
+      expect(response.cacheControl).toBe("no-store");
       expect(isDashboardFreshnessReport(response.body)).toBe(true);
-      expect(response).toMatchObject({
-        status: 200,
-        body: {
-          graphs: {
-            knowledge: {
-              status: "fresh",
-              graphCommitHash: headCommit,
-            },
-            domain: {
-              status: "stale",
-              relation: "behind",
-              graphCommitHash: baselineCommit,
-              headCommitHash: headCommit,
-              commitsBehind: 1,
-              changedFiles: ["src/index.ts"],
-            },
+      expect(response.body).toMatchObject({
+        graphs: {
+          knowledge: {
+            status: "fresh",
+            graphCommitHash: baselineCommit,
+            headCommitHash: baselineCommit,
           },
         },
       });
+      expect((response.body as { graphs: Record<string, unknown> }).graphs).not.toHaveProperty("domain");
+    },
+  );
+
+  it("reports knowledge and domain graph freshness independently", async () => {
+    writeProjectFile("src/index.ts", "export const value = 2;\n");
+    const headCommit = commitAll("project change");
+    writeGraph("knowledge-graph.json", headCommit);
+    writeGraph("domain-graph.json", baselineCommit);
+    const baseUrl = await startDashboardServer("test-token");
+
+    const response = await requestJson(baseUrl, "/staleness.json?token=test-token");
+    expect(isDashboardFreshnessReport(response.body)).toBe(true);
+    expect(response).toMatchObject({
+      status: 200,
+      body: {
+        graphs: {
+          knowledge: {
+            status: "fresh",
+            graphCommitHash: headCommit,
+          },
+          domain: {
+            status: "stale",
+            relation: "behind",
+            graphCommitHash: baselineCommit,
+            headCommitHash: headCommit,
+            commitsBehind: 1,
+            changedFiles: ["src/index.ts"],
+          },
+        },
+      },
     });
+  });
 
-    it("returns 404 when the required knowledge graph is missing", async () => {
-      const baseUrl = await startDashboardServer("test-token");
+  it("returns 404 when the required knowledge graph is missing", async () => {
+    const baseUrl = await startDashboardServer("test-token");
 
-      await expect(
-        requestJson(baseUrl, "/staleness.json?token=test-token"),
-      ).resolves.toEqual({
-        status: 404,
-        body: { error: "No knowledge graph found. Run /understand first." },
-        cacheControl: "no-store",
-      });
+    await expect(requestJson(baseUrl, "/staleness.json?token=test-token")).resolves.toEqual({
+      status: 404,
+      body: { error: "No knowledge graph found. Run /understand first." },
+      cacheControl: "no-store",
     });
+  });
 
-    it("returns a safe 500 response for invalid knowledge graph JSON", async () => {
-      fs.writeFileSync(
-        path.join(graphDirectory(), "knowledge-graph.json"),
-        "{not-json",
-        "utf8",
-      );
-      const baseUrl = await startDashboardServer("test-token");
+  it("returns a safe 500 response for invalid knowledge graph JSON", async () => {
+    fs.writeFileSync(path.join(graphDirectory(), "knowledge-graph.json"), "{not-json", "utf8");
+    const baseUrl = await startDashboardServer("test-token");
 
-      await expect(
-        requestJson(baseUrl, "/staleness.json?token=test-token"),
-      ).resolves.toEqual({
-        status: 500,
-        body: { error: "Failed to read graph file" },
-        cacheControl: "no-store",
-      });
+    await expect(requestJson(baseUrl, "/staleness.json?token=test-token")).resolves.toEqual({
+      status: 500,
+      body: { error: "Failed to read graph file" },
+      cacheControl: "no-store",
     });
+  });
 
-    it("returns a safe 500 response for invalid optional domain graph JSON", async () => {
-      writeGraph("knowledge-graph.json", baselineCommit);
-      fs.writeFileSync(
-        path.join(graphDirectory(), "domain-graph.json"),
-        "{not-json",
-        "utf8",
-      );
-      const baseUrl = await startDashboardServer("test-token");
+  it("returns a safe 500 response for invalid optional domain graph JSON", async () => {
+    writeGraph("knowledge-graph.json", baselineCommit);
+    fs.writeFileSync(path.join(graphDirectory(), "domain-graph.json"), "{not-json", "utf8");
+    const baseUrl = await startDashboardServer("test-token");
 
-      await expect(
-        requestJson(baseUrl, "/staleness.json?token=test-token"),
-      ).resolves.toEqual({
-        status: 500,
-        body: { error: "Failed to read graph file" },
-        cacheControl: "no-store",
-      });
+    await expect(requestJson(baseUrl, "/staleness.json?token=test-token")).resolves.toEqual({
+      status: 500,
+      body: { error: "Failed to read graph file" },
+      cacheControl: "no-store",
     });
-  },
-);
+  });
+});
+
+describe("dashboard loopback auto-auth middleware", () => {
+  it("redirects a loopback root without caching the bearer token", async () => {
+    const baseUrl = await startAutoAuthServer("test-token", true);
+    const response = await fetch(`${baseUrl}/`, { redirect: "manual" });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("/?token=test-token");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("rejects hostile hosts before issuing a token redirect", async () => {
+    const baseUrl = await startAutoAuthServer("test-token", true);
+    const response = await requestWithHost(baseUrl, "/", "attacker.example");
+
+    expect(response.status).toBe(421);
+    expect(response.location).toBeNull();
+  });
+
+  it("preserves the default explicit-token flow when disabled", async () => {
+    const baseUrl = await startAutoAuthServer("test-token", false);
+    const response = await fetch(`${baseUrl}/`, { redirect: "manual" });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("location")).toBeNull();
+  });
+});

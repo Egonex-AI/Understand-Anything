@@ -6,11 +6,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import type { IncomingMessage, ServerResponse } from "http";
-import {
-  getGraphFreshnessBatch,
-  type GraphFreshnessInput,
-  type GraphFreshnessResult,
-} from "../core/src/staleness";
+import { getGraphFreshnessBatch, type GraphFreshnessInput, type GraphFreshnessResult } from "../core/src/staleness";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -23,16 +19,43 @@ const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 // their existing `.understand-anything/` data.
 const UA_DIR_CANDIDATES = [".understand-anything", ".ua"];
 
+export function isLoopbackHost(host: string | undefined): boolean {
+  if (typeof host !== "string") return false;
+  return /^(?:(?:localhost|127\.0\.0\.1)(?::\d{1,5})?|\[::1\](?::\d{1,5})?)$/i.test(host);
+}
+
+export function createAutoAuthMiddleware(accessToken: string, enabled: boolean) {
+  return (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
+    if (!enabled) {
+      next();
+      return;
+    }
+    if (!isLoopbackHost(req.headers.host)) {
+      res.statusCode = 421;
+      res.setHeader("Content-Type", "application/json");
+      res.end(
+        JSON.stringify({
+          error: "Misdirected Request: loopback Host required",
+        }),
+      );
+      return;
+    }
+    const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
+    if (url.pathname === "/" && !url.searchParams.has("token")) {
+      res.statusCode = 302;
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Location", `/?token=${encodeURIComponent(accessToken)}`);
+      res.end();
+      return;
+    }
+    next();
+  };
+}
+
 function graphFileCandidates(fileName: string): string[] {
   const graphDir = process.env.GRAPH_DIR;
-  const roots = [
-    ...(graphDir ? [graphDir] : []),
-    process.cwd(),
-    path.resolve(process.cwd(), "../../.."),
-  ];
-  return roots.flatMap((root) =>
-    UA_DIR_CANDIDATES.map((dir) => path.resolve(root, dir, fileName)),
-  );
+  const roots = [...(graphDir ? [graphDir] : []), process.cwd(), path.resolve(process.cwd(), "../../..")];
+  return roots.flatMap((root) => UA_DIR_CANDIDATES.map((dir) => path.resolve(root, dir, fileName)));
 }
 
 function findGraphFile(fileName: string): string | null {
@@ -203,14 +226,8 @@ function readGraphMetadata(graphFile: string): GraphFreshnessInput {
     };
   };
   return {
-    graphCommitHash:
-      typeof graph.project?.gitCommitHash === "string"
-        ? graph.project.gitCommitHash
-        : undefined,
-    lastAnalyzedAt:
-      typeof graph.project?.analyzedAt === "string"
-        ? graph.project.analyzedAt
-        : undefined,
+    graphCommitHash: typeof graph.project?.gitCommitHash === "string" ? graph.project.gitCommitHash : undefined,
+    lastAnalyzedAt: typeof graph.project?.analyzedAt === "string" ? graph.project.analyzedAt : undefined,
   };
 }
 
@@ -225,9 +242,7 @@ export async function readGraphFreshness() {
   let domainInput: GraphFreshnessInput | undefined;
   try {
     knowledgeInput = readGraphMetadata(graphFile);
-    domainInput = fs.existsSync(domainGraphFile)
-      ? readGraphMetadata(domainGraphFile)
-      : undefined;
+    domainInput = fs.existsSync(domainGraphFile) ? readGraphMetadata(domainGraphFile) : undefined;
   } catch {
     return rejectFileRequest("Failed to read graph file", 500);
   }
@@ -252,15 +267,9 @@ export async function readGraphFreshness() {
   };
 }
 
-type DashboardDataMiddleware = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  next: () => void,
-) => void;
+type DashboardDataMiddleware = (req: IncomingMessage, res: ServerResponse, next: () => void) => void;
 
-export function createDashboardDataMiddleware(
-  accessToken: string,
-): DashboardDataMiddleware {
+export function createDashboardDataMiddleware(accessToken: string): DashboardDataMiddleware {
   return (req, res, next) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
     if (url.pathname !== "/staleness.json") {
@@ -325,16 +334,15 @@ const config: DashboardViteConfig = {
           // bloat the main bundle. graphology is similarly large.
           if (id.includes("node_modules/elkjs/")) return "elk";
           if (id.includes("node_modules/graphology")) return "graphology";
-          if (
-            id.includes("node_modules/@dagrejs/") ||
-            id.includes("node_modules/d3-force/")
-          ) {
+          if (id.includes("node_modules/@dagrejs/") || id.includes("node_modules/d3-force/")) {
             return "graph-layout";
           }
           if (
             id.includes("node_modules/react-markdown/") ||
             id.includes("node_modules/hast-util-to-jsx-runtime/") ||
-            /[\\/]node_modules[\\/](remark|rehype|mdast|hast|unist|micromark|decode-named-character-reference|property-information|space-separated-tokens|comma-separated-tokens|html-url-attributes|devlop|bail|ccount|character-entities|is-plain-obj|trim-lines|trough|unified|vfile|zwitch)/.test(id)
+            /[\\/]node_modules[\\/](remark|rehype|mdast|hast|unist|micromark|decode-named-character-reference|property-information|space-separated-tokens|comma-separated-tokens|html-url-attributes|devlop|bail|ccount|character-entities|is-plain-obj|trim-lines|trough|unified|vfile|zwitch)/.test(
+              id,
+            )
           ) {
             return "markdown";
           }
@@ -356,21 +364,10 @@ const config: DashboardViteConfig = {
           const dashboardUrl = AUTO_AUTH
             ? `http://127.0.0.1:${port}/`
             : `http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}`;
-          console.log(
-            `\n  🔑  Dashboard URL: ${dashboardUrl}\n`
-          );
+          console.log(`\n  🔑  Dashboard URL: ${dashboardUrl}\n`);
         });
 
-        server.middlewares.use((req, res, next) => {
-          const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
-          if (AUTO_AUTH && url.pathname === "/" && !url.searchParams.has("token")) {
-            res.statusCode = 302;
-            res.setHeader("Location", `/?token=${encodeURIComponent(ACCESS_TOKEN)}`);
-            res.end();
-            return;
-          }
-          next();
-        });
+        server.middlewares.use(createAutoAuthMiddleware(ACCESS_TOKEN, AUTO_AUTH));
 
         server.middlewares.use(createDashboardDataMiddleware(ACCESS_TOKEN));
 
@@ -393,7 +390,9 @@ const config: DashboardViteConfig = {
           // FIX 3 — require the one-time token on all data endpoints.
           // Requests without a matching ?token= get a 403.
           if (url.searchParams.get("token") !== ACCESS_TOKEN) {
-            sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
+            sendJson(res, 403, {
+              error: "Forbidden: missing or invalid token",
+            });
             return;
           }
 
@@ -425,10 +424,10 @@ const config: DashboardViteConfig = {
             pathname === "/diff-overlay.json"
               ? "diff-overlay.json"
               : pathname === "/meta.json"
-              ? "meta.json"
-              : pathname === "/domain-graph.json"
-              ? "domain-graph.json"
-              : "knowledge-graph.json";
+                ? "meta.json"
+                : pathname === "/domain-graph.json"
+                  ? "domain-graph.json"
+                  : "knowledge-graph.json";
 
           const candidates = graphFileCandidates(fileName);
 
@@ -458,8 +457,8 @@ const config: DashboardViteConfig = {
                   const rel = abs.startsWith(projectRoot)
                     ? abs.slice(projectRoot.length).replace(/^[\\/]/, "")
                     : path.isAbsolute(abs)
-                    ? path.basename(abs) // absolute but outside root — use filename only
-                    : abs;              // already relative — keep as-is
+                      ? path.basename(abs) // absolute but outside root — use filename only
+                      : abs; // already relative — keep as-is
                   return { ...node, filePath: rel };
                 });
               }
@@ -481,7 +480,11 @@ const config: DashboardViteConfig = {
           res.statusCode = 404;
           if (pathname === "/knowledge-graph.json") {
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ error: "No knowledge graph found. Run /understand first." }));
+            res.end(
+              JSON.stringify({
+                error: "No knowledge graph found. Run /understand first.",
+              }),
+            );
           } else {
             res.end();
           }

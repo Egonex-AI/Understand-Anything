@@ -4,32 +4,35 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const VIEWER_BIN = join(
-  REPO_ROOT,
-  "understand-anything-plugin",
-  "packages",
-  "viewer",
-  "bin",
-  "viewer.mjs",
-);
+const VIEWER_BIN = join(REPO_ROOT, "understand-anything-plugin", "packages", "viewer", "bin", "viewer.mjs");
 const VIEWER_DIST = join(REPO_ROOT, "understand-anything-plugin", "packages", "viewer", "dist");
 
 function fixtureGraph(gitCommitHash) {
   return {
     version: "1.0.0",
     project: {
-      name: "fixture", languages: ["ts"], frameworks: [], description: "d",
-      analyzedAt: "2026-07-17T00:00:00.000Z", gitCommitHash,
+      name: "fixture",
+      languages: ["ts"],
+      frameworks: [],
+      description: "d",
+      analyzedAt: "2026-07-17T00:00:00.000Z",
+      gitCommitHash,
     },
     nodes: [
       {
-        id: "file:src/a.ts", type: "file", name: "a.ts", filePath: "src/a.ts",
-        summary: "s", tags: [], complexity: "simple",
+        id: "file:src/a.ts",
+        type: "file",
+        name: "a.ts",
+        filePath: "src/a.ts",
+        summary: "s",
+        tags: [],
+        complexity: "simple",
       },
     ],
     edges: [],
@@ -58,21 +61,33 @@ function setupProject(dataDirName) {
 
   const dataDir = join(root, dataDirName);
   mkdirSync(dataDir, { recursive: true });
-  writeFileSync(
-    join(dataDir, "knowledge-graph.json"),
-    JSON.stringify(fixtureGraph(git(root, "rev-parse", "HEAD"))),
-  );
+  writeFileSync(join(dataDir, "knowledge-graph.json"), JSON.stringify(fixtureGraph(git(root, "rev-parse", "HEAD"))));
   return root;
 }
 
-/** Start the viewer and wait for the printed URL. Returns { proc, url, token, port }. */
-function startViewer(projectRoot) {
+function requestWithHost(url, host) {
   return new Promise((resolvePromise, rejectPromise) => {
-    const proc = spawn(
-      process.execPath,
-      [VIEWER_BIN, projectRoot, "--no-open", "--port", "0"],
-      { env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const request = httpRequest(url, { headers: { host } }, (response) => {
+      response.resume();
+      response.on("end", () =>
+        resolvePromise({
+          status: response.statusCode ?? 0,
+          location: response.headers.location ?? null,
+        }),
+      );
+    });
+    request.once("error", rejectPromise);
+    request.end();
+  });
+}
+
+/** Start the viewer and wait for the printed URL. Returns { proc, url, token, port }. */
+function startViewer(projectRoot, extraEnv = {}) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const proc = spawn(process.execPath, [VIEWER_BIN, projectRoot, "--no-open", "--port", "0"], {
+      env: { ...process.env, UNDERSTAND_AUTO_AUTH: "0", ...extraEnv },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let out = "";
     const timer = setTimeout(() => {
       proc.kill();
@@ -80,10 +95,16 @@ function startViewer(projectRoot) {
     }, 10_000);
     const onData = (chunk) => {
       out += String(chunk);
-      const m = out.match(/http:\/\/127\.0\.0\.1:(\d+)\/\?token=([a-f0-9]+)/);
+      const m = out.match(/Dashboard URL: (http:\/\/127\.0\.0\.1:(\d+)\/[^\s]*)/);
       if (m) {
         clearTimeout(timer);
-        resolvePromise({ proc, url: m[0], port: Number(m[1]), token: m[2] });
+        const parsedUrl = new URL(m[1]);
+        resolvePromise({
+          proc,
+          url: m[1],
+          port: Number(m[2]),
+          token: parsedUrl.searchParams.get("token") ?? extraEnv.UNDERSTAND_ACCESS_TOKEN,
+        });
       }
     };
     proc.stdout.on("data", onData);
@@ -122,6 +143,41 @@ describe.skipIf(!existsSync(VIEWER_DIST))("understand-anything-viewer", () => {
     expect(res.status).toBe(403);
   });
 
+  it("auto-authenticates only loopback hosts without caching the token redirect", async () => {
+    const accessToken = "a".repeat(32);
+    const autoViewer = await startViewer(root, {
+      UNDERSTAND_ACCESS_TOKEN: accessToken,
+      UNDERSTAND_AUTO_AUTH: "1",
+    });
+    const autoBase = `http://127.0.0.1:${autoViewer.port}`;
+    try {
+      expect(autoViewer.url).toBe(`${autoBase}/`);
+
+      const redirect = await fetch(`${autoBase}/`, { redirect: "manual" });
+      expect(redirect.status).toBe(302);
+      expect(redirect.headers.get("cache-control")).toBe("no-store");
+      expect(redirect.headers.get("location")).toBe(`/?token=${accessToken}`);
+
+      const dashboard = await fetch(`${autoBase}${redirect.headers.get("location")}`);
+      expect(dashboard.status).toBe(200);
+
+      const protectedEndpoint = await fetch(`${autoBase}/knowledge-graph.json`);
+      expect(protectedEndpoint.status).toBe(403);
+
+      const reboundRoot = await requestWithHost(`${autoBase}/`, "attacker.example");
+      expect(reboundRoot.status).toBe(421);
+      expect(reboundRoot.location).toBeNull();
+
+      const reboundToken = await requestWithHost(
+        `${autoBase}/knowledge-graph.json?token=${accessToken}`,
+        "attacker.example",
+      );
+      expect(reboundToken.status).toBe(421);
+    } finally {
+      autoViewer.proc.kill();
+    }
+  });
+
   it("serves the graph from .ua/ with a valid token", async () => {
     const res = await fetch(`${base()}/knowledge-graph.json?token=${viewer.token}`);
     expect(res.status).toBe(200);
@@ -130,14 +186,20 @@ describe.skipIf(!existsSync(VIEWER_DIST))("understand-anything-viewer", () => {
     expect(graph.nodes[0].filePath).toBe("src/a.ts");
   });
 
+  it("preserves explicit-token access through a custom Host", async () => {
+    const response = await requestWithHost(
+      `${base()}/knowledge-graph.json?token=${viewer.token}`,
+      "dashboard.internal",
+    );
+    expect(response.status).toBe(200);
+  });
+
   it("serves a protected no-store freshness report", async () => {
     const denied = await fetch(`${base()}/staleness.json`);
     expect(denied.status).toBe(403);
     expect(denied.headers.get("cache-control")).toBe("no-store");
 
-    const res = await fetch(
-      `${base()}/staleness.json?token=${viewer.token}`,
-    );
+    const res = await fetch(`${base()}/staleness.json?token=${viewer.token}`);
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(await res.json()).toMatchObject({
@@ -152,17 +214,13 @@ describe.skipIf(!existsSync(VIEWER_DIST))("understand-anything-viewer", () => {
   });
 
   it("serves file content only for files listed in the graph", async () => {
-    const ok = await fetch(
-      `${base()}/file-content.json?token=${viewer.token}&path=${encodeURIComponent("src/a.ts")}`,
-    );
+    const ok = await fetch(`${base()}/file-content.json?token=${viewer.token}&path=${encodeURIComponent("src/a.ts")}`);
     expect(ok.status).toBe(200);
     const body = await ok.json();
     expect(body.content).toContain("export const a");
     expect(body.language).toBe("typescript");
 
-    const denied = await fetch(
-      `${base()}/file-content.json?token=${viewer.token}&path=secret.txt`,
-    );
+    const denied = await fetch(`${base()}/file-content.json?token=${viewer.token}&path=secret.txt`);
     expect(denied.status).toBe(404);
   });
 
@@ -182,9 +240,7 @@ describe.skipIf(!existsSync(VIEWER_DIST))("understand-anything-viewer", () => {
     const legacyRoot = setupProject(".understand-anything");
     const legacyViewer = await startViewer(legacyRoot);
     try {
-      const res = await fetch(
-        `http://127.0.0.1:${legacyViewer.port}/knowledge-graph.json?token=${legacyViewer.token}`,
-      );
+      const res = await fetch(`http://127.0.0.1:${legacyViewer.port}/knowledge-graph.json?token=${legacyViewer.token}`);
       expect(res.status).toBe(200);
       expect((await res.json()).nodes).toHaveLength(1);
     } finally {

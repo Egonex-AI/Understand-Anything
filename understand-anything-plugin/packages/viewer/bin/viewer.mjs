@@ -65,20 +65,20 @@ for (let i = 0; i < args.length; i++) {
 if (!fs.existsSync(DIST_DIR)) {
   console.error(
     "Error: embedded dashboard build not found. This tarball was packed " +
-    "without running the build — run `pnpm --filter understand-anything-viewer build` first.",
+      "without running the build — run `pnpm --filter understand-anything-viewer build` first.",
   );
   process.exit(1);
 }
 
-const graphDir = UA_DIR_CANDIDATES
-  .map((d) => path.join(projectRoot, d))
-  .find((d) => fs.existsSync(path.join(d, "knowledge-graph.json")));
+const graphDir = UA_DIR_CANDIDATES.map((d) => path.join(projectRoot, d)).find((d) =>
+  fs.existsSync(path.join(d, "knowledge-graph.json")),
+);
 
 if (!graphDir) {
   console.error(
     `Error: no knowledge graph found under ${projectRoot}\n` +
-    "Expected .ua/knowledge-graph.json (or legacy .understand-anything/). " +
-    "Generate one with /understand first, or pass the project directory as an argument.",
+      "Expected .ua/knowledge-graph.json (or legacy .understand-anything/). " +
+      "Generate one with /understand first, or pass the project directory as an argument.",
   );
   process.exit(1);
 }
@@ -92,6 +92,11 @@ function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(payload));
+}
+
+function isLoopbackHost(host) {
+  if (typeof host !== "string") return false;
+  return /^(?:(?:localhost|127\.0\.0\.1)(?::\d{1,5})?|\[::1\](?::\d{1,5})?)$/i.test(host);
 }
 
 function normalizeGraphPath(filePath) {
@@ -133,17 +138,40 @@ function graphFilePathSet() {
 function detectLanguage(filePath) {
   const ext = path.extname(filePath).slice(1).toLowerCase();
   const byExt = {
-    bash: "bash", c: "c", cc: "cpp", cpp: "cpp", cs: "csharp", css: "css",
-    go: "go", h: "c", hpp: "cpp", html: "markup", java: "java",
-    js: "javascript", jsx: "jsx", json: "json", md: "markdown",
-    mjs: "javascript", py: "python", rb: "ruby", rs: "rust", sh: "bash",
-    ts: "typescript", tsx: "tsx", txt: "text", yaml: "yaml", yml: "yaml",
+    bash: "bash",
+    c: "c",
+    cc: "cpp",
+    cpp: "cpp",
+    cs: "csharp",
+    css: "css",
+    go: "go",
+    h: "c",
+    hpp: "cpp",
+    html: "markup",
+    java: "java",
+    js: "javascript",
+    jsx: "jsx",
+    json: "json",
+    md: "markdown",
+    mjs: "javascript",
+    py: "python",
+    rb: "ruby",
+    rs: "rust",
+    sh: "bash",
+    ts: "typescript",
+    tsx: "tsx",
+    txt: "text",
+    yaml: "yaml",
+    yml: "yaml",
   };
   return byExt[ext] ?? "text";
 }
 
 function readSourceFile(url) {
-  const reject = (message, statusCode = 400) => ({ statusCode, payload: { error: message } });
+  const reject = (message, statusCode = 400) => ({
+    statusCode,
+    payload: { error: message },
+  });
   const requestedPath = url.searchParams.get("path") ?? "";
   if (!requestedPath) return reject("Missing path");
   if (requestedPath.includes("\0")) return reject("Invalid path");
@@ -225,7 +253,9 @@ function serveGraphJson(res, fileName) {
     return;
   }
   if (fileName === "knowledge-graph.json") {
-    sendJson(res, 404, { error: "No knowledge graph found. Run /understand first." });
+    sendJson(res, 404, {
+      error: "No knowledge graph found. Run /understand first.",
+    });
   } else {
     res.statusCode = 404;
     res.end();
@@ -233,18 +263,10 @@ function serveGraphJson(res, fileName) {
 }
 
 function readGraphMetadata(fileName) {
-  const graph = JSON.parse(
-    fs.readFileSync(path.join(graphDir, fileName), "utf-8"),
-  );
+  const graph = JSON.parse(fs.readFileSync(path.join(graphDir, fileName), "utf-8"));
   return {
-    graphCommitHash:
-      typeof graph.project?.gitCommitHash === "string"
-        ? graph.project.gitCommitHash
-        : undefined,
-    lastAnalyzedAt:
-      typeof graph.project?.analyzedAt === "string"
-        ? graph.project.analyzedAt
-        : undefined,
+    graphCommitHash: typeof graph.project?.gitCommitHash === "string" ? graph.project.gitCommitHash : undefined,
+    lastAnalyzedAt: typeof graph.project?.analyzedAt === "string" ? graph.project.analyzedAt : undefined,
   };
 }
 
@@ -262,9 +284,7 @@ async function readGraphFreshness() {
   try {
     inputs = {
       knowledge: readGraphMetadata("knowledge-graph.json"),
-      ...(fs.existsSync(domainGraph)
-        ? { domain: readGraphMetadata("domain-graph.json") }
-        : {}),
+      ...(fs.existsSync(domainGraph) ? { domain: readGraphMetadata("domain-graph.json") } : {}),
     };
   } catch {
     return {
@@ -282,10 +302,18 @@ async function readGraphFreshness() {
 }
 
 const CONTENT_TYPES = {
-  ".css": "text/css", ".html": "text/html", ".ico": "image/x-icon",
-  ".js": "text/javascript", ".json": "application/json", ".map": "application/json",
-  ".png": "image/png", ".svg": "image/svg+xml", ".txt": "text/plain",
-  ".wasm": "application/wasm", ".woff": "font/woff", ".woff2": "font/woff2",
+  ".css": "text/css",
+  ".html": "text/html",
+  ".ico": "image/x-icon",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".map": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".txt": "text/plain",
+  ".wasm": "application/wasm",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
 };
 
 function serveStatic(res, pathname) {
@@ -321,11 +349,21 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const pathname = url.pathname;
 
+  // Binding to loopback is not sufficient against DNS rebinding: reject any
+  // request whose HTTP Host does not also name the loopback interface.
+  if (AUTO_AUTH && !isLoopbackHost(req.headers.host)) {
+    sendJson(res, 421, {
+      error: "Misdirected Request: loopback Host required",
+    });
+    return;
+  }
+
   // Local helpers can make the root URL frictionless without weakening the
   // protected graph and source-file endpoints. The dashboard consumes the
   // token once, stores it for this tab, and removes it from the address bar.
   if (AUTO_AUTH && pathname === "/" && !url.searchParams.has("token")) {
     res.statusCode = 302;
+    res.setHeader("Cache-Control", "no-store");
     res.setHeader("Location", `/?token=${encodeURIComponent(ACCESS_TOKEN)}`);
     res.end();
     return;
@@ -396,7 +434,11 @@ function listen(attemptPort, attemptsLeft) {
     console.log(`  🔑  Dashboard URL: ${dashboardUrl}\n`);
     if (openBrowser) {
       const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-      spawn(opener, [dashboardUrl], { shell: process.platform === "win32", stdio: "ignore", detached: true }).unref();
+      spawn(opener, [dashboardUrl], {
+        shell: process.platform === "win32",
+        stdio: "ignore",
+        detached: true,
+      }).unref();
     }
   });
 }
