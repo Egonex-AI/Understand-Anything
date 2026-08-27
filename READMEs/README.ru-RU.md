@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a>
+  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a> | <a href="README.pt-BR.md">Português</a>
 </p>
 
 <p align="center">
@@ -126,7 +126,7 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 # Генерация контента на русском (описания узлов графа знаний и UI панели)
 /understand --language ru
 
-# Поддерживаемые языки: en (по умолчанию), zh, zh-TW, ja, ko, ru
+# Поддерживаемые языки: en (по умолчанию), zh, zh-TW, ja, ko, ru, pt
 ```
 
 Параметр `--language` влияет на:

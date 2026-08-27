@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a>
+  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a> | <a href="README.pt-BR.md">Português</a>
 </p>
 
 <p align="center">
@@ -125,7 +125,7 @@ Un pipeline multi-agente escanea tu proyecto, extrae cada archivo, función, cla
 # Genera contenido en el idioma preferido (descripciones de nodos y UI del dashboard)
 /understand --language en
 
-# Idiomas soportados: en (default), zh, zh-TW, ja, ko, ru
+# Idiomas soportados: en (default), zh, zh-TW, ja, ko, ru, pt
 ```
 
 El parámetro `--language` afecta:
