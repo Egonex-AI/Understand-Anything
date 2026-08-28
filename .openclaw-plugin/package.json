@@ -1,0 +1,34 @@
+{
+  "name": "@understand-anything/openclaw-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "OpenClaw gateway plugin: native tree-sitter + LLM knowledge-graph pipeline and dashboard for Understand-Anything.",
+  "main": "dist/index.js",
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "scripts": {
+    "build": "tsc && cp src/selection.js dist/selection.js && cp src/ask-widget.js dist/ask-widget.js && cp src/tours-widget.js dist/tours-widget.js",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.0",
+    "@understand-anything/core": "workspace:*",
+    "understand-anything-viewer": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md"
+  ]
+}
