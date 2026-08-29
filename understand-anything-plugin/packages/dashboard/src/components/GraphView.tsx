@@ -569,6 +569,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           summary: node.summary,
           complexity: node.complexity,
           tags: node.tags,
+          filePath: node.filePath,
           isHighlighted: false,
           searchScore: undefined,
           isSelected: false,
@@ -948,6 +949,7 @@ function buildCustomFlowNode(
       summary: node.summary,
       complexity: node.complexity,
       tags: node.tags,
+      filePath: node.filePath,
       isHighlighted: false,
       searchScore: undefined,
       isSelected: false,
@@ -1324,8 +1326,11 @@ function GraphViewInner() {
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
+  const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
+  const uiResetGraphView = useDashboardStore((s) => s.uiResetGraphView);
+  const nodesById = useDashboardStore((s) => s.nodesById);
   const setReactFlowInstance = useDashboardStore((s) => s.setReactFlowInstance);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
   const expandContainer = useDashboardStore((s) => s.expandContainer);
@@ -1519,6 +1524,15 @@ function GraphViewInner() {
     selectNode(null);
   }, [selectNode]);
 
+  const handleResetView = useCallback(() => {
+    uiResetGraphView();
+    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+  }, [uiResetGraphView, fitView]);
+
+  const handleIsolate = useCallback(() => {
+    if (selectedNodeId) setFocusNode(selectedNodeId);
+  }, [selectedNodeId, setFocusNode]);
+
   if (!graph) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-root rounded-lg">
@@ -1530,15 +1544,40 @@ function GraphViewInner() {
   return (
     <div className="h-full w-full relative">
       <Breadcrumb />
-      {focusNodeId && navigationLevel === "layer-detail" && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
-          <button
-            onClick={() => setFocusNode(null)}
-            className="px-4 py-2 rounded-full bg-elevated border border-gold/30 text-gold text-xs font-semibold tracking-wider uppercase hover:bg-gold/10 transition-colors flex items-center gap-2 shadow-lg"
-          >
-            <span>Showing neighborhood</span>
-            <span className="text-text-muted">&times;</span>
-          </button>
+      {/* Floating toolbar: focus dismiss + selection actions */}
+      {navigationLevel === "layer-detail" && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
+          {focusNodeId && (
+            <button
+              onClick={handleResetView}
+              className="px-4 py-2 rounded-full bg-elevated border border-gold/30 text-gold text-xs font-semibold tracking-wider uppercase hover:bg-gold/10 transition-colors flex items-center gap-2 shadow-lg"
+            >
+              <span>
+                {nodesById.get(focusNodeId)?.name
+                  ? `Focused: ${nodesById.get(focusNodeId)!.name.slice(0, 20)}`
+                  : "Showing neighborhood"}
+              </span>
+              <span className="text-text-muted">&times;</span>
+            </button>
+          )}
+          {selectedNodeId && !focusNodeId && (
+            <button
+              onClick={handleIsolate}
+              className="px-3 py-1.5 rounded-full bg-elevated border border-accent/30 text-accent text-xs font-semibold tracking-wider uppercase hover:bg-accent/10 transition-colors shadow-lg"
+              title="Show only this node and its direct connections"
+            >
+              Isolate
+            </button>
+          )}
+          {(selectedNodeId || focusNodeId) && (
+            <button
+              onClick={handleResetView}
+              className="px-3 py-1.5 rounded-full bg-elevated border border-border-subtle text-text-secondary text-xs font-semibold tracking-wider uppercase hover:bg-surface transition-colors shadow-lg"
+              title="Clear selection and fit entire graph to view"
+            >
+              Reset view
+            </button>
+          )}
         </div>
       )}
       <ReactFlow

@@ -32,16 +32,22 @@ export default function SearchBar() {
   const { t } = useI18n();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  // Build a lookup map for node details
   const nodeMap = useMemo(
     () => new Map((graph?.nodes ?? []).map((n) => [n.id, n])),
     [graph],
   );
 
-  const topResults = searchResults.slice(0, 5);
+  const topResults = searchResults.slice(0, 10);
+
+  // Reset active index when results change
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [searchResults]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,16 +65,62 @@ export default function SearchBar() {
     [navigateToNodeInLayer],
   );
 
+  const handleClear = useCallback(() => {
+    setSearchQuery("");
+    setDropdownOpen(false);
+    inputRef.current?.focus();
+  }, [setSearchQuery]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!dropdownOpen || topResults.length === 0) return;
+
+      switch (e.key) {
+        case "ArrowDown": {
+          e.preventDefault();
+          setActiveIndex((prev) =>
+            prev < topResults.length - 1 ? prev + 1 : 0,
+          );
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          setActiveIndex((prev) =>
+            prev > 0 ? prev - 1 : topResults.length - 1,
+          );
+          break;
+        }
+        case "Enter": {
+          e.preventDefault();
+          if (activeIndex >= 0 && activeIndex < topResults.length) {
+            handleResultClick(topResults[activeIndex].nodeId);
+          } else if (topResults.length > 0) {
+            handleResultClick(topResults[0].nodeId);
+          }
+          break;
+        }
+      }
+    },
+    [dropdownOpen, topResults, activeIndex, handleResultClick],
+  );
+
+  // Scroll active item into view
+  useEffect(() => {
+    if (activeIndex < 0 || !listRef.current) return;
+    const item = listRef.current.children[activeIndex] as HTMLElement | undefined;
+    item?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex]);
+
   // Close dropdown on Escape
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setDropdownOpen(false);
         inputRef.current?.blur();
       }
     };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
   }, []);
 
   // Close dropdown on outside click
@@ -106,10 +158,25 @@ export default function SearchBar() {
           value={searchQuery}
           onChange={handleInputChange}
           onFocus={() => setDropdownOpen(true)}
+          onKeyDown={handleKeyDown}
           placeholder={t.search.placeholder}
           data-testid="search-input"
           className="flex-1 min-w-0 bg-elevated text-text-primary text-sm rounded-lg px-3 py-1.5 border border-border-subtle focus:outline-none focus:border-accent/50 placeholder-text-muted"
+          role="combobox"
+          aria-expanded={showDropdown || undefined}
+          aria-activedescendant={activeIndex >= 0 ? `search-result-${activeIndex}` : undefined}
         />
+        {searchQuery.trim() && (
+          <button
+            onClick={handleClear}
+            className="text-text-muted hover:text-text-primary transition-colors shrink-0 p-1"
+            aria-label="Clear search"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
         <div className="flex items-center gap-1 bg-elevated rounded-lg p-0.5 shrink-0">
           <button
             onClick={() => setSearchMode("fuzzy")}
@@ -142,20 +209,27 @@ export default function SearchBar() {
 
       {/* Dropdown results */}
       {showDropdown && (
-        <div className="absolute left-4 right-4 top-full mt-0.5 glass rounded-lg shadow-xl overflow-hidden">
-          {topResults.map((result) => {
+        <div ref={listRef} className="absolute left-4 right-4 top-full mt-0.5 glass rounded-lg shadow-xl overflow-y-auto max-h-[400px]" role="listbox">
+          {topResults.map((result, idx) => {
             const node = nodeMap.get(result.nodeId);
             if (!node) return null;
 
             const relevance = Math.round((1 - result.score) * 100);
             const badgeColor = typeBadgeColors[node.type] ?? typeBadgeColors.file;
+            const isActive = idx === activeIndex;
 
             return (
               <button
                 key={result.nodeId}
+                id={`search-result-${idx}`}
                 type="button"
+                role="option"
+                aria-selected={isActive}
                 onClick={() => handleResultClick(result.nodeId)}
-                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-elevated transition-colors text-left"
+                onMouseEnter={() => setActiveIndex(idx)}
+                className={`w-full flex items-center gap-3 px-3 py-2 transition-colors text-left ${
+                  isActive ? "bg-accent/10" : "hover:bg-elevated"
+                }`}
               >
                 {/* Type badge */}
                 <span
@@ -164,10 +238,17 @@ export default function SearchBar() {
                   {node.type}
                 </span>
 
-                {/* Node name */}
-                <span className="text-sm text-text-primary truncate flex-1">
-                  {node.name}
-                </span>
+                {/* Node name + file path */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-text-primary truncate">
+                    {node.name}
+                  </div>
+                  {node.filePath && (
+                    <div className="text-[10px] text-text-muted truncate font-mono">
+                      {node.filePath}
+                    </div>
+                  )}
+                </div>
 
                 {/* Relevance bar */}
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -184,6 +265,11 @@ export default function SearchBar() {
               </button>
             );
           })}
+          {searchResults.length > 10 && (
+            <div className="px-3 py-1.5 text-[10px] text-text-muted text-center border-t border-border-subtle">
+              {searchResults.length - 10} more results
+            </div>
+          )}
         </div>
       )}
     </div>

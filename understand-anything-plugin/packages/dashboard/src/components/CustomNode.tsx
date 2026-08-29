@@ -89,6 +89,7 @@ export interface CustomNodeData extends Record<string, unknown> {
   incomingCount?: number;
   outgoingCount?: number;
   tags?: string[];
+  filePath?: string;
 }
 
 export type CustomFlowNode = Node<CustomNodeData, "custom">;
@@ -134,7 +135,7 @@ function CustomNodeComponent({
 
   // Selection-based dimming (when another node is selected, fade unrelated nodes)
   if (data.isSelectionFaded) {
-    extraClass += " opacity-20 pointer-events-auto";
+    extraClass += " opacity-15 saturate-0 pointer-events-auto";
   } else if (data.isNeighbor) {
     extraClass += " ring-1 ring-gold-dim/50";
   }
@@ -183,6 +184,12 @@ function CustomNodeComponent({
         <div className="text-sm font-heading text-text-primary truncate" title={data.label}>
           {truncatedName}
         </div>
+
+        {data.filePath && (
+          <div className="text-[9px] text-text-muted truncate mt-0.5 font-mono" title={data.filePath}>
+            {data.filePath.split("/").slice(0, -1).join("/") || "."}
+          </div>
+        )}
 
         <div className="text-[11px] text-text-secondary mt-1 line-clamp-2 leading-tight">
           {data.summary}
