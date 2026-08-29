@@ -23,7 +23,7 @@ type TreeSitterLanguage = import("web-tree-sitter").Language;
  * and how to load their WASM grammars. Provides deep structural analysis
  * (functions, classes, imports, exports, call graphs) for all languages
  * with registered extractors: TypeScript, JavaScript, Python, Go, Rust,
- * Java, Ruby, PHP, C/C++, C#, Dart, Kotlin, Swift, and Scala.
+ * Java, Ruby, PHP, C/C++, C#, Dart, Kotlin, Swift, Scala, and Haskell.
  *
  * Languages without tree-sitter configs are gracefully skipped (the LLM
  * agent handles analysis for those).

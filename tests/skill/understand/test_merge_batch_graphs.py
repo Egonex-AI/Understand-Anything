@@ -115,6 +115,29 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTest.scala"))
         self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTests.scala"))
 
+    def test_haskell_test_files(self) -> None:
+        for path in [
+            "test/Spanshot/CaptureSpec.hs",
+            "test/Spanshot/CaptureTest.hs",
+            "test/Spanshot/CaptureTests.hs",
+            "test/Spanshot/CaptureSpec.lhs",
+            "test/Spanshot/CaptureTest.lhs",
+            "test/Spanshot/CaptureTests.lhs",
+            "test/Main.hs",
+            "tests/Main.hs",
+            "test/Main.lhs",
+            "tests/Main.lhs",
+        ]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
+        for path in ["Main.hs", "src/Main.hs", "Main.lhs", "src/Main.lhs"]:
+            with self.subTest(path=path):
+                self.assertFalse(
+                    mbg.is_test_path(path),
+                    f"{path} should remain production",
+                )
+
     def test_csharp_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTests.cs"))
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTest.cs"))
@@ -215,6 +238,15 @@ class ProductionCandidatesTests(unittest.TestCase):
     def test_scala_sbt_layout(self) -> None:
         cands = mbg.production_candidates("src/test/scala/com/foo/BarSpec.scala")
         self.assertIn("src/main/scala/com/foo/Bar.scala", cands)
+
+    def test_haskell_cabal_layout(self) -> None:
+        cands = mbg.production_candidates("test/Spanshot/CaptureSpec.hs")
+        self.assertIn("src/Spanshot/Capture.hs", cands)
+
+    def test_literate_haskell_cabal_layout(self) -> None:
+        cands = mbg.production_candidates("test/Spanshot/CaptureSpec.lhs")
+        self.assertIn("test/Spanshot/Capture.lhs", cands)
+        self.assertIn("src/Spanshot/Capture.lhs", cands)
 
     def test_scala_multimodule_sbt_layout(self) -> None:
         cands = mbg.production_candidates("modules/core/src/test/scala/com/foo/BarSpec.scala")
@@ -360,6 +392,46 @@ class LinkTestsTests(unittest.TestCase):
             edges[0]["target"],
             "file:modules/core/src/test/scala/com/foo/BarSpec.scala",
         )
+
+    def test_literate_haskell_pairing_emits_forward_edge(self) -> None:
+        nodes_by_id = {
+            "file:src/Spanshot/Capture.lhs": _file_node(
+                "src/Spanshot/Capture.lhs",
+            ),
+            "file:test/Spanshot/CaptureSpec.lhs": _file_node(
+                "test/Spanshot/CaptureSpec.lhs",
+            ),
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (1, 0, 1, 0))
+        self.assertEqual(edges[0]["source"], "file:src/Spanshot/Capture.lhs")
+        self.assertEqual(edges[0]["target"], "file:test/Spanshot/CaptureSpec.lhs")
+
+    def test_haskell_test_main_inverted_edge_is_swapped(self) -> None:
+        nodes_by_id = {
+            "file:src/Spanshot/Capture.hs": _file_node(
+                "src/Spanshot/Capture.hs",
+            ),
+            "file:test/Main.hs": _file_node("test/Main.hs"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:test/Main.hs",
+                "target": "file:src/Spanshot/Capture.hs",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 0, 1, 1))
+        self.assertEqual(edges[0]["source"], "file:src/Spanshot/Capture.hs")
+        self.assertEqual(edges[0]["target"], "file:test/Main.hs")
 
     def test_no_production_counterpart_no_edge(self) -> None:
         nodes_by_id = {

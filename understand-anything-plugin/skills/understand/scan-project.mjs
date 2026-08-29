@@ -124,7 +124,7 @@ const LANGUAGE_BY_EXT = Object.freeze({
   // Python
   '.py': 'python',
   '.pyi': 'python',
-  // Go / Rust / Java / Kotlin / Scala / C# / Swift / Lua
+  // Go / Rust / Java / Kotlin / Scala / C# / Swift / Lua / Haskell
   '.go': 'go',
   '.rs': 'rust',
   '.java': 'java',
@@ -136,6 +136,8 @@ const LANGUAGE_BY_EXT = Object.freeze({
   '.cs': 'csharp',
   '.swift': 'swift',
   '.lua': 'lua',
+  '.hs': 'haskell',
+  '.lhs': 'haskell',
   // Ruby / PHP
   '.rb': 'ruby',
   '.rake': 'ruby',
@@ -204,6 +206,8 @@ const LANGUAGE_BY_EXT = Object.freeze({
   '.properties': 'properties',
   '.mod': 'mod',
   '.sum': 'sum',
+  // Haskell build metadata
+  '.cabal': 'cabal',
 });
 
 /**
@@ -238,6 +242,7 @@ export function detectLanguage(filePath) {
 
   // Dockerfile.dev, Dockerfile.prod, etc. — common variant form.
   if (base === 'Dockerfile' || base.startsWith('Dockerfile.')) return 'dockerfile';
+  if (base === 'cabal.project' || base.startsWith('cabal.project.')) return 'cabal';
 
   // Dotfile names like .env, .env.local — path.extname returns '' for
   // single-segment dotfiles (e.g. '.env') and the SECOND segment for
@@ -317,6 +322,7 @@ const CATEGORY_BY_EXT = Object.freeze({
   '.ini': 'config',
   '.env': 'config',
   '.properties': 'config',
+  '.cabal': 'config',
   '.csproj': 'config',
   '.sln': 'config',
   '.mod': 'config',
@@ -400,6 +406,7 @@ export function detectCategory(filePath) {
   if (base === 'Dockerfile' || base.startsWith('Dockerfile.')) return 'infra';
   if (base.startsWith('docker-compose.')) return 'infra';
   if (base === 'compose.yml' || base === 'compose.yaml') return 'infra';
+  if (base === 'cabal.project' || base.startsWith('cabal.project.')) return 'config';
 
   // Rule 3: infra by path.
   if (posix.startsWith('.github/workflows/')) return 'infra';

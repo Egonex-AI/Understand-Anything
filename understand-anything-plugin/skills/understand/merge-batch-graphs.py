@@ -116,6 +116,8 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ".java": ((), ("Test", "Tests", "IT")),
     ".kt": ((), ("Test", "Tests")),
     ".scala": ((), ("Spec", "Suite", "Test", "Tests")),
+    ".hs": ((), ("Spec", "Test", "Tests")),
+    ".lhs": ((), ("Spec", "Test", "Tests")),
     ".cs": ((), ("Test", "Tests")),
     ".c": (("test_",), ("_test",)),
     ".cpp": (("test_",), ("_test",)),
@@ -334,6 +336,16 @@ def is_test_path(path: str) -> bool:
     """
     stem, ext = os.path.splitext(_basename(path))
 
+    # Cabal test suites commonly use `test/Main.hs` (or literate Haskell's
+    # `.lhs` equivalent) as their entry point. `Main` alone is not a test
+    # convention, so require an explicit test-directory segment.
+    if (
+        ext in {".hs", ".lhs"}
+        and stem == "Main"
+        and any(seg in {"test", "tests"} for seg in _path_segments(path)[:-1])
+    ):
+        return True
+
     # JS/TS family: the test marker is an infix on the stem (foo.test.ts has
     # stem "foo.test", ext ".ts"), not a prefix/suffix on the stem itself.
     if ext in _JS_TS_TEST_EXTS:
@@ -503,6 +515,19 @@ def production_candidates(test_path: str) -> list[str]:
                         _add_unique(candidates, f"{new_dir}/{base_stem}.scala")
                         break
                 _add_unique(candidates, _join(dir_path, f"{base_stem}.scala"))
+                break
+
+    # ── Haskell ─────────────────────────────────────────────────
+    elif ext in {".hs", ".lhs"}:
+        for suffix in ("Spec", "Tests", "Test"):
+            if stem.endswith(suffix):
+                base_stem = stem[: -len(suffix)]
+                _add_unique(candidates, _join(dir_path, f"{base_stem}{ext}"))
+                if dir_segs and dir_segs[0] in ("test", "tests"):
+                    tail_path = "/".join(dir_segs[1:])
+                    for root in ("src", "app", "lib"):
+                        new_dir = "/".join(p for p in (root, tail_path) if p)
+                        _add_unique(candidates, _join(new_dir, f"{base_stem}{ext}"))
                 break
 
     # ── C# ────────────────────────────────────────────────────────────

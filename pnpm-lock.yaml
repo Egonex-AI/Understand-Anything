@@ -84,6 +84,9 @@ importers:
       tree-sitter-go:
         specifier: ^0.25.0
         version: 0.25.0
+      tree-sitter-haskell:
+        specifier: ^0.23.1
+        version: 0.23.1
       tree-sitter-java:
         specifier: ^0.23.5
         version: 0.23.5
@@ -2879,6 +2882,14 @@ packages:
     resolution: {integrity: sha512-APBc/Dq3xz/e35Xpkhb1blu5UgW+2E3RyGWawZSCNcbGwa7jhSQPS8KsUupuzBla8PCo8+lz9W/JDJjmfRa2tw==}
     peerDependencies:
       tree-sitter: ^0.25.0
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
+  tree-sitter-haskell@0.23.1:
+    resolution: {integrity: sha512-qG4CYhejveu9DLMLEGBz/n9/TTeGSFLC6wniwOgG6m8/v7Dng8qR0ob0EVG7+XH+9WiOxohpGA23EhceWuxY4w==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
     peerDependenciesMeta:
       tree-sitter:
         optional: true
@@ -6310,6 +6321,11 @@ snapshots:
       tree-sitter-c: 0.23.6
 
   tree-sitter-go@0.25.0:
+    dependencies:
+      node-addon-api: 8.6.0
+      node-gyp-build: 4.8.4
+
+  tree-sitter-haskell@0.23.1:
     dependencies:
       node-addon-api: 8.6.0
       node-gyp-build: 4.8.4

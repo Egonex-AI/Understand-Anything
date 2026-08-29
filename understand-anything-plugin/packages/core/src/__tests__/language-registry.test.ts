@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 42 built-in language configs", () => {
+    it("registers all 43 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(42);
+      expect(all.length).toBe(43);
     });
 
     it("maps all expected extensions", () => {
@@ -73,6 +73,8 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".h")?.id).toBe("c");
       expect(registry.getByExtension(".lua")?.id).toBe("lua");
       expect(registry.getByExtension(".js")?.id).toBe("javascript");
+      expect(registry.getByExtension(".hs")?.id).toBe("haskell");
+      expect(registry.getByExtension(".lhs")?.id).toBe("haskell");
     });
 
     it("registers Swift with tree-sitter grammar metadata", () => {
@@ -81,6 +83,28 @@ describe("LanguageRegistry", () => {
         wasmPackage: "@understand-anything/tree-sitter-swift-wasm",
         wasmFile: "tree-sitter-swift.wasm",
       });
+    });
+
+    it("registers Haskell with tree-sitter grammar metadata", () => {
+      const registry = LanguageRegistry.createDefault();
+      expect(registry.getById("haskell")?.treeSitter).toEqual({
+        wasmPackage: "tree-sitter-haskell",
+        wasmFile: "tree-sitter-haskell.wasm",
+      });
+    });
+
+    it("registers Haskell source and literate test conventions", () => {
+      const tests = LanguageRegistry.createDefault().getById("haskell")?.filePatterns.tests;
+      expect(tests).toEqual(expect.arrayContaining([
+        "*Spec.hs",
+        "*Tests.hs",
+        "*Spec.lhs",
+        "*Tests.lhs",
+        "test/Main.hs",
+        "tests/Main.hs",
+        "test/Main.lhs",
+        "tests/Main.lhs",
+      ]));
     });
 
     it("has no duplicate extension mappings across configs", () => {
