@@ -1413,5 +1413,89 @@ class TestUaDirResolution(unittest.TestCase):
         self.assertFalse((self.tmp / ".ua" / "intermediate" / "assembled-graph.json").exists())
 
 
+
+class PrefixResolutionTests(unittest.TestCase):
+    """Cross-batch endpoints whose node-type prefix was guessed wrong.
+
+    A file-analyzer that emits an edge into another batch has to guess the
+    target's node-type prefix; `neighborMap` only resolves code imports, so
+    doc->pipeline and config->code references have no ground truth. Without
+    resolution those edges are dropped silently.
+    """
+
+    @staticmethod
+    def _node(node_id: str, node_type: str, path: str) -> dict[str, Any]:
+        return {
+            "id": node_id,
+            "type": node_type,
+            "name": path.rsplit("/", 1)[-1],
+            "filePath": path,
+            "summary": "",
+            "tags": [],
+            "complexity": "simple",
+        }
+
+    def _merge(self, edges: list[dict[str, Any]]):
+        owner = {
+            "nodes": [
+                self._node("pipeline:wf/a.md", "pipeline", "wf/a.md"),
+                self._node("file:src/x.ts", "file", "src/x.ts"),
+                self._node("file:amb/y.ts", "file", "amb/y.ts"),
+                self._node("config:amb/y.ts", "config", "amb/y.ts"),
+            ],
+            "edges": [],
+        }
+        citer = {
+            "nodes": [self._node("document:docs/d.md", "document", "docs/d.md")],
+            "edges": edges,
+        }
+        return mbg.merge_and_normalize([owner, citer])
+
+    @staticmethod
+    def _edge(target: str, etype: str = "documents") -> dict[str, Any]:
+        return {
+            "source": "document:docs/d.md",
+            "target": target,
+            "type": etype,
+            "direction": "forward",
+            "weight": 0.5,
+        }
+
+    def test_document_prefix_resolves_to_pipeline(self) -> None:
+        assembled, _ = self._merge([self._edge("document:wf/a.md")])
+        targets = [e["target"] for e in assembled["edges"]]
+        self.assertIn("pipeline:wf/a.md", targets)
+
+    def test_config_prefix_resolves_to_file(self) -> None:
+        assembled, _ = self._merge([self._edge("config:src/x.ts", "related")])
+        targets = [e["target"] for e in assembled["edges"]]
+        self.assertIn("file:src/x.ts", targets)
+
+    def test_missing_target_still_dropped(self) -> None:
+        assembled, report = self._merge([self._edge("document:ghost/nope.md")])
+        self.assertEqual(assembled["edges"], [])
+        self.assertIn("ghost/nope.md", "\n".join(report))
+
+    def test_ambiguous_body_still_dropped(self) -> None:
+        """Two nodes share the body `amb/y.ts` — resolution must not guess."""
+        assembled, report = self._merge([self._edge("document:amb/y.ts", "related")])
+        self.assertEqual(assembled["edges"], [])
+        self.assertIn("amb/y.ts", "\n".join(report))
+
+    def test_resolution_reported_as_a_fix(self) -> None:
+        _assembled, report = self._merge(
+            [self._edge("document:wf/a.md"), self._edge("config:src/x.ts", "related")]
+        )
+        self.assertIn(
+            "edge endpoints resolved to correct node-type prefix", "\n".join(report)
+        )
+
+    def test_already_valid_endpoints_untouched(self) -> None:
+        """Edges that resolve today must take an unchanged path."""
+        assembled, _ = self._merge([self._edge("pipeline:wf/a.md")])
+        self.assertEqual(len(assembled["edges"]), 1)
+        self.assertEqual(assembled["edges"][0]["target"], "pipeline:wf/a.md")
+
+
 if __name__ == "__main__":
     unittest.main()

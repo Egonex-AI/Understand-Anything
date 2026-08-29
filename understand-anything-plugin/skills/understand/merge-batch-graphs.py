@@ -870,6 +870,38 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
 
     # ── Step 6: Deduplicate edges, drop dangling ─────────────────────
     node_ids = set(nodes_by_id.keys())
+
+    # Cross-batch endpoints may carry the wrong node-type prefix. Each
+    # file-analyzer picks the prefix for a target it does not own
+    # (file:/config:/document:/pipeline:/table:/schema:/endpoint:) on its own,
+    # and neighborMap only resolves code imports -- so doc->pipeline and
+    # config->code references are guesses. Left alone, those edges are dropped
+    # below with no signal other than a stderr line.
+    #
+    # Safe by construction: consulted only for IDs already headed for the drop,
+    # and only remaps when exactly one node shares the ID body. Ambiguous cases
+    # (e.g. both `file:x.ts` and `config:x.ts` exist) keep the current
+    # drop-and-report behaviour.
+    _ids_by_body: dict[str, list[str]] = {}
+    for _nid in node_ids:
+        _head, _sep, _body = _nid.partition(":")
+        _k = _body if (_sep and _head in VALID_NODE_PREFIXES) else _nid
+        _ids_by_body.setdefault(_k, []).append(_nid)
+
+    def resolve_prefix(nid: str) -> str | None:
+        """Return the real node ID for `nid`, ignoring its node-type prefix.
+
+        Returns None when unresolvable or ambiguous, so the caller drops the
+        edge exactly as it does today.
+        """
+        if nid in node_ids:
+            return nid
+        _head, _sep, _body = nid.partition(":")
+        _k = _body if (_sep and _head in VALID_NODE_PREFIXES) else nid
+        candidates = _ids_by_body.get(_k, [])
+        return candidates[0] if len(candidates) == 1 else None
+
+    prefix_resolved = 0
     # Direction is part of the dedup key so a `forward` edge does not silently
     # overwrite a `bidirectional` one (or vice versa); they're different
     # semantic relationships that the dashboard renders distinctly.
@@ -880,6 +912,17 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         etype = edge.get("type", "")
         direction = normalize_direction(edge.get("direction"))
         edge["direction"] = direction
+
+        if src not in node_ids or tgt not in node_ids:
+            resolved_src = resolve_prefix(src)
+            resolved_tgt = resolve_prefix(tgt)
+            if resolved_src is not None and resolved_tgt is not None:
+                if resolved_src != src:
+                    edge["source"] = src = resolved_src
+                    prefix_resolved += 1
+                if resolved_tgt != tgt:
+                    edge["target"] = tgt = resolved_tgt
+                    prefix_resolved += 1
 
         if src not in node_ids or tgt not in node_ids:
             missing = []
@@ -909,6 +952,8 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             fixed_lines.append(f"  {count:>4} × complexity {pattern}")
     if edges_rewritten:
         fixed_lines.append(f"  {edges_rewritten:>4} × edge references rewritten after ID normalization")
+    if prefix_resolved:
+        fixed_lines.append(f"  {prefix_resolved:>4} × edge endpoints resolved to correct node-type prefix")
     if duplicate_count:
         fixed_lines.append(f"  {duplicate_count:>4} × duplicate node IDs removed (kept last)")
     if tested_by_swapped:
@@ -922,6 +967,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
             sum(id_fix_patterns.values())
             + sum(complexity_fix_patterns.values())
             + edges_rewritten
+            + prefix_resolved
             + duplicate_count
             + tested_by_swapped
             + tested_by_dropped
