@@ -170,6 +170,31 @@ def batch_sort_key(path: Path) -> tuple[int, int, str]:
     return (batch_index, part_number or 0, path.name)
 
 
+def batch_file_has_content(path: Path) -> bool:
+    """Return True when a batch file would lose nodes/edges if dropped.
+
+    Used to hard-fail on unrecognized non-empty filenames (#641) while still
+    tolerating empty stub files that carry no graph payload.
+    """
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if not raw.strip():
+        return False
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        # Unparseable but non-empty — treat as content so we refuse to
+        # silently discard whatever the agent intended to merge.
+        return True
+    if not isinstance(data, dict):
+        return True
+    nodes = data.get("nodes") or []
+    edges = data.get("edges") or []
+    return len(nodes) > 0 or len(edges) > 0
+
+
 # ── Batch loading ─────────────────────────────────────────────────────────
 
 def load_batch(path: Path) -> dict[str, Any] | None:
@@ -1087,15 +1112,17 @@ def main() -> None:
     # files from multi-part file-analyzer outputs. Files that don't match the
     # `batch-existing.json` / `batch-<N>.json` / `batch-<N>-part-<K>.json`
     # pattern (e.g. fused `batch-fused-8-13.json`, range `batch-8-13.json`)
-    # would otherwise be silently dropped during load — flag them loudly
-    # instead so the user can fix the file-analyzer agent.
+    # must not be silently dropped when they carry graph content (#641) —
+    # hard-fail so a partial merge never ships.
     from collections import defaultdict as _dd
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
+    unrecognized_by_name: dict[str, Path] = {}
     for f in batch_files:
         parsed = parse_batch_filename(f.name)
         if parsed is None:
             unrecognized_batch_files.append(f.name)
+            unrecognized_by_name[f.name] = f
         else:
             batch_index, part_number = parsed
             by_batch[batch_index].append((f.name, part_number))
@@ -1107,11 +1134,34 @@ def main() -> None:
             if len(unrecognized_batch_files) > 5
             else ""
         )
+        contentful = [
+            name
+            for name in unrecognized_batch_files
+            if batch_file_has_content(unrecognized_by_name[name])
+        ]
+        if contentful:
+            content_preview = ", ".join(contentful[:5])
+            content_suffix = (
+                f" (+{len(contentful) - 5} more)"
+                if len(contentful) > 5
+                else ""
+            )
+            print(
+                f"Error: merge-batch-graphs: refusing to merge — "
+                f"{len(contentful)} batch file(s) with unrecognized "
+                f"filenames carry nodes/edges that would be lost — "
+                f"files: {content_preview}{content_suffix} — fix the "
+                f"file-analyzer agent to use only batch-<N>.json, "
+                f"batch-<N>-part-<K>.json, or batch-existing.json",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         print(
             f"Warning: merge-batch-graphs: {len(unrecognized_batch_files)} "
-            f"batch file(s) with unrecognized filenames will be DROPPED — "
-            f"files: {preview}{suffix} — fix the file-analyzer agent to use "
-            f"only batch-<N>.json or batch-<N>-part-<K>.json patterns",
+            f"empty batch file(s) with unrecognized filenames will be "
+            f"DROPPED — files: {preview}{suffix} — fix the file-analyzer "
+            f"agent to use only batch-<N>.json or batch-<N>-part-<K>.json "
+            f"patterns",
             file=sys.stderr,
         )
 
@@ -1203,8 +1253,9 @@ def main() -> None:
         for w in empty_batch_warnings:
             report.append(f"  - {w}")
 
-    # Surface unrecognized-filename drops to the phase report so the
-    # downstream review step sees them, not just stderr.
+    # Surface unrecognized empty-filename stubs to the phase report so the
+    # downstream review step sees them. Non-empty unrecognized files already
+    # hard-failed above (#641).
     if unrecognized_batch_files:
         preview = ", ".join(unrecognized_batch_files[:5])
         suffix = (
@@ -1214,11 +1265,10 @@ def main() -> None:
         )
         report.append("")
         report.append(
-            f"Warning: dropped {len(unrecognized_batch_files)} batch file(s) "
-            f"with unrecognized filenames — files: {preview}{suffix} — "
+            f"Warning: dropped {len(unrecognized_batch_files)} empty batch "
+            f"file(s) with unrecognized filenames — files: {preview}{suffix} — "
             f"fix the file-analyzer agent to use only batch-<N>.json or "
-            f"batch-<N>-part-<K>.json patterns (every node/edge in these "
-            f"files was excluded from the final graph)"
+            f"batch-<N>-part-<K>.json patterns"
         )
 
     # Recover any imports edges file-analyzer batches dropped despite
