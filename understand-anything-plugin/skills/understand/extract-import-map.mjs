@@ -153,13 +153,84 @@ function dirOf(p) {
  * with the exact tsconfig path that failed; bubbling the error would
  * conceal which file was at fault when many tsconfigs are loaded.
  */
+/**
+ * Strip JSONC comments from `text`, honoring string literals.
+ *
+ * A regex stripper cannot do this safely, because tsconfig path aliases and
+ * include globs legitimately contain the comment delimiters. In
+ *
+ *   "paths": { "@/*": ["./src/*"] },
+ *   "include": ["**\/*.ts"]
+ *
+ * the `/*` inside `"@/*"` opens a spurious block comment that the `*\/` inside
+ * `"**\/*.ts"` then closes, deleting every key in between. A tsconfig carrying
+ * BOTH comments and globs therefore fails the stripped parse AND the raw parse,
+ * and `parseTsConfigText` returns null — every alias from that config is
+ * silently dropped from the import map.
+ *
+ * Newlines inside block comments are preserved so parse-error line numbers
+ * still point at the original file.
+ */
+function stripJsonComments(text) {
+  let out = '';
+  let inString = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (inLineComment) {
+      if (ch === '\n') {
+        inLineComment = false;
+        out += ch;
+      }
+      continue;
+    }
+    if (inBlockComment) {
+      if (ch === '*' && next === '/') {
+        inBlockComment = false;
+        i++;
+      } else if (ch === '\n') {
+        out += ch;
+      }
+      continue;
+    }
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      inLineComment = true;
+      i++;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      inBlockComment = true;
+      i++;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 function parseTsConfigText(raw) {
-  // tsconfig.json often contains JSONC-style comments; strip line and block
-  // comments before parsing. The strip is naive (it doesn't honor string
-  // contents), so we fall back to the raw text on failure.
-  const stripped = raw
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+  // tsconfig.json often contains JSONC-style comments; strip them before
+  // parsing. The stripper honors string literals, so path aliases and include
+  // globs that contain comment delimiters survive intact. Raw text remains the
+  // fallback for anything the stripper still can't handle.
+  const stripped = stripJsonComments(raw);
   let parsed;
   try {
     parsed = JSON.parse(stripped);
