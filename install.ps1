@@ -22,11 +22,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Lum1104/Understand-Anything.git' }
+$RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Egonex-AI/Understand-Anything.git' }
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
 
-# Platform table — Target = skills directory; Style = "per-skill" | "folder"
+# Platform table - Target = skills directory; Style = "per-skill" | "folder"
 $Platforms = [ordered]@{
     gemini      = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     codex       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
@@ -34,11 +34,14 @@ $Platforms = [ordered]@{
     pi          = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
     openclaw    = @{ Target = (Join-Path $HOME '.openclaw\skills');           Style = 'folder' }
     antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
+    vibe        = @{ Target = (Join-Path $HOME '.vibe\skills');               Style = 'per-skill' }
     vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
     hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder' }
     cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
     kimi        = @{ Target = (Join-Path $HOME '.kimi\skills');               Style = 'folder' }
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
+    nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
+    kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -85,10 +88,10 @@ function Get-SkillsRoot { Join-Path $RepoDir 'understand-anything-plugin\skills'
 
 function Clone-Or-Update {
     if (Test-Path (Join-Path $RepoDir '.git')) {
-        Write-Host "→ Updating existing checkout at $RepoDir"
+        Write-Host "-> Updating existing checkout at $RepoDir"
         git -C $RepoDir pull --ff-only
     } else {
-        Write-Host "→ Cloning $RepoUrl → $RepoDir"
+        Write-Host "-> Cloning $RepoUrl -> $RepoDir"
         $parent = Split-Path -Parent $RepoDir
         if (-not (Test-Path $parent)) { New-Item -ItemType Directory -Path $parent | Out-Null }
         git clone $RepoUrl $RepoDir
@@ -117,7 +120,7 @@ function Remove-Reparse([string]$Path) {
         $item.Delete()
         return $true
     }
-    Write-Warning "Refusing to delete $Path — it is a real file/directory, not a junction/symlink we created. Remove it manually if you intended to."
+    Write-Warning "Refusing to delete $Path - it is a real file/directory, not a junction/symlink we created. Remove it manually if you intended to."
     return $false
 }
 
@@ -126,7 +129,7 @@ function New-Junction([string]$LinkPath, [string]$TargetPath) {
         if (Test-IsReparse $LinkPath) {
             (Get-Item -LiteralPath $LinkPath -Force).Delete()
         } else {
-            Write-Error "Refusing to overwrite $LinkPath — it is a real file/directory, not a junction. Move or remove it first."
+            Write-Error "Refusing to overwrite $LinkPath - it is a real file/directory, not a junction. Move or remove it first."
         }
     }
     New-Item -ItemType Junction -Path $LinkPath -Target $TargetPath | Out-Null
@@ -142,13 +145,13 @@ function Link-Skills([string]$Target, [string]$Style) {
                 $link = Join-Path $Target $skill
                 $src  = Join-Path $root $skill
                 New-Junction $link $src
-                Write-Host "  ✓ $link → $src"
+                Write-Host "  OK $link -> $src"
             }
         }
         'folder' {
             $link = Join-Path $Target 'understand-anything'
             New-Junction $link $root
-            Write-Host "  ✓ $link → $root"
+            Write-Host "  OK $link -> $root"
         }
         default { Write-Error "Unknown style: $Style" }
     }
@@ -164,7 +167,7 @@ function Unlink-Skills([string]$Target, [string]$Style) {
                     Remove-Reparse (Join-Path $Target $skill) | Out-Null
                 }
             } else {
-                # Checkout is gone — scan the target dir for stale links pointing
+                # Checkout is gone - scan the target dir for stale links pointing
                 # into our plugin tree so we can still clean up.
                 Get-ChildItem -LiteralPath $Target -Force | ForEach-Object {
                     if ($_.LinkType -eq 'Junction' -or $_.LinkType -eq 'SymbolicLink') {
@@ -183,36 +186,80 @@ function Unlink-Skills([string]$Target, [string]$Style) {
 
 function Link-Plugin-Root {
     if (Test-Path $PluginLink) {
-        Write-Host "  • $PluginLink already exists, leaving as-is"
+        Write-Host "  * $PluginLink already exists, leaving as-is"
     } else {
         $src = Join-Path $RepoDir 'understand-anything-plugin'
         New-Item -ItemType Junction -Path $PluginLink -Target $src | Out-Null
-        Write-Host "  ✓ $PluginLink → $src"
+        Write-Host "  OK $PluginLink -> $src"
     }
+}
+
+function ConvertTo-FileUri([string]$Path) {
+    # Produce a forward-slashed file URI (Windows: file:///C:/path/...).
+    return 'file:///' + ($Path -replace '\\', '/')
 }
 
 function Cmd-Install([string]$Id) {
     $cfg = Resolve-Platform $Id
     Clone-Or-Update
-    Write-Host "→ Linking skills for $Id ($($cfg.Style) → $($cfg.Target))"
+    Write-Host "-> Linking skills for $Id ($($cfg.Style) -> $($cfg.Target))"
     Link-Skills $cfg.Target $cfg.Style
-    Write-Host '→ Linking universal plugin root'
+    Write-Host '-> Linking universal plugin root'
     Link-Plugin-Root
 
-    Write-Host "`n✓ Installed Understand-Anything for $Id"
+    if ($Id -eq 'kiro') {
+        Write-Host '-> Creating Kiro agent configuration'
+        $agentsDir = Join-Path $HOME '.kiro\agents'
+        if (-not (Test-Path $agentsDir)) { New-Item -ItemType Directory -Path $agentsDir | Out-Null }
+        $pluginRoot = Join-Path $RepoDir 'understand-anything-plugin'
+
+        # Build the "resources" list dynamically from the agent definitions in
+        # the repo so it never drifts as agents are added or removed.
+        $resources = @(
+            Get-ChildItem -Path (Join-Path $pluginRoot 'agents') -Filter '*.md' -File |
+                Sort-Object Name |
+                ForEach-Object { ConvertTo-FileUri $_.FullName }
+        )
+        $agent = [ordered]@{
+            name        = 'understand'
+            description = 'Analyze codebase into interactive knowledge graph - Understand Anything'
+            prompt      = ConvertTo-FileUri (Join-Path $pluginRoot 'skills\understand\SKILL.md')
+            tools       = @('read', 'write', 'shell', 'grep', 'glob', 'code', 'subagent')
+            resources   = $resources
+        }
+        $agentJson = Join-Path $agentsDir 'understand.json'
+        # WriteAllText emits UTF-8 without a BOM on every PowerShell version.
+        [System.IO.File]::WriteAllText($agentJson, ($agent | ConvertTo-Json -Depth 5))
+        Write-Host "  OK $agentJson"
+    }
+
+    Write-Host "`nOK Installed Understand-Anything for $Id"
     Write-Host '  Restart your CLI or IDE to pick up the skills.'
+    if ($Id -eq 'codex') {
+        Write-Host "`n  Tip: Codex invokes skills with `$ instead of / - type `$understand, not /understand."
+    }
     if ($Id -eq 'vscode') {
         Write-Host "`n  Tip: VS Code can also auto-discover the plugin by opening this repo"
         Write-Host '       directly (it reads .copilot-plugin/plugin.json), no symlinks needed.'
+    }
+    if ($Id -eq 'kiro') {
+        Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
     }
 }
 
 function Cmd-Uninstall([string]$Id) {
     $cfg = Resolve-Platform $Id
-    Write-Host "→ Removing skill links for $Id"
+    Write-Host "-> Removing skill links for $Id"
     Unlink-Skills $cfg.Target $cfg.Style
+    if ($Id -eq 'kiro') {
+        $agentJson = Join-Path $HOME '.kiro\agents\understand.json'
+        if (Test-Path $agentJson) {
+            Remove-Item -LiteralPath $agentJson -Force
+            Write-Host "  OK removed $agentJson"
+        }
+    }
     if (Remove-Reparse $PluginLink) {
-        Write-Host "  ✓ removed $PluginLink"
+        Write-Host "  OK removed $PluginLink"
     }
     if (Test-Path $RepoDir) {
         Write-Host "`nThe checkout at $RepoDir was kept (other platforms may still use it)."
@@ -225,7 +272,7 @@ function Cmd-Update {
         Write-Error "No installation found at $RepoDir. Run install first."
     }
     git -C $RepoDir pull --ff-only
-    Write-Host '✓ Updated.'
+    Write-Host 'OK Updated.'
 }
 
 if ($Help) { Show-Usage; return }

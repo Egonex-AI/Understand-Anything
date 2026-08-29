@@ -10,7 +10,9 @@ Usage:
     python parse-knowledge-base.py <wiki-directory>
 
 Output:
-    Writes scan-manifest.json to <wiki-directory>/.understand-anything/intermediate/
+    Writes scan-manifest.json to <wiki-directory>/<ua-dir>/intermediate/, where
+    <ua-dir> is `.ua/` (or legacy `.understand-anything/` when that directory
+    already exists).
 """
 
 import json
@@ -18,6 +20,12 @@ import os
 import re
 import sys
 from pathlib import Path
+
+
+def resolve_ua_dir(root: Path) -> Path:
+    """Mirror core resolveUaDir: legacy .understand-anything/ wins if present."""
+    legacy = root / ".understand-anything"
+    return legacy if legacy.is_dir() else root / ".ua"
 
 # ---------------------------------------------------------------------------
 # Regex patterns
@@ -31,6 +39,27 @@ INDEX_SECTION_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 # Files that are part of wiki infrastructure, not content articles
 INFRA_FILES = {"index.md", "log.md", "claude.md", "agents.md", "soul.md"}
 
+
+def find_markdown_case_insensitive(parent: Path, name: str) -> Path:
+    """Resolve a known markdown filename case-insensitively within one directory.
+
+    An exact match always wins (so `index.md` beats `Index.md` when both
+    exist); otherwise the first case-insensitive sibling is returned. The
+    unmatched candidate comes back as-is so callers can keep using
+    `.is_file()` checks. Deliberately single-directory — no recursive fuzzy
+    matching (see #342 non-goals).
+    """
+    candidate = parent / name
+    if candidate.is_file():
+        return candidate
+    if not parent.is_dir():
+        return candidate
+    wanted = name.lower()
+    for child in sorted(parent.iterdir()):
+        if child.is_file() and child.name.lower() == wanted:
+            return child
+    return candidate
+
 # ---------------------------------------------------------------------------
 # Detection: is this a Karpathy-pattern wiki?
 # ---------------------------------------------------------------------------
@@ -38,8 +67,10 @@ INFRA_FILES = {"index.md", "log.md", "claude.md", "agents.md", "soul.md"}
 def detect_format(root: Path) -> dict:
     """Detect if directory follows the Karpathy LLM wiki three-layer pattern."""
     signals = {
-        "has_index": (root / "index.md").is_file() or (root / "wiki" / "index.md").is_file(),
-        "has_log": (root / "log.md").is_file() or (root / "wiki" / "log.md").is_file(),
+        "has_index": find_markdown_case_insensitive(root, "index.md").is_file()
+        or find_markdown_case_insensitive(root / "wiki", "index.md").is_file(),
+        "has_log": find_markdown_case_insensitive(root, "log.md").is_file()
+        or find_markdown_case_insensitive(root / "wiki", "log.md").is_file(),
         "has_raw": (root / "raw").is_dir(),
         "has_schema": any(
             (root / f).is_file() or (root / "wiki" / f).is_file()
@@ -249,29 +280,43 @@ def build_name_to_stem_map(wiki_root: Path) -> dict[str, str]:
     return name_map
 
 
-def resolve_wikilink(target: str, name_map: dict[str, str], node_ids: set[str] | None = None) -> str | None:
+def resolve_wikilink(
+    target: str,
+    name_map: dict[str, str],
+    node_ids: set[str] | None = None,
+    root_prefix: str | None = None,
+) -> str | None:
     """Resolve a wikilink target to an article node ID.
 
     If node_ids is provided, only resolve to IDs that exist in the set.
+    root_prefix is the article-root directory name (e.g. "wiki") — links
+    written from the repository root include it ([[wiki/concepts/Index]])
+    while name_map keys are relative to the article root, so such targets
+    are tried both as written and with the prefix stripped.
     """
     key = target.lower().strip()
     # Skip targets that are clearly not page names (shell flags, etc.)
     if key.startswith("-"):
         return None
-    stem = name_map.get(key)
-    if stem:
-        candidate = f"article:{stem}"
-        # If we have a node set, verify the target exists
-        if node_ids is not None and candidate not in node_ids:
-            return None
-        return candidate
-    # Try without directory prefix
-    for stored_key, stored_stem in name_map.items():
-        if stored_key.endswith("/" + key) or stored_key == key:
-            candidate = f"article:{stored_stem}"
+    keys = [key]
+    if root_prefix and key.startswith(root_prefix + "/"):
+        keys.append(key[len(root_prefix) + 1:])
+    for k in keys:
+        stem = name_map.get(k)
+        if stem:
+            candidate = f"article:{stem}"
+            # If we have a node set, verify the target exists
             if node_ids is not None and candidate not in node_ids:
                 return None
             return candidate
+    # Try without directory prefix
+    for k in keys:
+        for stored_key, stored_stem in name_map.items():
+            if stored_key.endswith("/" + k) or stored_key == k:
+                candidate = f"article:{stored_stem}"
+                if node_ids is not None and candidate not in node_ids:
+                    return None
+                return candidate
     return None
 
 
@@ -289,23 +334,32 @@ def parse_wiki(root: Path) -> dict:
     # Build name resolution map
     name_map = build_name_to_stem_map(wiki_root)
 
-    # Find index.md and log.md
-    index_path = wiki_root / "index.md"
+    # Find index.md and log.md (case-insensitively — Index.md/Log.md are a
+    # reasonable convention on case-sensitive filesystems)
+    index_path = find_markdown_case_insensitive(wiki_root, "index.md")
     if not index_path.is_file():
-        index_path = root / "index.md"
-    log_path = wiki_root / "log.md"
+        index_path = find_markdown_case_insensitive(root, "index.md")
+    log_path = find_markdown_case_insensitive(wiki_root, "log.md")
     if not log_path.is_file():
-        log_path = root / "log.md"
+        log_path = find_markdown_case_insensitive(root, "log.md")
 
     # Parse index for categories
     categories = parse_index(index_path)
     log_entries = parse_log(log_path)
 
+    # Article ids are relative to wiki_root, but a root index.md commonly
+    # links with the article-root prefix included ([[wiki/concepts/Index]]).
+    # Register/resolve such targets both as written and prefix-stripped.
+    root_prefix = wiki_root.name.lower() if wiki_root != root else None
+
     # Build category lookup: wikilink target → category name
     category_lookup: dict[str, str] = {}
     for cat in categories:
         for article_target in cat["articles"]:
-            category_lookup[article_target.lower()] = cat["name"]
+            t = article_target.lower()
+            category_lookup[t] = cat["name"]
+            if root_prefix and t.startswith(root_prefix + "/"):
+                category_lookup[t[len(root_prefix) + 1:]] = cat["name"]
 
     # --- Pre-compute article IDs (for edge resolution validation) ---
     # Only skip infra files at the wiki root level, not in subdirectories
@@ -390,7 +444,7 @@ def parse_wiki(root: Path) -> dict:
 
         # Build edges from wikilinks (resolve against known article IDs)
         for wl in wikilinks:
-            target_id = resolve_wikilink(wl["target"], name_map, article_ids)
+            target_id = resolve_wikilink(wl["target"], name_map, article_ids, root_prefix)
             if target_id and target_id != node_id:
                 edges.append({
                     "source": node_id,
@@ -418,7 +472,7 @@ def parse_wiki(root: Path) -> dict:
 
         # categorized_under edges (only resolve to known article nodes)
         for article_target in cat["articles"]:
-            article_id = resolve_wikilink(article_target, name_map, article_ids)
+            article_id = resolve_wikilink(article_target, name_map, article_ids, root_prefix)
             if article_id:
                 edges.append({
                     "source": article_id,
@@ -492,7 +546,7 @@ def main():
     manifest = parse_wiki(root)
 
     # Write output
-    out_dir = root / ".understand-anything" / "intermediate"
+    out_dir = resolve_ua_dir(root) / "intermediate"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "scan-manifest.json"
     out_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

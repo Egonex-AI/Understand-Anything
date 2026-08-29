@@ -30,6 +30,30 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
+ * Cosine similarity when the query vector's magnitude is already known.
+ * The query is constant across an entire search() sweep, so recomputing its
+ * magnitude (and re-squaring every query component) per candidate node is
+ * pure waste. Same arithmetic, same order as cosineSimilarity → bit-identical
+ * results, but it skips the per-node magA loop.
+ */
+function cosineSimilarityWithQueryMag(
+  query: number[],
+  queryMag: number,
+  vec: number[],
+): number {
+  if (queryMag === 0) return 0;
+  let dot = 0;
+  let magB = 0;
+  for (let i = 0; i < query.length; i++) {
+    dot += query[i] * vec[i];
+    magB += vec[i] * vec[i];
+  }
+  magB = Math.sqrt(magB);
+  if (magB === 0) return 0;
+  return dot / (queryMag * magB);
+}
+
+/**
  * Semantic search engine using vector embeddings.
  * Stores pre-computed embeddings for graph nodes and performs
  * cosine similarity search against query embeddings.
@@ -61,13 +85,24 @@ export class SemanticSearchEngine {
 
     const scored: Array<{ nodeId: string; score: number }> = [];
 
+    // Hoist the query magnitude out of the per-node loop — it's invariant.
+    let queryMag = 0;
+    for (let i = 0; i < queryEmbedding.length; i++) {
+      queryMag += queryEmbedding[i] * queryEmbedding[i];
+    }
+    queryMag = Math.sqrt(queryMag);
+
     for (const node of this.nodes) {
       if (typeFilter && !typeFilter.includes(node.type)) continue;
 
       const embedding = this.embeddings.get(node.id);
       if (!embedding) continue;
 
-      const similarity = cosineSimilarity(queryEmbedding, embedding);
+      const similarity = cosineSimilarityWithQueryMag(
+        queryEmbedding,
+        queryMag,
+        embedding,
+      );
       if (similarity >= threshold) {
         scored.push({ nodeId: node.id, score: 1 - similarity });
       }

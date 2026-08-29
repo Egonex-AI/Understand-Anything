@@ -727,3 +727,110 @@ describe("Extended node/edge types", () => {
     expect(result.success).toBe(true);
   });
 });
+
+function designGraph() {
+  return {
+    version: "1.0.0",
+    kind: "design",
+    project: { name: "F", languages: ["figma"], frameworks: [], description: "d", analyzedAt: "t", gitCommitHash: "" },
+    nodes: [
+      { id: "screen:1:2", type: "screen", name: "Login", summary: "s", tags: ["auth"], complexity: "simple" },
+      { id: "component:3:4", type: "component", name: "Button/Primary", summary: "s", tags: ["ds"], complexity: "simple" },
+      { id: "instance:5:6", type: "instance", name: "SignInBtn", summary: "s", tags: ["use"], complexity: "simple" },
+      { id: "token:color:brand", type: "token", name: "color/brand", summary: "s", tags: ["token"], complexity: "simple" },
+    ],
+    edges: [
+      { source: "instance:5:6", target: "component:3:4", type: "instance_of", direction: "forward", weight: 0.8 },
+      { source: "component:3:4", target: "token:color:brand", type: "uses_token", direction: "forward", weight: 0.5 },
+    ],
+    layers: [],
+    tour: [],
+  };
+}
+
+describe("design graph schema", () => {
+  it("accepts design node and edge types", () => {
+    const res = validateGraph(designGraph());
+    expect(res.success).toBe(true);
+    expect(res.data!.nodes).toHaveLength(4);
+    expect(res.data!.edges).toHaveLength(2);
+  });
+
+  it("keeps instance_of as a first-class edge (NOT rewritten to exemplifies)", () => {
+    const res = validateGraph(designGraph());
+    const e = res.data!.edges.find((x) => x.source === "instance:5:6");
+    expect(e!.type).toBe("instance_of");
+  });
+
+  it("normalizes figma node-type aliases (frame → screen)", () => {
+    const g = designGraph();
+    g.nodes[0].type = "frame";
+    const res = validateGraph(g);
+    expect(res.data!.nodes.find((n) => n.id === "screen:1:2")!.type).toBe("screen");
+  });
+
+  it("keeps componentSet (the only camelCase node type) through sanitize lowercasing", () => {
+    const g = designGraph();
+    g.nodes.push({ id: "componentSet:7:8", type: "componentSet", name: "Button", summary: "s", tags: ["ds"], complexity: "simple" });
+    g.edges.push({ source: "component:3:4", target: "componentSet:7:8", type: "variant_of", direction: "forward", weight: 0.9 });
+    const res = validateGraph(g);
+    const set = res.data!.nodes.find((n) => n.id === "componentSet:7:8");
+    expect(set).toBeTruthy();
+    expect(set!.type).toBe("componentSet");
+    // the variant_of edge must survive (its target was not dropped)
+    expect(res.data!.edges.some((e) => e.target === "componentSet:7:8" && e.type === "variant_of")).toBe(true);
+  });
+});
+
+// `page` and `instance_of` are canonical design types, but every other kind
+// relied on them normalizing to knowledge types (page → article, instance_of
+// → exemplifies) before the design kind existed. The alias tables are
+// kind-scoped so promoting them for design graphs doesn't regress the rest.
+describe("kind-aware alias normalization", () => {
+  function knowledgeGraph(kind?: string) {
+    return {
+      version: "1.0.0",
+      ...(kind ? { kind } : {}),
+      project: { name: "K", languages: ["markdown"], frameworks: [], description: "d", analyzedAt: "t", gitCommitHash: "" },
+      nodes: [
+        { id: "article:home", type: "page", name: "Home", summary: "s", tags: ["wiki"], complexity: "simple" },
+        { id: "entity:gpt", type: "entity", name: "GPT", summary: "s", tags: ["model"], complexity: "simple" },
+        { id: "topic:llm", type: "topic", name: "LLMs", summary: "s", tags: ["topic"], complexity: "simple" },
+      ],
+      edges: [
+        { source: "entity:gpt", target: "topic:llm", type: "instance_of", direction: "forward", weight: 0.7 },
+      ],
+      layers: [],
+      tour: [],
+    };
+  }
+
+  it('rewrites page → article and instance_of → exemplifies for kind:"knowledge"', () => {
+    const res = validateGraph(knowledgeGraph("knowledge"));
+    expect(res.success).toBe(true);
+    expect(res.data!.nodes.find((n) => n.id === "article:home")!.type).toBe("article");
+    expect(res.data!.edges[0].type).toBe("exemplifies");
+  });
+
+  it("rewrites page → article for graphs without a kind (pre-design behavior)", () => {
+    const res = validateGraph(knowledgeGraph());
+    expect(res.success).toBe(true);
+    expect(res.data!.nodes.find((n) => n.id === "article:home")!.type).toBe("article");
+    expect(res.data!.edges[0].type).toBe("exemplifies");
+  });
+
+  it('keeps page and instance_of first-class for kind:"design"', () => {
+    const g = designGraph();
+    g.nodes.push({ id: "page:1:0", type: "page", name: "Onboarding", summary: "s", tags: ["page"], complexity: "simple" });
+    const res = validateGraph(g);
+    expect(res.data!.nodes.find((n) => n.id === "page:1:0")!.type).toBe("page");
+    expect(res.data!.edges.find((x) => x.source === "instance:5:6")!.type).toBe("instance_of");
+  });
+
+  it('applies design aliases (styled_by → uses_token) only to design graphs', () => {
+    const g = designGraph();
+    g.edges.push({ source: "screen:1:2", target: "token:color:brand", type: "styled_by", direction: "forward", weight: 0.5 });
+    const res = validateGraph(g);
+    expect(res.data!.edges.some((e) => e.source === "screen:1:2" && e.type === "uses_token")).toBe(true);
+  });
+});

@@ -1,6 +1,7 @@
 import ignore, { type Ignore } from "ignore";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { resolveUaDir } from "./persistence/index.js";
 
 /**
  * Hardcoded default ignore patterns matching the project-scanner agent's
@@ -76,21 +77,23 @@ export interface IgnoreFilter {
 
 /**
  * Creates an IgnoreFilter that merges hardcoded defaults with user-defined
- * patterns from .understandignore files.
+ * patterns from .understandignore files and CLI-provided exclude patterns.
  *
  * Pattern load order (later entries can override earlier ones via ! negation):
  * 1. Hardcoded defaults
- * 2. .understand-anything/.understandignore (if exists)
+ * 2. <ua-dir>/.understandignore (if exists — `.ua/`, or the legacy
+ *    `.understand-anything/` when that directory already exists)
  * 3. .understandignore at project root (if exists)
+ * 4. CLI --exclude patterns (highest priority)
  */
-export function createIgnoreFilter(projectRoot: string): IgnoreFilter {
+export function createIgnoreFilter(projectRoot: string, extraPatterns: string[] = []): IgnoreFilter {
   const ig: Ignore = ignore();
 
   // Layer 1: hardcoded defaults
   ig.add(DEFAULT_IGNORE_PATTERNS);
 
-  // Layer 2: .understand-anything/.understandignore
-  const projectIgnorePath = join(projectRoot, ".understand-anything", ".understandignore");
+  // Layer 2: <ua-dir>/.understandignore
+  const projectIgnorePath = join(resolveUaDir(projectRoot), ".understandignore");
   if (existsSync(projectIgnorePath)) {
     const content = readFileSync(projectIgnorePath, "utf-8");
     ig.add(content);
@@ -101,6 +104,11 @@ export function createIgnoreFilter(projectRoot: string): IgnoreFilter {
   if (existsSync(rootIgnorePath)) {
     const content = readFileSync(rootIgnorePath, "utf-8");
     ig.add(content);
+  }
+
+  // Layer 4: CLI --exclude patterns (highest priority)
+  if (extraPatterns.length > 0) {
+    ig.add(extraPatterns);
   }
 
   return {

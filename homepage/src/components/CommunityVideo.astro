@@ -4,11 +4,11 @@ const youTubeUrl = `https://www.youtube.com/watch?v=${youTubeId}`;
 const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7`;
 ---
 
-<section class="community-video">
+<section class="community-video" id="community">
   <span class="community-video-label reveal">Community</span>
   <h2 class="community-video-heading reveal">
     A walkthrough from the
-    <span style="display:inline;background:linear-gradient(135deg,#b8865c,#d4a574);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">community</span>
+    <span class="grad">community</span>
   </h2>
   <p class="community-video-desc reveal">
     A community-made video tour by
@@ -50,8 +50,11 @@ const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7
     font-size: 0.75rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #d4a574;
-    border: 1px solid rgba(212, 165, 116, 0.3);
+    color: var(--accent);
+    border: 1px solid rgba(88, 43, 232, 0.2);
+    background: rgba(255, 255, 255, 0.68);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px) saturate(1.12);
     padding: 0.3rem 1rem;
     border-radius: 100px;
     margin-bottom: 1.5rem;
@@ -61,6 +64,7 @@ const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7
     font-family: var(--font-heading);
     font-size: clamp(1.75rem, 4.5vw, 3rem);
     color: var(--text);
+    font-weight: 780;
     margin-bottom: 1.5rem;
     line-height: 1.2;
   }
@@ -74,24 +78,24 @@ const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7
   }
 
   .community-video-credit {
-    color: #d4a574;
+    color: var(--accent);
     text-decoration: none;
-    border-bottom: 1px dashed rgba(212, 165, 116, 0.4);
+    border-bottom: 1px dashed rgba(88, 43, 232, 0.32);
     transition: border-color 0.2s ease;
   }
 
   .community-video-credit:hover {
-    border-bottom-color: #d4a574;
+    border-bottom-color: var(--accent);
   }
 
   .community-video-frame {
     border-radius: 12px;
     overflow: hidden;
     background: var(--surface);
-    border: 1px solid rgba(212, 165, 116, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     box-shadow:
-      0 0 60px rgba(212, 165, 116, 0.08),
-      0 25px 50px rgba(0, 0, 0, 0.45);
+      0 34px 90px rgba(88, 43, 232, 0.14),
+      0 14px 34px rgba(15, 16, 32, 0.1);
   }
 
   .community-video-titlebar {
@@ -99,8 +103,8 @@ const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7
     align-items: center;
     gap: 6px;
     padding: 10px 14px;
-    background: rgba(20, 20, 20, 0.8);
-    border-bottom: 1px solid var(--border);
+    background: rgba(16, 19, 29, 0.86);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   }
 
   .community-video-titlebar-text {
@@ -108,7 +112,7 @@ const embedUrl = `https://www.youtube.com/embed/${youTubeId}?si=IB3cjpjbq9wis5D7
     text-align: center;
     font-family: var(--font-code);
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--text-muted-on-dark);
     margin-right: 30px;
   }
 

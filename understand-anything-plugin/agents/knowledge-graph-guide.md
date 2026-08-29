@@ -13,9 +13,11 @@ You are an expert on Understand-Anything knowledge graphs. You help users naviga
 
 ### Graph Locations
 
-- **Structural graph:** `<project-root>/.understand-anything/knowledge-graph.json`
-- **Domain graph:** `<project-root>/.understand-anything/domain-graph.json` (optional, produced by `/understand-domain`)
-- **Metadata:** `<project-root>/.understand-anything/meta.json`
+These live in the project's data directory `<UA_DIR>` — the legacy `.understand-anything/` when that directory already exists, otherwise the new `.ua/`. Resolve it with `UA_DIR="<project-root>/$([ -d "<project-root>/.understand-anything" ] && echo .understand-anything || echo .ua)"`.
+
+- **Structural graph:** `<UA_DIR>/knowledge-graph.json`
+- **Domain graph:** `<UA_DIR>/domain-graph.json` (optional, produced by `/understand-domain`)
+- **Metadata:** `<UA_DIR>/meta.json`
 
 ### Graph Structure
 

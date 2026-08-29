@@ -117,7 +117,7 @@ Produce a JSON object with this exact structure:
 
 ## Writing Results
 
-1. Write the JSON to: `<project-root>/.understand-anything/intermediate/domain-analysis.json`
+1. Write the JSON to the `intermediate/domain-analysis.json` file inside the project's data directory (`.ua/`, or the legacy `.understand-anything/` when that directory is present). Use the exact output path given in your prompt.
 2. The project root will be provided in your prompt.
 3. Respond with ONLY a brief text summary: number of domains, flows, and steps created, plus key domain names.
 

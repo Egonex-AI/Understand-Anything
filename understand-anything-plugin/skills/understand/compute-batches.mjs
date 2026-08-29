@@ -7,15 +7,38 @@
  *
  * Usage:
  *   node compute-batches.mjs <project-root> [--changed-files=<path>]
+ *     [--scan-result=<path>] [--output=<path>]
  *
- * Input:  <project-root>/.understand-anything/intermediate/scan-result.json
- * Output: <project-root>/.understand-anything/intermediate/batches.json
+ * Input/output live under the project's data dir (`.ua/`, or legacy
+ * `.understand-anything/` when that directory already exists — resolved by
+ * core's resolveUaDir):
+ *   Input:  <ua-dir>/intermediate/scan-result.json
+ *   Output: <ua-dir>/intermediate/batches.json
+ *
+ * `--scan-result` and `--output` let read-only tooling (for example the
+ * large-repository benchmark runner) keep intermediate artifacts outside the
+ * analyzed project. Omitting them preserves the normal /understand paths.
  */
 
-import { readFileSync, writeFileSync, existsSync, realpathSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+
+/**
+ * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
+ * to open every descriptor at once (would hit `EMFILE`) while still keeping
+ * libuv's worker-thread pool saturated. Empirically chosen to keep memory
+ * around tens of MB even when the average file is ~10 KB.
+ */
+const IO_PARALLELISM = 64;
 
 const __filename = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(__filename), '../..');
@@ -27,7 +50,7 @@ try {
 } catch {
   core = await import(pathToFileURL(resolve(PLUGIN_ROOT, 'packages/core/dist/index.js')).href);
 }
-const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers } = core;
+const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers, resolveUaDir } = core;
 
 import Graph from 'graphology';
 import louvain from 'graphology-communities-louvain';
@@ -57,31 +80,55 @@ async function extractExports(projectRoot, codeFiles) {
   }
 
   const exportsByPath = new Map();
-  for (const file of codeFiles) {
-    const abs = join(projectRoot, file.path);
-    let content;
-    try {
-      content = readFileSync(abs, 'utf-8');
-    } catch (err) {
-      process.stderr.write(
-        `Warning: compute-batches: exports extraction failed for ${file.path} ` +
-        `(read error: ${err.message}) — symbols=[] in neighborMap — ` +
-        `cross-batch edges to this file limited to file-level\n`,
-      );
-      exportsByPath.set(file.path, []);
-      continue;
-    }
-    try {
-      const analysis = registry.analyzeFile(file.path, content);
-      const names = (analysis?.exports || []).map(e => e.name).filter(Boolean);
-      exportsByPath.set(file.path, names);
-    } catch (err) {
-      process.stderr.write(
-        `Warning: compute-batches: exports extraction failed for ${file.path} ` +
-        `(analyze error: ${err.message}) — symbols=[] in neighborMap — ` +
-        `cross-batch edges to this file limited to file-level\n`,
-      );
-      exportsByPath.set(file.path, []);
+
+  // I/O is parallelised in bounded chunks (libuv worker threads handle the
+  // disk reads concurrently) while the actual tree-sitter parse stays on
+  // the main thread, since web-tree-sitter is single-threaded WASM. For a
+  // 15k-file iOS repo (#226), the sequential `readFileSync` loop dominated;
+  // letting reads pipeline drops wall time roughly proportional to the
+  // share of the loop spent waiting on disk.
+  for (let start = 0; start < codeFiles.length; start += IO_PARALLELISM) {
+    const slice = codeFiles.slice(start, start + IO_PARALLELISM);
+
+    // Read every file in the slice concurrently. Errors per file are
+    // captured in-place so a single bad file does not abort the chunk.
+    const reads = await Promise.all(
+      slice.map(async (file) => {
+        const abs = join(projectRoot, file.path);
+        try {
+          const content = await readFile(abs, 'utf-8');
+          return { file, content, readError: null };
+        } catch (err) {
+          return { file, content: null, readError: err };
+        }
+      }),
+    );
+
+    // Serialise the CPU-bound tree-sitter work and the stderr warning emits
+    // so log order remains identical to the previous sequential loop. This
+    // also keeps existing fixture-comparison tests stable.
+    for (const { file, content, readError } of reads) {
+      if (readError) {
+        process.stderr.write(
+          `Warning: compute-batches: exports extraction failed for ${file.path} ` +
+          `(read error: ${readError.message}) — symbols=[] in neighborMap — ` +
+          `cross-batch edges to this file limited to file-level\n`,
+        );
+        exportsByPath.set(file.path, []);
+        continue;
+      }
+      try {
+        const analysis = registry.analyzeFile(file.path, content);
+        const names = (analysis?.exports || []).map(e => e.name).filter(Boolean);
+        exportsByPath.set(file.path, names);
+      } catch (err) {
+        process.stderr.write(
+          `Warning: compute-batches: exports extraction failed for ${file.path} ` +
+          `(analyze error: ${err.message}) — symbols=[] in neighborMap — ` +
+          `cross-batch edges to this file limited to file-level\n`,
+        );
+        exportsByPath.set(file.path, []);
+      }
     }
   }
   return exportsByPath;
@@ -103,14 +150,28 @@ function buildNonCodeBatches(nonCodeFiles) {
   const dirOf = p => p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
   const baseOf = p => p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
 
+  // Hoist the path list once (it was re-materialized via [...byPath.keys()]
+  // seven times below) and index paths by parent dir a single time. Groups A
+  // and D previously re-filtered the full path list once per Dockerfile dir /
+  // migration dir — O(dirs · N). On a many-service monorepo (one Dockerfile
+  // per service) that was the dominant cost; the dir index makes those
+  // lookups O(1). Output is byte-for-byte identical (verified).
+  const allPaths = [...byPath.keys()];
+  const pathsByDir = new Map();
+  for (const p of allPaths) {
+    const d = dirOf(p);
+    let arr = pathsByDir.get(d);
+    if (!arr) { arr = []; pathsByDir.set(d, arr); }
+    arr.push(p);
+  }
+
   // Group A: per-directory Dockerfile clusters.
-  const dirsWithDockerfile = new Set(
-    [...byPath.keys()]
-      .filter(p => baseOf(p) === 'Dockerfile')
-      .map(dirOf),
-  );
+  const dirsWithDockerfile = new Set();
+  for (const p of allPaths) {
+    if (baseOf(p) === 'Dockerfile') dirsWithDockerfile.add(dirOf(p));
+  }
   for (const dir of [...dirsWithDockerfile].sort()) {
-    const inDir = [...byPath.keys()].filter(p => dirOf(p) === dir);
+    const inDir = pathsByDir.get(dir) ?? [];
     const cluster = inDir.filter(p => {
       const b = baseOf(p);
       return b === 'Dockerfile'
@@ -124,7 +185,7 @@ function buildNonCodeBatches(nonCodeFiles) {
   }
 
   // Group B: .github/workflows/*
-  const ghWorkflows = [...byPath.keys()].filter(
+  const ghWorkflows = allPaths.filter(
     p => p.startsWith('.github/workflows/') && (p.endsWith('.yml') || p.endsWith('.yaml')),
   ).filter(p => !consumed.has(p));
   if (ghWorkflows.length) {
@@ -133,7 +194,7 @@ function buildNonCodeBatches(nonCodeFiles) {
   }
 
   // Group C: .gitlab-ci.yml + .circleci/*
-  const ciFiles = [...byPath.keys()].filter(
+  const ciFiles = allPaths.filter(
     p => (p === '.gitlab-ci.yml' || p.startsWith('.circleci/'))
       && !consumed.has(p),
   );
@@ -145,15 +206,16 @@ function buildNonCodeBatches(nonCodeFiles) {
   // Group D: SQL migrations per migrations/ or migration/ directory.
   // Defensive consumed.has check: no upstream group consumes SQL today, but
   // future Group additions could; keep the check for forward-compat.
-  const migrationDirs = new Set(
-    [...byPath.keys()]
-      .filter(p => p.endsWith('.sql'))
-      .map(dirOf)
-      .filter(d => /(^|\/)migrations?$/.test(d)),
-  );
+  const migrationDirs = new Set();
+  for (const p of allPaths) {
+    if (p.endsWith('.sql')) {
+      const d = dirOf(p);
+      if (/(^|\/)migrations?$/.test(d)) migrationDirs.add(d);
+    }
+  }
   for (const dir of migrationDirs) {
-    const sqls = [...byPath.keys()]
-      .filter(p => dirOf(p) === dir && p.endsWith('.sql') && !consumed.has(p))
+    const sqls = (pathsByDir.get(dir) ?? [])
+      .filter(p => p.endsWith('.sql') && !consumed.has(p))
       .sort();
     if (sqls.length) {
       groups.push({ files: sqls.map(p => byPath.get(p)), mergeable: false });
@@ -163,7 +225,7 @@ function buildNonCodeBatches(nonCodeFiles) {
 
   // Group E: all remaining grouped by immediate parent dir, max 20 per batch
   const remainingByDir = new Map();
-  for (const p of [...byPath.keys()].sort()) {
+  for (const p of [...allPaths].sort()) {
     if (consumed.has(p)) continue;
     const dir = dirOf(p);
     if (!remainingByDir.has(dir)) remainingByDir.set(dir, []);
@@ -193,6 +255,21 @@ function buildBatchOfMap(allBatches) {
   return m;
 }
 
+function normalizeRelativePathForMatch(pathText) {
+  return pathText
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\/+/, '')
+    .replace(/\/+/g, '/');
+}
+
+// ECMAScript string comparison uses a stable UTF-16 code-unit order and does
+// not depend on the host locale or ICU version.
+function comparePaths(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 /**
  * Returns Map<path, communityId> via Louvain. May throw — caller must catch
  * and fall back if it does. Honors UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW=1
@@ -203,15 +280,18 @@ function runLouvain(codeFiles, importMap) {
     throw new Error('forced throw via UA_COMPUTE_BATCHES_FORCE_LOUVAIN_THROW');
   }
   const g = new Graph({ type: 'undirected', allowSelfLoops: false });
-  for (const f of codeFiles) g.addNode(f.path);
-  for (const [src, targets] of Object.entries(importMap)) {
+  const sortedCodePaths = codeFiles.map(f => f.path).sort(comparePaths);
+  for (const path of sortedCodePaths) g.addNode(path);
+  const sortedImports = Object.entries(importMap)
+    .sort(([a], [b]) => comparePaths(a, b));
+  for (const [src, targets] of sortedImports) {
     if (!g.hasNode(src)) continue;
-    for (const tgt of targets) {
+    for (const tgt of [...targets].sort(comparePaths)) {
       if (!g.hasNode(tgt) || src === tgt || g.hasEdge(src, tgt)) continue;
       g.addEdge(src, tgt);
     }
   }
-  const cs = louvain(g);  // { nodeId: communityId }
+  const cs = louvain(g, { randomWalk: false });  // { nodeId: communityId }
   return new Map(Object.entries(cs));
 }
 
@@ -272,7 +352,7 @@ function mergeSmallBatches(bareBatches) {
   // Pool and sort deterministically by path so repeated runs match byte-for-byte.
   const pooledFiles = smallMergeable
     .flatMap(b => b.files)
-    .sort((a, b) => a.path.localeCompare(b.path));
+    .sort((a, b) => comparePaths(a.path, b.path));
 
   const miscBatches = [];
   for (let i = 0; i < pooledFiles.length; i += MAX_MERGE_TARGET) {
@@ -302,33 +382,55 @@ function mergeSmallBatches(bareBatches) {
 async function main() {
   const projectRoot = process.argv[2];
   if (!projectRoot) {
-    process.stderr.write('Usage: node compute-batches.mjs <project-root> [--changed-files=<path>]\n');
+    process.stderr.write(
+      'Usage: node compute-batches.mjs <project-root> [--changed-files=<path>] ' +
+      '[--scan-result=<path>] [--output=<path>]\n',
+    );
     process.exit(1);
   }
 
-  let changedFiles = null;
+  const helperOptions = new Map();
   for (const arg of process.argv.slice(3)) {
-    const m = arg.match(/^--changed-files=(.+)$/);
-    if (m) {
-      const p = m[1];
-      let content;
-      try {
-        content = readFileSync(p, 'utf-8');
-      } catch (err) {
-        process.stderr.write(
-          `Error: compute-batches: --changed-files path not readable: ${p} (${err.message})\n`,
-        );
-        process.exit(1);
-      }
-      const lines = content
-        .split('\n')
-        .map(s => s.trim())
-        .filter(Boolean);
-      changedFiles = new Set(lines);
+    const match = arg.match(/^--(changed-files|scan-result|output)=(.+)$/);
+    if (!match) {
+      process.stderr.write(`Error: compute-batches: invalid option: ${arg}\n`);
+      process.exit(1);
     }
+    const [, optionName, optionValue] = match;
+    if (helperOptions.has(optionName)) {
+      process.stderr.write(`Error: compute-batches: duplicate option: --${optionName}\n`);
+      process.exit(1);
+    }
+    helperOptions.set(optionName, optionValue);
   }
 
-  const scanPath = join(projectRoot, '.understand-anything', 'intermediate', 'scan-result.json');
+  let changedFiles = null;
+  const changedFilesPath = helperOptions.get('changed-files');
+  if (changedFilesPath) {
+    let content;
+    try {
+      content = readFileSync(changedFilesPath, 'utf-8');
+    } catch (err) {
+      process.stderr.write(
+        `Error: compute-batches: --changed-files path not readable: ${changedFilesPath} ` +
+        `(${err.message})\n`,
+      );
+      process.exit(1);
+    }
+    const lines = content
+      .split('\n')
+      .map(normalizeRelativePathForMatch)
+      .filter(Boolean);
+    changedFiles = new Set(lines);
+  }
+
+  const scanResultValue = helperOptions.get('scan-result');
+  const outputValue = helperOptions.get('output');
+  const scanResultPath = scanResultValue ? resolve(scanResultValue) : null;
+  const outputPath = outputValue ? resolve(outputValue) : null;
+
+  const uaDir = resolveUaDir(projectRoot);
+  const scanPath = scanResultPath ?? join(uaDir, 'intermediate', 'scan-result.json');
   if (!existsSync(scanPath)) {
     process.stderr.write(`Error: scan-result.json not found at ${scanPath}\n`);
     process.exit(1);
@@ -398,7 +500,7 @@ async function main() {
       if (b[1].length !== a[1].length) return b[1].length - a[1].length;
       const minA = [...a[1]].sort()[0];
       const minB = [...b[1]].sort()[0];
-      return minA.localeCompare(minB);
+      return comparePaths(minA, minB);
     });
 
   // Build per-batch file list with full file metadata from scan
@@ -447,15 +549,18 @@ async function main() {
 
   const MAX_NEIGHBORS = 50;
 
-  // Second-pass: enrich each batch with batchImportData + neighborMap
-  const batches = mergedBareBatches.map(b => {
-    const batchPaths = new Set(b.files.map(f => f.path));
+  // Second-pass: enrich each batch with batchImportData + neighborMap.
+  // `analysisFiles` is usually the full batch. In --changed-files mode, it is
+  // only the changed target set, while batchOf remains the full-graph lookup.
+  const buildBatchPayload = (b, analysisFiles = b.files) => {
+    const analysisPaths = new Set(analysisFiles.map(f => f.path));
     const batchImportData = {};
     const neighborMap = {};
-    for (const f of b.files) {
+    for (const f of analysisFiles) {
       batchImportData[f.path] = (importMap[f.path] || []).slice();
 
-      // 1-hop neighbors: imports out + imported-by in, excluding same batch.
+      // 1-hop neighbors: imports out + imported-by in, excluding files already
+      // emitted for analysis in this payload.
       // Note on truncation: we measure "popularity" by total raw 1-hop neighbor
       // count (rawCount), not kept.length. A widely-imported hub like a logger
       // module may have N>50 inbound imports but, after Louvain + size
@@ -467,7 +572,7 @@ async function main() {
       const inNeighbors = reverseImportMap.get(f.path) || [];
       const all = new Set([...outNeighbors, ...inNeighbors]);
       const rawCount = all.size;
-      const filtered = [...all].filter(p => batchOf.has(p) && !batchPaths.has(p));
+      const filtered = [...all].filter(p => batchOf.has(p) && !analysisPaths.has(p));
 
       let kept = filtered.map(p => ({
         path: p,
@@ -478,7 +583,7 @@ async function main() {
       if (rawCount > MAX_NEIGHBORS) {
         kept.sort((a, b2) => (NEIGHBOR_DEGREE.get(b2.path) || 0)
                             - (NEIGHBOR_DEGREE.get(a.path) || 0)
-                            || a.path.localeCompare(b2.path));  // deterministic tiebreak
+                            || comparePaths(a.path, b2.path));  // deterministic tiebreak
         const beforeSlice = kept.length;
         kept = kept.slice(0, MAX_NEIGHBORS);
         process.stderr.write(
@@ -490,12 +595,21 @@ async function main() {
 
       if (kept.length) neighborMap[f.path] = kept;
     }
-    return { batchIndex: b.batchIndex, files: b.files, batchImportData, neighborMap };
-  });
+    return { batchIndex: b.batchIndex, files: analysisFiles, batchImportData, neighborMap };
+  };
+
+  const batches = mergedBareBatches.map(b => buildBatchPayload(b));
 
   let finalBatches = batches;
   if (changedFiles) {
-    finalBatches = batches.filter(b => b.files.some(f => changedFiles.has(f.path)));
+    finalBatches = mergedBareBatches
+      .map(b => {
+        const changedBatchFiles = b.files.filter(f =>
+          changedFiles.has(normalizeRelativePathForMatch(f.path)));
+        if (changedBatchFiles.length === 0) return null;
+        return buildBatchPayload(b, changedBatchFiles);
+      })
+      .filter(Boolean);
     // batchIndex on filtered batches retains the full-graph assignment
     // (the design says neighborMap should still reference unchanged files'
     // full-graph batchIndex). No renumbering.
@@ -514,7 +628,8 @@ async function main() {
     batches: finalBatches,
   };
 
-  const outPath = join(projectRoot, '.understand-anything', 'intermediate', 'batches.json');
+  const outPath = outputPath ?? join(uaDir, 'intermediate', 'batches.json');
+  mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, JSON.stringify(output, null, 2), 'utf-8');
   const batchSizes = finalBatches.map(b => b.files.length);
   const maxSize = batchSizes.length ? Math.max(...batchSizes) : 0;

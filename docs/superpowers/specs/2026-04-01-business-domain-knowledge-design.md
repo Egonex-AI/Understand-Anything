@@ -1,6 +1,6 @@
 # Business Domain Knowledge Extraction — Design Spec
 
-**Issue:** [#61](https://github.com/Lum1104/Understand-Anything/issues/61)
+**Issue:** [#61](https://github.com/Egonex-AI/Understand-Anything/issues/61)
 **Date:** 2026-04-01
 
 ## Problem

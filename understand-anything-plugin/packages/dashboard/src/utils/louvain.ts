@@ -36,8 +36,16 @@ export function detectCommunities(
   // Defensive: reassign any -1 sentinels to unique ids past the max.
   // See the JSDoc on detectCommunities for why this is kept despite the
   // current library already producing unique ids for disconnected nodes.
-  let next =
-    Math.max(...Array.from(map.values()).filter((v) => v >= 0), -1) + 1;
+  // Reduce instead of `Math.max(...spread)`: spreading every community id as
+  // call arguments throws `RangeError: Maximum call stack size exceeded` once
+  // the node count crosses the engine's argument limit — reachable on the
+  // ~3k+ node graphs this dashboard targets. Same result, no spread, no
+  // throwaway filtered array.
+  let maxCommunity = -1;
+  for (const v of map.values()) {
+    if (v >= 0 && v > maxCommunity) maxCommunity = v;
+  }
+  let next = maxCommunity + 1;
   for (const [id, c] of map) {
     if (c === -1) {
       map.set(id, next++);

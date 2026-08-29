@@ -27,6 +27,12 @@ const typeColors: Record<NodeType, string> = {
   topic: "var(--color-node-topic)",
   claim: "var(--color-node-claim)",
   source: "var(--color-node-source)",
+  page: "var(--color-node-concept)",
+  screen: "var(--color-node-service)",
+  component: "var(--color-node-class)",
+  componentSet: "var(--color-node-module)",
+  instance: "var(--color-node-function)",
+  token: "var(--color-node-config)",
 };
 
 const typeTextColors: Record<NodeType, string> = {
@@ -51,6 +57,12 @@ const typeTextColors: Record<NodeType, string> = {
   topic: "text-node-topic",
   claim: "text-node-claim",
   source: "text-node-source",
+  page: "text-node-concept",
+  screen: "text-node-service",
+  component: "text-node-class",
+  componentSet: "text-node-module",
+  instance: "text-node-function",
+  token: "text-node-config",
 };
 
 const complexityColors: Record<string, string> = {

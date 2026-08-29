@@ -75,7 +75,35 @@ const NODE_TYPE_TO_CATEGORY: Record<NodeType, NodeCategory> = {
   table: "data", endpoint: "data", schema: "data",
   domain: "domain", flow: "domain", step: "domain",
   article: "knowledge", entity: "knowledge", topic: "knowledge", claim: "knowledge", source: "knowledge",
+  // Design node types (Figma graphs). No dedicated filter category in v1, so they
+  // group under "code" — matching the runtime fallback below — to stay visible by default.
+  page: "code", screen: "code", component: "code", componentSet: "code", instance: "code", token: "code",
 } as const;
+
+/**
+ * Node types rendered in the structural drill-in (layer-detail) canvas.
+ *
+ * Mirrors every NON-knowledge core NodeType: 5 code + 8 non-code + 3 domain
+ * + 6 design (Figma graphs reuse this structural view in v1 — there is no
+ * separate design view). Knowledge types (article/entity/topic/claim/source)
+ * are intentionally excluded; knowledge graphs render in KnowledgeGraphView.
+ *
+ * Hoisted to module scope and exported so the guard test can assert design
+ * node types stay visible on drill-in (see
+ * __tests__/structuralVisibleTypes.test.ts). If a node type listed here is
+ * removed — or a new design NodeType is added to core without being added
+ * here — that test fails.
+ */
+export const STRUCTURAL_VISIBLE_TYPES = new Set<string>([
+  // code
+  "file", "function", "class", "module", "concept",
+  // non-code
+  "config", "document", "service", "table", "endpoint", "pipeline", "schema", "resource",
+  // domain
+  "domain", "flow", "step",
+  // design (Figma)
+  "page", "screen", "component", "componentSet", "instance", "token",
+]);
 
 // ── Helper components that must live inside <ReactFlow> ────────────────
 
@@ -425,13 +453,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     }
 
     const subFileTypes = new Set(["function", "class"]);
-    const allVisibleTypes = new Set([
-      "file", "module", "concept",
-      "config", "document", "service", "table",
-      "endpoint", "pipeline", "schema", "resource",
-      "domain", "flow", "step",
-      "function", "class",
-    ]);
+    const allVisibleTypes = STRUCTURAL_VISIBLE_TYPES;
 
     let filteredGraphNodes = graph.nodes.filter((n) => {
       if (!expandedLayerNodeIds.has(n.id)) return false;
