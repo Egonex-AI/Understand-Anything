@@ -140,7 +140,6 @@ async function main() {
 }
 
 // ---------------------------------------------------------------------------
-
 // Run only when executed directly as a CLI; importing the module (e.g. from
 // tests) must not trigger main().
 //
