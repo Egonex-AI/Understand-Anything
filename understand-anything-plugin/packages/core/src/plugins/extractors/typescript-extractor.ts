@@ -1,6 +1,20 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
-import { getStringValue } from "./base-extractor.js";
+import { computeCyclomaticComplexity, getStringValue } from "./base-extractor.js";
+
+const BRANCH_TYPES = [
+  "if_statement",
+  "for_statement",
+  "for_in_statement",
+  "while_statement",
+  "do_statement",
+  "catch_clause",
+  "conditional_expression",
+  "ternary_expression",
+  "switch_case",
+] as const;
+
+const BRANCH_TEXTS = ["&&", "||", "??"] as const;
 
 /**
  * Extract parameter names from a formal_parameters node.
@@ -261,6 +275,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, BRANCH_TYPES, BRANCH_TEXTS),
     });
   }
 
@@ -313,6 +328,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      cyclomaticComplexity: computeCyclomaticComplexity(node, BRANCH_TYPES, BRANCH_TEXTS),
     });
   }
 
@@ -351,6 +367,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
           ],
           params,
           returnType,
+          cyclomaticComplexity: computeCyclomaticComplexity(valueNode, BRANCH_TYPES, BRANCH_TEXTS),
         });
       }
     }

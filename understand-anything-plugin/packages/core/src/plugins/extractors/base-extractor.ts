@@ -12,6 +12,35 @@ export function traverse(
   }
 }
 
+/** Compute McCabe-style cyclomatic complexity for a syntax subtree. */
+export function computeCyclomaticComplexity(
+  node: TreeSitterNode,
+  branchTypes: readonly string[],
+  branchTexts: readonly string[] = [],
+): number {
+  const branchTypeSet = new Set(branchTypes);
+  const branchTextSet = new Set(branchTexts);
+  let count = 1;
+
+  traverse(node, (current) => {
+    if (branchTypeSet.has(current.type)) {
+      count++;
+      return;
+    }
+
+    if (branchTextSet.size > 0) {
+      for (let i = 0; i < current.childCount; i++) {
+        const child = current.child(i);
+        if (child && branchTextSet.has(child.text)) {
+          count++;
+        }
+      }
+    }
+  });
+
+  return count;
+}
+
 /** Extract the unquoted string value from a string-like node. */
 export function getStringValue(node: TreeSitterNode): string {
   for (let i = 0; i < node.childCount; i++) {

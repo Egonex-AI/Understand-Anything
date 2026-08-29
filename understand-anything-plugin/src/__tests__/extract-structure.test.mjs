@@ -89,6 +89,28 @@ describe("extract-structure buildResult", () => {
     });
   });
 
+  describe("cyclomaticComplexity", () => {
+    it("preserves deterministic complexity for extracted functions and classes", () => {
+      const result = buildResult(file(), 10, 8, analysis({
+        functions: [{
+          name: "route",
+          lineRange: [2, 20],
+          params: ["request"],
+          cyclomaticComplexity: 4,
+        }],
+        classes: [{
+          name: "Router",
+          lineRange: [1, 40],
+          methods: ["route"],
+          properties: [],
+          cyclomaticComplexity: 6,
+        }],
+      }), null, {});
+
+      expect(result.functions[0].cyclomaticComplexity).toBe(4);
+      expect(result.classes[0].cyclomaticComplexity).toBe(6);
+    });
+  });
   describe("totalLines", () => {
     // Documents the off-by-one fix: `wc -l` reports N for a POSIX text file
     // with N lines + trailing \n; the extractor must match.
