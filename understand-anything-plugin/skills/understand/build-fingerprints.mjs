@@ -4,7 +4,9 @@
  *
  * Builds the structural-fingerprint baseline used by auto-update's
  * incremental change detection. Runs once per /understand full rebuild
- * (Phase 7 step 2.5), generating .understand-anything/fingerprints.json.
+ * (Phase 7 step 2.5), generating fingerprints.json in the project's data dir
+ * (`.ua/`, or legacy `.understand-anything/` — resolved by core's
+ * saveFingerprints via resolveUaDir).
  *
  * Replaces the LLM-written fingerprint script that previously sat in
  * SKILL.md as a code example — that example had the wrong signature
@@ -17,7 +19,8 @@
  * Input JSON:
  *   { projectRoot: string, sourceFilePaths: string[], gitCommitHash: string }
  *
- * Writes: <projectRoot>/.understand-anything/fingerprints.json
+ * Writes: <projectRoot>/.ua/fingerprints.json (or legacy
+ *   <projectRoot>/.understand-anything/fingerprints.json when that dir exists)
  * Exit code: 0 on success (including 0 files analyzed); non-zero on error.
  */
 

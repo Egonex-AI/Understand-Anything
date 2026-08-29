@@ -12,7 +12,9 @@ Usage:
     python merge-knowledge-graph.py <wiki-directory>
 
 Output:
-    Writes assembled-graph.json to <wiki-directory>/.understand-anything/intermediate/
+    Writes assembled-graph.json to <wiki-directory>/<ua-dir>/intermediate/, where
+    <ua-dir> is `.ua/` (or legacy `.understand-anything/` when that directory
+    already exists).
 """
 
 import json
@@ -21,6 +23,32 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+
+def resolve_ua_dir(root: Path) -> Path:
+    """Mirror core resolveUaDir: legacy .understand-anything/ wins if present."""
+    legacy = root / ".understand-anything"
+    return legacy if legacy.is_dir() else root / ".ua"
+
+
+def _find_markdown_case_insensitive(parent: Path, name: str) -> Path:
+    """Resolve a known markdown filename case-insensitively within one directory.
+
+    Mirrors find_markdown_case_insensitive in parse-knowledge-base.py (the
+    scripts are standalone, so the helper is duplicated): an exact match
+    always wins; otherwise the first case-insensitive sibling is returned.
+    """
+    candidate = parent / name
+    if candidate.is_file():
+        return candidate
+    if not parent.is_dir():
+        return candidate
+    wanted = name.lower()
+    for child in sorted(parent.iterdir()):
+        if child.is_file() and child.name.lower() == wanted:
+            return child
+    return candidate
+
 
 # ---------------------------------------------------------------------------
 # Canonical type sets (must match core/src/types.ts)
@@ -90,7 +118,7 @@ def normalize_entity_name(name: str) -> str:
 # ---------------------------------------------------------------------------
 
 def merge(root: Path) -> dict:
-    intermediate = root / ".understand-anything" / "intermediate"
+    intermediate = resolve_ua_dir(root) / "intermediate"
     manifest_path = intermediate / "scan-manifest.json"
 
     if not manifest_path.is_file():
@@ -321,10 +349,11 @@ def merge(root: Path) -> dict:
 
     # --- Detect project name ---
     project_name = root.name
-    # Try to find a better name from index.md H1
-    index_path = root / "wiki" / "index.md"
+    # Try to find a better name from index.md H1 (case-insensitively —
+    # Index.md is a reasonable convention; exact lowercase wins if both exist)
+    index_path = _find_markdown_case_insensitive(root / "wiki", "index.md")
     if not index_path.is_file():
-        index_path = root / "index.md"
+        index_path = _find_markdown_case_insensitive(root, "index.md")
     if index_path.is_file():
         text = index_path.read_text(encoding="utf-8", errors="replace")
         h1_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)

@@ -1,6 +1,8 @@
 export const zh = {
   common: {
     loading: "加载项目...",
+    computingGraphLayout: "正在计算图布局...",
+    forceLayoutFallback: "力导向布局不可用，正在显示备用网格。",
     noGraphLoaded: "未加载知识图谱",
     selectNode: "选择节点查看详情",
     back: "返回",
@@ -179,6 +181,8 @@ export const zh = {
     closeExpanded: "关闭展开的代码查看器",
     closeViewer: "关闭代码查看器",
     sourceUnavailable: "源码不可用",
+    rendered: "渲染",
+    source: "源码",
   },
   customNode: {
     tested: "已测试",

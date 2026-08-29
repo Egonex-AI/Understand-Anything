@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an idea or improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the user pain or workflow gap. Concrete examples help more than abstract framing.
+      placeholder: |
+        When onboarding new engineers to our 8k-file Go monorepo, they spend
+        days finding the auth boundary. /understand finds the files but the
+        dashboard doesn't visually separate "trusted" from "untrusted" zones.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution (optional)
+      description: If you have an idea for what the feature should look like, share it. Skip if you'd rather just describe the problem.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Other tools, workarounds, or approaches you've tried.
+
+  - type: input
+    id: scope
+    attributes:
+      label: Which part of the project?
+      placeholder: "skill / dashboard / core / agents / all"

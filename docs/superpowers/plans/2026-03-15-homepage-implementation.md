@@ -274,7 +274,7 @@ Create `homepage/src/components/Nav.astro`:
 
 ```astro
 ---
-const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 ---
 
 <nav class="nav" id="nav">
@@ -437,7 +437,7 @@ Create `homepage/src/components/Hero.astro`:
 
 ```astro
 ---
-const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 ---
 
 <section class="hero">
@@ -817,7 +817,7 @@ Create `homepage/src/components/Install.astro`:
         <span class="install-code-dot"></span>
         <span class="install-code-label">Claude Code</span>
       </div>
-      <pre><code><span class="cmd">/plugin marketplace add</span> Lum1104/Understand-Anything
+      <pre><code><span class="cmd">/plugin marketplace add</span> Egonex-AI/Understand-Anything
 <span class="cmd">/plugin install</span> understand-anything
 <span class="cmd">/understand</span></code></pre>
     </div>
@@ -928,7 +928,7 @@ Create `homepage/src/components/Footer.astro`:
 
 ```astro
 ---
-const githubUrl = 'https://github.com/Lum1104/Understand-Anything';
+const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 ---
 
 <footer class="footer">
@@ -1223,7 +1223,7 @@ Verify in browser:
 Add a "Homepage" link near the top of the README, after the badges section. Add a single line:
 
 ```markdown
-**[Homepage](https://understand-anything.com)** | **[GitHub](https://github.com/Lum1104/Understand-Anything)**
+**[Homepage](https://understand-anything.com)** | **[GitHub](https://github.com/Egonex-AI/Understand-Anything)**
 ```
 
 **Step 4: Final commit**

@@ -222,6 +222,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
         this.extractFunction(node, functions);
         break;
 
+      case "abstract_class_declaration":
       case "class_declaration":
         this.extractClass(node, classes);
         break;
@@ -299,7 +300,10 @@ export class TypeScriptExtractor implements LanguageExtractor {
         const member = classBody.child(j);
         if (!member) continue;
 
-        if (member.type === "method_definition") {
+        if (
+          member.type === "method_definition" ||
+          member.type === "abstract_method_signature"
+        ) {
           const methodName = member.children.find(
             (c) => c.type === "property_identifier",
           );
@@ -433,6 +437,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
           break;
         }
 
+        case "abstract_class_declaration":
         case "class_declaration": {
           this.extractClass(child, classes);
           const nameNode = child.children.find(

@@ -1,0 +1,85 @@
+name: Bug report
+description: Report something that isn't working
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more concrete you can be,
+        the faster it gets fixed. If you can include the analyzed project's
+        primary language and an approximate file count, that's gold.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect to happen, and what actually happened?
+      placeholder: |
+        1. Ran `/understand --full` on a ~3,000 file Rust project
+        2. Expected: dashboard opens with the graph
+        3. Got: dashboard shows "Failed to load graph: schema validation error"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Smallest set of steps (or a link to a public repo) that reproduces the issue.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: Run `/understand --version` or check `~/.claude/plugins/cache/understand-anything/understand-anything/`.
+      placeholder: "e.g. 2.7.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform / client
+      multiple: true
+      options:
+        - Claude Code (CLI)
+        - Claude Code (VS Code extension)
+        - Claude Code (JetBrains)
+        - Cursor
+        - GitHub Copilot CLI
+        - opencode
+        - Other (please describe in "What happened?")
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS + Node version
+      placeholder: "e.g. macOS 14.5 (arm64), Node v22.6.0"
+    validations:
+      required: true
+
+  - type: input
+    id: project-language
+    attributes:
+      label: Primary language of the analyzed project
+      placeholder: "e.g. TypeScript, Python, Swift…"
+
+  - type: input
+    id: file-count
+    attributes:
+      label: Approximate file count of the analyzed project
+      placeholder: "e.g. ~3,000"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Any console output, the contents of `.understand-anything/intermediate/`
+        if it still exists, or screenshots of the dashboard error.
+      render: shell

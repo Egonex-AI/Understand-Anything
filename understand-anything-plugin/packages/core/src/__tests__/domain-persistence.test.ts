@@ -56,8 +56,8 @@ describe("domain graph persistence", () => {
 
   it("saves to domain-graph.json, not knowledge-graph.json", () => {
     saveDomainGraph(testRoot, domainGraph);
-    const domainPath = join(testRoot, ".understand-anything", "domain-graph.json");
-    const structuralPath = join(testRoot, ".understand-anything", "knowledge-graph.json");
+    const domainPath = join(testRoot, ".ua", "domain-graph.json");
+    const structuralPath = join(testRoot, ".ua", "knowledge-graph.json");
     expect(existsSync(domainPath)).toBe(true);
     expect(existsSync(structuralPath)).toBe(false);
   });

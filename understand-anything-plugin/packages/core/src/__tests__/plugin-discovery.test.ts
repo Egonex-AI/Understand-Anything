@@ -77,6 +77,10 @@ describe("plugin-discovery", () => {
       expect(DEFAULT_PLUGIN_CONFIG.plugins[0].name).toBe("tree-sitter");
       expect(DEFAULT_PLUGIN_CONFIG.plugins[0].enabled).toBe(true);
     });
+
+    it("includes Swift now that a tree-sitter grammar is available", () => {
+      expect(DEFAULT_PLUGIN_CONFIG.plugins[0].languages).toContain("swift");
+    });
   });
 
   describe("serializePluginConfig", () => {

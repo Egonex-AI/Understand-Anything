@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -13,12 +13,26 @@ import "@xyflow/react/dist/style.css";
 import CustomNode from "./CustomNode";
 import type { CustomNodeData } from "./CustomNode";
 import { useDashboardStore } from "../store";
-import { applyForceLayout, NODE_WIDTH, NODE_HEIGHT } from "../utils/layout";
+import { NODE_WIDTH, NODE_HEIGHT } from "../utils/layout";
+import {
+  createFallbackGrid,
+  ForceLayoutCancelledError,
+  startForceLayoutTask,
+} from "../utils/force-layout-client";
+import type {
+  ForceLayoutEdge,
+  ForceLayoutNode,
+  ForceLayoutPosition,
+} from "../utils/force-layout";
+import { useI18n } from "../contexts/I18nContext";
 import type { KnowledgeGraph } from "@understand-anything/core/types";
 
 const nodeTypes = {
   custom: CustomNode,
 };
+
+const EMPTY_POSITION_MAP = new Map<string, { x: number; y: number }>();
+const EMPTY_EDGE_COUNTS = new Map<string, number>();
 
 /** Edge style presets by knowledge edge type. */
 const EDGE_STYLES: Record<string, React.CSSProperties> = {
@@ -44,13 +58,29 @@ function getNodeDimensions(
   };
 }
 
-/**
- * Compute the stable layout (positions) from graph topology.
- * This only re-runs when the graph data or filters change, NOT on selection/search.
- */
-function computeLayout(
-  graph: KnowledgeGraph,
-): { positionMap: Map<string, { x: number; y: number }>; edgeCounts: Map<string, number>; communityMap: Map<string, number> } {
+interface PreparedLayout {
+  graph: KnowledgeGraph;
+  nodes: ForceLayoutNode[];
+  edges: ForceLayoutEdge[];
+  edgeCounts: Map<string, number>;
+}
+
+interface LayoutState {
+  graph: KnowledgeGraph | null;
+  status: "loading" | "ready";
+  positionMap: Map<string, { x: number; y: number }>;
+  edgeCounts: Map<string, number>;
+  hasWarning?: boolean;
+}
+
+function positionsToMap(
+  positions: ForceLayoutPosition[],
+): Map<string, { x: number; y: number }> {
+  return new Map(positions.map(({ id, x, y }) => [id, { x, y }]));
+}
+
+/** Prepare lightweight, structured-clone-safe input for the layout worker. */
+function prepareLayout(graph: KnowledgeGraph): PreparedLayout {
   const edgeCounts = new Map<string, number>();
   for (const edge of graph.edges) {
     edgeCounts.set(edge.source, (edgeCounts.get(edge.source) ?? 0) + 1);
@@ -64,33 +94,26 @@ function computeLayout(
     }
   });
 
-  const dims = new Map<string, { width: number; height: number }>();
-  for (const node of graph.nodes) {
-    dims.set(node.id, getNodeDimensions(edgeCounts.get(node.id) ?? 0));
-  }
+  return {
+    graph,
+    edgeCounts,
+    nodes: graph.nodes.map((node) => ({
+      id: node.id,
+      ...getNodeDimensions(edgeCounts.get(node.id) ?? 0),
+      community: communityMap.get(node.id),
+    })),
+    edges: graph.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+    })),
+  };
+}
 
-  // Build temporary nodes/edges for layout computation only
-  const tmpNodes: Node[] = graph.nodes.map((node) => ({
-    id: node.id,
-    type: "custom" as const,
-    position: { x: 0, y: 0 },
-    data: {},
-  }));
-
-  const tmpEdges: Edge[] = graph.edges.map((e, i) => ({
-    id: `ke-${i}`,
-    source: e.source,
-    target: e.target,
-  }));
-
-  const { nodes: layoutedNodes } = applyForceLayout(tmpNodes, tmpEdges, dims, communityMap);
-
-  const positionMap = new Map<string, { x: number; y: number }>();
-  for (const n of layoutedNodes) {
-    positionMap.set(n.id, n.position);
-  }
-
-  return { positionMap, edgeCounts, communityMap };
+function createForceLayoutWorker(): Worker {
+  return new Worker(
+    new URL("../utils/force-layout.worker.ts", import.meta.url),
+    { type: "module" },
+  );
 }
 
 function KnowledgeGraphViewInner() {
@@ -100,7 +123,17 @@ function KnowledgeGraphViewInner() {
   const selectNode = useDashboardStore((s) => s.selectNode);
   const searchResultsRaw = useDashboardStore((s) => s.searchResults);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
-  const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
+  const knowledgeNodesVisible = useDashboardStore(
+    (s) => s.nodeTypeFilters.knowledge !== false,
+  );
+  const { t } = useI18n();
+  const nextLayoutRequestId = useRef(0);
+  const [layoutState, setLayoutState] = useState<LayoutState>({
+    graph: null,
+    status: "loading",
+    positionMap: EMPTY_POSITION_MAP,
+    edgeCounts: EMPTY_EDGE_COUNTS,
+  });
 
   const onNodeClick = useCallback(
     (nodeId: string) => selectNode(nodeId),
@@ -123,7 +156,7 @@ function KnowledgeGraphViewInner() {
 
     const filteredNodes = graph.nodes.filter((n) => {
       if (["article", "entity", "topic", "claim", "source"].includes(n.type)) {
-        return nodeTypeFilters.knowledge !== false;
+        return knowledgeNodesVisible;
       }
       return true;
     });
@@ -134,17 +167,92 @@ function KnowledgeGraphViewInner() {
     );
 
     return { ...graph, nodes: filteredNodes, edges: filteredEdges };
-  }, [graph, nodeTypeFilters]);
+  }, [graph, knowledgeNodesVisible]);
 
-  // Compute layout ONCE per graph/filter change — stable positions
-  const { positionMap, edgeCounts } = useMemo(() => {
-    if (!filteredGraph) return { positionMap: new Map(), edgeCounts: new Map() };
-    return computeLayout(filteredGraph);
+  const preparedLayout = useMemo(() => {
+    if (!filteredGraph) return null;
+    return prepareLayout(filteredGraph);
   }, [filteredGraph]);
+
+  // Run d3-force outside the main thread. A fresh worker per graph revision
+  // lets cleanup terminate an in-progress synchronous simulation immediately.
+  useEffect(() => {
+    if (!preparedLayout) {
+      setLayoutState({
+        graph: null,
+        status: "loading",
+        positionMap: EMPTY_POSITION_MAP,
+        edgeCounts: EMPTY_EDGE_COUNTS,
+      });
+      return;
+    }
+
+    const { graph: layoutGraph, nodes: layoutNodes, edges: layoutEdges, edgeCounts } =
+      preparedLayout;
+
+    if (layoutNodes.length === 0) {
+      setLayoutState({
+        graph: layoutGraph,
+        status: "ready",
+        positionMap: EMPTY_POSITION_MAP,
+        edgeCounts,
+      });
+      return;
+    }
+
+    const requestId = ++nextLayoutRequestId.current;
+    let active = true;
+    setLayoutState({
+      graph: layoutGraph,
+      status: "loading",
+      positionMap: EMPTY_POSITION_MAP,
+      edgeCounts,
+    });
+
+    const task = startForceLayoutTask(
+      { requestId, nodes: layoutNodes, edges: layoutEdges },
+      createForceLayoutWorker,
+    );
+
+    void task.promise
+      .then((positions) => {
+        if (!active || requestId !== nextLayoutRequestId.current) return;
+        setLayoutState({
+          graph: layoutGraph,
+          status: "ready",
+          positionMap: positionsToMap(positions),
+          edgeCounts,
+        });
+      })
+      .catch((error: unknown) => {
+        if (!active || error instanceof ForceLayoutCancelledError) return;
+        setLayoutState({
+          graph: layoutGraph,
+          status: "ready",
+          positionMap: positionsToMap(createFallbackGrid(layoutNodes)),
+          edgeCounts,
+          hasWarning: true,
+        });
+      });
+
+    return () => {
+      active = false;
+      task.cancel();
+    };
+  }, [preparedLayout]);
+
+  const layoutIsReady =
+    !!filteredGraph &&
+    layoutState.graph === filteredGraph &&
+    layoutState.status === "ready";
+  const positionMap = layoutIsReady
+    ? layoutState.positionMap
+    : EMPTY_POSITION_MAP;
+  const edgeCounts = layoutIsReady ? layoutState.edgeCounts : EMPTY_EDGE_COUNTS;
 
   // Build visual nodes/edges — recomputes on selection/search/tour WITHOUT re-layout
   const { nodes, edges } = useMemo(() => {
-    if (!filteredGraph) return { nodes: [], edges: [] };
+    if (!filteredGraph || !layoutIsReady) return { nodes: [], edges: [] };
 
     const neighborIds = new Set<string>();
     if (focusNodeId || selectedNodeId) {
@@ -233,7 +341,7 @@ function KnowledgeGraphViewInner() {
     });
 
     return { nodes: rfNodes, edges: rfEdges };
-  }, [filteredGraph, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts]);
+  }, [filteredGraph, layoutIsReady, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts]);
 
   if (!graph) {
     return (
@@ -243,8 +351,28 @@ function KnowledgeGraphViewInner() {
     );
   }
 
+  if (!layoutIsReady) {
+    return (
+      <div
+        className="h-full flex items-center justify-center text-text-muted text-sm"
+        role="status"
+        aria-live="polite"
+      >
+        {t.common.computingGraphLayout}
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full relative">
+      {layoutState.hasWarning && (
+        <div
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-10 rounded-md border border-border-medium bg-surface/95 px-3 py-2 text-xs text-text-muted shadow-lg"
+          role="status"
+        >
+          {t.common.forceLayoutFallback}
+        </div>
+      )}
       <ReactFlow
         nodes={nodes}
         edges={edges}

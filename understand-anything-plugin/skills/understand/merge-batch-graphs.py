@@ -11,11 +11,10 @@ then reviews the output for semantic issues the script cannot catch.
 Usage:
     python merge-batch-graphs.py <project-root>
 
-Input:
-    <project-root>/.understand-anything/intermediate/batch-*.json
-
-Output:
-    <project-root>/.understand-anything/intermediate/assembled-graph.json
+Input/output live under the project's data dir (`.ua/`, or legacy
+`.understand-anything/` when that directory already exists):
+    Input:  <ua-dir>/intermediate/batch-*.json
+    Output: <ua-dir>/intermediate/assembled-graph.json
 """
 
 import json
@@ -25,6 +24,12 @@ import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+
+def resolve_ua_dir(root: Path) -> Path:
+    """Mirror core resolveUaDir: legacy .understand-anything/ wins if present."""
+    legacy = root / ".understand-anything"
+    return legacy if legacy.is_dir() else root / ".ua"
 
 
 # ── Configuration ─────────────────────────────────────────────────────────
@@ -37,6 +42,17 @@ VALID_NODE_PREFIXES = {
     # Knowledge-base node types (schema.ts NodeType enum)
     "article", "entity", "topic", "claim", "source",
 }
+
+# Precompiled once at import time. The previous inline form rebuilt and
+# re-escaped this 24-alternative pattern *string* on every node (the regex
+# cache keys on the final string, so only the compile was cached — the
+# join + re.escape work was not). Benchmarked ~15x faster on large graphs.
+# The `:`-delimited group + anchoring makes alternation order (and hence the
+# unordered-set iteration order) irrelevant to matching, so hoisting is
+# byte-for-byte equivalent.
+_PROJECT_PREFIX_RE = re.compile(
+    r"^[^:]+:(" + "|".join(re.escape(p) for p in VALID_NODE_PREFIXES) + r"):(.+)$"
+)
 
 # node.type → canonical ID prefix
 TYPE_TO_PREFIX: dict[str, str] = {
@@ -99,6 +115,7 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ".py": (("test_",), ("_test",)),
     ".java": ((), ("Test", "Tests", "IT")),
     ".kt": ((), ("Test", "Tests")),
+    ".scala": ((), ("Spec", "Suite", "Test", "Tests")),
     ".cs": ((), ("Test", "Tests")),
     ".c": (("test_",), ("_test",)),
     ".cpp": (("test_",), ("_test",)),
@@ -127,6 +144,30 @@ def _num(v: Any) -> float:
         return float(v)
     except (TypeError, ValueError):
         return 0.0
+
+
+def parse_batch_filename(name: str) -> tuple[int, int | None] | None:
+    """Return the logical batch index and optional part number for a batch file.
+
+    Incremental updates write the pruned baseline graph as `batch-existing.json`;
+    treat it as a real batch that sorts before freshly analyzed numeric batches.
+    """
+    if name == "batch-existing.json":
+        return (-1, None)
+
+    match = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", name)
+    if match is None:
+        return None
+    return (int(match.group(1)), int(match.group(2)) if match.group(2) else None)
+
+
+def batch_sort_key(path: Path) -> tuple[int, int, str]:
+    parsed = parse_batch_filename(path.name)
+    if parsed is None:
+        return (sys.maxsize, sys.maxsize, path.name)
+
+    batch_index, part_number = parsed
+    return (batch_index, part_number or 0, path.name)
 
 
 # ── Batch loading ─────────────────────────────────────────────────────────
@@ -188,7 +229,7 @@ def normalize_node_id(node_id: str, node: dict[str, Any]) -> str:
 
     # Strip project-name prefix: "my-project:file:src/foo.ts" → "file:src/foo.ts"
     # Pattern: <word>:<valid-prefix>:<path>
-    match = re.match(r"^[^:]+:(" + "|".join(re.escape(p) for p in VALID_NODE_PREFIXES) + r"):(.+)$", nid)
+    match = _PROJECT_PREFIX_RE.match(nid)
     if match:
         # Only strip if the first segment is NOT a valid prefix itself
         first_seg = nid.split(":")[0]
@@ -443,6 +484,25 @@ def production_candidates(test_path: str) -> list[str]:
                     new_dir = "/".join(["src", "main", "kotlin"] + list(dir_segs[3:]))
                     _add_unique(candidates, f"{new_dir}/{base_stem}.kt")
                 _add_unique(candidates, _join(dir_path, f"{base_stem}.kt"))
+                break
+
+    # ── Scala ─────────────────────────────────────────────────────────
+    elif ext == ".scala":
+        for suffix in ("Spec", "Suite", "Tests", "Test"):
+            if stem.endswith(suffix):
+                base_stem = stem[: -len(suffix)]
+                # sbt layout: swap any .../src/test/scala/... segment while
+                # preserving a module prefix such as modules/core/.
+                for i in range(0, max(len(dir_segs) - 2, 0)):
+                    if list(dir_segs[i : i + 3]) == ["src", "test", "scala"]:
+                        new_dir = "/".join(
+                            list(dir_segs[:i])
+                            + ["src", "main", "scala"]
+                            + list(dir_segs[i + 3 :])
+                        )
+                        _add_unique(candidates, f"{new_dir}/{base_stem}.scala")
+                        break
+                _add_unique(candidates, _join(dir_path, f"{base_stem}.scala"))
                 break
 
     # ── C# ────────────────────────────────────────────────────────────
@@ -1006,18 +1066,18 @@ def main() -> None:
         sys.exit(1)
 
     project_root = Path(sys.argv[1]).resolve()
-    intermediate_dir = project_root / ".understand-anything" / "intermediate"
+    intermediate_dir = resolve_ua_dir(project_root) / "intermediate"
 
     if not intermediate_dir.is_dir():
         print(f"Error: {intermediate_dir} does not exist", file=sys.stderr)
         sys.exit(1)
 
-    # Discover batch files, sorted by numeric index (not lexicographic)
+    # Discover batch files, sorted by numeric index (not lexicographic).
+    # `batch-existing.json` is the documented incremental baseline and must
+    # sort before fresh batches so fresh duplicate nodes/edges win later.
     batch_files = sorted(
         intermediate_dir.glob("batch-*.json"),
-        key=lambda p: int(re.search(r"batch-(\d+)", p.stem).group(1))
-        if re.search(r"batch-(\d+)", p.stem)
-        else 0,
+        key=batch_sort_key,
     )
     if not batch_files:
         print("Error: no batch-*.json files found in intermediate/", file=sys.stderr)
@@ -1025,19 +1085,20 @@ def main() -> None:
 
     # Group by logical batch index so the report distinguishes single-batch
     # files from multi-part file-analyzer outputs. Files that don't match the
-    # `batch-<N>.json` / `batch-<N>-part-<K>.json` pattern (e.g. fused
-    # `batch-fused-8-13.json`, range `batch-8-13.json`) would otherwise be
-    # silently dropped during load — flag them loudly instead so the user
-    # can fix the file-analyzer agent.
+    # `batch-existing.json` / `batch-<N>.json` / `batch-<N>-part-<K>.json`
+    # pattern (e.g. fused `batch-fused-8-13.json`, range `batch-8-13.json`)
+    # would otherwise be silently dropped during load — flag them loudly
+    # instead so the user can fix the file-analyzer agent.
     from collections import defaultdict as _dd
     by_batch = _dd(list)
     unrecognized_batch_files: list[str] = []
     for f in batch_files:
-        m = re.match(r"batch-(\d+)(?:-part-(\d+))?\.json", f.name)
-        if m:
-            by_batch[int(m.group(1))].append((f.name, int(m.group(2)) if m.group(2) else None))
-        else:
+        parsed = parse_batch_filename(f.name)
+        if parsed is None:
             unrecognized_batch_files.append(f.name)
+        else:
+            batch_index, part_number = parsed
+            by_batch[batch_index].append((f.name, part_number))
 
     if unrecognized_batch_files:
         preview = ", ".join(unrecognized_batch_files[:5])
@@ -1088,6 +1149,7 @@ def main() -> None:
     # merged graph with content the agent labeled incorrectly.
     unrecognized_set = set(unrecognized_batch_files)
     batches: list[dict[str, Any]] = []
+    empty_batch_warnings: list[str] = []
     for f in batch_files:
         if f.name in unrecognized_set:
             continue
@@ -1097,6 +1159,17 @@ def main() -> None:
             n = len(batch.get("nodes", []))
             e = len(batch.get("edges", []))
             print(f"  {f.name}: {n} nodes, {e} edges", file=sys.stderr)
+            # A file that parses but contributes nothing is how a silent
+            # partial merge looks from the outside (see #484) — flag it
+            # loudly instead of relying on a downstream reviewer to notice.
+            if n == 0 and e == 0:
+                msg = (
+                    f"{f.name} loaded but contributed 0 nodes and 0 edges — "
+                    f"either the analyzer wrote an empty batch or the file "
+                    f"was read mid-write; inspect it directly"
+                )
+                print(f"  Warning: {msg}", file=sys.stderr)
+                empty_batch_warnings.append(msg)
 
     if not batches:
         print("Error: no valid batch files loaded", file=sys.stderr)
@@ -1117,6 +1190,17 @@ def main() -> None:
             f"— some nodes/edges silently dropped:"
         )
         for w in missing_part_warnings:
+            report.append(f"  - {w}")
+
+    # Surface empty-contribution batches to the phase report (same rationale
+    # as missing_part_warnings above — stderr alone gets buried).
+    if empty_batch_warnings:
+        report.append("")
+        report.append(
+            f"Warning: {len(empty_batch_warnings)} batch file(s) loaded but "
+            f"contributed no nodes or edges:"
+        )
+        for w in empty_batch_warnings:
             report.append(f"  - {w}")
 
     # Surface unrecognized-filename drops to the phase report so the

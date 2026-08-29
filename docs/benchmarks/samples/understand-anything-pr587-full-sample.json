@@ -1,0 +1,218 @@
+{
+  "schemaUrl": "https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/docs/benchmarks/large-repo-report-1.0.0.schema.json",
+  "schemaVersion": "1.0.0",
+  "pairId": "d7a047c6-9c05-41b2-9923-43a1e71e9634",
+  "status": "degraded",
+  "mode": "deterministic",
+  "run": {
+    "startedAt": "2026-07-17T11:45:14.919Z",
+    "finishedAt": "2026-07-17T11:45:26.653Z",
+    "durationMs": 11734.69
+  },
+  "tool": {
+    "commit": "851ca14ebab22c81fde136986263d550daa38ee3",
+    "dirty": false,
+    "packageVersion": "2.9.3"
+  },
+  "subject": {
+    "label": "understand-anything-pr587-full-sample",
+    "commit": "851ca14ebab22c81fde136986263d550daa38ee3",
+    "dirty": false
+  },
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "nodeVersion": "v22.18.0",
+    "cpuModel": "13th Gen Intel(R) Core(TM) i9-13900HX",
+    "logicalCores": 32,
+    "totalMemoryBytes": 16907100160
+  },
+  "configuration": {
+    "concurrency": 5,
+    "stages": [
+      "scan",
+      "imports",
+      "batching",
+      "structure"
+    ]
+  },
+  "scale": {
+    "files": 459,
+    "lines": 127155,
+    "bytes": 8918520,
+    "missingFiles": 0,
+    "filteredByUserIgnore": 0,
+    "byCategory": {
+      "config": 33,
+      "docs": 117,
+      "infra": 3,
+      "code": 301,
+      "markup": 3,
+      "script": 2
+    },
+    "byLanguage": {
+      "json": 27,
+      "yaml": 8,
+      "markdown": 117,
+      "unknown": 3,
+      "javascript": 31,
+      "astro": 10,
+      "css": 2,
+      "powershell": 1,
+      "shell": 1,
+      "python": 8,
+      "typescript": 247,
+      "html": 1,
+      "wasm": 2,
+      "swift": 1
+    }
+  },
+  "stages": {
+    "scan": {
+      "status": "ok",
+      "durationMs": 783.46,
+      "peakRssBytes": 80211968,
+      "userCpuTimeMicros": 281000,
+      "systemCpuTimeMicros": 407000,
+      "warningCount": 0,
+      "warningMessages": [],
+      "warningMessagesTruncated": false,
+      "stdoutTruncated": false,
+      "stderrTruncated": false,
+      "outputBytes": 82572,
+      "files": 459,
+      "lines": 127155,
+      "bytes": 8918520,
+      "filteredByUserIgnore": 0
+    },
+    "imports": {
+      "status": "ok",
+      "durationMs": 1172.55,
+      "peakRssBytes": 190054400,
+      "userCpuTimeMicros": 906000,
+      "systemCpuTimeMicros": 562000,
+      "warningCount": 0,
+      "warningMessages": [],
+      "warningMessagesTruncated": false,
+      "stdoutTruncated": false,
+      "stderrTruncated": false,
+      "outputBytes": 71809,
+      "filesScanned": 459,
+      "filesWithImports": 212,
+      "edges": 462
+    },
+    "batching": {
+      "status": "ok",
+      "durationMs": 1169.17,
+      "peakRssBytes": 191143936,
+      "userCpuTimeMicros": 875000,
+      "systemCpuTimeMicros": 578000,
+      "warningCount": 5,
+      "warningMessages": [
+        "Warning: compute-batches: community size 46 > max 35 — splitting via alphabetical chunking — modularity may decrease",
+        "Warning: compute-batches: community size 61 > max 35 — splitting via alphabetical chunking — modularity may decrease",
+        "Warning: compute-batches: community size 52 > max 35 — splitting via alphabetical chunking — modularity may decrease",
+        "Warning: compute-batches: neighborMap for understand-anything-plugin/packages/core/src/languages/types.ts has high 1-hop degree 59 — exceeds soft cap of 50 — keeping top 31 cross-batch entries (0 dropped by degree sort)",
+        "Warning: compute-batches: neighborMap for understand-anything-plugin/packages/core/src/types.ts has high 1-hop degree 58 — exceeds soft cap of 50 — keeping top 38 cross-batch entries (0 dropped by degree sort)"
+      ],
+      "warningMessagesTruncated": false,
+      "stdoutTruncated": false,
+      "stderrTruncated": false,
+      "outputBytes": 354328,
+      "algorithm": "louvain",
+      "totalBatches": 37,
+      "batchSizes": {
+        "min": 1,
+        "p50": 7,
+        "p95": 31,
+        "max": 31,
+        "mean": 12.41
+      },
+      "estimatedAgentInputBytes": 212711
+    },
+    "structure": {
+      "status": "ok",
+      "durationMs": 8070.21,
+      "maxWorkerPeakRssBytes": 193888256,
+      "userCpuTimeMicros": 18300000,
+      "systemCpuTimeMicros": 21344000,
+      "warningCount": 0,
+      "warningMessages": [],
+      "warningMessagesTruncated": false,
+      "failureSamples": [],
+      "failureSamplesTruncated": false,
+      "outputBytes": 1636826,
+      "batchesSucceeded": 37,
+      "batchesFailed": 0,
+      "filesAnalyzed": 439,
+      "filesSkipped": 20,
+      "structureSucceeded": 439,
+      "structureFailed": 0,
+      "callGraphSucceeded": 285,
+      "callGraphFailed": 0,
+      "callGraphSkipped": 154,
+      "entities": {
+        "functions": 654,
+        "classes": 55,
+        "exports": 628,
+        "callGraph": 8026,
+        "definitions": 0,
+        "services": 0,
+        "endpoints": 0,
+        "steps": 0,
+        "resources": 0
+      },
+      "batchDurationMs": {
+        "min": 800.05,
+        "p50": 991.31,
+        "p95": 1224.87,
+        "max": 1337.28,
+        "mean": 1027.58
+      }
+    }
+  },
+  "integrity": {
+    "allScannedFilesBatched": true,
+    "missingBatchFiles": 0,
+    "duplicateBatchFiles": 0,
+    "unexpectedBatchFiles": 0,
+    "missingImportTargets": 0,
+    "structureCoverage": 1,
+    "structureFailures": 0,
+    "callGraphFailures": 0,
+    "filesSkipped": 20,
+    "failedBatches": 0,
+    "missingStructurePaths": 0,
+    "duplicateStructurePaths": 0,
+    "unexpectedStructurePaths": 0,
+    "malformedStructureBatches": 0
+  },
+  "determinism": {
+    "algorithm": "sha256",
+    "inputDigest": "ff0ab0d785f92f6324bc36c389a50abdbfa86ddb6a892a0439be1162a4da6a6f",
+    "outputDigest": "69f6cee48ef7e3febf0c5bb7dd04528010fc5764386b9982a44865813d9ec24a"
+  },
+  "llm": {
+    "invoked": false,
+    "inputTokens": null,
+    "outputTokens": null,
+    "costUsd": null
+  },
+  "warnings": [
+    {
+      "stage": "batching",
+      "count": 5,
+      "messages": [
+        "Warning: compute-batches: community size 46 > max 35 — splitting via alphabetical chunking — modularity may decrease",
+        "Warning: compute-batches: community size 61 > max 35 — splitting via alphabetical chunking — modularity may decrease",
+        "Warning: compute-batches: community size 52 > max 35 — splitting via alphabetical chunking — modularity may decrease",
+        "Warning: compute-batches: neighborMap for understand-anything-plugin/packages/core/src/languages/types.ts has high 1-hop degree 59 — exceeds soft cap of 50 — keeping top 31 cross-batch entries (0 dropped by degree sort)",
+        "Warning: compute-batches: neighborMap for understand-anything-plugin/packages/core/src/types.ts has high 1-hop degree 58 — exceeds soft cap of 50 — keeping top 38 cross-batch entries (0 dropped by degree sort)"
+      ],
+      "truncated": false
+    }
+  ],
+  "secondaryErrors": [],
+  "error": null
+}
