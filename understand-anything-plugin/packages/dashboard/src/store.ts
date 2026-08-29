@@ -121,6 +121,11 @@ interface DashboardStore {
   codeViewerNodeId: string | null;
   codeViewerExpanded: boolean;
 
+  // File explanations are pre-generated and persisted in the graph. This
+  // state only remembers whether the reader has opened one in this dashboard.
+  explanationExpandedNodeIds: Set<string>;
+  toggleExplanation: (nodeId: string) => void;
+
   tourActive: boolean;
   currentTourStep: number;
   tourHighlightedNodeIds: string[];
@@ -238,6 +243,9 @@ interface DashboardStore {
   layoutIssues: GraphIssue[];
   appendLayoutIssues: (issues: GraphIssue[]) => void;
   clearLayoutIssues: () => void;
+
+  // Track 3 — Graph UI/UX actions (ui prefix per convention)
+  uiResetGraphView: () => void;
 }
 
 function getSortedTour(graph: KnowledgeGraph): TourStep[] {
@@ -303,6 +311,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
+  explanationExpandedNodeIds: new Set<string>(),
 
   tourActive: false,
   currentTourStep: 0,
@@ -493,6 +502,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       codeViewerOpen: false,
       codeViewerNodeId: null,
       codeViewerExpanded: false,
+      explanationExpandedNodeIds: new Set<string>(),
       // Container ids derive from folder names and collide across layers
       // (e.g. `container:auth` exists in many layers). Drop the cache so
       // we don't render stale positions for the new layer's children.
@@ -560,6 +570,14 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false }),
   expandCodeViewer: () => set({ codeViewerExpanded: true }),
   collapseCodeViewer: () => set({ codeViewerExpanded: false }),
+
+  toggleExplanation: (nodeId) =>
+    set((state) => {
+      const next = new Set(state.explanationExpandedNodeIds);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return { explanationExpandedNodeIds: next };
+    }),
 
   setDiffOverlay: (changed, affected) =>
     set({
@@ -793,5 +811,17 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       return { layoutIssues: [...state.layoutIssues, ...fresh] };
     }),
   clearLayoutIssues: () => set({ layoutIssues: [] }),
-}));
 
+  uiResetGraphView: () => {
+    set({
+      selectedNodeId: null,
+      focusNodeId: null,
+      searchQuery: "",
+      searchResults: [],
+      containerLayoutCache: new Map(),
+      containerSizeMemory: new Map(),
+      expandedContainers: new Set(),
+      pendingFocusContainer: null,
+    });
+  },
+}));

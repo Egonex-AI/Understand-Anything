@@ -60,6 +60,13 @@ export const ja = {
     entryPoint: "エントリポイント",
     steps: "ステップ",
     implementation: "実装",
+    showExplanation: "解説を見る",
+    hideExplanation: "解説を閉じる",
+    explanation: "ファイル詳細解説",
+    explanationGenerating: "解説を生成しています…",
+    explanationFailed: "解説を生成できませんでした。",
+    noExplanation: "このファイルの解説データはありません。",
+    relatedFiles: "関連ファイル",
   },
   fileExplorer: {
     analyzedFiles: "分析済みファイル",

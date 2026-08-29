@@ -60,6 +60,13 @@ export const ru = {
     entryPoint: "Точка входа",
     steps: "Шаги",
     implementation: "Реализация",
+    showExplanation: "Показать объяснение",
+    hideExplanation: "Скрыть объяснение",
+    explanation: "Описание файла",
+    explanationGenerating: "Создание описания…",
+    explanationFailed: "Не удалось создать описание.",
+    noExplanation: "Для этого файла нет описания.",
+    relatedFiles: "Связанные файлы",
   },
   fileExplorer: {
     analyzedFiles: "Проанализированные файлы",

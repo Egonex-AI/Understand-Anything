@@ -60,6 +60,13 @@ export const zh = {
     entryPoint: "入口点",
     steps: "步骤",
     implementation: "实现",
+    showExplanation: "查看说明",
+    hideExplanation: "关闭说明",
+    explanation: "文件详细说明",
+    explanationGenerating: "正在生成说明…",
+    explanationFailed: "无法生成说明。",
+    noExplanation: "此文件没有可用说明。",
+    relatedFiles: "相关文件",
   },
   fileExplorer: {
     analyzedFiles: "已分析文件",

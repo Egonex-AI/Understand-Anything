@@ -60,6 +60,13 @@ export const ko = {
     entryPoint: "진입점",
     steps: "단계",
     implementation: "구현",
+    showExplanation: "설명 보기",
+    hideExplanation: "설명 닫기",
+    explanation: "파일 상세 설명",
+    explanationGenerating: "설명을 생성하는 중…",
+    explanationFailed: "설명을 생성할 수 없습니다.",
+    noExplanation: "이 파일에 사용할 수 있는 설명이 없습니다.",
+    relatedFiles: "관련 파일",
   },
   fileExplorer: {
     analyzedFiles: "분석된 파일",

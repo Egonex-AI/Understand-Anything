@@ -60,6 +60,13 @@ export const zhTW = {
     entryPoint: "入口點",
     steps: "步驟",
     implementation: "實作",
+    showExplanation: "查看說明",
+    hideExplanation: "關閉說明",
+    explanation: "檔案詳細說明",
+    explanationGenerating: "正在產生說明…",
+    explanationFailed: "無法產生說明。",
+    noExplanation: "此檔案沒有可用說明。",
+    relatedFiles: "相關檔案",
   },
   fileExplorer: {
     analyzedFiles: "已分析檔案",

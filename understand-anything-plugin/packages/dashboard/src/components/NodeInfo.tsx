@@ -1,4 +1,6 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
@@ -59,6 +61,73 @@ function FigmaThumbnail({ node }: { node: GraphNode }) {
     <div className="mb-3 rounded-lg overflow-hidden border border-border-subtle bg-elevated">
       <img src={url} alt={node.name} className="w-full h-auto block" loading="lazy" />
     </div>
+  );
+}
+
+function FileExplanation({ node, graph }: { node: GraphNode; graph: KnowledgeGraph }) {
+  const { t } = useI18n();
+  const navigateToNode = useDashboardStore((s) => s.navigateToNode);
+  const expanded = useDashboardStore((s) => s.explanationExpandedNodeIds.has(node.id));
+  const toggleExplanation = useDashboardStore((s) => s.toggleExplanation);
+
+  if (node.type !== "file") return null;
+
+  const relatedFiles = graph.edges
+    .filter((edge) => edge.source === node.id || edge.target === node.id)
+    .map((edge) => graph.nodes.find((candidate) => candidate.id === (edge.source === node.id ? edge.target : edge.source)))
+    .filter((candidate): candidate is GraphNode => candidate?.type === "file")
+    .filter((candidate, index, candidates) => candidates.findIndex((item) => item.id === candidate.id) === index);
+
+  const status = node.explanationStatus ?? (node.explanation ? "ready" : "unavailable");
+  const message = status === "generating"
+    ? t.nodeInfo.explanationGenerating
+    : status === "failed"
+      ? node.explanationError ?? t.nodeInfo.explanationFailed
+      : t.nodeInfo.noExplanation;
+
+  return (
+    <section className="mb-4 rounded-lg border border-accent/25 bg-accent/5 p-3">
+      <button
+        type="button"
+        onClick={() => toggleExplanation(node.id)}
+        className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold uppercase tracking-wider text-accent hover:text-accent-bright"
+        aria-expanded={expanded}
+      >
+        <span>{t.nodeInfo.explanation}</span>
+        <span className="text-[10px]">{expanded ? t.nodeInfo.hideExplanation : t.nodeInfo.showExplanation}</span>
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          {status === "ready" && node.explanation ? (
+            <div className="prose prose-invert prose-sm max-w-none text-text-secondary prose-headings:text-text-primary prose-headings:font-heading prose-h2:text-sm prose-h3:text-xs prose-p:leading-relaxed prose-li:my-1">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{node.explanation}</ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm text-text-secondary" role="status">{message}</p>
+          )}
+          {relatedFiles.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gold">
+                {t.nodeInfo.relatedFiles} ({relatedFiles.length})
+              </h3>
+              <div className="space-y-1">
+                {relatedFiles.map((related) => (
+                  <button
+                    key={related.id}
+                    type="button"
+                    onClick={() => navigateToNode(related.id)}
+                    className="block w-full truncate rounded bg-elevated px-2 py-1.5 text-left text-[11px] text-text-secondary transition-colors hover:bg-gold/10 hover:text-gold"
+                    title={related.filePath ?? related.name}
+                  >
+                    {related.filePath ?? related.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -455,6 +524,8 @@ export default function NodeInfo() {
           )}
         </div>
       )}
+
+      {activeGraph && <FileExplanation node={node} graph={activeGraph} />}
 
       {node.tags.length > 0 && (
         <div className="mb-4">

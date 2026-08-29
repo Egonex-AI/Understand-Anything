@@ -60,6 +60,13 @@ export const en = {
     entryPoint: "Entry Point",
     steps: "Steps",
     implementation: "Implementation",
+    showExplanation: "Show explanation",
+    hideExplanation: "Hide explanation",
+    explanation: "File explanation",
+    explanationGenerating: "Generating explanation…",
+    explanationFailed: "Explanation could not be generated.",
+    noExplanation: "No explanation is available for this file.",
+    relatedFiles: "Related files",
   },
   fileExplorer: {
     analyzedFiles: "Analyzed Files",
