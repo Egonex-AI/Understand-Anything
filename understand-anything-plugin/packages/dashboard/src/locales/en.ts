@@ -24,6 +24,14 @@ export const en = {
     path: "Path",
     theme: "Theme",
   },
+  graphView: {
+    focused: "Focused",
+    showingNeighborhood: "Showing neighborhood",
+    isolate: "Isolate",
+    isolateTitle: "Show only this node and its direct connections",
+    resetView: "Reset view",
+    resetViewTitle: "Clear selection and fit entire graph to view",
+  },
   projectOverview: {
     nodes: "Nodes",
     edges: "Edges",
@@ -230,6 +238,8 @@ export const en = {
     fuzzy: "Fuzzy",
     semantic: "Semantic",
     result: "result",
+    clear: "Clear search",
+    moreResults: "more results",
   },
   export: {
     label: "Export",

@@ -24,6 +24,14 @@ export const zhTW = {
     path: "路徑",
     theme: "主題",
   },
+  graphView: {
+    focused: "已聚焦",
+    showingNeighborhood: "正在顯示鄰近節點",
+    isolate: "僅看相關",
+    isolateTitle: "僅顯示此節點及其直接連線",
+    resetView: "重設檢視",
+    resetViewTitle: "清除選取並顯示完整圖譜",
+  },
   projectOverview: {
     nodes: "節點",
     edges: "邊",
@@ -230,6 +238,8 @@ export const zhTW = {
     fuzzy: "模糊",
     semantic: "語意",
     result: "結果",
+    clear: "清除搜尋",
+    moreResults: "筆更多結果",
   },
   export: {
     label: "匯出",

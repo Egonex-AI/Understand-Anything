@@ -24,6 +24,14 @@ export const ru = {
     path: "Путь",
     theme: "Тема",
   },
+  graphView: {
+    focused: "В фокусе",
+    showingNeighborhood: "Показаны соседние узлы",
+    isolate: "Изолировать",
+    isolateTitle: "Показать только этот узел и его прямые связи",
+    resetView: "Сбросить вид",
+    resetViewTitle: "Очистить выбор и показать весь граф",
+  },
   projectOverview: {
     nodes: "Узлы",
     edges: "Рёбра",
@@ -230,6 +238,8 @@ export const ru = {
     fuzzy: "Нечёткий",
     semantic: "Семантический",
     result: "результат",
+    clear: "Очистить поиск",
+    moreResults: "дополнительных результатов",
   },
   export: {
     label: "Экспорт",

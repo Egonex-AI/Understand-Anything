@@ -24,6 +24,14 @@ export const ko = {
     path: "경로",
     theme: "테마",
   },
+  graphView: {
+    focused: "포커스 중",
+    showingNeighborhood: "인접 노드 표시 중",
+    isolate: "관련 항목만 보기",
+    isolateTitle: "이 노드와 직접 연결된 노드만 표시",
+    resetView: "보기 재설정",
+    resetViewTitle: "선택을 지우고 전체 그래프 표시",
+  },
   projectOverview: {
     nodes: "노드",
     edges: "엣지",
@@ -230,6 +238,8 @@ export const ko = {
     fuzzy: "퍼지",
     semantic: "시맨틱",
     result: "결과",
+    clear: "검색 지우기",
+    moreResults: "개의 추가 결과",
   },
   export: {
     label: "내보내기",

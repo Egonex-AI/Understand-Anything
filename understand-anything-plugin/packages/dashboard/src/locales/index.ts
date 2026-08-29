@@ -24,12 +24,37 @@ export function getLocale(key: LocaleKey): Locale {
 export function resolveLocaleKey(lang: string | undefined): LocaleKey {
   if (!lang) return "en";
   const normalized = lang.toLowerCase().replace(/[_\s]/g, "-");
-  if (normalized === "zh" || normalized === "chinese" || normalized === "zh-cn") return "zh";
+  if (
+    normalized === "zh" ||
+    normalized === "chinese" ||
+    normalized === "zh-cn" ||
+    normalized.startsWith("zh-cn-")
+  )
+    return "zh";
   if (normalized === "zh-tw" || normalized === "traditional-chinese") return "zh-TW";
-  if (normalized === "ja" || normalized === "japanese") return "ja";
-  if (normalized === "ko" || normalized === "korean") return "ko";
+  if (normalized === "zh-hk" || normalized.startsWith("zh-hk-")) return "zh";
+  if (
+    normalized === "ja" ||
+    normalized === "japanese" ||
+    normalized.startsWith("ja-")
+  )
+    return "ja";
+  if (
+    normalized === "ko" ||
+    normalized === "korean" ||
+    normalized.startsWith("ko-")
+  )
+    return "ko";
   if (normalized === "ru" || normalized === "russian" || normalized === "ru-ru") return "ru";
+  if (normalized.startsWith("ru-")) return "ru";
   return "en";
+}
+
+export function resolvePreferredLocaleKey(
+  configuredLanguage: string | undefined,
+  browserLanguage: string | undefined,
+): LocaleKey {
+  return resolveLocaleKey(configuredLanguage ?? browserLanguage);
 }
 
 export { en, zh, zhTW as "zh-TW", ja, ko, ru };

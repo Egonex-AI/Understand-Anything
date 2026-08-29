@@ -31,6 +31,7 @@ import type {
   NodeType,
 } from "@understand-anything/core/types";
 import { useTheme } from "../themes/index.ts";
+import { useI18n } from "../contexts/I18nContext";
 import {
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -1321,6 +1322,7 @@ function useLayerDetailGraph() {
 // ── Main inner component (must be inside ReactFlowProvider) ────────────
 
 function GraphViewInner() {
+  const { t } = useI18n();
   const graph = useDashboardStore((s) => s.graph);
   const navigationLevel = useDashboardStore((s) => s.navigationLevel);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
@@ -1536,7 +1538,7 @@ function GraphViewInner() {
   if (!graph) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-root rounded-lg">
-        <p className="text-text-muted text-sm">No knowledge graph loaded</p>
+        <p className="text-text-muted text-sm">{t.common.noGraphLoaded}</p>
       </div>
     );
   }
@@ -1554,8 +1556,8 @@ function GraphViewInner() {
             >
               <span>
                 {nodesById.get(focusNodeId)?.name
-                  ? `Focused: ${nodesById.get(focusNodeId)!.name.slice(0, 20)}`
-                  : "Showing neighborhood"}
+                  ? `${t.graphView.focused}: ${nodesById.get(focusNodeId)!.name.slice(0, 20)}`
+                  : t.graphView.showingNeighborhood}
               </span>
               <span className="text-text-muted">&times;</span>
             </button>
@@ -1564,18 +1566,18 @@ function GraphViewInner() {
             <button
               onClick={handleIsolate}
               className="px-3 py-1.5 rounded-full bg-elevated border border-accent/30 text-accent text-xs font-semibold tracking-wider uppercase hover:bg-accent/10 transition-colors shadow-lg"
-              title="Show only this node and its direct connections"
+              title={t.graphView.isolateTitle}
             >
-              Isolate
+              {t.graphView.isolate}
             </button>
           )}
           {(selectedNodeId || focusNodeId) && (
             <button
               onClick={handleResetView}
               className="px-3 py-1.5 rounded-full bg-elevated border border-border-subtle text-text-secondary text-xs font-semibold tracking-wider uppercase hover:bg-surface transition-colors shadow-lg"
-              title="Clear selection and fit entire graph to view"
+              title={t.graphView.resetViewTitle}
             >
-              Reset view
+              {t.graphView.resetView}
             </button>
           )}
         </div>
