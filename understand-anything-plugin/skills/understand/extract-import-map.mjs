@@ -1257,14 +1257,265 @@ function compareScalaPackageMembers(a, b) {
 // ---------------------------------------------------------------------------
 // C# resolver
 //
-// C# `using Foo.Bar;` declarations are typically NAMESPACES, not files, and
-// the C# convention is namespace = directory (loose). Tree-sitter's C#
-// extractor captures these as imports with the dotted source. We probe the
-// dotted path against the .cs index the same way Java/Kotlin do.
+// C# `using Foo.Bar;` declarations are namespaces, not file references.
+// We therefore do not convert namespace imports into file edges. C# file
+// dependencies are produced from declared type evidence collected in the
+// two-pass C# prepass below.
 // ---------------------------------------------------------------------------
 
-export function resolveCSharpImport(rawImport, _file, ctx) {
-  return resolveDottedFqn(rawImport, '.cs', ctx.csIndex);
+export function resolveCSharpImport(_rawImport, _file, _ctx) {
+  return [];
+}
+
+function stripCSharpTypeWrappers(typeName) {
+  let out = String(typeName ?? '').trim();
+  if (!out) return '';
+  out = out.replace(/\?+$/g, '').replace(/\[\]$/g, '').trim();
+  const genericStart = out.indexOf('<');
+  if (genericStart !== -1) out = out.slice(0, genericStart).trim();
+  return out;
+}
+
+function isCSharpBuiltInType(typeName) {
+  return new Set([
+    'bool', 'byte', 'sbyte', 'char', 'decimal', 'double', 'float',
+    'int', 'uint', 'long', 'ulong', 'object', 'short', 'ushort',
+    'string', 'void', 'dynamic',
+  ]).has(typeName);
+}
+
+function buildCSharpTypeIndex(analysesByPath) {
+  const fullNameIndex = new Map();
+  const simpleNameIndex = new Map();
+
+  for (const [filePath, analysis] of analysesByPath.entries()) {
+    for (const cls of analysis?.classes ?? []) {
+      if (!cls?.name || typeof cls.name !== 'string') continue;
+      const namespace = typeof cls.namespace === 'string' ? cls.namespace : '';
+      const fullName = typeof cls.fullName === 'string' && cls.fullName
+        ? cls.fullName
+        : namespace ? `${namespace}.${cls.name}` : cls.name;
+      const decl = {
+        name: cls.name,
+        fullName,
+        namespace,
+        kind: cls.kind,
+        filePath,
+        classInfo: cls,
+      };
+      if (!fullNameIndex.has(fullName)) fullNameIndex.set(fullName, []);
+      fullNameIndex.get(fullName).push(decl);
+      if (!simpleNameIndex.has(cls.name)) simpleNameIndex.set(cls.name, []);
+      simpleNameIndex.get(cls.name).push(decl);
+    }
+  }
+
+  return { fullNameIndex, simpleNameIndex };
+}
+
+function isCSharpProjectPath(path) {
+  return /\.csproj$/i.test(path);
+}
+
+function buildCSharpProjectDirs(files) {
+  return [...new Set(files
+    .map(file => toPosix(String(file?.path ?? '')))
+    .filter(isCSharpProjectPath)
+    .map(dirOf))]
+    .sort(comparePaths);
+}
+
+function pathIsInsideDir(path, dir) {
+  return dir === '' || path === dir || path.startsWith(`${dir}/`);
+}
+
+function csharpProjectKeyForPath(filePath, projectDirs) {
+  if (projectDirs.length <= 1) {
+    return projectDirs[0] ?? '__implicit_csharp_project__';
+  }
+  const matches = projectDirs
+    .filter(dir => pathIsInsideDir(filePath, dir))
+    .sort((a, b) => {
+      const depthDiff = b.split('/').length - a.split('/').length;
+      return depthDiff || comparePaths(a, b);
+    });
+  return matches[0] ?? null;
+}
+
+function collectCSharpGlobalUsingNamespaces(analysesByPath, projectDirs) {
+  const namespacesByProject = new Map();
+  for (const [filePath, analysis] of analysesByPath.entries()) {
+    const projectKey = csharpProjectKeyForPath(filePath, projectDirs);
+    if (projectKey === null) continue;
+    if (!namespacesByProject.has(projectKey)) namespacesByProject.set(projectKey, new Set());
+    const namespaces = namespacesByProject.get(projectKey);
+    for (const imp of analysis?.imports ?? []) {
+      const kind = imp?.kind ?? 'namespace';
+      if (
+        imp?.isGlobal === true &&
+        kind === 'namespace' &&
+        typeof imp.source === 'string' &&
+        imp.source.length > 0
+      ) {
+        namespaces.add(imp.source);
+      }
+    }
+  }
+  return new Map([...namespacesByProject.entries()]
+    .map(([projectKey, namespaces]) => [projectKey, [...namespaces].sort(comparePaths)]));
+}
+
+async function buildCSharpAnalysisContext(projectRoot, files, registry) {
+  const analysesByPath = new Map();
+  const failedPaths = new Set();
+  const projectDirs = buildCSharpProjectDirs(files);
+  const csharpFiles = files
+    .filter(file => file.fileCategory === 'code' && file.language === 'csharp')
+    .map(file => {
+      const key = toPosix(file.path);
+      return { key, absPath: join(projectRoot, key) };
+    });
+
+  const reads = await readFilesParallel(csharpFiles);
+  for (const { key, raw, err } of reads) {
+    if (err) {
+      process.stderr.write(
+        `Warning: extract-import-map: C# prepass failed for ${key} ` +
+        `(read error: ${err.message}) — importMap[${key}]=[]\n`,
+      );
+      failedPaths.add(key);
+      continue;
+    }
+
+    try {
+      const analysis = registry.analyzeFile(key, raw);
+      analysesByPath.set(key, analysis);
+    } catch (err) {
+      process.stderr.write(
+        `Warning: extract-import-map: C# prepass failed for ${key} ` +
+        `(analyze error: ${err.message}) — importMap[${key}]=[]\n`,
+      );
+      failedPaths.add(key);
+    }
+  }
+
+  return {
+    analysesByPath,
+    failedPaths,
+    typeIndex: buildCSharpTypeIndex(analysesByPath),
+    projectDirs,
+    globalUsingNamespacesByProject: collectCSharpGlobalUsingNamespaces(analysesByPath, projectDirs),
+  };
+}
+
+function resolveUniqueCSharpType(typeText, namespace, usingNamespaces, ctx) {
+  const typeName = stripCSharpTypeWrappers(typeText);
+  if (!typeName || isCSharpBuiltInType(typeName)) {
+    return { status: 'unresolved', declaration: null };
+  }
+
+  const candidates = [];
+  if (typeName.includes('.')) {
+    candidates.push(typeName);
+  } else {
+    if (namespace) candidates.push(`${namespace}.${typeName}`);
+    else candidates.push(typeName);
+    for (const usingNamespace of usingNamespaces) {
+      candidates.push(`${usingNamespace}.${typeName}`);
+    }
+  }
+
+  const seenDeclarations = new Set();
+  const matches = [];
+  for (const candidate of candidates) {
+    const declarations = ctx.csharp?.typeIndex.fullNameIndex.get(candidate) ?? [];
+    for (const decl of declarations) {
+      const key = `${decl.fullName}|${decl.filePath}`;
+      if (seenDeclarations.has(key)) continue;
+      seenDeclarations.add(key);
+      matches.push(decl);
+    }
+  }
+
+  if (matches.length === 1) {
+    return { status: 'resolved', declaration: matches[0] };
+  }
+  if (matches.length > 1) {
+    return { status: 'ambiguous', declaration: null };
+  }
+  return { status: 'unresolved', declaration: null };
+}
+
+function findContainingCSharpClass(classes, lineNumber) {
+  const matches = (classes ?? []).filter(cls =>
+    Array.isArray(cls.lineRange) &&
+    cls.lineRange[0] <= lineNumber &&
+    lineNumber <= cls.lineRange[1]);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function csharpUsingAppliesToNamespace(usingEntry, namespace) {
+  const usingNamespace = typeof usingEntry.namespace === 'string'
+    ? usingEntry.namespace
+    : '';
+  if (!usingNamespace) return true;
+  return namespace === usingNamespace || namespace.startsWith(`${usingNamespace}.`);
+}
+
+function csharpUsingNamespacesFor(analysis, namespace, ctx, filePath) {
+  const projectKey = csharpProjectKeyForPath(filePath, ctx.csharp?.projectDirs ?? []);
+  const globalNamespaces = projectKey === null
+    ? []
+    : ctx.csharp?.globalUsingNamespacesByProject.get(projectKey) ?? [];
+  const namespaces = new Set(globalNamespaces);
+  for (const source of (analysis?.imports ?? [])
+    .filter(imp => {
+      const kind = imp?.kind ?? 'namespace';
+      return (
+        imp?.isGlobal !== true &&
+        kind === 'namespace' &&
+        typeof imp.source === 'string' &&
+        imp.source.length > 0 &&
+        csharpUsingAppliesToNamespace(imp, namespace)
+      );
+    })
+    .map(imp => imp.source)) {
+    namespaces.add(source);
+  }
+  return [...namespaces].sort(comparePaths);
+}
+
+function resolveCSharpFileDependencies(file, analysis, ctx) {
+  const resolvedSet = new Set();
+  const sourcePath = toPosix(file.path);
+
+  const resolveReference = (typeText, namespace) => {
+    const usingNamespaces = csharpUsingNamespacesFor(analysis, namespace, ctx, sourcePath);
+    const result = resolveUniqueCSharpType(typeText, namespace, usingNamespaces, ctx);
+    if (
+      result.status === 'resolved' &&
+      result.declaration.filePath !== sourcePath
+    ) {
+      resolvedSet.add(result.declaration.filePath);
+    }
+  };
+
+  for (const cls of analysis?.classes ?? []) {
+    const namespace = typeof cls.namespace === 'string' ? cls.namespace : '';
+    for (const baseType of cls.baseTypes ?? []) resolveReference(baseType, namespace);
+    for (const param of cls.primaryConstructorParams ?? []) resolveReference(param.type, namespace);
+    for (const field of cls.fields ?? []) resolveReference(field.type, namespace);
+  }
+
+  for (const fn of analysis?.functions ?? []) {
+    const containingClass = findContainingCSharpClass(analysis.classes, fn.lineRange?.[0] ?? 0);
+    const namespace = typeof containingClass?.namespace === 'string'
+      ? containingClass.namespace
+      : '';
+    for (const param of fn.typedParams ?? []) resolveReference(param.type, namespace);
+  }
+
+  return [...resolvedSet].sort(comparePaths);
 }
 
 // ---------------------------------------------------------------------------
@@ -1843,6 +2094,17 @@ async function main() {
   // tsconfig/go.mod/composer.json files inside is parallelised — see
   // `buildResolutionContext`.
   const ctx = await buildResolutionContext(projectRoot, files);
+  if (treeSitterReady) {
+    ctx.csharp = await buildCSharpAnalysisContext(projectRoot, files, registry);
+  } else {
+    ctx.csharp = {
+      analysesByPath: new Map(),
+      failedPaths: new Set(),
+      typeIndex: { fullNameIndex: new Map(), simpleNameIndex: new Map() },
+      projectDirs: buildCSharpProjectDirs(files),
+      globalUsingNamespacesByProject: new Map(),
+    };
+  }
 
   const importMap = {};
   let filesWithImports = 0;
@@ -1862,6 +2124,25 @@ async function main() {
     // already emitted at startup.
     if (!treeSitterReady) {
       importMap[path] = [];
+      continue;
+    }
+
+    if (file.language === 'csharp') {
+      if (ctx.csharp.failedPaths.has(path)) {
+        importMap[path] = [];
+        continue;
+      }
+      const analysis = ctx.csharp.analysesByPath.get(path);
+      if (!analysis) {
+        importMap[path] = [];
+        continue;
+      }
+      const resolved = resolveCSharpFileDependencies(file, analysis, ctx);
+      importMap[path] = resolved;
+      if (resolved.length > 0) {
+        filesWithImports += 1;
+        totalEdges += resolved.length;
+      }
       continue;
     }
 
@@ -1938,13 +2219,15 @@ async function main() {
     }
   }
 
+  const stats = {
+    filesScanned: files.length,
+    filesWithImports,
+    totalEdges,
+  };
+
   const output = {
     scriptCompleted: true,
-    stats: {
-      filesScanned: files.length,
-      filesWithImports,
-      totalEdges,
-    },
+    stats,
     importMap,
   };
 

@@ -1058,6 +1058,505 @@ def recover_imports_from_scan(
     return recovered, lines
 
 
+# ── Deterministic C# linker from extraction artifacts ─────────────────────
+
+_CS_BUILTIN_TYPES = {
+    "bool", "byte", "sbyte", "char", "decimal", "double", "float",
+    "int", "uint", "long", "ulong", "object", "short", "ushort",
+    "string", "void", "dynamic",
+}
+
+_CS_MEMBER_CALL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$")
+_CS_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _cs_line_range(entry: dict[str, Any]) -> tuple[int, int] | None:
+    start = entry.get("startLine")
+    end = entry.get("endLine")
+    if isinstance(start, int) and isinstance(end, int):
+        return start, end
+    rng = entry.get("lineRange")
+    if (
+        isinstance(rng, list)
+        and len(rng) == 2
+        and isinstance(rng[0], int)
+        and isinstance(rng[1], int)
+    ):
+        return rng[0], rng[1]
+    return None
+
+
+def _cs_strip_type(type_text: Any) -> str:
+    out = str(type_text or "").strip()
+    while out.endswith("?"):
+        out = out[:-1].strip()
+    while out.endswith("[]"):
+        out = out[:-2].strip()
+    generic_start = out.find("<")
+    if generic_start != -1:
+        out = out[:generic_start].strip()
+    return out
+
+
+def _cs_dir_of(path: str) -> str:
+    return path.rsplit("/", 1)[0] if "/" in path else ""
+
+
+def _cs_is_project_path(path: str) -> bool:
+    return path.lower().endswith(".csproj")
+
+
+def _cs_project_dirs(paths: list[str]) -> list[str]:
+    return sorted({_cs_dir_of(path) for path in paths if _cs_is_project_path(path)})
+
+
+def _cs_path_inside_dir(path: str, directory: str) -> bool:
+    return directory == "" or path == directory or path.startswith(f"{directory}/")
+
+
+def _cs_project_key_for_path(file_path: str, project_dirs: list[str]) -> str | None:
+    if len(project_dirs) <= 1:
+        return project_dirs[0] if project_dirs else "__implicit_csharp_project__"
+    matches = [
+        directory
+        for directory in project_dirs
+        if _cs_path_inside_dir(file_path, directory)
+    ]
+    if not matches:
+        return None
+    return sorted(matches, key=lambda directory: (-len(directory.split("/")), directory))[0]
+
+
+def _cs_project_paths_from_assembled(assembled: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    for node in assembled.get("nodes", []):
+        if not isinstance(node, dict):
+            continue
+        path = node.get("filePath")
+        if not isinstance(path, str) or not path:
+            node_id = node.get("id")
+            if isinstance(node_id, str) and node_id.startswith("file:"):
+                path = node_id[len("file:"):]
+        if isinstance(path, str) and _cs_is_project_path(path):
+            paths.append(path)
+    return paths
+
+
+def _load_csharp_extract_results(tmp_dir: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    if not tmp_dir.is_dir():
+        return [], []
+
+    results: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for path in sorted(tmp_dir.glob("ua-file-extract-results-*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            warnings.append(f"  Skipped {path.name}: {e}")
+            continue
+        entries = data.get("results")
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("language") == "csharp":
+                results.append(entry)
+    return results, warnings
+
+
+def _cs_build_indexes(
+    results: list[dict[str, Any]],
+    project_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    files: dict[str, dict[str, Any]] = {}
+    full_name_index: dict[str, list[dict[str, Any]]] = {}
+    project_dirs = _cs_project_dirs(
+        [result.get("path", "") for result in results if isinstance(result.get("path"), str)]
+        + (project_paths or [])
+    )
+
+    for result in results:
+        file_path = result.get("path")
+        if not isinstance(file_path, str) or not file_path:
+            continue
+        imports = []
+        for imp in result.get("imports", []):
+            if not isinstance(imp, dict) or not isinstance(imp.get("source"), str):
+                continue
+            imports.append({
+                "source": imp.get("source"),
+                "kind": imp.get("kind", "namespace"),
+                "namespace": imp.get("namespace", ""),
+                "isGlobal": imp.get("isGlobal") is True,
+            })
+        file_info = {
+            "path": file_path,
+            "imports": imports,
+            "classes": [],
+            "functions": [],
+            "functionNameCounts": Counter(),
+            "callGraph": result.get("callGraph", [])
+            if isinstance(result.get("callGraph"), list)
+            else [],
+        }
+        files[file_path] = file_info
+
+        for raw_fn in result.get("functions", []) or []:
+            if not isinstance(raw_fn, dict):
+                continue
+            rng = _cs_line_range(raw_fn)
+            if rng is None or not isinstance(raw_fn.get("name"), str):
+                continue
+            fn = dict(raw_fn)
+            fn["lineRange"] = rng
+            file_info["functions"].append(fn)
+            file_info["functionNameCounts"][fn["name"]] += 1
+
+        for raw_cls in result.get("classes", []) or []:
+            if not isinstance(raw_cls, dict):
+                continue
+            rng = _cs_line_range(raw_cls)
+            name = raw_cls.get("name")
+            if rng is None or not isinstance(name, str):
+                continue
+            namespace = raw_cls.get("namespace") if isinstance(raw_cls.get("namespace"), str) else ""
+            full_name = raw_cls.get("fullName") if isinstance(raw_cls.get("fullName"), str) else ""
+            if not full_name:
+                full_name = f"{namespace}.{name}" if namespace else name
+            cls = dict(raw_cls)
+            cls["lineRange"] = rng
+            cls["namespace"] = namespace
+            cls["fullName"] = full_name
+            cls["filePath"] = file_path
+            file_info["classes"].append(cls)
+            full_name_index.setdefault(full_name, []).append(cls)
+
+    global_using_namespaces_by_project: dict[str, list[str]] = {}
+    global_using_namespace_sets: dict[str, set[str]] = {}
+    for file_info in files.values():
+        project_key = _cs_project_key_for_path(file_info["path"], project_dirs)
+        if project_key is None:
+            continue
+        namespace_set = global_using_namespace_sets.setdefault(project_key, set())
+        for imp in file_info["imports"]:
+            if (
+                imp.get("isGlobal") is True
+                and imp.get("kind", "namespace") == "namespace"
+                and isinstance(imp.get("source"), str)
+                and imp.get("source")
+            ):
+                namespace_set.add(imp["source"])
+    for project_key, namespaces in global_using_namespace_sets.items():
+        global_using_namespaces_by_project[project_key] = sorted(namespaces)
+
+    return {
+        "files": files,
+        "fullNameIndex": full_name_index,
+        "projectDirs": project_dirs,
+        "globalUsingNamespacesByProject": global_using_namespaces_by_project,
+    }
+
+
+def _cs_resolve_type(
+    type_text: Any,
+    namespace: str,
+    using_namespaces: list[str],
+    indexes: dict[str, Any],
+) -> tuple[str, dict[str, Any] | None]:
+    type_name = _cs_strip_type(type_text)
+    if not type_name or type_name in _CS_BUILTIN_TYPES:
+        return "unresolved", None
+
+    candidates: list[str]
+    if "." in type_name:
+        candidates = [type_name]
+    else:
+        candidates = [f"{namespace}.{type_name}" if namespace else type_name]
+        candidates.extend(f"{using_namespace}.{type_name}" for using_namespace in using_namespaces)
+
+    matches: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for candidate in candidates:
+        for decl in indexes["fullNameIndex"].get(candidate, []):
+            key = (decl.get("fullName", ""), decl.get("filePath", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            matches.append(decl)
+
+    if len(matches) == 1:
+        return "resolved", matches[0]
+    if len(matches) > 1:
+        return "ambiguous", None
+    return "unresolved", None
+
+
+def _cs_containing_class(classes: list[dict[str, Any]], line_number: int) -> dict[str, Any] | None:
+    matches = [
+        cls for cls in classes
+        if cls["lineRange"][0] <= line_number <= cls["lineRange"][1]
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _cs_containing_function(functions: list[dict[str, Any]], line_number: int) -> dict[str, Any] | None:
+    matches = [
+        fn for fn in functions
+        if fn["lineRange"][0] <= line_number <= fn["lineRange"][1]
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _cs_using_applies_to_namespace(using_entry: dict[str, Any], namespace: str) -> bool:
+    using_namespace = using_entry.get("namespace") if isinstance(using_entry.get("namespace"), str) else ""
+    if not using_namespace:
+        return True
+    return namespace == using_namespace or namespace.startswith(f"{using_namespace}.")
+
+
+def _cs_using_namespaces_for(
+    file_info: dict[str, Any],
+    namespace: str,
+    indexes: dict[str, Any],
+) -> list[str]:
+    project_key = _cs_project_key_for_path(file_info["path"], indexes.get("projectDirs", []))
+    global_namespaces = (
+        indexes.get("globalUsingNamespacesByProject", {}).get(project_key, [])
+        if project_key is not None
+        else []
+    )
+    namespaces: set[str] = set(global_namespaces)
+    for imp in file_info.get("imports", []):
+        if not isinstance(imp, dict):
+            continue
+        if imp.get("isGlobal") is True:
+            continue
+        if imp.get("kind", "namespace") != "namespace":
+            continue
+        source = imp.get("source")
+        if not isinstance(source, str) or not source:
+            continue
+        if not _cs_using_applies_to_namespace(imp, namespace):
+            continue
+        namespaces.add(source)
+    return sorted(namespaces)
+
+
+def _cs_target_method_function(
+    target_class: dict[str, Any],
+    method_name: str,
+    indexes: dict[str, Any],
+    node_ids: set[str],
+) -> str | None:
+    file_path = target_class.get("filePath", "")
+    file_info = indexes["files"].get(file_path)
+    if file_info is None:
+        return None
+
+    matches = [
+        fn for fn in file_info["functions"]
+        if fn.get("name") == method_name
+        and target_class["lineRange"][0] <= fn["lineRange"][0] <= target_class["lineRange"][1]
+    ]
+    if len(matches) != 1:
+        return None
+    if file_info["functionNameCounts"].get(method_name, 0) != 1:
+        return None
+
+    target_id = f"function:{file_path}:{method_name}"
+    return target_id if target_id in node_ids else None
+
+
+def _cs_add_edge(
+    edges: list[dict[str, Any]],
+    existing: set[tuple[str, str, str]],
+    source: str,
+    target: str,
+    edge_type: str,
+    weight: float,
+) -> bool:
+    if source == target:
+        return False
+    key = (source, target, edge_type)
+    if key in existing:
+        return False
+    edges.append({
+        "source": source,
+        "target": target,
+        "type": edge_type,
+        "direction": "forward",
+        "weight": weight,
+        "deterministic": True,
+    })
+    existing.add(key)
+    return True
+
+
+def link_csharp_deterministic_edges(
+    assembled: dict[str, Any],
+    tmp_dir: Path,
+) -> tuple[dict[str, int], list[str]]:
+    """Add deterministic C# calls/implements/inherits edges from extraction output."""
+    results, warnings = _load_csharp_extract_results(tmp_dir)
+    stats = {
+        "filesScanned": len(results),
+        "identifierMemberCalls": 0,
+        "receiverTypesFound": 0,
+        "receiverTypesResolved": 0,
+        "targetMethodsResolved": 0,
+        "callsAdded": 0,
+        "callsSkipped": 0,
+        "baseTypesScanned": 0,
+        "inheritanceAdded": 0,
+        "inheritanceSkipped": 0,
+    }
+    if not results:
+        return stats, warnings
+
+    indexes = _cs_build_indexes(results, _cs_project_paths_from_assembled(assembled))
+    node_ids = {
+        node.get("id")
+        for node in assembled.get("nodes", [])
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
+    existing_edges = {
+        (edge.get("source", ""), edge.get("target", ""), edge.get("type", ""))
+        for edge in assembled.get("edges", [])
+        if isinstance(edge, dict)
+    }
+
+    for file_info in indexes["files"].values():
+        for cls in file_info["classes"]:
+            source_id = f"class:{file_info['path']}:{cls.get('name', '')}"
+            if source_id not in node_ids:
+                continue
+            source_kind = cls.get("kind")
+            using_namespaces = _cs_using_namespaces_for(file_info, cls.get("namespace", ""), indexes)
+            for base_type in cls.get("baseTypes", []) or []:
+                stats["baseTypesScanned"] += 1
+                status, target = _cs_resolve_type(
+                    base_type,
+                    cls.get("namespace", ""),
+                    using_namespaces,
+                    indexes,
+                )
+                if status != "resolved" or target is None:
+                    stats["inheritanceSkipped"] += 1
+                    continue
+                target_id = f"class:{target.get('filePath', '')}:{target.get('name', '')}"
+                if target_id not in node_ids:
+                    stats["inheritanceSkipped"] += 1
+                    continue
+                target_kind = target.get("kind")
+                if target_kind == "interface" and source_kind in {"class", "record", "struct"}:
+                    edge_type = "implements"
+                elif source_kind in {"class", "record"} and target_kind in {"class", "record"}:
+                    edge_type = "inherits"
+                elif source_kind == "interface" and target_kind == "interface":
+                    edge_type = "inherits"
+                else:
+                    stats["inheritanceSkipped"] += 1
+                    continue
+                if _cs_add_edge(assembled["edges"], existing_edges, source_id, target_id, edge_type, 0.8):
+                    stats["inheritanceAdded"] += 1
+
+        for call in file_info["callGraph"]:
+            if not isinstance(call, dict):
+                continue
+            callee = call.get("callee")
+            line_number = call.get("lineNumber")
+            if not isinstance(callee, str) or not isinstance(line_number, int):
+                continue
+
+            caller_fn = _cs_containing_function(file_info["functions"], line_number)
+            caller_cls = _cs_containing_class(file_info["classes"], line_number)
+            if caller_fn is None or caller_cls is None:
+                stats["callsSkipped"] += 1
+                continue
+            caller_id = f"function:{file_info['path']}:{caller_fn.get('name', '')}"
+            if (
+                caller_id not in node_ids
+                or file_info["functionNameCounts"].get(caller_fn.get("name", ""), 0) != 1
+            ):
+                stats["callsSkipped"] += 1
+                continue
+            using_namespaces = _cs_using_namespaces_for(file_info, caller_cls.get("namespace", ""), indexes)
+
+            member_match = _CS_MEMBER_CALL_RE.match(callee)
+            if member_match:
+                stats["identifierMemberCalls"] += 1
+                receiver, method_name = member_match.groups()
+                receiver_type = None
+                for param in caller_fn.get("typedParams", []) or []:
+                    if isinstance(param, dict) and param.get("name") == receiver:
+                        receiver_type = param.get("type")
+                        break
+                if receiver_type is None:
+                    for param in caller_cls.get("primaryConstructorParams", []) or []:
+                        if isinstance(param, dict) and param.get("name") == receiver:
+                            receiver_type = param.get("type")
+                            break
+                if receiver_type is None:
+                    for field in caller_cls.get("fields", []) or []:
+                        if isinstance(field, dict) and field.get("name") == receiver:
+                            receiver_type = field.get("type")
+                            break
+                if receiver_type is None:
+                    stats["callsSkipped"] += 1
+                    continue
+
+                stats["receiverTypesFound"] += 1
+                status, target_class = _cs_resolve_type(
+                    receiver_type,
+                    caller_cls.get("namespace", ""),
+                    using_namespaces,
+                    indexes,
+                )
+                if status != "resolved" or target_class is None:
+                    stats["callsSkipped"] += 1
+                    continue
+                stats["receiverTypesResolved"] += 1
+                target_id = _cs_target_method_function(target_class, method_name, indexes, node_ids)
+                if target_id is None:
+                    stats["callsSkipped"] += 1
+                    continue
+                stats["targetMethodsResolved"] += 1
+                if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
+                    stats["callsAdded"] += 1
+                continue
+
+            if _CS_IDENTIFIER_RE.match(callee):
+                containing_methods = [
+                    fn for fn in file_info["functions"]
+                    if fn.get("name") == callee
+                    and caller_cls["lineRange"][0] <= fn["lineRange"][0] <= caller_cls["lineRange"][1]
+                ]
+                target_id = f"function:{file_info['path']}:{callee}"
+                if (
+                    len(containing_methods) == 1
+                    and target_id in node_ids
+                    and file_info["functionNameCounts"].get(callee, 0) == 1
+                ):
+                    if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
+                        stats["callsAdded"] += 1
+                else:
+                    stats["callsSkipped"] += 1
+                continue
+
+            stats["callsSkipped"] += 1
+
+    lines = [
+        f"  C# files scanned: {stats['filesScanned']}",
+        f"  identifier.Method calls: {stats['identifierMemberCalls']}",
+        f"  receiver types found: {stats['receiverTypesFound']}",
+        f"  receiver types uniquely resolved: {stats['receiverTypesResolved']}",
+        f"  target methods uniquely resolved: {stats['targetMethodsResolved']}",
+        f"  calls added: {stats['callsAdded']}",
+        f"  base types scanned: {stats['baseTypesScanned']}",
+        f"  implements/inherits added: {stats['inheritanceAdded']}",
+    ]
+    return stats, warnings + lines
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1230,6 +1729,14 @@ def main() -> None:
         report.append("")
         report.append("Imports edge recovery:")
         report.extend(recovery_report)
+
+    csharp_stats, csharp_report = link_csharp_deterministic_edges(
+        assembled, resolve_ua_dir(project_root) / "tmp"
+    )
+    if csharp_report:
+        report.append("")
+        report.append("C# deterministic linker:")
+        report.extend(csharp_report)
 
     # Print report
     print("", file=sys.stderr)

@@ -40,6 +40,13 @@ function isLineRange(value) {
     value.every(isFiniteInteger);
 }
 
+function isTypedNameArray(value) {
+  return Array.isArray(value) && value.every(entry =>
+    isPlainObject(entry) &&
+    typeof entry.name === 'string' &&
+    typeof entry.type === 'string');
+}
+
 function hasValidOptionalField(value, field, validator) {
   return value[field] === undefined || validator(value[field]);
 }
@@ -54,16 +61,29 @@ const STRUCTURE_ENTRY_VALIDATORS = {
     typeof entry.name === 'string' &&
     isLineRange(entry.lineRange) &&
     isStringArray(entry.params) &&
-    hasValidOptionalField(entry, 'returnType', value => typeof value === 'string'),
+    hasValidOptionalField(entry, 'returnType', value => typeof value === 'string') &&
+    hasValidOptionalField(entry, 'typedParams', isTypedNameArray),
   classes: entry =>
     typeof entry.name === 'string' &&
     isLineRange(entry.lineRange) &&
     isStringArray(entry.methods) &&
-    isStringArray(entry.properties),
+    isStringArray(entry.properties) &&
+    hasValidOptionalField(entry, 'kind', value =>
+      ['class', 'interface', 'struct', 'record'].includes(value)) &&
+    hasValidOptionalField(entry, 'namespace', value => typeof value === 'string') &&
+    hasValidOptionalField(entry, 'fullName', value => typeof value === 'string') &&
+    hasValidOptionalField(entry, 'baseTypes', isStringArray) &&
+    hasValidOptionalField(entry, 'primaryConstructorParams', isTypedNameArray) &&
+    hasValidOptionalField(entry, 'fields', isTypedNameArray),
   imports: entry =>
     typeof entry.source === 'string' &&
     isStringArray(entry.specifiers) &&
-    isFiniteInteger(entry.lineNumber),
+    isFiniteInteger(entry.lineNumber) &&
+    hasValidOptionalField(entry, 'kind', value =>
+      ['namespace', 'alias', 'static'].includes(value)) &&
+    hasValidOptionalField(entry, 'alias', value => typeof value === 'string') &&
+    hasValidOptionalField(entry, 'isGlobal', value => typeof value === 'boolean') &&
+    hasValidOptionalField(entry, 'namespace', value => typeof value === 'string'),
   exports: entry =>
     typeof entry.name === 'string' &&
     isFiniteInteger(entry.lineNumber) &&
@@ -233,6 +253,8 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       startLine: fn.lineRange[0],
       endLine: fn.lineRange[1],
       params: fn.params || [],
+      ...(fn.returnType ? { returnType: fn.returnType } : {}),
+      ...(fn.typedParams ? { typedParams: fn.typedParams } : {}),
     }));
   }
 
@@ -243,6 +265,12 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       endLine: cls.lineRange[1],
       methods: cls.methods || [],
       properties: cls.properties || [],
+      ...(cls.kind ? { kind: cls.kind } : {}),
+      ...(cls.namespace ? { namespace: cls.namespace } : {}),
+      ...(cls.fullName ? { fullName: cls.fullName } : {}),
+      ...(cls.baseTypes ? { baseTypes: cls.baseTypes } : {}),
+      ...(cls.primaryConstructorParams ? { primaryConstructorParams: cls.primaryConstructorParams } : {}),
+      ...(cls.fields ? { fields: cls.fields } : {}),
     }));
   }
 
@@ -251,6 +279,18 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       name: exp.name,
       line: exp.lineNumber,
       isDefault: exp.isDefault === true,
+    }));
+  }
+
+  if (file.language === 'csharp' && analysis.imports && analysis.imports.length > 0) {
+    base.imports = analysis.imports.map(imp => ({
+      source: imp.source,
+      specifiers: imp.specifiers || [],
+      line: imp.lineNumber,
+      ...(imp.kind ? { kind: imp.kind } : {}),
+      ...(imp.alias ? { alias: imp.alias } : {}),
+      ...(imp.isGlobal ? { isGlobal: imp.isGlobal } : {}),
+      ...(imp.namespace ? { namespace: imp.namespace } : {}),
     }));
   }
 

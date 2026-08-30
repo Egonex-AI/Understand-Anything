@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,34 @@ def _file_node(path: str, **extra: Any) -> dict[str, Any]:
         "id": f"file:{path}",
         "type": "file",
         "name": path.rsplit("/", 1)[-1],
+        "filePath": path,
+        "summary": "",
+        "tags": [],
+        "complexity": "simple",
+    }
+    node.update(extra)
+    return node
+
+
+def _class_node(path: str, name: str, **extra: Any) -> dict[str, Any]:
+    node: dict[str, Any] = {
+        "id": f"class:{path}:{name}",
+        "type": "class",
+        "name": name,
+        "filePath": path,
+        "summary": "",
+        "tags": [],
+        "complexity": "simple",
+    }
+    node.update(extra)
+    return node
+
+
+def _function_node(path: str, name: str, **extra: Any) -> dict[str, Any]:
+    node: dict[str, Any] = {
+        "id": f"function:{path}:{name}",
+        "type": "function",
+        "name": name,
         "filePath": path,
         "summary": "",
         "tags": [],
@@ -1411,6 +1440,704 @@ class TestUaDirResolution(unittest.TestCase):
             (self.tmp / ".understand-anything" / "intermediate" / "assembled-graph.json").is_file()
         )
         self.assertFalse((self.tmp / ".ua" / "intermediate" / "assembled-graph.json").exists())
+
+
+class CSharpDeterministicLinkerTests(unittest.TestCase):
+    """Deterministic C# calls and inheritance from extraction artifacts."""
+
+    def _link(self, assembled: dict[str, Any], results: list[dict[str, Any]]) -> dict[str, int]:
+        with tempfile.TemporaryDirectory(prefix="ua-csharp-link-") as tmp:
+            tmp_dir = Path(tmp)
+            (tmp_dir / "ua-file-extract-results-1.json").write_text(
+                mbg.json.dumps({"scriptCompleted": True, "results": results}),
+                encoding="utf-8",
+            )
+            stats, _report = mbg.link_csharp_deterministic_edges(assembled, tmp_dir)
+            return stats
+
+    def test_no_csharp_results_do_not_emit_report_noise(self) -> None:
+        assembled = {"nodes": [_file_node("src/index.ts")], "edges": []}
+        with tempfile.TemporaryDirectory(prefix="ua-csharp-link-empty-") as tmp:
+            stats, report = mbg.link_csharp_deterministic_edges(
+                assembled,
+                Path(tmp) / "missing-tmp",
+            )
+
+        self.assertEqual(stats["filesScanned"], 0)
+        self.assertEqual(report, [])
+        self.assertEqual(assembled["edges"], [])
+
+    def test_primary_constructor_receiver_call_and_implements(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Controllers/FooController.cs"),
+                _class_node("Controllers/FooController.cs", "FooController"),
+                _function_node("Controllers/FooController.cs", "Get"),
+                _file_node("Services/IFooService.cs"),
+                _class_node("Services/IFooService.cs", "IFooService"),
+                _function_node("Services/IFooService.cs", "GetAsync"),
+                _file_node("Services/FooService.cs"),
+                _class_node("Services/FooService.cs", "FooService"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Controllers/FooController.cs",
+                "language": "csharp",
+                "imports": [{"source": "App.Services", "line": 1, "specifiers": ["Services"]}],
+                "classes": [{
+                    "name": "FooController",
+                    "startLine": 3,
+                    "endLine": 8,
+                    "kind": "class",
+                    "namespace": "App.Controllers",
+                    "fullName": "App.Controllers.FooController",
+                    "methods": ["Get"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "fooService", "type": "IFooService"}],
+                }],
+                "functions": [{
+                    "name": "Get",
+                    "startLine": 5,
+                    "endLine": 7,
+                    "params": [],
+                    "typedParams": [],
+                }],
+                "callGraph": [{"caller": "Get", "callee": "fooService.GetAsync", "lineNumber": 6}],
+            },
+            {
+                "path": "Services/IFooService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IFooService",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "interface",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.IFooService",
+                    "methods": ["GetAsync"],
+                    "properties": [],
+                }],
+                "functions": [{
+                    "name": "GetAsync",
+                    "startLine": 3,
+                    "endLine": 3,
+                    "params": [],
+                    "typedParams": [],
+                }],
+                "callGraph": [],
+            },
+            {
+                "path": "Services/FooService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "FooService",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.FooService",
+                    "methods": [],
+                    "properties": [],
+                    "baseTypes": ["IFooService"],
+                }],
+                "functions": [],
+                "callGraph": [],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 1)
+        self.assertEqual(stats["inheritanceAdded"], 1)
+        self.assertIn({
+            "source": "function:Controllers/FooController.cs:Get",
+            "target": "function:Services/IFooService.cs:GetAsync",
+            "type": "calls",
+            "direction": "forward",
+            "weight": 0.8,
+            "deterministic": True,
+        }, assembled["edges"])
+        self.assertIn({
+            "source": "class:Services/FooService.cs:FooService",
+            "target": "class:Services/IFooService.cs:IFooService",
+            "type": "implements",
+            "direction": "forward",
+            "weight": 0.8,
+            "deterministic": True,
+        }, assembled["edges"])
+
+    def test_same_file_call_and_method_parameter_receiver_call(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Services/FooService.cs"),
+                _class_node("Services/FooService.cs", "FooService"),
+                _function_node("Services/FooService.cs", "Run"),
+                _function_node("Services/FooService.cs", "Validate"),
+                _file_node("Repositories/IRepository.cs"),
+                _class_node("Repositories/IRepository.cs", "IRepository"),
+                _function_node("Repositories/IRepository.cs", "Save"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Services/FooService.cs",
+                "language": "csharp",
+                "imports": [{"source": "App.Repositories", "line": 1, "specifiers": ["Repositories"]}],
+                "classes": [{
+                    "name": "FooService",
+                    "startLine": 3,
+                    "endLine": 12,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.FooService",
+                    "methods": ["Run", "Validate"],
+                    "properties": [],
+                }],
+                "functions": [
+                    {
+                        "name": "Run",
+                        "startLine": 5,
+                        "endLine": 8,
+                        "params": ["repository"],
+                        "typedParams": [{"name": "repository", "type": "IRepository"}],
+                    },
+                    {"name": "Validate", "startLine": 10, "endLine": 10, "params": [], "typedParams": []},
+                ],
+                "callGraph": [
+                    {"caller": "Run", "callee": "Validate", "lineNumber": 6},
+                    {"caller": "Run", "callee": "repository.Save", "lineNumber": 7},
+                ],
+            },
+            {
+                "path": "Repositories/IRepository.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IRepository",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "interface",
+                    "namespace": "App.Repositories",
+                    "fullName": "App.Repositories.IRepository",
+                    "methods": ["Save"],
+                    "properties": [],
+                }],
+                "functions": [{"name": "Save", "startLine": 3, "endLine": 3, "params": [], "typedParams": []}],
+                "callGraph": [],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 2)
+        edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        self.assertIn((
+            "function:Services/FooService.cs:Run",
+            "function:Services/FooService.cs:Validate",
+            "calls",
+        ), edge_pairs)
+        self.assertIn((
+            "function:Services/FooService.cs:Run",
+            "function:Repositories/IRepository.cs:Save",
+            "calls",
+        ), edge_pairs)
+
+    def test_inherits_class_and_interface_base_types(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("BaseService.cs"),
+                _class_node("BaseService.cs", "BaseService"),
+                _file_node("Service.cs"),
+                _class_node("Service.cs", "Service"),
+                _file_node("IBase.cs"),
+                _class_node("IBase.cs", "IBase"),
+                _file_node("IService.cs"),
+                _class_node("IService.cs", "IService"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "BaseService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "BaseService",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "class",
+                    "namespace": "App",
+                    "fullName": "App.BaseService",
+                    "methods": [],
+                    "properties": [],
+                }],
+            },
+            {
+                "path": "Service.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "class",
+                    "namespace": "App",
+                    "fullName": "App.Service",
+                    "methods": [],
+                    "properties": [],
+                    "baseTypes": ["BaseService"],
+                }],
+            },
+            {
+                "path": "IBase.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IBase",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "interface",
+                    "namespace": "App",
+                    "fullName": "App.IBase",
+                    "methods": [],
+                    "properties": [],
+                }],
+            },
+            {
+                "path": "IService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IService",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "interface",
+                    "namespace": "App",
+                    "fullName": "App.IService",
+                    "methods": [],
+                    "properties": [],
+                    "baseTypes": ["IBase"],
+                }],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["inheritanceAdded"], 2)
+        edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        self.assertIn(("class:Service.cs:Service", "class:BaseService.cs:BaseService", "inherits"), edge_pairs)
+        self.assertIn(("class:IService.cs:IService", "class:IBase.cs:IBase", "inherits"), edge_pairs)
+
+    def test_ambiguous_receiver_type_and_overloaded_target_are_skipped(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("App/Consumer.cs"),
+                _class_node("App/Consumer.cs", "Consumer"),
+                _function_node("App/Consumer.cs", "Run"),
+                _file_node("A/IFoo.cs"),
+                _class_node("A/IFoo.cs", "IFoo"),
+                _function_node("A/IFoo.cs", "Save"),
+                _file_node("B/IFoo.cs"),
+                _class_node("B/IFoo.cs", "IFoo"),
+                _function_node("B/IFoo.cs", "Save"),
+                _file_node("App/IBar.cs"),
+                _class_node("App/IBar.cs", "IBar"),
+                _function_node("App/IBar.cs", "Find"),
+            ],
+            "edges": [
+                {
+                    "source": "function:App/Consumer.cs:Run",
+                    "target": "function:App/IBar.cs:Find",
+                    "type": "calls",
+                    "direction": "forward",
+                    "weight": 0.5,
+                },
+            ],
+        }
+        results = [
+            {
+                "path": "App/Consumer.cs",
+                "language": "csharp",
+                "imports": [
+                    {"source": "A", "line": 1, "specifiers": ["A"]},
+                    {"source": "B", "line": 2, "specifiers": ["B"]},
+                ],
+                "classes": [{
+                    "name": "Consumer",
+                    "startLine": 4,
+                    "endLine": 9,
+                    "kind": "class",
+                    "namespace": "App",
+                    "fullName": "App.Consumer",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [
+                        {"name": "foo", "type": "IFoo"},
+                        {"name": "bar", "type": "IBar"},
+                    ],
+                }],
+                "functions": [{"name": "Run", "startLine": 6, "endLine": 8, "params": [], "typedParams": []}],
+                "callGraph": [
+                    {"caller": "Run", "callee": "foo.Save", "lineNumber": 7},
+                    {"caller": "Run", "callee": "bar.Find", "lineNumber": 8},
+                ],
+            },
+            {
+                "path": "A/IFoo.cs",
+                "language": "csharp",
+                "classes": [{"name": "IFoo", "startLine": 1, "endLine": 3, "kind": "interface", "namespace": "A", "fullName": "A.IFoo", "methods": ["Save"], "properties": []}],
+                "functions": [{"name": "Save", "startLine": 2, "endLine": 2, "params": [], "typedParams": []}],
+            },
+            {
+                "path": "B/IFoo.cs",
+                "language": "csharp",
+                "classes": [{"name": "IFoo", "startLine": 1, "endLine": 3, "kind": "interface", "namespace": "B", "fullName": "B.IFoo", "methods": ["Save"], "properties": []}],
+                "functions": [{"name": "Save", "startLine": 2, "endLine": 2, "params": [], "typedParams": []}],
+            },
+            {
+                "path": "App/IBar.cs",
+                "language": "csharp",
+                "classes": [{"name": "IBar", "startLine": 1, "endLine": 6, "kind": "interface", "namespace": "App", "fullName": "App.IBar", "methods": ["Find", "Find"], "properties": []}],
+                "functions": [
+                    {"name": "Find", "startLine": 2, "endLine": 2, "params": ["id"], "typedParams": [{"name": "id", "type": "int"}]},
+                    {"name": "Find", "startLine": 3, "endLine": 3, "params": ["name"], "typedParams": [{"name": "name", "type": "string"}]},
+                ],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(
+            len([e for e in assembled["edges"] if e["type"] == "calls"]),
+            1,
+        )
+
+    def test_alias_using_does_not_resolve_unqualified_receiver_type(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Services/Service.cs"),
+                _class_node("Services/Service.cs", "Service"),
+                _function_node("Services/Service.cs", "Run"),
+                _file_node("Repositories/IRepository.cs"),
+                _class_node("Repositories/IRepository.cs", "IRepository"),
+                _function_node("Repositories/IRepository.cs", "Save"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Services/Service.cs",
+                "language": "csharp",
+                "imports": [{"source": "App.Repositories", "kind": "alias", "alias": "Repo", "line": 1}],
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 3,
+                    "endLine": 8,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Service",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "repository", "type": "IRepository"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 5, "endLine": 7, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "repository.Save", "lineNumber": 6}],
+            },
+            {
+                "path": "Repositories/IRepository.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IRepository",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "interface",
+                    "namespace": "App.Repositories",
+                    "fullName": "App.Repositories.IRepository",
+                    "methods": ["Save"],
+                    "properties": [],
+                }],
+                "functions": [{"name": "Save", "startLine": 3, "endLine": 3, "params": [], "typedParams": []}],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(assembled["edges"], [])
+
+    def test_global_using_resolves_receiver_type_across_files(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("GlobalUsings.cs"),
+                _file_node("Services/Service.cs"),
+                _class_node("Services/Service.cs", "Service"),
+                _function_node("Services/Service.cs", "Run"),
+                _file_node("Repositories/IRepository.cs"),
+                _class_node("Repositories/IRepository.cs", "IRepository"),
+                _function_node("Repositories/IRepository.cs", "Save"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "GlobalUsings.cs",
+                "language": "csharp",
+                "imports": [
+                    {"source": "App.Repositories", "kind": "namespace", "isGlobal": True, "line": 1},
+                    {"source": "System.Math", "kind": "static", "isGlobal": True, "line": 2},
+                ],
+                "classes": [],
+                "functions": [],
+                "callGraph": [],
+            },
+            {
+                "path": "Services/Service.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 1,
+                    "endLine": 6,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Service",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "repository", "type": "IRepository"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 3, "endLine": 5, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "repository.Save", "lineNumber": 4}],
+            },
+            {
+                "path": "Repositories/IRepository.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IRepository",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "interface",
+                    "namespace": "App.Repositories",
+                    "fullName": "App.Repositories.IRepository",
+                    "methods": ["Save"],
+                    "properties": [],
+                }],
+                "functions": [{"name": "Save", "startLine": 3, "endLine": 3, "params": [], "typedParams": []}],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 1)
+        self.assertIn((
+            "function:Services/Service.cs:Run",
+            "function:Repositories/IRepository.cs:Save",
+            "calls",
+        ), {(e["source"], e["target"], e["type"]) for e in assembled["edges"]})
+
+    def test_global_using_is_scoped_to_csproj_project(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("ProjectA/ProjectA.csproj"),
+                _file_node("ProjectA/GlobalUsings.cs"),
+                _file_node("ProjectA/Services/Service.cs"),
+                _class_node("ProjectA/Services/Service.cs", "Service"),
+                _function_node("ProjectA/Services/Service.cs", "Run"),
+                _file_node("ProjectA/Repositories/IRepository.cs"),
+                _class_node("ProjectA/Repositories/IRepository.cs", "IRepository"),
+                _function_node("ProjectA/Repositories/IRepository.cs", "Save"),
+                _file_node("ProjectB/ProjectB.csproj"),
+                _file_node("ProjectB/Services/Service.cs"),
+                _class_node("ProjectB/Services/Service.cs", "Service"),
+                _function_node("ProjectB/Services/Service.cs", "Run"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "ProjectA/GlobalUsings.cs",
+                "language": "csharp",
+                "imports": [
+                    {
+                        "source": "ProjectA.Repositories",
+                        "kind": "namespace",
+                        "isGlobal": True,
+                        "line": 1,
+                    },
+                ],
+                "classes": [],
+                "functions": [],
+                "callGraph": [],
+            },
+            {
+                "path": "ProjectA/Services/Service.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 1,
+                    "endLine": 6,
+                    "kind": "class",
+                    "namespace": "ProjectA.Services",
+                    "fullName": "ProjectA.Services.Service",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "repository", "type": "IRepository"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 3, "endLine": 5, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "repository.Save", "lineNumber": 4}],
+            },
+            {
+                "path": "ProjectA/Repositories/IRepository.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IRepository",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "interface",
+                    "namespace": "ProjectA.Repositories",
+                    "fullName": "ProjectA.Repositories.IRepository",
+                    "methods": ["Save"],
+                    "properties": [],
+                }],
+                "functions": [{"name": "Save", "startLine": 3, "endLine": 3, "params": [], "typedParams": []}],
+            },
+            {
+                "path": "ProjectB/Services/Service.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 1,
+                    "endLine": 6,
+                    "kind": "class",
+                    "namespace": "ProjectB.Services",
+                    "fullName": "ProjectB.Services.Service",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "repository", "type": "IRepository"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 3, "endLine": 5, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "repository.Save", "lineNumber": 4}],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        self.assertEqual(stats["callsAdded"], 1)
+        self.assertIn((
+            "function:ProjectA/Services/Service.cs:Run",
+            "function:ProjectA/Repositories/IRepository.cs:Save",
+            "calls",
+        ), edge_pairs)
+        self.assertNotIn((
+            "function:ProjectB/Services/Service.cs:Run",
+            "function:ProjectA/Repositories/IRepository.cs:Save",
+            "calls",
+        ), edge_pairs)
+
+    def test_duplicate_function_node_id_target_is_skipped(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Services/Service.cs"),
+                _class_node("Services/Service.cs", "Service"),
+                _function_node("Services/Service.cs", "Run"),
+                _file_node("Abstractions.cs"),
+                _class_node("Abstractions.cs", "IA"),
+                _class_node("Abstractions.cs", "IB"),
+                _function_node("Abstractions.cs", "Run"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Services/Service.cs",
+                "language": "csharp",
+                "imports": [{"source": "App", "kind": "namespace", "line": 1}],
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 3,
+                    "endLine": 8,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Service",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "a", "type": "IA"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 5, "endLine": 7, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "a.Run", "lineNumber": 6}],
+            },
+            {
+                "path": "Abstractions.cs",
+                "language": "csharp",
+                "classes": [
+                    {
+                        "name": "IA",
+                        "startLine": 1,
+                        "endLine": 4,
+                        "kind": "interface",
+                        "namespace": "App",
+                        "fullName": "App.IA",
+                        "methods": ["Run"],
+                        "properties": [],
+                    },
+                    {
+                        "name": "IB",
+                        "startLine": 6,
+                        "endLine": 9,
+                        "kind": "interface",
+                        "namespace": "App",
+                        "fullName": "App.IB",
+                        "methods": ["Run"],
+                        "properties": [],
+                    },
+                ],
+                "functions": [
+                    {"name": "Run", "startLine": 3, "endLine": 3, "params": [], "typedParams": []},
+                    {"name": "Run", "startLine": 8, "endLine": 8, "params": [], "typedParams": []},
+                ],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(assembled["edges"], [])
+
+    def test_duplicate_function_node_id_caller_is_skipped(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Service.cs"),
+                _class_node("Service.cs", "Service"),
+                _function_node("Service.cs", "Run"),
+                _function_node("Service.cs", "Validate"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Service.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 1,
+                    "endLine": 12,
+                    "kind": "class",
+                    "namespace": "App",
+                    "fullName": "App.Service",
+                    "methods": ["Run", "Run", "Validate"],
+                    "properties": [],
+                }],
+                "functions": [
+                    {"name": "Run", "startLine": 3, "endLine": 5, "params": [], "typedParams": []},
+                    {"name": "Run", "startLine": 7, "endLine": 9, "params": ["id"], "typedParams": [{"name": "id", "type": "int"}]},
+                    {"name": "Validate", "startLine": 11, "endLine": 11, "params": [], "typedParams": []},
+                ],
+                "callGraph": [{"caller": "Run", "callee": "Validate", "lineNumber": 4}],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(assembled["edges"], [])
 
 
 if __name__ == "__main__":

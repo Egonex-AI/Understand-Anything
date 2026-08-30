@@ -181,11 +181,46 @@ export interface ReferenceResolution {
   line?: number;
 }
 
+export interface TypedParameter {
+  name: string;
+  type: string;
+}
+
+export interface TypedField {
+  name: string;
+  type: string;
+}
+
 // Plugin interfaces
 export interface StructuralAnalysis {
-  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string }>;
-  classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
-  imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
+  functions: Array<{
+    name: string;
+    lineRange: [number, number];
+    params: string[];
+    returnType?: string;
+    typedParams?: TypedParameter[];
+  }>;
+  classes: Array<{
+    name: string;
+    lineRange: [number, number];
+    methods: string[];
+    properties: string[];
+    kind?: "class" | "interface" | "struct" | "record";
+    namespace?: string;
+    fullName?: string;
+    baseTypes?: string[];
+    primaryConstructorParams?: TypedParameter[];
+    fields?: TypedField[];
+  }>;
+  imports: Array<{
+    source: string;
+    specifiers: string[];
+    lineNumber: number;
+    kind?: "namespace" | "alias" | "static";
+    alias?: string;
+    isGlobal?: boolean;
+    namespace?: string;
+  }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;
   // Non-code structural data (all optional for backward compat)
   sections?: SectionInfo[];
