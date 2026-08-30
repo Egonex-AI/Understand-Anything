@@ -7,19 +7,23 @@ where `.understand-anything/` is intentionally ignored by Git.
 
 ## Provenance
 
-- Source application: `/home/amida/projects/EventCalendar_App`
+- Source application (read-only): `/home/amida/projects/EventCalendar_App`
 - Source repository: `https://github.com/noanoa117117/EventCalendar_App.git`
 - Source commit: `ea1f309f69435edd36d94c7d839e7a30bf2d4446`
-- Original generated directory:
-  `/home/amida/projects/EventCalendar_App/.understand-anything/`
-- Analysis timestamp: `2026-08-29T10:14:37.718Z`
+- Analysis working copy:
+  `/tmp/ua-eventcalendar-integration-OTJZuB/EventCalendar_App`
+- Generated directory in that temporary copy:
+  `/tmp/ua-eventcalendar-integration-OTJZuB/EventCalendar_App/.understand-anything/`
+- Analysis timestamp: `2026-08-30T04:21:32.446Z`
 - Language setting: Japanese (`outputLanguage: "ja"`)
 
 ## Contents
 
 `understand-anything-data/` is the relocated management directory. It contains
-the knowledge graph (261 nodes, 352 edges), configuration, fingerprints, and
-the intermediate assembly and batch outputs used to build the graph.
+the knowledge graph (262 nodes, 424 edges), configuration, fingerprints, and
+the intermediate assembly and batch outputs used to build the graph. Its 81
+`type: "file"` nodes all have `explanationStatus: "ready"` with explanations
+using the eight required Japanese headings.
 
 The source snapshot at the original directory's `repo/` path and transient
 `tmp/` logs are deliberately excluded: this fixture tracks analysis artifacts,
