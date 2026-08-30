@@ -199,6 +199,8 @@ export const ko = {
     sourceUnavailable: "소스 사용 불가",
     rendered: "렌더링",
     source: "소스",
+    chooseDestination: "대상 선택",
+    openDestination: "대상 열기",
   },
   customNode: {
     tested: "테스트됨",

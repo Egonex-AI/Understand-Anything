@@ -199,6 +199,8 @@ export const ja = {
     sourceUnavailable: "ソースが利用できません",
     rendered: "プレビュー",
     source: "ソース",
+    chooseDestination: "移動先を選択",
+    openDestination: "移動先を開く",
   },
   customNode: {
     tested: "テスト済み",

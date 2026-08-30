@@ -4,6 +4,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import {
+  buildNavigationIndex,
+  importTargetForSpecifier,
+  isImportSpecifierToken,
+  sourceFileIdForNode,
+} from "../utils/navigationIndex";
 
 interface CodeViewerProps {
   accessToken: string;
@@ -129,6 +135,7 @@ export default function CodeViewer({
   const viewMode = useDashboardStore((s) => s.viewMode);
   const codeViewerNodeId = useDashboardStore((s) => s.codeViewerNodeId);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
+  const navigateToCodeFile = useDashboardStore((s) => s.navigateToCodeFile);
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
   // Files tab always builds its tree from the structural graph, so a node ID opened from
   // there may not exist in the active (domain) graph — fall back to the structural graph.
@@ -144,7 +151,9 @@ export default function CodeViewer({
   // Markdown files default to the rendered view (#555); toggle back to
   // source for line numbers / lineRange highlighting.
   const [mdView, setMdView] = useState<"rendered" | "source">("rendered");
+  const [choices, setChoices] = useState<string[]>([]);
   const { t } = useI18n();
+  const navigationIndex = useMemo(() => graph ? buildNavigationIndex(graph) : null, [graph]);
 
   useEffect(() => {
     if (!node?.filePath) {
@@ -206,6 +215,7 @@ export default function CodeViewer({
     : t.codeViewer.fullFile;
   const isModal = presentation === "modal";
   const handleClose = onClose ?? closeCodeViewer;
+  const navigate = (fileId: string) => { setChoices([]); navigateToCodeFile(fileId); };
 
   return (
     <div className="h-full w-full flex flex-col bg-surface overflow-hidden">
@@ -302,6 +312,15 @@ export default function CodeViewer({
                 <span>{formatBytes(source.sizeBytes)}</span>
               </div>
             </div>
+            {choices.length > 0 && (
+              <div className="px-4 py-2 border-b border-border-subtle bg-surface flex items-center gap-2 text-xs">
+                <label htmlFor="symbol-destination" className="text-text-secondary">{t.codeViewer.chooseDestination}</label>
+                <select id="symbol-destination" autoFocus className="bg-elevated text-text-primary rounded px-2 py-1" onChange={(event) => { if (event.target.value) navigate(event.target.value); }} defaultValue="">
+                  <option value="">{t.codeViewer.chooseDestination}</option>
+                  {choices.map((id) => <option key={id} value={id}>{navigationIndex?.files.get(id)?.filePath ?? id}</option>)}
+                </select>
+              </div>
+            )}
             {showRendered && <MarkdownView content={source.content} />}
             {!showRendered && (
             <Highlight code={source.content} language={language} theme={themes.vsDark}>
@@ -331,9 +350,20 @@ export default function CodeViewer({
                           {lineNumber}
                         </span>
                         <span className="pl-3 pr-6 whitespace-pre">
-                          {line.map((token, key) => (
-                            <span key={key} {...getTokenProps({ token })} />
-                          ))}
+                          {line.map((token, key) => {
+                            const props = getTokenProps({ token });
+                            const text = String(token.content);
+                            const before = line.slice(0, key).map((part) => String(part.content)).join("");
+                            const isSafeIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text) && !token.types.includes("comment") && !token.types.includes("string") && !before.endsWith(".");
+                            const sourceFileId = navigationIndex ? sourceFileIdForNode(navigationIndex, node.id) : null;
+                            const importTarget = navigationIndex && sourceFileId && isImportSpecifierToken(tokens, index, key)
+                              ? importTargetForSpecifier(navigationIndex, sourceFileId, text)
+                              : null;
+                            const symbolTargets = navigationIndex && isSafeIdentifier ? navigationIndex.symbols.get(text) ?? [] : [];
+                            const targets = importTarget ? [importTarget] : symbolTargets;
+                            if (targets.length === 0) return <span key={key} {...props} />;
+                            return <button key={key} type="button" {...props} className={`${props.className ?? ""} underline decoration-accent/50 hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent rounded`} onClick={() => targets.length === 1 ? navigate(targets[0]) : setChoices([...targets])} aria-label={targets.length === 1 ? t.codeViewer.openDestination : t.codeViewer.chooseDestination}>{text}</button>;
+                          })}
                         </span>
                       </div>
                     );

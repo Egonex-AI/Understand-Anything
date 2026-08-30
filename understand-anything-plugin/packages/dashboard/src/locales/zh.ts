@@ -199,6 +199,8 @@ export const zh = {
     sourceUnavailable: "源码不可用",
     rendered: "渲染",
     source: "源码",
+    chooseDestination: "选择目标位置",
+    openDestination: "打开目标位置",
   },
   customNode: {
     tested: "已测试",

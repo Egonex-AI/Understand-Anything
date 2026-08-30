@@ -199,6 +199,8 @@ export const ru = {
     sourceUnavailable: "Исходный код недоступен",
     rendered: "Просмотр",
     source: "Исходник",
+    chooseDestination: "Выберите назначение",
+    openDestination: "Открыть назначение",
   },
   customNode: {
     tested: "Покрыт тестами",

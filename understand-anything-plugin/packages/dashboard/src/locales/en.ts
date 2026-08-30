@@ -199,6 +199,8 @@ export const en = {
     sourceUnavailable: "Source unavailable",
     rendered: "Rendered",
     source: "Source",
+    chooseDestination: "Choose destination",
+    openDestination: "Open destination",
   },
   customNode: {
     tested: "Tested",

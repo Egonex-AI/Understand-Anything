@@ -199,6 +199,8 @@ export const zhTW = {
     sourceUnavailable: "原始碼不可用",
     rendered: "渲染",
     source: "原始碼",
+    chooseDestination: "選擇目標位置",
+    openDestination: "開啟目標位置",
   },
   customNode: {
     tested: "已測試",
