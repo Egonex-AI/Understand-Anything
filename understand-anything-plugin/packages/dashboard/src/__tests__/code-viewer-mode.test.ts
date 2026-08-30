@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { definitionLinkClassName } from "../components/CodeViewer";
 import { useDashboardStore } from "../store";
 
 beforeEach(() => {
@@ -19,5 +20,10 @@ describe("code viewer mode", () => {
     useDashboardStore.getState().setCodeViewerMode("code");
 
     expect(useDashboardStore.getState().codeViewerMode).toBe("code");
+  });
+
+  it("marks definition links as underlined pointer targets", () => {
+    expect(definitionLinkClassName).toContain("underline");
+    expect(definitionLinkClassName).toContain("cursor-pointer");
   });
 });

@@ -27,6 +27,8 @@ interface SourceFile {
   lineCount: number;
 }
 
+export const definitionLinkClassName = "underline cursor-pointer decoration-accent/50 hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent rounded";
+
 type SourceState =
   | { status: "idle" | "loading"; source: null; error: null }
   | { status: "loaded"; source: SourceFile; error: null }
@@ -405,7 +407,7 @@ export default function CodeViewer({
                             const symbolTargets = navigationIndex && isSafeIdentifier ? navigationIndex.symbols.get(text) ?? [] : [];
                             const targets = importTarget ? [importTarget] : symbolTargets;
                             if (targets.length === 0) return <span key={key} {...props} />;
-                            return <button key={key} type="button" {...props} className={`${props.className ?? ""} underline decoration-accent/50 hover:text-accent focus:outline-none focus:ring-1 focus:ring-accent rounded`} onClick={() => targets.length === 1 ? navigate(targets[0]) : setChoices([...targets])} aria-label={targets.length === 1 ? t.codeViewer.openDestination : t.codeViewer.chooseDestination}>{text}</button>;
+                            return <button key={key} type="button" {...props} className={`${props.className ?? ""} ${definitionLinkClassName}`} onClick={() => targets.length === 1 ? navigate(targets[0]) : setChoices([...targets])} aria-label={targets.length === 1 ? t.codeViewer.openDestination : t.codeViewer.chooseDestination}>{text}</button>;
                           })}
                         </span>
                       </div>
