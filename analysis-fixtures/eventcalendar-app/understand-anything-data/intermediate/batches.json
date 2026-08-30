@@ -1,0 +1,1179 @@
+{
+  "schemaVersion": 1,
+  "algorithm": "louvain",
+  "totalFiles": 118,
+  "totalBatches": 10,
+  "exportsByPath": {
+    "eslint.config.mjs": [],
+    "next.config.ts": [],
+    "open-next.config.ts": [],
+    "postcss.config.mjs": [],
+    "public/_headers": [],
+    "scripts/supabase-env.mjs": [],
+    "src/app/access-denied/page.tsx": [
+      "AccessDeniedPage"
+    ],
+    "src/app/admin/admin-panel.tsx": [
+      "AdminPanel"
+    ],
+    "src/app/admin/page.tsx": [
+      "AdminPage"
+    ],
+    "src/app/api/events/cancel/route.ts": [
+      "POST"
+    ],
+    "src/app/api/events/sync/route.ts": [
+      "POST"
+    ],
+    "src/app/auth/callback/route.ts": [
+      "GET"
+    ],
+    "src/app/auth/cloudflare/logout/route.ts": [
+      "GET"
+    ],
+    "src/app/auth/cloudflare/route.ts": [
+      "GET"
+    ],
+    "src/app/availability/_components/availability-board.tsx": [
+      "AvailabilityBoard"
+    ],
+    "src/app/availability/_components/member-list.tsx": [
+      "MemberList"
+    ],
+    "src/app/availability/_components/month-calendar.tsx": [
+      "MonthCalendar"
+    ],
+    "src/app/availability/_components/preset-dialog.tsx": [
+      "PresetDialog"
+    ],
+    "src/app/availability/_components/preset-panel.tsx": [
+      "PresetPanel"
+    ],
+    "src/app/availability/_components/use-drag-paint.ts": [
+      "useDragPaint"
+    ],
+    "src/app/availability/_components/week-calendar.tsx": [
+      "WeekCalendar"
+    ],
+    "src/app/availability/loading.tsx": [
+      "Loading"
+    ],
+    "src/app/availability/page.tsx": [
+      "AvailabilityPage"
+    ],
+    "src/app/dashboard/dashboard.tsx": [
+      "Dashboard"
+    ],
+    "src/app/dev-preview/page.tsx": [
+      "DevPreviewPage"
+    ],
+    "src/app/events/event-calendar.tsx": [
+      "EventCalendar"
+    ],
+    "src/app/events/loading.tsx": [
+      "Loading"
+    ],
+    "src/app/events/page.tsx": [
+      "EventsPage"
+    ],
+    "src/app/layout.tsx": [
+      "metadata",
+      "RootLayout"
+    ],
+    "src/app/login/login-button.tsx": [
+      "LoginButton"
+    ],
+    "src/app/login/page.tsx": [
+      "LoginPage"
+    ],
+    "src/app/page.tsx": [
+      "HomePage"
+    ],
+    "src/app/planning/_components/planning-board.tsx": [
+      "PlanningBoard"
+    ],
+    "src/app/planning/loading.tsx": [
+      "Loading"
+    ],
+    "src/app/planning/page.tsx": [
+      "parsePlanningQuery",
+      "PlanningPage"
+    ],
+    "src/app/setup-nickname/nickname-form.tsx": [
+      "NicknameForm"
+    ],
+    "src/app/setup-nickname/page.tsx": [
+      "SetupNicknamePage"
+    ],
+    "src/components/app-header.tsx": [
+      "AppHeader"
+    ],
+    "src/components/night-beach-scene.tsx": [
+      "NightScene"
+    ],
+    "src/components/sign-out-button.tsx": [
+      "SignOutButton"
+    ],
+    "src/components/ui/badge.tsx": [
+      "Badge",
+      "badgeVariants"
+    ],
+    "src/components/ui/button.tsx": [
+      "Button",
+      "buttonVariants"
+    ],
+    "src/components/ui/checkbox.tsx": [
+      "Checkbox"
+    ],
+    "src/components/ui/dialog.tsx": [
+      "Dialog",
+      "DialogClose",
+      "DialogContent",
+      "DialogDescription",
+      "DialogFooter",
+      "DialogHeader",
+      "DialogOverlay",
+      "DialogPortal",
+      "DialogTitle",
+      "DialogTrigger"
+    ],
+    "src/components/ui/input.tsx": [
+      "Input"
+    ],
+    "src/components/ui/label.tsx": [
+      "Label"
+    ],
+    "src/components/ui/popover.tsx": [
+      "Popover",
+      "PopoverContent",
+      "PopoverDescription",
+      "PopoverHeader",
+      "PopoverTitle",
+      "PopoverTrigger"
+    ],
+    "src/components/ui/select.tsx": [
+      "Select",
+      "SelectContent",
+      "SelectGroup",
+      "SelectItem",
+      "SelectLabel",
+      "SelectScrollDownButton",
+      "SelectScrollUpButton",
+      "SelectSeparator",
+      "SelectTrigger",
+      "SelectValue"
+    ],
+    "src/components/ui/separator.tsx": [
+      "Separator"
+    ],
+    "src/components/ui/sonner.tsx": [
+      "Toaster"
+    ],
+    "src/components/ui/tabs.tsx": [
+      "Tabs",
+      "TabsList",
+      "TabsTrigger",
+      "TabsContent",
+      "tabsListVariants"
+    ],
+    "src/components/ui/toggle.tsx": [
+      "Toggle",
+      "toggleVariants"
+    ],
+    "src/lib/availability.ts": [
+      "APP_TIME_ZONE",
+      "jstNow",
+      "jstToday",
+      "registrableWindow",
+      "isDateEditable",
+      "monthGridRange",
+      "applyAvailabilityOperations",
+      "endMinutes",
+      "startMinutes",
+      "minutesToTime",
+      "isRangeCovered",
+      "formatTimeLabel",
+      "expandToSlots",
+      "computeDaySummaries"
+    ],
+    "src/lib/cancellation-email.ts": [
+      "buildCancellationEmail",
+      "sendCancellationEmail"
+    ],
+    "src/lib/cloudflare-access.ts": [
+      "isLoopbackSupabaseUrl",
+      "isLocalAuthAllowed",
+      "cloudflareAppOrigin",
+      "isExpectedCloudflareAppRequest",
+      "appOriginForRequest",
+      "verifyCloudflareAccessToken",
+      "cloudflareLogoutUrl",
+      "cloudflareAccessToken"
+    ],
+    "src/lib/cloudflare-auth-bridge.ts": [
+      "safeNextPath",
+      "generateSupabaseMagicLinkIfAllowed",
+      "generateSupabaseMagicLink"
+    ],
+    "src/lib/database.types.ts": [],
+    "src/lib/dev-auth.ts": [
+      "isDevPreviewEnabled",
+      "getDevPreviewData",
+      "getDevAvailabilityData",
+      "getDevPlanningData",
+      "addDevEvent"
+    ],
+    "src/lib/google-calendar.ts": [
+      "isConfigured",
+      "getAccessToken",
+      "resetTokenCache",
+      "appEventIdToGoogleId",
+      "toGoogleEvent",
+      "upsertGoogleEvent",
+      "deleteGoogleEvent",
+      "syncEventToGoogle",
+      "checkSyncPermission"
+    ],
+    "src/lib/supabase/admin.ts": [
+      "createAdminClient"
+    ],
+    "src/lib/supabase/client.ts": [
+      "createClient"
+    ],
+    "src/lib/supabase/proxy.ts": [
+      "updateSession"
+    ],
+    "src/lib/supabase/server.ts": [
+      "createClient"
+    ],
+    "src/lib/types.ts": [],
+    "src/lib/utils.ts": [
+      "cn"
+    ],
+    "src/middleware.ts": [
+      "middleware",
+      "config"
+    ],
+    "tests/cancel-event-schema.test.ts": [],
+    "tests/cancellation-email.test.ts": [],
+    "tests/cloudflare-access.test.ts": [],
+    "tests/day-summary.test.ts": [],
+    "tests/event-calendar-sunday-start.test.ts": [],
+    "tests/event-submit-guard.test.ts": [],
+    "tests/google-calendar.test.ts": [],
+    "tests/member-access.test.ts": [],
+    "tests/month-calendar-label.test.ts": [],
+    "tests/night-beach-theme.test.ts": [],
+    "tests/personal-events.test.ts": [],
+    "tests/planning-navigation.test.ts": [],
+    "tests/preset-panel.test.ts": []
+  },
+  "batches": [
+    {
+      "batchIndex": 1,
+      "files": [
+        {
+          "path": ".github/workflows/backup-supabase-to-r2.yml",
+          "language": "yaml",
+          "sizeLines": 158,
+          "fileCategory": "infra"
+        },
+        {
+          "path": ".github/workflows/keep-supabase-alive.yml",
+          "language": "yaml",
+          "sizeLines": 34,
+          "fileCategory": "infra"
+        }
+      ],
+      "batchImportData": {
+        ".github/workflows/backup-supabase-to-r2.yml": [],
+        ".github/workflows/keep-supabase-alive.yml": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 2,
+      "files": [
+        {
+          "path": "supabase/migrations/0001_init.sql",
+          "language": "sql",
+          "sizeLines": 474,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0002_secure_profile_and_availability_writes.sql",
+          "language": "sql",
+          "sizeLines": 49,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0003_harden_authorization_and_availability.sql",
+          "language": "sql",
+          "sizeLines": 167,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0004_admin_roles.sql",
+          "language": "sql",
+          "sizeLines": 122,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0005_admin_access_controls.sql",
+          "language": "sql",
+          "sizeLines": 97,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0006_batch_availability.sql",
+          "language": "sql",
+          "sizeLines": 101,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0007_super_user_delete_event.sql",
+          "language": "sql",
+          "sizeLines": 30,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0008_google_calendar_sync.sql",
+          "language": "sql",
+          "sizeLines": 8,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0009_active_members_and_admin_nicknames.sql",
+          "language": "sql",
+          "sizeLines": 61,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0010_admin_self_access_protection.sql",
+          "language": "sql",
+          "sizeLines": 100,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0011_cancel_event_notifications.sql",
+          "language": "sql",
+          "sizeLines": 122,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/migrations/0012_personal_events.sql",
+          "language": "sql",
+          "sizeLines": 112,
+          "fileCategory": "data"
+        }
+      ],
+      "batchImportData": {
+        "supabase/migrations/0001_init.sql": [],
+        "supabase/migrations/0002_secure_profile_and_availability_writes.sql": [],
+        "supabase/migrations/0003_harden_authorization_and_availability.sql": [],
+        "supabase/migrations/0004_admin_roles.sql": [],
+        "supabase/migrations/0005_admin_access_controls.sql": [],
+        "supabase/migrations/0006_batch_availability.sql": [],
+        "supabase/migrations/0007_super_user_delete_event.sql": [],
+        "supabase/migrations/0008_google_calendar_sync.sql": [],
+        "supabase/migrations/0009_active_members_and_admin_nicknames.sql": [],
+        "supabase/migrations/0010_admin_self_access_protection.sql": [],
+        "supabase/migrations/0011_cancel_event_notifications.sql": [],
+        "supabase/migrations/0012_personal_events.sql": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 3,
+      "files": [
+        {
+          "path": ".codex/agents/README.md",
+          "language": "markdown",
+          "sizeLines": 26,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".codex/agents/auditor.toml",
+          "language": "toml",
+          "sizeLines": 17,
+          "fileCategory": "config"
+        },
+        {
+          "path": ".codex/agents/coder.toml",
+          "language": "toml",
+          "sizeLines": 15,
+          "fileCategory": "config"
+        }
+      ],
+      "batchImportData": {
+        ".codex/agents/README.md": [],
+        ".codex/agents/auditor.toml": [],
+        ".codex/agents/coder.toml": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 4,
+      "files": [
+        {
+          "path": ".env.local.example",
+          "language": "config",
+          "sizeLines": 17,
+          "fileCategory": "config"
+        },
+        {
+          "path": "AGENTS.md",
+          "language": "markdown",
+          "sizeLines": 27,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "CLAUDE.md",
+          "language": "markdown",
+          "sizeLines": 32,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "PROGRESS.md",
+          "language": "markdown",
+          "sizeLines": 202,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "README.md",
+          "language": "markdown",
+          "sizeLines": 177,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "REQUIREMENTS.md",
+          "language": "markdown",
+          "sizeLines": 192,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "components.json",
+          "language": "json",
+          "sizeLines": 25,
+          "fileCategory": "config"
+        },
+        {
+          "path": "package.json",
+          "language": "json",
+          "sizeLines": 54,
+          "fileCategory": "config"
+        },
+        {
+          "path": "skills-lock.json",
+          "language": "json",
+          "sizeLines": 11,
+          "fileCategory": "config"
+        },
+        {
+          "path": "tsconfig.json",
+          "language": "json",
+          "sizeLines": 35,
+          "fileCategory": "config"
+        },
+        {
+          "path": "wrangler.jsonc",
+          "language": "jsonc",
+          "sizeLines": 20,
+          "fileCategory": "config"
+        }
+      ],
+      "batchImportData": {
+        ".env.local.example": [],
+        "AGENTS.md": [],
+        "CLAUDE.md": [],
+        "PROGRESS.md": [],
+        "README.md": [],
+        "REQUIREMENTS.md": [],
+        "components.json": [],
+        "package.json": [],
+        "skills-lock.json": [],
+        "tsconfig.json": [],
+        "wrangler.jsonc": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 5,
+      "files": [
+        {
+          "path": "supabase/local/README.md",
+          "language": "markdown",
+          "sizeLines": 45,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "supabase/local/cleanup.sql",
+          "language": "sql",
+          "sizeLines": 25,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/local/fixture.sql",
+          "language": "sql",
+          "sizeLines": 84,
+          "fileCategory": "data"
+        }
+      ],
+      "batchImportData": {
+        "supabase/local/README.md": [],
+        "supabase/local/cleanup.sql": [],
+        "supabase/local/fixture.sql": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 6,
+      "files": [
+        {
+          "path": "supabase/manual/README.md",
+          "language": "markdown",
+          "sizeLines": 21,
+          "fileCategory": "docs"
+        },
+        {
+          "path": "supabase/manual/cleanup_real_google_ui_fixture.sql",
+          "language": "sql",
+          "sizeLines": 53,
+          "fileCategory": "data"
+        },
+        {
+          "path": "supabase/manual/real_google_ui_fixture.sql",
+          "language": "sql",
+          "sizeLines": 134,
+          "fileCategory": "data"
+        }
+      ],
+      "batchImportData": {
+        "supabase/manual/README.md": [],
+        "supabase/manual/cleanup_real_google_ui_fixture.sql": [],
+        "supabase/manual/real_google_ui_fixture.sql": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 7,
+      "files": [
+        {
+          "path": ".agents/skills/find-skills/SKILL.md",
+          "language": "markdown",
+          "sizeLines": 141,
+          "fileCategory": "docs"
+        },
+        {
+          "path": ".codex/config.toml",
+          "language": "toml",
+          "sizeLines": 11,
+          "fileCategory": "config"
+        },
+        {
+          "path": "eslint.config.mjs",
+          "language": "javascript",
+          "sizeLines": 20,
+          "fileCategory": "code"
+        },
+        {
+          "path": "next.config.ts",
+          "language": "typescript",
+          "sizeLines": 15,
+          "fileCategory": "code"
+        },
+        {
+          "path": "open-next.config.ts",
+          "language": "typescript",
+          "sizeLines": 6,
+          "fileCategory": "code"
+        },
+        {
+          "path": "postcss.config.mjs",
+          "language": "javascript",
+          "sizeLines": 7,
+          "fileCategory": "code"
+        },
+        {
+          "path": "public/_headers",
+          "language": "unknown",
+          "sizeLines": 2,
+          "fileCategory": "code"
+        },
+        {
+          "path": "scripts/supabase-env.mjs",
+          "language": "javascript",
+          "sizeLines": 141,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/access-denied/page.tsx",
+          "language": "typescript",
+          "sizeLines": 18,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/admin/admin-panel.tsx",
+          "language": "typescript",
+          "sizeLines": 73,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/admin/page.tsx",
+          "language": "typescript",
+          "sizeLines": 20,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/api/events/cancel/route.ts",
+          "language": "typescript",
+          "sizeLines": 68,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/api/events/sync/route.ts",
+          "language": "typescript",
+          "sizeLines": 89,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/auth/callback/route.ts",
+          "language": "typescript",
+          "sizeLines": 39,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/auth/cloudflare/logout/route.ts",
+          "language": "typescript",
+          "sizeLines": 12,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/auth/cloudflare/route.ts",
+          "language": "typescript",
+          "sizeLines": 53,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/availability-board.tsx",
+          "language": "typescript",
+          "sizeLines": 335,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/member-list.tsx",
+          "language": "typescript",
+          "sizeLines": 63,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/month-calendar.tsx",
+          "language": "typescript",
+          "sizeLines": 167,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/preset-dialog.tsx",
+          "language": "typescript",
+          "sizeLines": 271,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/preset-panel.tsx",
+          "language": "typescript",
+          "sizeLines": 329,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/use-drag-paint.ts",
+          "language": "typescript",
+          "sizeLines": 62,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/_components/week-calendar.tsx",
+          "language": "typescript",
+          "sizeLines": 161,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/loading.tsx",
+          "language": "typescript",
+          "sizeLines": 17,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/availability/page.tsx",
+          "language": "typescript",
+          "sizeLines": 45,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        ".agents/skills/find-skills/SKILL.md": [],
+        ".codex/config.toml": [],
+        "eslint.config.mjs": [],
+        "next.config.ts": [],
+        "open-next.config.ts": [],
+        "postcss.config.mjs": [],
+        "public/_headers": [],
+        "scripts/supabase-env.mjs": [],
+        "src/app/access-denied/page.tsx": [],
+        "src/app/admin/admin-panel.tsx": [],
+        "src/app/admin/page.tsx": [],
+        "src/app/api/events/cancel/route.ts": [],
+        "src/app/api/events/sync/route.ts": [],
+        "src/app/auth/callback/route.ts": [],
+        "src/app/auth/cloudflare/logout/route.ts": [],
+        "src/app/auth/cloudflare/route.ts": [],
+        "src/app/availability/_components/availability-board.tsx": [],
+        "src/app/availability/_components/member-list.tsx": [],
+        "src/app/availability/_components/month-calendar.tsx": [],
+        "src/app/availability/_components/preset-dialog.tsx": [],
+        "src/app/availability/_components/preset-panel.tsx": [],
+        "src/app/availability/_components/use-drag-paint.ts": [],
+        "src/app/availability/_components/week-calendar.tsx": [],
+        "src/app/availability/loading.tsx": [],
+        "src/app/availability/page.tsx": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 8,
+      "files": [
+        {
+          "path": "src/app/dashboard/dashboard.tsx",
+          "language": "typescript",
+          "sizeLines": 75,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/dev-preview/page.tsx",
+          "language": "typescript",
+          "sizeLines": 24,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/events/event-calendar.tsx",
+          "language": "typescript",
+          "sizeLines": 212,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/events/loading.tsx",
+          "language": "typescript",
+          "sizeLines": 19,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/events/page.tsx",
+          "language": "typescript",
+          "sizeLines": 25,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/globals.css",
+          "language": "css",
+          "sizeLines": 532,
+          "fileCategory": "markup"
+        },
+        {
+          "path": "src/app/layout.tsx",
+          "language": "typescript",
+          "sizeLines": 41,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/login/login-button.tsx",
+          "language": "typescript",
+          "sizeLines": 73,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/login/page.tsx",
+          "language": "typescript",
+          "sizeLines": 40,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/page.tsx",
+          "language": "typescript",
+          "sizeLines": 11,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/planning/_components/planning-board.tsx",
+          "language": "typescript",
+          "sizeLines": 370,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/planning/loading.tsx",
+          "language": "typescript",
+          "sizeLines": 13,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/planning/page.tsx",
+          "language": "typescript",
+          "sizeLines": 40,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/setup-nickname/nickname-form.tsx",
+          "language": "typescript",
+          "sizeLines": 67,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/app/setup-nickname/page.tsx",
+          "language": "typescript",
+          "sizeLines": 17,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/app-header.tsx",
+          "language": "typescript",
+          "sizeLines": 50,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/night-beach-scene.tsx",
+          "language": "typescript",
+          "sizeLines": 46,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/sign-out-button.tsx",
+          "language": "typescript",
+          "sizeLines": 27,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/badge.tsx",
+          "language": "typescript",
+          "sizeLines": 52,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/button.tsx",
+          "language": "typescript",
+          "sizeLines": 58,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/checkbox.tsx",
+          "language": "typescript",
+          "sizeLines": 29,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/dialog.tsx",
+          "language": "typescript",
+          "sizeLines": 160,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/input.tsx",
+          "language": "typescript",
+          "sizeLines": 20,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/label.tsx",
+          "language": "typescript",
+          "sizeLines": 20,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/popover.tsx",
+          "language": "typescript",
+          "sizeLines": 90,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/app/dashboard/dashboard.tsx": [],
+        "src/app/dev-preview/page.tsx": [],
+        "src/app/events/event-calendar.tsx": [],
+        "src/app/events/loading.tsx": [],
+        "src/app/events/page.tsx": [],
+        "src/app/globals.css": [],
+        "src/app/layout.tsx": [],
+        "src/app/login/login-button.tsx": [],
+        "src/app/login/page.tsx": [],
+        "src/app/page.tsx": [],
+        "src/app/planning/_components/planning-board.tsx": [],
+        "src/app/planning/loading.tsx": [],
+        "src/app/planning/page.tsx": [],
+        "src/app/setup-nickname/nickname-form.tsx": [],
+        "src/app/setup-nickname/page.tsx": [],
+        "src/components/app-header.tsx": [],
+        "src/components/night-beach-scene.tsx": [],
+        "src/components/sign-out-button.tsx": [],
+        "src/components/ui/badge.tsx": [],
+        "src/components/ui/button.tsx": [],
+        "src/components/ui/checkbox.tsx": [],
+        "src/components/ui/dialog.tsx": [],
+        "src/components/ui/input.tsx": [],
+        "src/components/ui/label.tsx": [],
+        "src/components/ui/popover.tsx": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 9,
+      "files": [
+        {
+          "path": "src/components/ui/select.tsx",
+          "language": "typescript",
+          "sizeLines": 201,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/separator.tsx",
+          "language": "typescript",
+          "sizeLines": 25,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/sonner.tsx",
+          "language": "typescript",
+          "sizeLines": 49,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/tabs.tsx",
+          "language": "typescript",
+          "sizeLines": 82,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/components/ui/toggle.tsx",
+          "language": "typescript",
+          "sizeLines": 45,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/availability.ts",
+          "language": "typescript",
+          "sizeLines": 242,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/cancellation-email.ts",
+          "language": "typescript",
+          "sizeLines": 46,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/cloudflare-access.ts",
+          "language": "typescript",
+          "sizeLines": 102,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/cloudflare-auth-bridge.ts",
+          "language": "typescript",
+          "sizeLines": 61,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/database.types.ts",
+          "language": "typescript",
+          "sizeLines": 255,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/dev-auth.ts",
+          "language": "typescript",
+          "sizeLines": 134,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/google-calendar.ts",
+          "language": "typescript",
+          "sizeLines": 210,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/supabase/admin.ts",
+          "language": "typescript",
+          "sizeLines": 16,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/supabase/client.ts",
+          "language": "typescript",
+          "sizeLines": 9,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/supabase/proxy.ts",
+          "language": "typescript",
+          "sizeLines": 146,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/supabase/server.ts",
+          "language": "typescript",
+          "sizeLines": 30,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/types.ts",
+          "language": "typescript",
+          "sizeLines": 24,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/lib/utils.ts",
+          "language": "typescript",
+          "sizeLines": 6,
+          "fileCategory": "code"
+        },
+        {
+          "path": "src/middleware.ts",
+          "language": "typescript",
+          "sizeLines": 15,
+          "fileCategory": "code"
+        },
+        {
+          "path": "supabase/config.toml",
+          "language": "toml",
+          "sizeLines": 414,
+          "fileCategory": "config"
+        },
+        {
+          "path": "supabase/seed.sql",
+          "language": "sql",
+          "sizeLines": 6,
+          "fileCategory": "data"
+        },
+        {
+          "path": "tests/cancel-event-schema.test.ts",
+          "language": "typescript",
+          "sizeLines": 22,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/cancellation-email.test.ts",
+          "language": "typescript",
+          "sizeLines": 38,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/cloudflare-access.test.ts",
+          "language": "typescript",
+          "sizeLines": 217,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/day-summary.test.ts",
+          "language": "typescript",
+          "sizeLines": 50,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "src/components/ui/select.tsx": [],
+        "src/components/ui/separator.tsx": [],
+        "src/components/ui/sonner.tsx": [],
+        "src/components/ui/tabs.tsx": [],
+        "src/components/ui/toggle.tsx": [],
+        "src/lib/availability.ts": [],
+        "src/lib/cancellation-email.ts": [],
+        "src/lib/cloudflare-access.ts": [],
+        "src/lib/cloudflare-auth-bridge.ts": [],
+        "src/lib/database.types.ts": [],
+        "src/lib/dev-auth.ts": [],
+        "src/lib/google-calendar.ts": [],
+        "src/lib/supabase/admin.ts": [],
+        "src/lib/supabase/client.ts": [],
+        "src/lib/supabase/proxy.ts": [],
+        "src/lib/supabase/server.ts": [],
+        "src/lib/types.ts": [],
+        "src/lib/utils.ts": [],
+        "src/middleware.ts": [],
+        "supabase/config.toml": [],
+        "supabase/seed.sql": [],
+        "tests/cancel-event-schema.test.ts": [],
+        "tests/cancellation-email.test.ts": [],
+        "tests/cloudflare-access.test.ts": [],
+        "tests/day-summary.test.ts": []
+      },
+      "neighborMap": {}
+    },
+    {
+      "batchIndex": 10,
+      "files": [
+        {
+          "path": "tests/event-calendar-sunday-start.test.ts",
+          "language": "typescript",
+          "sizeLines": 37,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/event-submit-guard.test.ts",
+          "language": "typescript",
+          "sizeLines": 29,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/google-calendar.test.ts",
+          "language": "typescript",
+          "sizeLines": 401,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/member-access.test.ts",
+          "language": "typescript",
+          "sizeLines": 62,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/month-calendar-label.test.ts",
+          "language": "typescript",
+          "sizeLines": 24,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/night-beach-theme.test.ts",
+          "language": "typescript",
+          "sizeLines": 84,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/personal-events.test.ts",
+          "language": "typescript",
+          "sizeLines": 47,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/planning-navigation.test.ts",
+          "language": "typescript",
+          "sizeLines": 30,
+          "fileCategory": "code"
+        },
+        {
+          "path": "tests/preset-panel.test.ts",
+          "language": "typescript",
+          "sizeLines": 29,
+          "fileCategory": "code"
+        }
+      ],
+      "batchImportData": {
+        "tests/event-calendar-sunday-start.test.ts": [],
+        "tests/event-submit-guard.test.ts": [],
+        "tests/google-calendar.test.ts": [],
+        "tests/member-access.test.ts": [],
+        "tests/month-calendar-label.test.ts": [],
+        "tests/night-beach-theme.test.ts": [],
+        "tests/personal-events.test.ts": [],
+        "tests/planning-navigation.test.ts": [],
+        "tests/preset-panel.test.ts": []
+      },
+      "neighborMap": {}
+    }
+  ]
+}
