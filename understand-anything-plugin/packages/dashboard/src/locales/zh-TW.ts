@@ -74,6 +74,7 @@ export const zhTW = {
     explanationGenerating: "正在產生說明…",
     explanationFailed: "無法產生說明。",
     noExplanation: "此檔案沒有可用說明。",
+    personaExplanationUnavailable: "此說明沒有適合所選閱讀程度的小節。",
     relatedFiles: "相關檔案",
   },
   fileExplorer: {

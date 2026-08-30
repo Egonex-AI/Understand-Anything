@@ -74,6 +74,7 @@ export const ru = {
     explanationGenerating: "Создание описания…",
     explanationFailed: "Не удалось создать описание.",
     noExplanation: "Для этого файла нет описания.",
+    personaExplanationUnavailable: "В этом описании нет разделов для выбранного уровня чтения.",
     relatedFiles: "Связанные файлы",
   },
   fileExplorer: {

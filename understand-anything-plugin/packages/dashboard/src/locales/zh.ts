@@ -74,6 +74,7 @@ export const zh = {
     explanationGenerating: "正在生成说明…",
     explanationFailed: "无法生成说明。",
     noExplanation: "此文件没有可用说明。",
+    personaExplanationUnavailable: "此说明没有适合所选阅读级别的小节。",
     relatedFiles: "相关文件",
   },
   fileExplorer: {

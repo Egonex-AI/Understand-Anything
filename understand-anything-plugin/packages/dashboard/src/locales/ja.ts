@@ -74,6 +74,7 @@ export const ja = {
     explanationGenerating: "解説を生成しています…",
     explanationFailed: "解説を生成できませんでした。",
     noExplanation: "このファイルの解説データはありません。",
+    personaExplanationUnavailable: "この解説には、選択した読みやすさに対応する見出しがありません。",
     relatedFiles: "関連ファイル",
   },
   fileExplorer: {

@@ -74,6 +74,7 @@ export const en = {
     explanationGenerating: "Generating explanation…",
     explanationFailed: "Explanation could not be generated.",
     noExplanation: "No explanation is available for this file.",
+    personaExplanationUnavailable: "This explanation does not include sections for the selected reading level.",
     relatedFiles: "Related files",
   },
   fileExplorer: {

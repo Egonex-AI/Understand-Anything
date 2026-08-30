@@ -74,6 +74,7 @@ export const ko = {
     explanationGenerating: "설명을 생성하는 중…",
     explanationFailed: "설명을 생성할 수 없습니다.",
     noExplanation: "이 파일에 사용할 수 있는 설명이 없습니다.",
+    personaExplanationUnavailable: "이 설명에는 선택한 읽기 수준에 맞는 섹션이 없습니다.",
     relatedFiles: "관련 파일",
   },
   fileExplorer: {

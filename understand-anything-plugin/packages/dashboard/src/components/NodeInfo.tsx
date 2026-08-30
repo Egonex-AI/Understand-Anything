@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { complexityLabel, edgeDirectionalLabel, nodeTypeLabel } from "../locales/displayLabels";
+import { explanationForPersona } from "../utils/explanationSections";
 import type { NodeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 // Badge color classes keyed by NodeType — must be kept in sync with core NodeType union.
@@ -56,6 +57,7 @@ function FigmaThumbnail({ node }: { node: GraphNode }) {
 function FileExplanation({ node, graph }: { node: GraphNode; graph: KnowledgeGraph }) {
   const { t } = useI18n();
   const navigateToNode = useDashboardStore((s) => s.navigateToNode);
+  const persona = useDashboardStore((s) => s.persona);
   const expanded = useDashboardStore((s) => s.explanationExpandedNodeIds.has(node.id));
   const toggleExplanation = useDashboardStore((s) => s.toggleExplanation);
 
@@ -68,11 +70,16 @@ function FileExplanation({ node, graph }: { node: GraphNode; graph: KnowledgeGra
     .filter((candidate, index, candidates) => candidates.findIndex((item) => item.id === candidate.id) === index);
 
   const status = node.explanationStatus ?? (node.explanation ? "ready" : "unavailable");
+  const personaExplanation = status === "ready" && node.explanation
+    ? explanationForPersona(node.explanation, persona)
+    : null;
   const message = status === "generating"
     ? t.nodeInfo.explanationGenerating
     : status === "failed"
       ? node.explanationError ?? t.nodeInfo.explanationFailed
-      : t.nodeInfo.noExplanation;
+      : status === "ready"
+        ? t.nodeInfo.personaExplanationUnavailable
+        : t.nodeInfo.noExplanation;
 
   return (
     <section className="mb-4 rounded-lg border border-accent/25 bg-accent/5 p-3">
@@ -87,9 +94,9 @@ function FileExplanation({ node, graph }: { node: GraphNode; graph: KnowledgeGra
       </button>
       {expanded && (
         <div className="mt-3 space-y-3">
-          {status === "ready" && node.explanation ? (
+          {personaExplanation ? (
             <div className="prose prose-invert prose-sm max-w-none text-text-secondary prose-headings:text-text-primary prose-headings:font-heading prose-h2:text-sm prose-h3:text-xs prose-p:leading-relaxed prose-li:my-1">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{node.explanation}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{personaExplanation}</ReactMarkdown>
             </div>
           ) : (
             <p className="text-sm text-text-secondary" role="status">{message}</p>
