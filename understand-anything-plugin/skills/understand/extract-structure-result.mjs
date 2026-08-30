@@ -47,6 +47,11 @@ function isTypedNameArray(value) {
     typeof entry.type === 'string');
 }
 
+function isTypedFieldArray(value) {
+  return isTypedNameArray(value) && value.every(entry =>
+    entry.isStatic === undefined || typeof entry.isStatic === 'boolean');
+}
+
 function hasValidOptionalField(value, field, validator) {
   return value[field] === undefined || validator(value[field]);
 }
@@ -62,7 +67,9 @@ const STRUCTURE_ENTRY_VALIDATORS = {
     isLineRange(entry.lineRange) &&
     isStringArray(entry.params) &&
     hasValidOptionalField(entry, 'returnType', value => typeof value === 'string') &&
-    hasValidOptionalField(entry, 'typedParams', isTypedNameArray),
+    hasValidOptionalField(entry, 'typedParams', isTypedNameArray) &&
+    hasValidOptionalField(entry, 'kind', value =>
+      ['method', 'constructor'].includes(value)),
   classes: entry =>
     typeof entry.name === 'string' &&
     isLineRange(entry.lineRange) &&
@@ -74,7 +81,7 @@ const STRUCTURE_ENTRY_VALIDATORS = {
     hasValidOptionalField(entry, 'fullName', value => typeof value === 'string') &&
     hasValidOptionalField(entry, 'baseTypes', isStringArray) &&
     hasValidOptionalField(entry, 'primaryConstructorParams', isTypedNameArray) &&
-    hasValidOptionalField(entry, 'fields', isTypedNameArray),
+    hasValidOptionalField(entry, 'fields', isTypedFieldArray),
   imports: entry =>
     typeof entry.source === 'string' &&
     isStringArray(entry.specifiers) &&
@@ -255,6 +262,7 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
       params: fn.params || [],
       ...(fn.returnType ? { returnType: fn.returnType } : {}),
       ...(fn.typedParams ? { typedParams: fn.typedParams } : {}),
+      ...(fn.kind ? { kind: fn.kind } : {}),
     }));
   }
 

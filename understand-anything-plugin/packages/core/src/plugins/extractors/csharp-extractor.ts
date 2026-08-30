@@ -449,6 +449,7 @@ export class CSharpExtractor implements LanguageExtractor {
             params: typedParams.map(param => param.name),
             returnType: extractReturnType(methodNode),
             typedParams,
+            kind: "method",
           });
         }
       }
@@ -547,6 +548,7 @@ export class CSharpExtractor implements LanguageExtractor {
       params,
       returnType,
       typedParams,
+      kind: "method",
     });
 
     if (hasModifier(node, "public")) {
@@ -580,6 +582,7 @@ export class CSharpExtractor implements LanguageExtractor {
       ],
       params,
       typedParams,
+      kind: "constructor",
       // Constructors have no return type
     });
 
@@ -629,6 +632,7 @@ export class CSharpExtractor implements LanguageExtractor {
         fields.push({
           name: nameNode.text,
           type,
+          ...(hasModifier(node, "static") ? { isStatic: true } : {}),
         });
 
         if (hasModifier(node, "public")) {

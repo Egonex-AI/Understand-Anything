@@ -212,6 +212,7 @@ export interface TypedParameter {
 export interface TypedField {
   name: string;
   type: string;
+  isStatic?: boolean;
 }
 
 // Plugin interfaces
@@ -225,6 +226,7 @@ export interface StructuralAnalysis {
      * Omitted by extractors that only represent methods in classes[].methods. */
     owner?: string | null;
     typedParams?: TypedParameter[];
+    kind?: "method" | "constructor";
   }>;
   classes: Array<{
     name: string;

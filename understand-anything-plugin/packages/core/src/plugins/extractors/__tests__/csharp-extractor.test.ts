@@ -54,6 +54,7 @@ describe("CSharpExtractor", () => {
       expect(result.functions).toHaveLength(2);
 
       expect(result.functions[0].name).toBe("GetName");
+      expect(result.functions[0].kind).toBe("method");
       expect(result.functions[0].params).toEqual(["id"]);
       expect(result.functions[0].returnType).toBe("string");
 
@@ -78,6 +79,7 @@ describe("CSharpExtractor", () => {
 
       expect(result.functions).toHaveLength(1);
       expect(result.functions[0].name).toBe("Foo");
+      expect(result.functions[0].kind).toBe("constructor");
       expect(result.functions[0].params).toEqual(["name", "value"]);
       expect(result.functions[0].returnType).toBeUndefined();
 
@@ -796,6 +798,7 @@ public sealed class Service(IRepository repository) : BaseService, IService
 public class Service
 {
     private readonly IRepository _repository;
+    private static readonly ICache Cache;
     public void Run(IRepository repository) { }
 }
 `);
@@ -805,11 +808,13 @@ public class Service
     expect(service).toBeDefined();
     expect(service!.fields).toEqual([
       { name: "_repository", type: "IRepository" },
+      { name: "Cache", type: "ICache", isStatic: true },
     ]);
 
     const run = result.functions.find((fn) => fn.name === "Run");
     expect(run).toBeDefined();
     expect(run!.params).toEqual(["repository"]);
+    expect(run!.kind).toBe("method");
     expect(run!.typedParams).toEqual([
       { name: "repository", type: "IRepository" },
     ]);
