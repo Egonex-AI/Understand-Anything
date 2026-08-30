@@ -25,6 +25,71 @@ function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function beginnerSummaryBody(explanation) {
+  if (!nonEmptyString(explanation)) return "";
+  const lines = explanation.split(/\r?\n/);
+  const summaryIndex = lines.findIndex(
+    (line) => line.trim() === "## 初心者向けまとめ",
+  );
+  if (summaryIndex < 0) return "";
+  const evidenceIndex = lines.findIndex(
+    (line, index) => index > summaryIndex && line.trim() === "## 根拠",
+  );
+  if (evidenceIndex < 0) return "";
+  return lines.slice(summaryIndex + 1, evidenceIndex).join("\n").trim();
+}
+
+/**
+ * Check only mechanical beginner-summary constraints. Whether each sentence
+ * is supported by the evidence remains a human review concern.
+ */
+export function validateBeginnerSummary(explanation, { nodeId = "unknown" } = {}) {
+  const body = beginnerSummaryBody(explanation);
+  if (!body) {
+    return [
+      issue(
+        "beginner-summary-empty",
+        `Ready file node '${nodeId}' must have a non-empty beginner summary`,
+        { nodeId },
+      ),
+    ];
+  }
+
+  const sentences = body.split(/(?<=。)/u).map((sentence) => sentence.trim()).filter(Boolean);
+  const issues = [];
+  if (sentences.length < 3 || sentences.length > 5) {
+    issues.push(
+      issue(
+        "beginner-summary-sentence-count",
+        `Beginner summary for '${nodeId}' must contain 3-5 Japanese sentences, found ${sentences.length}`,
+        { nodeId, count: sentences.length },
+      ),
+    );
+  }
+  sentences.forEach((sentence, index) => {
+    const length = Array.from(sentence).length;
+    if (length > 40) {
+      issues.push(
+        issue(
+          "beginner-summary-sentence-length",
+          `Beginner summary sentence ${index + 1} for '${nodeId}' exceeds 40 characters (${length})`,
+          { nodeId, sentenceIndex: index, length },
+        ),
+      );
+    }
+  });
+  if (!sentences.every((sentence) => sentence.endsWith("。"))) {
+    issues.push(
+      issue(
+        "beginner-summary-sentence-termination",
+        `Beginner summary for '${nodeId}' must terminate each sentence with '。'`,
+        { nodeId },
+      ),
+    );
+  }
+  return issues;
+}
+
 function issue(code, message, details = {}) {
   return { code, message, ...details };
 }
@@ -42,9 +107,13 @@ function issue(code, message, details = {}) {
  *   ratio, inclusive.
  * @param {boolean} [options.checkGraphIntegrity=true] Check node IDs and edge
  *   endpoints in addition to explanation fields.
+ * @param {boolean} [options.beginnerQuality=false] Check that ready file
+ *   explanations contain a 3-5 sentence beginner summary with <=40
+ *   characters per sentence.
  * @returns {{valid: boolean, totalFileNodes: number, expectedFileNodes: number|null,
  *   readyCount: number, failedCount: number, readyRatio: number,
- *   statusCounts: Record<string, number>, issues: Array<object>}}
+ *   statusCounts: Record<string, number>, beginnerQuality: object,
+ *   issues: Array<object>}}
  */
 export function validateExplanations(graph, options = {}) {
   const expectedFileNodes = Object.hasOwn(options, "expectedFileNodes")
@@ -52,6 +121,7 @@ export function validateExplanations(graph, options = {}) {
     : null;
   const minimumReadyRatio = options.minimumReadyRatio ?? 0.8;
   const checkGraphIntegrity = options.checkGraphIntegrity ?? true;
+  const beginnerQualityEnabled = options.beginnerQuality ?? false;
   const issues = [];
 
   if (!isRecord(graph)) {
@@ -63,6 +133,11 @@ export function validateExplanations(graph, options = {}) {
       failedCount: 0,
       readyRatio: 0,
       statusCounts: {},
+      beginnerQuality: {
+        enabled: beginnerQualityEnabled,
+        checkedCount: 0,
+        validCount: 0,
+      },
       issues: [issue("graph.invalid", "Graph must be a JSON object")],
     };
   }
@@ -83,6 +158,8 @@ export function validateExplanations(graph, options = {}) {
   const statusCounts = {};
   let readyCount = 0;
   let failedCount = 0;
+  let beginnerSummaryChecked = 0;
+  let beginnerSummaryValid = 0;
 
   if (fileNodes.length === 0) {
     issues.push(issue("file-nodes-empty", "Graph must contain at least one type=file node"));
@@ -134,6 +211,17 @@ export function validateExplanations(graph, options = {}) {
                 { nodeId: node.id, heading },
               ),
             );
+          }
+        }
+        if (beginnerQualityEnabled) {
+          beginnerSummaryChecked += 1;
+          const beginnerIssues = validateBeginnerSummary(node.explanation, {
+            nodeId: node.id ?? index,
+          });
+          if (beginnerIssues.length === 0) {
+            beginnerSummaryValid += 1;
+          } else {
+            issues.push(...beginnerIssues);
           }
         }
       }
@@ -213,6 +301,11 @@ export function validateExplanations(graph, options = {}) {
     failedCount,
     readyRatio,
     statusCounts,
+    beginnerQuality: {
+      enabled: beginnerQualityEnabled,
+      checkedCount: beginnerSummaryChecked,
+      validCount: beginnerSummaryValid,
+    },
     issues,
   };
 }

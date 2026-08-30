@@ -38,7 +38,7 @@
         "react-component"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n許可メール一覧を表示し、役割・有効状態・登録内容を Supabase RPC 経由で管理するクライアント画面です。プレビュー時はローカル状態だけを更新します。\n\n## 呼ばれる場面\n\nAdminPanel が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ initialEntries, role, actorEmail, preview = false }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nAdminPanel（12–73行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/components/ui/button.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/admin/admin-panel.tsx` — AdminPanel（12–73行）",
+      "explanation": "## 役割\n\n許可メール一覧を表示し、役割・有効状態・登録内容を Supabase RPC 経由で管理するクライアント画面です。プレビュー時はローカル状態だけを更新します。\n\n## 呼ばれる場面\n\nAdminPanel が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ initialEntries, role, actorEmail, preview = false }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nAdminPanel（12–73行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/components/ui/button.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこの画面では、利用を許可するメールアドレスを管理します。役割や有効かどうかを確認して変更できます。プレビューでは本番データを変更しません。\n\n## 根拠\n\n- `src/app/admin/admin-panel.tsx` — AdminPanel（12–73行）",
       "explanationStatus": "ready"
     },
     {
@@ -70,7 +70,7 @@
         "server-component"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n開発プレビューまたは Supabase セッションを確認し、管理者権限と許可メール一覧を AdminPanel に渡す管理ページです。\n\n## 呼ばれる場面\n\nAdminPage が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\nAdminPage（7–20行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/app/admin/admin-panel.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/admin/page.tsx` — AdminPage（7–20行）",
+      "explanation": "## 役割\n\n開発プレビューまたは Supabase セッションを確認し、管理者権限と許可メール一覧を AdminPanel に渡す管理ページです。\n\n## 呼ばれる場面\n\nAdminPage が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\nAdminPage（7–20行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/app/admin/admin-panel.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのページは、管理画面を開く前に利用者を確認します。管理者かどうかと許可メールの一覧を読み込みます。確認後に管理用の操作画面を表示します。\n\n## 根拠\n\n- `src/app/admin/page.tsx` — AdminPage（7–20行）",
       "explanationStatus": "ready"
     },
     {
@@ -102,7 +102,7 @@
         "通知"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nイベント取消要求を認証・権限確認し、Supabase の取消 RPC を実行した後、対象者へ取消メールを送って通知結果を記録する API です。\n\n## 呼ばれる場面\n\nPOST が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ndateLabel（6–8行）、POST（10–68行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cancellation-email.ts`、`src/lib/supabase/admin.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/api/events/cancel/route.ts` — dateLabel（6–8行）",
+      "explanation": "## 役割\n\nイベント取消要求を認証・権限確認し、Supabase の取消 RPC を実行した後、対象者へ取消メールを送って通知結果を記録する API です。\n\n## 呼ばれる場面\n\nPOST が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ndateLabel（6–8行）、POST（10–68行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cancellation-email.ts`、`src/lib/supabase/admin.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこの処理は、イベントを取り消す依頼を受け付けます。権限を確認してから取消を記録します。対象の参加者には取消のメールを送ります。\n\n## 根拠\n\n- `src/app/api/events/cancel/route.ts` — dateLabel（6–8行）",
       "explanationStatus": "ready"
     },
     {
@@ -134,7 +134,7 @@
         "supabase"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nイベントを Supabase から取得して同期権限と Google Calendar 設定を確認し、同期結果を events テーブルへ保存する API です。\n\n## 呼ばれる場面\n\nPOST が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nPOST（10–89行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/google-calendar.ts`、`src/lib/supabase/admin.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/api/events/sync/route.ts` — POST（10–89行）",
+      "explanation": "## 役割\n\nイベントを Supabase から取得して同期権限と Google Calendar 設定を確認し、同期結果を events テーブルへ保存する API です。\n\n## 呼ばれる場面\n\nPOST が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nPOST（10–89行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/google-calendar.ts`、`src/lib/supabase/admin.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこの処理は、イベント情報をGoogleカレンダーと同期します。同期できる権限と設定を確認してから実行します。結果はイベントの記録に保存されます。\n\n## 根拠\n\n- `src/app/api/events/sync/route.ts` — POST（10–89行）",
       "explanationStatus": "ready"
     },
     {
@@ -166,7 +166,7 @@
         "リダイレクト"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nSupabase 認証コールバックで安全な遷移先を検証し、認証済みなら指定先、未認証ならログイン画面へ転送します。\n\n## 呼ばれる場面\n\nGET が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nsafeNextPath（5–23行）、GET（25–39行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/supabase/server.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/auth/callback/route.ts` — safeNextPath（5–23行）",
+      "explanation": "## 役割\n\nSupabase 認証コールバックで安全な遷移先を検証し、認証済みなら指定先、未認証ならログイン画面へ転送します。\n\n## 呼ばれる場面\n\nGET が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nsafeNextPath（5–23行）、GET（25–39行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/supabase/server.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこの処理は、ログイン後の戻り先を安全に確認します。ログイン済みなら指定された画面へ移動します。未ログインならログイン画面へ戻します。\n\n## 根拠\n\n- `src/app/auth/callback/route.ts` — safeNextPath（5–23行）",
       "explanationStatus": "ready"
     },
     {
@@ -215,7 +215,7 @@
         "cloudflare-access"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nCloudflare 認証モードではログアウト URL へ、それ以外や設定失敗時はローカルのログイン画面へ転送するルートです。\n\n## 呼ばれる場面\n\nGET が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nGET（4–12行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/auth/cloudflare/logout/route.ts` — GET（4–12行）",
+      "explanation": "## 役割\n\nCloudflare 認証モードではログアウト URL へ、それ以外や設定失敗時はローカルのログイン画面へ転送するルートです。\n\n## 呼ばれる場面\n\nGET が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nGET（4–12行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこの処理は、Cloudflare認証でのログアウト先を決めます。設定が使える場合は専用のログアウト先へ移動します。使えない場合はアプリのログイン画面へ戻します。\n\n## 根拠\n\n- `src/app/auth/cloudflare/logout/route.ts` — GET（4–12行）",
       "explanationStatus": "ready"
     },
     {
@@ -247,7 +247,7 @@
         "cloudflare-access"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nCloudflare Access トークンを検証し、許可メールだけに Supabase magic link を発行してセッション Cookie を確立する認証ルートです。\n\n## 呼ばれる場面\n\nGET が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nGET（8–53行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/cloudflare-auth-bridge.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/auth/cloudflare/route.ts` — GET（8–53行）",
+      "explanation": "## 役割\n\nCloudflare Access トークンを検証し、許可メールだけに Supabase magic link を発行してセッション Cookie を確立する認証ルートです。\n\n## 呼ばれる場面\n\nGET が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nGET（8–53行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/cloudflare-auth-bridge.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこの処理は、Cloudflare経由のログインを確認します。許可されたメールアドレスだけログインを続けられます。確認できるとアプリ用のログイン状態を作ります。\n\n## 根拠\n\n- `src/app/auth/cloudflare/route.ts` — GET（8–53行）",
       "explanationStatus": "ready"
     },
     {
@@ -279,7 +279,7 @@
         "supabase"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n認証ユーザーの profile、参加者一覧、availability_presets を Supabase から取得し、AvailabilityBoard を初期化するページです。\n\n## 呼ばれる場面\n\nAvailabilityPage が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\nAvailabilityPage（7–45行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/availability-board.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/availability/page.tsx` — AvailabilityPage（7–45行）",
+      "explanation": "## 役割\n\n認証ユーザーの profile、参加者一覧、availability_presets を Supabase から取得し、AvailabilityBoard を初期化するページです。\n\n## 呼ばれる場面\n\nAvailabilityPage が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\nAvailabilityPage（7–45行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/availability-board.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのページは、空き時間画面に必要な情報を読み込みます。自分の情報、参加者、空き時間の定型を集めます。読み込んだ情報を空き時間の画面へ渡します。\n\n## 根拠\n\n- `src/app/availability/page.tsx` — AvailabilityPage（7–45行）",
       "explanationStatus": "ready"
     },
     {
@@ -311,7 +311,7 @@
         "supabase"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nSupabase から events、event_participants、profiles、現在の役割を取得し、EventCalendar に初期データを渡すイベント一覧ページです。\n\n## 呼ばれる場面\n\nEventsPage が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\nEventsPage（6–25行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/app/events/event-calendar.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/app/events/page.tsx` — EventsPage（6–25行）",
+      "explanation": "## 役割\n\nSupabase から events、event_participants、profiles、現在の役割を取得し、EventCalendar に初期データを渡すイベント一覧ページです。\n\n## 呼ばれる場面\n\nEventsPage が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\nEventsPage（6–25行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/app/events/event-calendar.tsx`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのページは、イベント一覧に必要な情報を読み込みます。予定、参加者、利用者情報、役割を集めます。読み込んだ情報をイベントカレンダーへ渡します。\n\n## 根拠\n\n- `src/app/events/page.tsx` — EventsPage（6–25行）",
       "explanationStatus": "ready"
     },
     {
@@ -344,7 +344,7 @@
         "tested"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n取消通知メールの件名・テキスト・HTMLを組み立て、Resend API が設定済みなら送信するサーバー用ユーティリティです。\n\n## 呼ばれる場面\n\nbuildCancellationEmail、sendCancellationEmail が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nescapeHtml（12–12行）、buildCancellationEmail（14–24行） など全 3 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/cancellation-email.ts` — escapeHtml（12–12行）",
+      "explanation": "## 役割\n\n取消通知メールの件名・テキスト・HTMLを組み立て、Resend API が設定済みなら送信するサーバー用ユーティリティです。\n\n## 呼ばれる場面\n\nbuildCancellationEmail、sendCancellationEmail が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nescapeHtml（12–12行）、buildCancellationEmail（14–24行） など全 3 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n予定キャンセル通知のメール内容を作る処理です。件名や本文をテキストとHTMLで組み立てます。設定がそろった場合だけResendで送信します。入力値のHTMLも安全に扱います。\n\n## 根拠\n\n- `src/lib/cancellation-email.ts` — escapeHtml（12–12行）",
       "explanationStatus": "ready"
     },
     {
@@ -394,7 +394,7 @@
         "tested"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nCloudflare Access の設定値、許可 origin、JWT 検証、ログアウト URL、リクエスト Cookie からのトークン取得を集約します。\n\n## 呼ばれる場面\n\nisLoopbackSupabaseUrl、isLocalAuthAllowed、cloudflareAppOrigin など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `name` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nrequired（6–10行）、isLoopbackSupabaseUrl（12–24行） など全 10 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/cloudflare-access.ts` — required（6–10行）",
+      "explanation": "## 役割\n\nCloudflare Access の設定値、許可 origin、JWT 検証、ログアウト URL、リクエスト Cookie からのトークン取得を集約します。\n\n## 呼ばれる場面\n\nisLoopbackSupabaseUrl、isLocalAuthAllowed、cloudflareAppOrigin など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `name` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nrequired（6–10行）、isLoopbackSupabaseUrl（12–24行） など全 10 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nCloudflare Access認証に必要な設定を検証します。許可された接続元やJWTのメールを確認します。認証トークンやログアウト先も取り出します。\n\n## 根拠\n\n- `src/lib/cloudflare-access.ts` — required（6–10行）",
       "explanationStatus": "ready"
     },
     {
@@ -546,7 +546,7 @@
         "tested"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n安全な相対遷移先を検証し、allowed_emails の有効行を確認してから Supabase magic link を生成する認証橋渡し層です。\n\n## 呼ばれる場面\n\nsafeNextPath、generateSupabaseMagicLinkIfAllowed、generateSupabaseMagicLink が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nsafeNextPath（3–11行）、generateSupabaseMagicLinkIfAllowed（41–53行） など全 3 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/cloudflare-auth-bridge.ts` — safeNextPath（3–11行）",
+      "explanation": "## 役割\n\n安全な相対遷移先を検証し、allowed_emails の有効行を確認してから Supabase magic link を生成する認証橋渡し層です。\n\n## 呼ばれる場面\n\nsafeNextPath、generateSupabaseMagicLinkIfAllowed、generateSupabaseMagicLink が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `value` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nsafeNextPath（3–11行）、generateSupabaseMagicLinkIfAllowed（41–53行） など全 3 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n安全な遷移先と許可メールを確認する認証処理です。条件を満たすメールだけSupabaseの一回限りリンクを作ります。不正な入力や未許可メールは先へ進めません。\n\n## 根拠\n\n- `src/lib/cloudflare-auth-bridge.ts` — safeNextPath（3–11行）",
       "explanationStatus": "ready"
     },
     {
@@ -612,7 +612,7 @@
         "supabase"
       ],
       "complexity": "complex",
-      "explanation": "## 役割\n\nSupabase の public schema にあるテーブル、行、挿入・更新型、関数戻り値、列挙型を TypeScript 型として定義します。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\n有意な関数定義は抽出されていません。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/database.types.ts` — ファイル全体",
+      "explanation": "## 役割\n\nSupabase の public schema にあるテーブル、行、挿入・更新型、関数戻り値、列挙型を TypeScript 型として定義します。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\n有意な関数定義は抽出されていません。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nSupabaseのデータ構造をTypeScriptの型で表すファイルです。テーブルの列や追加・更新データの形を定義します。画面を直接表示する処理はありません。\n\n## 根拠\n\n- `src/lib/database.types.ts` — ファイル全体",
       "explanationStatus": "ready"
     },
     {
@@ -628,7 +628,7 @@
         "tested"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nGoogle OAuth の access token を取得・キャッシュし、アプリのイベントを Google Calendar 形式へ変換して登録・削除・権限判定する連携層です。\n\n## 呼ばれる場面\n\nisConfigured、getAccessToken、resetTokenCache など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `res` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ngetConfig（22–32行）、isConfigured（34–36行） など全 12 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/google-calendar.ts` — getConfig（22–32行）",
+      "explanation": "## 役割\n\nGoogle OAuth の access token を取得・キャッシュし、アプリのイベントを Google Calendar 形式へ変換して登録・削除・権限判定する連携層です。\n\n## 呼ばれる場面\n\nisConfigured、getAccessToken、resetTokenCache など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `res` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ngetConfig（22–32行）、isConfigured（34–36行） など全 12 件を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nGoogle Calendar連携の設定と通信をまとめます。予定をGoogle形式に変換し、登録や削除を行います。アクセストークンを一時保存し、同期結果も返します。\n\n## 根拠\n\n- `src/lib/google-calendar.ts` — getConfig（22–32行）",
       "explanationStatus": "ready"
     },
     {
@@ -847,7 +847,7 @@
         "管理権限"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nservice role key を使う Supabase 管理クライアントを生成し、Database 型を付けてサーバー処理へ提供します。\n\n## 呼ばれる場面\n\ncreateAdminClient が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\ncreateAdminClient（7–16行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/database.types.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/supabase/admin.ts` — createAdminClient（7–16行）",
+      "explanation": "## 役割\n\nservice role key を使う Supabase 管理クライアントを生成し、Database 型を付けてサーバー処理へ提供します。\n\n## 呼ばれる場面\n\ncreateAdminClient が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\ncreateAdminClient（7–16行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/database.types.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n管理用のSupabaseクライアントを作ります。サービスロールキーでサーバーからデータを操作します。データベースの型を付けて安全に扱います。\n\n## 根拠\n\n- `src/lib/supabase/admin.ts` — createAdminClient（7–16行）",
       "explanationStatus": "ready"
     },
     {
@@ -879,7 +879,7 @@
         "アクセス制御"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n全リクエストで認証モード、Cloudflare Access、Supabase セッション、許可リスト、管理者権限、nickname を順に検査して遷移を制御します。\n\n## 呼ばれる場面\n\nupdateSession が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `pathname` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nisPublicPath（14–16行）、updateSession（18–146行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/supabase/proxy.ts` — isPublicPath（14–16行）",
+      "explanation": "## 役割\n\n全リクエストで認証モード、Cloudflare Access、Supabase セッション、許可リスト、管理者権限、nickname を順に検査して遷移を制御します。\n\n## 呼ばれる場面\n\nupdateSession が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `pathname` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nisPublicPath（14–16行）、updateSession（18–146行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/database.types.ts` などへの imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nリクエストごとの認証と画面遷移を管理します。認証方式や許可リスト、管理者権限を順に確認します。必要ならログインやニックネーム設定へ送ります。\n\n## 根拠\n\n- `src/lib/supabase/proxy.ts` — isPublicPath（14–16行）",
       "explanationStatus": "ready"
     },
     {
@@ -911,7 +911,7 @@
         "server-only"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nNext.js の Cookie ストアと接続した型付き Supabase サーバークライアントを生成します。\n\n## 呼ばれる場面\n\ncreateClient が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\ncreateClient（6–30行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/database.types.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/supabase/server.ts` — createClient（6–30行）",
+      "explanation": "## 役割\n\nNext.js の Cookie ストアと接続した型付き Supabase サーバークライアントを生成します。\n\n## 呼ばれる場面\n\ncreateClient が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\ncreateClient（6–30行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/database.types.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nサーバー処理で使うSupabaseクライアントを作ります。Next.jsのCookieからセッションを読み書きします。データベースの型を付けて接続します。\n\n## 根拠\n\n- `src/lib/supabase/server.ts` — createClient（6–30行）",
       "explanationStatus": "ready"
     },
     {
@@ -943,7 +943,7 @@
         "認証"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nNext.js middleware の入口として updateSession を呼び、静的資産を除くリクエストに認証・セッション処理を適用します。\n\n## 呼ばれる場面\n\nmiddleware が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nmiddleware（7–9行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/supabase/proxy.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/middleware.ts` — middleware（7–9行）",
+      "explanation": "## 役割\n\nNext.js middleware の入口として updateSession を呼び、静的資産を除くリクエストに認証・セッション処理を適用します。\n\n## 呼ばれる場面\n\nmiddleware が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `request` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nmiddleware（7–9行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/supabase/proxy.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nNext.jsのリクエスト入口です。静的ファイル以外でセッション確認処理を呼びます。認証状態に応じた画面遷移につなげます。\n\n## 根拠\n\n- `src/middleware.ts` — middleware（7–9行）",
       "explanationStatus": "ready"
     },
     {
@@ -975,7 +975,7 @@
         "回帰テスト"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n取消メールの件名、本文、HTML escape、Resend API 未設定時の送信抑止を検証する Node.js テストです。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\n有意な関数定義は抽出されていません。\n\n## 依存・データの流れ\n\n`src/lib/cancellation-email.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `tests/cancellation-email.test.ts` — ファイル全体",
+      "explanation": "## 役割\n\n取消メールの件名、本文、HTML escape、Resend API 未設定時の送信抑止を検証する Node.js テストです。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\n有意な関数定義は抽出されていません。\n\n## 依存・データの流れ\n\n`src/lib/cancellation-email.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nキャンセル通知メールの動きを確認するテストです。件名や本文、HTMLの安全な変換を検証します。送信設定がない場合に送らないことも確認します。\n\n## 根拠\n\n- `tests/cancellation-email.test.ts` — ファイル全体",
       "explanationStatus": "ready"
     },
     {
@@ -990,7 +990,7 @@
         "cloudflare-access"
       ],
       "complexity": "complex",
-      "explanation": "## 役割\n\nCloudflare Access の JWT 検証、origin 判定、ローカル認証条件、認証橋渡しの許可リスト処理を検証するテスト群です。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n確認できる引数は `overrides` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ntoken（29–39行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/cloudflare-auth-bridge.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `tests/cloudflare-access.test.ts` — token（29–39行）",
+      "explanation": "## 役割\n\nCloudflare Access の JWT 検証、origin 判定、ローカル認証条件、認証橋渡しの許可リスト処理を検証するテスト群です。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n確認できる引数は `overrides` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ntoken（29–39行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/cloudflare-access.ts`、`src/lib/cloudflare-auth-bridge.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nCloudflare認証の条件を確認するテストです。JWTや接続元、許可リストの処理を検証します。認証橋渡しの設定も対象です。\n\n## 根拠\n\n- `tests/cloudflare-access.test.ts` — token（29–39行）",
       "explanationStatus": "ready"
     },
     {
@@ -1022,7 +1022,7 @@
         "回帰テスト"
       ],
       "complexity": "complex",
-      "explanation": "## 役割\n\nGoogle Calendar 連携の設定判定、トークン処理、イベント変換、登録・削除、同期権限を広範に検証するテスト群です。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\n有意な関数定義は抽出されていません。\n\n## 依存・データの流れ\n\n`src/lib/google-calendar.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `tests/google-calendar.test.ts` — ファイル全体",
+      "explanation": "## 役割\n\nGoogle Calendar 連携の設定判定、トークン処理、イベント変換、登録・削除、同期権限を広範に検証するテスト群です。\n\n## 呼ばれる場面\n\n公開関数と具体的な呼び出し元は抽出範囲で確認できません。\n\n## 入出力\n\n構造抽出では関数引数と戻り値を確認できません。\n\n## 主な処理\n\n有意な関数定義は抽出されていません。\n\n## 依存・データの流れ\n\n`src/lib/google-calendar.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nGoogle Calendar連携の動きを確認するテストです。設定、トークン、予定変換、登録と削除を検証します。同期できる利用者の条件も確認します。\n\n## 根拠\n\n- `tests/google-calendar.test.ts` — ファイル全体",
       "explanationStatus": "ready"
     },
     {
@@ -1038,7 +1038,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n許可リスト外の利用者へアクセス拒否理由を示し、別アカウントでの再ログイン手段を提供する画面です。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nAccessDeniedPage（3-18行） が中心です。\n## 依存・データの流れ\n`src/components/sign-out-button.tsx` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/access-denied/page.tsx` — AccessDeniedPage（3-18行）；`src/components/sign-out-button.tsx` — imports",
+      "explanation": "## 役割\n許可リスト外の利用者へアクセス拒否理由を示し、別アカウントでの再ログイン手段を提供する画面です。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nAccessDeniedPage（3-18行） が中心です。\n## 依存・データの流れ\n`src/components/sign-out-button.tsx` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこの画面は、利用を許可されていない人に理由を伝えます。別のアカウントでログインし直す案内も表示します。許可されないまま機能を使うことはできません。\n\n## 根拠\n`src/app/access-denied/page.tsx` — AccessDeniedPage（3-18行）；`src/components/sign-out-button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1071,7 +1071,7 @@
       ],
       "complexity": "complex",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n空き時間プリセットの追加・編集・削除を行うダイアログで、入力検証後に `availability_presets` を更新します。\n## 呼ばれる場面\nPresetDialog などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nPresetDialog（31-76行）、PresetForm（78-271行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/components/ui/checkbox.tsx` を import（ほか5件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/availability/_components/preset-dialog.tsx` — PresetDialog（31-76行）、PresetForm（78-271行）；`src/components/ui/button.tsx` — imports",
+      "explanation": "## 役割\n空き時間プリセットの追加・編集・削除を行うダイアログで、入力検証後に `availability_presets` を更新します。\n## 呼ばれる場面\nPresetDialog などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nPresetDialog（31-76行）、PresetForm（78-271行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/components/ui/checkbox.tsx` を import（ほか5件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのダイアログでは、空き時間の定型を作れます。作った定型は編集や削除もできます。入力に問題がなければ空き時間の定型として保存します。\n\n## 根拠\n`src/app/availability/_components/preset-dialog.tsx` — PresetDialog（31-76行）、PresetForm（78-271行）；`src/components/ui/button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1121,7 +1121,7 @@
       ],
       "complexity": "complex",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n空き時間プリセットを一覧表示し、有効化と管理ダイアログの状態を調整する操作パネルです。\n## 呼ばれる場面\nPresetPanel などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nPresetPanel（18-329行） が中心です。\n## 依存・データの流れ\n`src/app/availability/_components/preset-dialog.tsx`、`src/components/ui/button.tsx` を import（ほか4件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/availability/_components/preset-panel.tsx` — PresetPanel（18-329行）；`src/app/availability/_components/preset-dialog.tsx` — imports",
+      "explanation": "## 役割\n空き時間プリセットを一覧表示し、有効化と管理ダイアログの状態を調整する操作パネルです。\n## 呼ばれる場面\nPresetPanel などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nPresetPanel（18-329行） が中心です。\n## 依存・データの流れ\n`src/app/availability/_components/preset-dialog.tsx`、`src/components/ui/button.tsx` を import（ほか4件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのパネルは、空き時間の定型を一覧で表示します。使う定型を有効にできます。定型を管理する画面を開くこともできます。\n\n## 根拠\n`src/app/availability/_components/preset-panel.tsx` — PresetPanel（18-329行）；`src/app/availability/_components/preset-dialog.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1154,7 +1154,7 @@
       ],
       "complexity": "moderate",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nSupabase のパスワード認証または OAuth 認証を開始し、指定された遷移先へ利用者を送るログインフォームです。\n## 呼ばれる場面\nLoginButton などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nLoginButton（7-73行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/lib/supabase/client.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/login/login-button.tsx` — LoginButton（7-73行）；`src/components/ui/button.tsx` — imports",
+      "explanation": "## 役割\nSupabase のパスワード認証または OAuth 認証を開始し、指定された遷移先へ利用者を送るログインフォームです。\n## 呼ばれる場面\nLoginButton などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nLoginButton（7-73行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/lib/supabase/client.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのフォームは、ログインを始めるために使います。パスワードまたは外部サービスで認証できます。ログイン後は指定された画面へ移動します。\n\n## 根拠\n`src/app/login/login-button.tsx` — LoginButton（7-73行）；`src/components/ui/button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1187,7 +1187,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nログイン画面を構成し、Supabase URL がローカル環境かを判定して利用可能な認証方法を切り替えます。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nisLocalSupabaseUrl（3-15行）、LoginPage（17-40行） が中心です。\n## 依存・データの流れ\n`src/app/login/login-button.tsx` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/login/page.tsx` — isLocalSupabaseUrl（3-15行）、LoginPage（17-40行）；`src/app/login/login-button.tsx` — imports",
+      "explanation": "## 役割\nログイン画面を構成し、Supabase URL がローカル環境かを判定して利用可能な認証方法を切り替えます。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nisLocalSupabaseUrl（3-15行）、LoginPage（17-40行） が中心です。\n## 依存・データの流れ\n`src/app/login/login-button.tsx` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのページは、ログイン画面を表示します。利用できるログイン方法を接続先によって切り替えます。利用者は表示された方法でログインを始められます。\n\n## 根拠\n`src/app/login/page.tsx` — isLocalSupabaseUrl（3-15行）、LoginPage（17-40行）；`src/app/login/login-button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1237,7 +1237,7 @@
       ],
       "complexity": "moderate",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n初回利用者のニックネームを検証し、`setup_profile` RPC を呼んでプロフィールを初期化するフォームです。\n## 呼ばれる場面\nNicknameForm などの公開要素を利用する時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nNicknameForm（10-67行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/components/ui/input.tsx` を import（ほか2件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/setup-nickname/nickname-form.tsx` — NicknameForm（10-67行）；`src/components/ui/button.tsx` — imports",
+      "explanation": "## 役割\n初回利用者のニックネームを検証し、`setup_profile` RPC を呼んでプロフィールを初期化するフォームです。\n## 呼ばれる場面\nNicknameForm などの公開要素を利用する時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nNicknameForm（10-67行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/components/ui/input.tsx` を import（ほか2件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのフォームは、初めて使う人の名前を設定します。入力した名前を確認してプロフィールを作ります。設定が終わると利用開始の準備ができます。\n\n## 根拠\n`src/app/setup-nickname/nickname-form.tsx` — NicknameForm（10-67行）；`src/components/ui/button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1270,7 +1270,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nニックネーム設定フォームを配置し、初回プロフィール設定を案内する Next.js ページです。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nSetupNicknamePage（3-17行） が中心です。\n## 依存・データの流れ\n`src/app/setup-nickname/nickname-form.tsx` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/setup-nickname/page.tsx` — SetupNicknamePage（3-17行）；`src/app/setup-nickname/nickname-form.tsx` — imports",
+      "explanation": "## 役割\nニックネーム設定フォームを配置し、初回プロフィール設定を案内する Next.js ページです。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nSetupNicknamePage（3-17行） が中心です。\n## 依存・データの流れ\n`src/app/setup-nickname/nickname-form.tsx` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのページは、ニックネームを設定する画面を表示します。初回のプロフィール設定を利用者に案内します。入力は専用のフォームで行えます。\n\n## 根拠\n`src/app/setup-nickname/page.tsx` — SetupNicknamePage（3-17行）；`src/app/setup-nickname/nickname-form.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1303,7 +1303,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nSupabase セッションを終了し、ログイン画面へ戻す共通サインアウトボタンです。\n## 呼ばれる場面\nSignOutButton などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nSignOutButton（8-27行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/lib/supabase/client.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/sign-out-button.tsx` — SignOutButton（8-27行）；`src/components/ui/button.tsx` — imports",
+      "explanation": "## 役割\nSupabase セッションを終了し、ログイン画面へ戻す共通サインアウトボタンです。\n## 呼ばれる場面\nSignOutButton などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nSignOutButton（8-27行） が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/lib/supabase/client.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nログアウト用の共通ボタンです。押すとSupabaseのセッションを終了します。その後、ログアウト処理へ移動します。処理中はボタンを押せません。\n\n## 根拠\n`src/components/sign-out-button.tsx` — SignOutButton（8-27行）；`src/components/ui/button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1336,7 +1336,7 @@
       ],
       "complexity": "moderate",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n表示種別とサイズの variant を持つ共通 Button コンポーネントとスタイル定義を提供します。\n## 呼ばれる場面\nButton などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nButton（43-56行） が中心です。\n## 依存・データの流れ\n`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/ui/button.tsx` — Button（43-56行）；`src/lib/utils.ts` — imports",
+      "explanation": "## 役割\n表示種別とサイズの variant を持つ共通 Button コンポーネントとスタイル定義を提供します。\n## 呼ばれる場面\nButton などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nButton（43-56行） が中心です。\n## 依存・データの流れ\n`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nアプリで使うボタンの共通部品です。色や大きさなどの表示形式を選べます。クリックなどの動作は渡された設定に従います。\n\n## 根拠\n`src/components/ui/button.tsx` — Button（43-56行）；`src/lib/utils.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1369,7 +1369,7 @@
       ],
       "complexity": "moderate",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nRadix UI の Dialog primitive を、オーバーレイ、内容、見出し、フッターなどの共通スタイル付き部品として公開します。\n## 呼ばれる場面\nDialog などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nDialog（10-12行）、DialogTrigger（14-16行）ほか8件 が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/ui/dialog.tsx` — Dialog（10-12行）、DialogTrigger（14-16行）ほか8件；`src/components/ui/button.tsx` — imports",
+      "explanation": "## 役割\nRadix UI の Dialog primitive を、オーバーレイ、内容、見出し、フッターなどの共通スタイル付き部品として公開します。\n## 呼ばれる場面\nDialog などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nDialog（10-12行）、DialogTrigger（14-16行）ほか8件 が中心です。\n## 依存・データの流れ\n`src/components/ui/button.tsx`、`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\n画面上に重ねて表示するダイアログ部品です。開閉、見出し、本文、閉じる操作を組み合わせられます。背景と配置の見た目も共通化しています。\n\n## 根拠\n`src/components/ui/dialog.tsx` — Dialog（10-12行）、DialogTrigger（14-16行）ほか8件；`src/components/ui/button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1555,7 +1555,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nRadix UI の Label primitive に共通スタイルを適用するフォーム用ラベル部品です。\n## 呼ばれる場面\nLabel などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nLabel（7-18行） が中心です。\n## 依存・データの流れ\n`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/ui/label.tsx` — Label（7-18行）；`src/lib/utils.ts` — imports",
+      "explanation": "## 役割\nRadix UI の Label primitive に共通スタイルを適用するフォーム用ラベル部品です。\n## 呼ばれる場面\nLabel などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nLabel（7-18行） が中心です。\n## 依存・データの流れ\n`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\n入力欄に付けるラベルの共通部品です。文字の配置と大きさを統一します。無効な入力欄に合わせて薄く表示します。\n\n## 根拠\n`src/components/ui/label.tsx` — Label（7-18行）；`src/lib/utils.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1588,7 +1588,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n公開環境変数と生成済み Database 型を使い、ブラウザ向け Supabase client を生成します。\n## 呼ばれる場面\ncreateClient などの公開要素を利用する時です。\n## 入出力\n明示引数なしで型付き Supabase client を返します。\n## 主な処理\ncreateClient（4-9行） が中心です。\n## 依存・データの流れ\n`src/lib/database.types.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/lib/supabase/client.ts` — createClient（4-9行）；`src/lib/database.types.ts` — imports",
+      "explanation": "## 役割\n公開環境変数と生成済み Database 型を使い、ブラウザ向け Supabase client を生成します。\n## 呼ばれる場面\ncreateClient などの公開要素を利用する時です。\n## 入出力\n明示引数なしで型付き Supabase client を返します。\n## 主な処理\ncreateClient（4-9行） が中心です。\n## 依存・データの流れ\n`src/lib/database.types.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nブラウザから使うSupabaseクライアントを作ります。公開環境変数で接続先を指定します。データベースの型を付けて利用します。\n\n## 根拠\n`src/lib/supabase/client.ts` — createClient（4-9行）；`src/lib/database.types.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1621,7 +1621,7 @@
         "state-management"
       ],
       "complexity": "complex",
-      "explanation": "## 役割\n\nメンバー選択、月・週表示、編集下書き、Supabaseへの一括保存を統括する空き時間画面の中心コンポーネントです。\n\n## 呼ばれる場面\n\n関係先として `src/app/availability/_components/preset-panel.tsx` が確認済みです。\n\n## 入出力\n\n内部importは12件で、`AvailabilityBoard`を提供します。\n\n## 主な処理\n\n主要単位は `AvailabilityBoard`（35-335行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/member-list.tsx` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/availability/_components/availability-board.tsx` — `AvailabilityBoard` 35-335行\n- `src/app/availability/_components/member-list.tsx` — imports",
+      "explanation": "## 役割\n\nメンバー選択、月・週表示、編集下書き、Supabaseへの一括保存を統括する空き時間画面の中心コンポーネントです。\n\n## 呼ばれる場面\n\n関係先として `src/app/availability/_components/preset-panel.tsx` が確認済みです。\n\n## 入出力\n\n内部importは12件で、`AvailabilityBoard`を提供します。\n\n## 主な処理\n\n主要単位は `AvailabilityBoard`（35-335行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/member-list.tsx` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこの画面は、メンバーの空き時間をまとめて扱います。月表示と週表示を切り替えて予定を編集できます。変更した空き時間はまとめて保存できます。\n\n## 根拠\n\n- `src/app/availability/_components/availability-board.tsx` — `AvailabilityBoard` 35-335行\n- `src/app/availability/_components/member-list.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1653,7 +1653,7 @@
         "logic"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n表示対象メンバーの選択と各人の登録日数を一覧表示し、現在ユーザーの状態も示すサイドパネルです。\n\n## 呼ばれる場面\n\n関係先として `src/components/sign-out-button.tsx` が確認済みです。\n\n## 入出力\n\n内部importは3件で、`MemberList`を提供します。\n\n## 主な処理\n\n主要単位は `MemberList`（7-63行）です。\n\n## 依存・データの流れ\n\n`src/components/sign-out-button.tsx` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/availability/_components/member-list.tsx` — `MemberList` 7-63行\n- `src/components/sign-out-button.tsx` — imports",
+      "explanation": "## 役割\n\n表示対象メンバーの選択と各人の登録日数を一覧表示し、現在ユーザーの状態も示すサイドパネルです。\n\n## 呼ばれる場面\n\n関係先として `src/components/sign-out-button.tsx` が確認済みです。\n\n## 入出力\n\n内部importは3件で、`MemberList`を提供します。\n\n## 主な処理\n\n主要単位は `MemberList`（7-63行）です。\n\n## 依存・データの流れ\n\n`src/components/sign-out-button.tsx` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこのパネルは、表示するメンバーを一覧で選べます。各メンバーが登録した日数も確認できます。自分が選ばれている状態も分かります。\n\n## 根拠\n\n- `src/app/availability/_components/member-list.tsx` — `MemberList` 7-63行\n- `src/components/sign-out-button.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1686,7 +1686,7 @@
         "drag-input"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n月間グリッドに登録状況と共通空き時間を集約表示し、日付選択やドラッグ入力を受け付けるコンポーネントです。\n\n## 呼ばれる場面\n\n関係先として `src/lib/utils.ts` が確認済みです。\n\n## 入出力\n\n内部importは4件で、`MonthCalendar`を提供します。\n\n## 主な処理\n\n主要単位は `MonthCalendar`（14-167行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/use-drag-paint.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/availability/_components/month-calendar.tsx` — `MonthCalendar` 14-167行\n- `src/app/availability/_components/use-drag-paint.ts` — imports",
+      "explanation": "## 役割\n\n月間グリッドに登録状況と共通空き時間を集約表示し、日付選択やドラッグ入力を受け付けるコンポーネントです。\n\n## 呼ばれる場面\n\n関係先として `src/lib/utils.ts` が確認済みです。\n\n## 入出力\n\n内部importは4件で、`MonthCalendar`を提供します。\n\n## 主な処理\n\n主要単位は `MonthCalendar`（14-167行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/use-drag-paint.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこのカレンダーは、月ごとの空き時間を一覧で見せます。みんなが空いている日も確認できます。日付を選んだり、ドラッグして入力したりできます。\n\n## 根拠\n\n- `src/app/availability/_components/month-calendar.tsx` — `MonthCalendar` 14-167行\n- `src/app/availability/_components/use-drag-paint.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1718,7 +1718,7 @@
         "drag-input"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n空き時間セルのポインター操作を追跡し、複数日への適用・解除を一度の操作として確定するReactフックです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importは1件で、`useDragPaint`を提供します。\n\n## 主な処理\n\n主要単位は `useDragPaint`（6-62行）です。\n\n## 依存・データの流れ\n\n`src/lib/types.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/availability/_components/use-drag-paint.ts` — `useDragPaint` 6-62行\n- `src/lib/types.ts` — imports",
+      "explanation": "## 役割\n\n空き時間セルのポインター操作を追跡し、複数日への適用・解除を一度の操作として確定するReactフックです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importは1件で、`useDragPaint`を提供します。\n\n## 主な処理\n\n主要単位は `useDragPaint`（6-62行）です。\n\n## 依存・データの流れ\n\n`src/lib/types.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこの処理は、空き時間のセルをなぞる操作を支えます。複数の日を一度に空きまたは非表示にできます。操作を終えると、まとめて一つの変更になります。\n\n## 根拠\n\n- `src/app/availability/_components/use-drag-paint.ts` — `useDragPaint` 6-62行\n- `src/lib/types.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1751,7 +1751,7 @@
         "availability"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n選択日の前後3日を30分単位で表示し、空き時間編集と共通時間から企画画面への遷移を提供します。\n\n## 呼ばれる場面\n\n関係先として `src/lib/utils.ts` が確認済みです。\n\n## 入出力\n\n内部importは4件で、`WeekCalendar`を提供します。\n\n## 主な処理\n\n主要単位は `WeekCalendar`（24-161行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/use-drag-paint.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/availability/_components/week-calendar.tsx` — `WeekCalendar` 24-161行\n- `src/app/availability/_components/use-drag-paint.ts` — imports",
+      "explanation": "## 役割\n\n選択日の前後3日を30分単位で表示し、空き時間編集と共通時間から企画画面への遷移を提供します。\n\n## 呼ばれる場面\n\n関係先として `src/lib/utils.ts` が確認済みです。\n\n## 入出力\n\n内部importは4件で、`WeekCalendar`を提供します。\n\n## 主な処理\n\n主要単位は `WeekCalendar`（24-161行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/use-drag-paint.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこのカレンダーは、選んだ日の前後を30分ごとに表示します。空いている時間を細かく編集できます。共通の空き時間から日程調整画面へ進めます。\n\n## 根拠\n\n- `src/app/availability/_components/week-calendar.tsx` — `WeekCalendar` 24-161行\n- `src/app/availability/_components/use-drag-paint.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1783,7 +1783,7 @@
         "logic"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n空き時間ボードとイベントカレンダーを統合し、通常表示とローカルプレビュー表示を切り替えるダッシュボードです。\n\n## 呼ばれる場面\n\n関係先として `src/app/events/event-calendar.tsx` が確認済みです。\n\n## 入出力\n\n内部importは8件で、`Dashboard`を提供します。\n\n## 主な処理\n\n主要単位は `Dashboard`（21-33行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/availability-board.tsx` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/dashboard/dashboard.tsx` — `Dashboard` 21-33行\n- `src/app/availability/_components/availability-board.tsx` — imports",
+      "explanation": "## 役割\n\n空き時間ボードとイベントカレンダーを統合し、通常表示とローカルプレビュー表示を切り替えるダッシュボードです。\n\n## 呼ばれる場面\n\n関係先として `src/app/events/event-calendar.tsx` が確認済みです。\n\n## 入出力\n\n内部importは8件で、`Dashboard`を提供します。\n\n## 主な処理\n\n主要単位は `Dashboard`（21-33行）です。\n\n## 依存・データの流れ\n\n`src/app/availability/_components/availability-board.tsx` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこの画面は、空き時間とイベントの表示を一つにまとめます。通常の表示とローカルの試し表示を切り替えられます。どちらの画面を見せるかをここで決めます。\n\n## 根拠\n\n- `src/app/dashboard/dashboard.tsx` — `Dashboard` 21-33行\n- `src/app/availability/_components/availability-board.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -1833,7 +1833,7 @@
         "aggregation"
       ],
       "complexity": "complex",
-      "explanation": "## 役割\n\nJST基準の日付範囲、空き時間の下書き演算、30分セル変換、複数メンバーの共通時間集計を提供するドメインユーティリティです。\n\n## 呼ばれる場面\n\n関係先として `src/app/availability/_components/preset-panel.tsx` が確認済みです。\n\n## 入出力\n\n`jstNow`を提供します。\n\n## 主な処理\n\n主要単位は `jstNow`（13-15行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/lib/availability.ts` — `jstNow` 13-15行\n",
+      "explanation": "## 役割\n\nJST基準の日付範囲、空き時間の下書き演算、30分セル変換、複数メンバーの共通時間集計を提供するドメインユーティリティです。\n\n## 呼ばれる場面\n\n関係先として `src/app/availability/_components/preset-panel.tsx` が確認済みです。\n\n## 入出力\n\n`jstNow`を提供します。\n\n## 主な処理\n\n主要単位は `jstNow`（13-15行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n日本時間を基準に日付を扱う共通処理です。空き時間を30分単位に変換し、追加や削除を計算します。複数人に共通する時間帯も集計します。\n\n## 根拠\n\n- `src/lib/availability.ts` — `jstNow` 13-15行\n",
       "explanationStatus": "ready"
     },
     {
@@ -2086,7 +2086,7 @@
         "shared-types"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nプロフィール、空き時間、プリセット、イベントなど、画面とデータ処理で共有するTypeScript型を定義します。\n\n## 呼ばれる場面\n\n関係先として `src/app/availability/_components/preset-dialog.tsx` が確認済みです。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n22非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/lib/types.ts` — ファイル構造（22非空行）",
+      "explanation": "## 役割\n\nプロフィール、空き時間、プリセット、イベントなど、画面とデータ処理で共有するTypeScript型を定義します。\n\n## 呼ばれる場面\n\n関係先として `src/app/availability/_components/preset-dialog.tsx` が確認済みです。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n22非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面と処理で共有するデータの型を定義します。プロフィールや空き時間、予定の形をそろえます。実行時の画面表示や通信は行いません。\n\n## 根拠\n\n- `src/lib/types.ts` — ファイル構造（22非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -2101,7 +2101,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n日別集計について全員一致、未登録者を含む部分一致、時間帯不一致などを検証する単体テストです。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importは1件で、ファイル内容を提供します。\n\n## 主な処理\n\n42非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n`src/lib/availability.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/day-summary.test.ts` — ファイル構造（42非空行）\n- `src/lib/availability.ts` — imports",
+      "explanation": "## 役割\n\n日別集計について全員一致、未登録者を含む部分一致、時間帯不一致などを検証する単体テストです。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importは1件で、ファイル内容を提供します。\n\n## 主な処理\n\n42非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n`src/lib/availability.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n日ごとの空き時間集計を確認するテストです。全員一致や一部一致の結果を検証します。時間帯が合わない場合も確認します。\n\n## 根拠\n\n- `tests/day-summary.test.ts` — ファイル構造（42非空行）\n- `src/lib/availability.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2116,7 +2116,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n月表示の時間ラベルが終了時刻の深夜 sentinel を24:00として扱うことを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importは1件で、ファイル内容を提供します。\n\n## 主な処理\n\n21非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n`src/lib/availability.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/month-calendar-label.test.ts` — ファイル構造（21非空行）\n- `src/lib/availability.ts` — imports",
+      "explanation": "## 役割\n\n月表示の時間ラベルが終了時刻の深夜 sentinel を24:00として扱うことを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importは1件で、ファイル内容を提供します。\n\n## 主な処理\n\n21非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n`src/lib/availability.ts` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n月カレンダーの時間ラベルを確認するテストです。深夜の終了時刻を24時として扱うか検証します。空き時間の表示ルールも一部確認します。\n\n## 根拠\n\n- `tests/month-calendar-label.test.ts` — ファイル構造（21非空行）\n- `src/lib/availability.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2132,7 +2132,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nクエリで選んだ機能に応じてイベント、空き時間、日程調整の各プレビューをローカルデータで表示します。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nDevPreviewPage（7-24行） が中心です。\n## 依存・データの流れ\n`src/app/availability/_components/availability-board.tsx`、`src/app/events/event-calendar.tsx` を import（ほか2件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/dev-preview/page.tsx` — DevPreviewPage（7-24行）；`src/app/availability/_components/availability-board.tsx` — imports",
+      "explanation": "## 役割\nクエリで選んだ機能に応じてイベント、空き時間、日程調整の各プレビューをローカルデータで表示します。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nDevPreviewPage（7-24行） が中心です。\n## 依存・データの流れ\n`src/app/availability/_components/availability-board.tsx`、`src/app/events/event-calendar.tsx` を import（ほか2件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのページは、開発中に機能の見た目を確認するための画面です。選んだ内容に応じてイベントや空き時間を表示します。本番データを使わずに画面を試せます。\n\n## 根拠\n`src/app/dev-preview/page.tsx` — DevPreviewPage（7-24行）；`src/app/availability/_components/availability-board.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2165,7 +2165,7 @@
       ],
       "complexity": "moderate",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n共有・個人イベントを月週カレンダーで表示し、Supabase を介した保存・参加回答・削除と API 経由の取消・同期を扱います。\n## 呼ばれる場面\nEventCalendar などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nEventCalendar（31-181行）、EventDetail（183-192行）ほか1件 が中心です。\n## 依存・データの流れ\n`src/components/app-header.tsx`、`src/components/night-beach-scene.tsx` を import（ほか7件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/events/event-calendar.tsx` — EventCalendar（31-181行）、EventDetail（183-192行）ほか1件；`src/components/app-header.tsx` — imports",
+      "explanation": "## 役割\n共有・個人イベントを月週カレンダーで表示し、Supabase を介した保存・参加回答・削除と API 経由の取消・同期を扱います。\n## 呼ばれる場面\nEventCalendar などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nEventCalendar（31-181行）、EventDetail（183-192行）ほか1件 が中心です。\n## 依存・データの流れ\n`src/components/app-header.tsx`、`src/components/night-beach-scene.tsx` を import（ほか7件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのカレンダーは、共有予定と個人予定を月や週で表示します。予定の保存、参加の返事、削除を行えます。取消や外部カレンダーとの同期も扱います。\n\n## 根拠\n`src/app/events/event-calendar.tsx` — EventCalendar（31-181行）、EventDetail（183-192行）ほか1件；`src/components/app-header.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2232,7 +2232,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n開発プレビューが有効ならローカルデータのカレンダーを表示し、それ以外は通常のイベント画面へ遷移する入口ページです。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nHomePage（5-11行） が中心です。\n## 依存・データの流れ\n`src/app/events/event-calendar.tsx`、`src/lib/dev-auth.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/page.tsx` — HomePage（5-11行）；`src/app/events/event-calendar.tsx` — imports",
+      "explanation": "## 役割\n開発プレビューが有効ならローカルデータのカレンダーを表示し、それ以外は通常のイベント画面へ遷移する入口ページです。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nHomePage（5-11行） が中心です。\n## 依存・データの流れ\n`src/app/events/event-calendar.tsx`、`src/lib/dev-auth.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのページは、アプリを開いたときの入口です。開発用の表示が有効なら試し用カレンダーを見せます。通常はイベント画面へ移動します。\n\n## 根拠\n`src/app/page.tsx` — HomePage（5-11行）；`src/app/events/event-calendar.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2265,7 +2265,7 @@
       ],
       "complexity": "complex",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n複数メンバーの空き時間から候補時間帯を計算・選択し、確定した共有イベントを作成する日程調整画面です。\n## 呼ばれる場面\nPlanningBoard などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nPlanningBoard（26-370行） が中心です。\n## 依存・データの流れ\n`src/components/app-header.tsx`、`src/components/night-beach-scene.tsx` を import（ほか7件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/planning/_components/planning-board.tsx` — PlanningBoard（26-370行）；`src/components/app-header.tsx` — imports",
+      "explanation": "## 役割\n複数メンバーの空き時間から候補時間帯を計算・選択し、確定した共有イベントを作成する日程調整画面です。\n## 呼ばれる場面\nPlanningBoard などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nPlanningBoard（26-370行） が中心です。\n## 依存・データの流れ\n`src/components/app-header.tsx`、`src/components/night-beach-scene.tsx` を import（ほか7件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこの画面は、みんなの空き時間から候補を探します。候補の時間帯を選んで共有予定を作れます。日程を決める作業を一か所で進められます。\n\n## 根拠\n`src/app/planning/_components/planning-board.tsx` — PlanningBoard（26-370行）；`src/components/app-header.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2298,7 +2298,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n認証済み利用者と有効メンバーを Supabase から取得し、クエリ指定を検証して日程調整画面へ渡します。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nparsePlanningQuery（14-21行）、PlanningPage（23-40行） が中心です。\n## 依存・データの流れ\n`src/app/planning/_components/planning-board.tsx`、`src/lib/database.types.ts` を import（ほか2件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/app/planning/page.tsx` — parsePlanningQuery（14-21行）、PlanningPage（23-40行）；`src/app/planning/_components/planning-board.tsx` — imports",
+      "explanation": "## 役割\n認証済み利用者と有効メンバーを Supabase から取得し、クエリ指定を検証して日程調整画面へ渡します。\n## 呼ばれる場面\n対応する Next.js ルートの表示時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nparsePlanningQuery（14-21行）、PlanningPage（23-40行） が中心です。\n## 依存・データの流れ\n`src/app/planning/_components/planning-board.tsx`、`src/lib/database.types.ts` を import（ほか2件）。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのページは、日程調整に必要な利用者情報を読み込みます。有効なメンバーも集めて、指定内容を確認します。確認後に日程調整の画面へ渡します。\n\n## 根拠\n`src/app/planning/page.tsx` — parsePlanningQuery（14-21行）、PlanningPage（23-40行）；`src/app/planning/_components/planning-board.tsx` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2348,7 +2348,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\nイベント・空き時間・日程調整間の共通ナビゲーションと、遷移前コールバック領域を提供するヘッダーです。\n## 呼ばれる場面\nAppHeader などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nAppHeader（14-50行） が中心です。\n## 依存・データの流れ\nproject 内 import はありません。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/app-header.tsx` — AppHeader（14-50行）",
+      "explanation": "## 役割\nイベント・空き時間・日程調整間の共通ナビゲーションと、遷移前コールバック領域を提供するヘッダーです。\n## 呼ばれる場面\nAppHeader などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nAppHeader（14-50行） が中心です。\n## 依存・データの流れ\nproject 内 import はありません。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこのヘッダーは、主な画面へ移動するメニューを表示します。イベント、空き時間、日程調整を切り替えられます。移動前に追加の処理を置くこともできます。\n\n## 根拠\n`src/components/app-header.tsx` — AppHeader（14-50行）",
       "explanationStatus": "ready"
     },
     {
@@ -2381,7 +2381,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n夜の海辺を表現する装飾用 SVG 背景を描画する表示専用コンポーネントです。\n## 呼ばれる場面\nNightScene などの公開要素を利用する時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nNightScene（1-46行） が中心です。\n## 依存・データの流れ\nproject 内 import はありません。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/night-beach-scene.tsx` — NightScene（1-46行）",
+      "explanation": "## 役割\n夜の海辺を表現する装飾用 SVG 背景を描画する表示専用コンポーネントです。\n## 呼ばれる場面\nNightScene などの公開要素を利用する時です。\n## 入出力\n明示引数はなく、JSX を返します。\n## 主な処理\nNightScene（1-46行） が中心です。\n## 依存・データの流れ\nproject 内 import はありません。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\nこの部品は、夜の海辺を表す背景を描きます。画面の雰囲気を整えるためだけに使われます。利用者が操作する機能はありません。\n\n## 根拠\n`src/components/night-beach-scene.tsx` — NightScene（1-46行）",
       "explanationStatus": "ready"
     },
     {
@@ -2414,7 +2414,7 @@
       ],
       "complexity": "simple",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n標準 input に共通の外観、フォーカス、無効状態のスタイルを適用する入力部品です。\n## 呼ばれる場面\nInput などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nInput（6-18行） が中心です。\n## 依存・データの流れ\n`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/components/ui/input.tsx` — Input（6-18行）；`src/lib/utils.ts` — imports",
+      "explanation": "## 役割\n標準 input に共通の外観、フォーカス、無効状態のスタイルを適用する入力部品です。\n## 呼ばれる場面\nInput などの公開要素を利用する時です。\n## 入出力\n型付き引数を受け、JSX を返します。\n## 主な処理\nInput（6-18行） が中心です。\n## 依存・データの流れ\n`src/lib/utils.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\n文字などを入力する欄の共通部品です。枠やフォーカス時の見た目を統一します。無効や入力エラーの表示にも対応します。\n\n## 根拠\n`src/components/ui/input.tsx` — Input（6-18行）；`src/lib/utils.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2447,7 +2447,7 @@
       ],
       "complexity": "moderate",
       "languageNotes": "TypeScript と React の型付きコンポーネントとして実装されています。",
-      "explanation": "## 役割\n開発時の認証バイパス判定と、イベント・参加者・空き時間を含む固定プレビューデータを提供します。\n## 呼ばれる場面\nisDevPreviewEnabled などの公開要素を利用する時です。\n## 入出力\n明示引数なしで型付き Supabase client を返します。\n## 主な処理\nisDevPreviewEnabled（8-10行）、getDevPreviewData（118-120行）ほか3件 が中心です。\n## 依存・データの流れ\n`src/lib/database.types.ts`、`src/lib/types.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n画面または共通処理の責務を一か所にまとめています。\n## 根拠\n`src/lib/dev-auth.ts` — isDevPreviewEnabled（8-10行）、getDevPreviewData（118-120行）ほか3件；`src/lib/database.types.ts` — imports",
+      "explanation": "## 役割\n開発時の認証バイパス判定と、イベント・参加者・空き時間を含む固定プレビューデータを提供します。\n## 呼ばれる場面\nisDevPreviewEnabled などの公開要素を利用する時です。\n## 入出力\n明示引数なしで型付き Supabase client を返します。\n## 主な処理\nisDevPreviewEnabled（8-10行）、getDevPreviewData（118-120行）ほか3件 が中心です。\n## 依存・データの流れ\n`src/lib/database.types.ts`、`src/lib/types.ts` を import。\n## 変更時の影響\n公開 API と利用画面の整合性に影響します。\n## 初心者向けまとめ\n\n開発用プレビューの認証と固定データを提供します。開発設定が有効なときだけ仮の利用者や予定を返します。空き時間や企画画面の確認にも使えるデータを含みます。\n\n## 根拠\n`src/lib/dev-auth.ts` — isDevPreviewEnabled（8-10行）、getDevPreviewData（118-120行）ほか3件；`src/lib/database.types.ts` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -2547,7 +2547,7 @@
         "ui"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n表示 variant を選べる Badge コンポーネントとスタイル定義を提供し、class 名を cn で統合します。\n\n## 呼ばれる場面\n\nBadge が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  variant = \"default\",\n  render,\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nBadge（30–50行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/badge.tsx` — Badge（30–50行）",
+      "explanation": "## 役割\n\n表示 variant を選べる Badge コンポーネントとスタイル定義を提供し、class 名を cn で統合します。\n\n## 呼ばれる場面\n\nBadge が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  variant = \"default\",\n  render,\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nBadge（30–50行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n短い状態表示を共通の見た目で包む部品です。色の種類を選べます。必要に応じて追加のクラスも適用できます。\n\n## 根拠\n\n- `src/components/ui/badge.tsx` — Badge（30–50行）",
       "explanationStatus": "ready"
     },
     {
@@ -2579,7 +2579,7 @@
         "ui"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nBase UI の Checkbox をアプリ共通の見た目とチェックアイコンで包む UI コンポーネントです。\n\n## 呼ばれる場面\n\nCheckbox が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ className, ...props }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nCheckbox（8–27行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/checkbox.tsx` — Checkbox（8–27行）",
+      "explanation": "## 役割\n\nBase UI の Checkbox をアプリ共通の見た目とチェックアイコンで包む UI コンポーネントです。\n\n## 呼ばれる場面\n\nCheckbox が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ className, ...props }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nCheckbox（8–27行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nチェック欄の共通部品です。選択状態をチェック印で表示します。無効やエラー時の見た目も用意されています。\n\n## 根拠\n\n- `src/components/ui/checkbox.tsx` — Checkbox（8–27行）",
       "explanationStatus": "ready"
     },
     {
@@ -2611,7 +2611,7 @@
         "ui"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nBase UI を基に Popover の root、trigger、content、header、title、description を共通スタイル付きで提供します。\n\n## 呼ばれる場面\n\nPopover、PopoverTrigger、PopoverContent など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ ...props }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nPopover（8–10行）、PopoverTrigger（12–14行） など全 6 件を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/popover.tsx` — Popover（8–10行）",
+      "explanation": "## 役割\n\nBase UI を基に Popover の root、trigger、content、header、title、description を共通スタイル付きで提供します。\n\n## 呼ばれる場面\n\nPopover、PopoverTrigger、PopoverContent など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ ...props }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nPopover（8–10行）、PopoverTrigger（12–14行） など全 6 件を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nボタンの近くに開く小さな情報欄の部品です。表示位置や見出し、説明を組み合わせられます。開閉時の配置と見た目を共通化します。\n\n## 根拠\n\n- `src/components/ui/popover.tsx` — Popover（8–10行）",
       "explanationStatus": "ready"
     },
     {
@@ -2728,7 +2728,7 @@
         "ui"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nBase UI の Select を構成する trigger、content、item、label、separator、scroll button など一式を共通スタイルで提供します。\n\n## 呼ばれる場面\n\nSelectGroup、SelectValue、SelectTrigger など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ className, ...props }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nSelectGroup（11–19行）、SelectValue（21–29行） など全 9 件を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/select.tsx` — SelectGroup（11–19行）",
+      "explanation": "## 役割\n\nBase UI の Select を構成する trigger、content、item、label、separator、scroll button など一式を共通スタイルで提供します。\n\n## 呼ばれる場面\n\nSelectGroup、SelectValue、SelectTrigger など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{ className, ...props }` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nSelectGroup（11–19行）、SelectValue（21–29行） など全 9 件を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n選択肢から一つを選ぶ部品群です。選択欄、項目、見出し、区切りをまとめて提供します。項目のスクロールや選択印にも対応します。\n\n## 根拠\n\n- `src/components/ui/select.tsx` — SelectGroup（11–19行）",
       "explanationStatus": "ready"
     },
     {
@@ -2896,7 +2896,7 @@
         "ui"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n水平・垂直方向を選べる Base UI Separator を共通スタイルで包む表示コンポーネントです。\n\n## 呼ばれる場面\n\nSeparator が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nSeparator（7–23行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/separator.tsx` — Separator（7–23行）",
+      "explanation": "## 役割\n\n水平・垂直方向を選べる Base UI Separator を共通スタイルで包む表示コンポーネントです。\n\n## 呼ばれる場面\n\nSeparator が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nSeparator（7–23行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n内容を区切る線の部品です。横向きと縦向きを選べます。共通の太さや色で表示します。\n\n## 根拠\n\n- `src/components/ui/separator.tsx` — Separator（7–23行）",
       "explanationStatus": "ready"
     },
     {
@@ -2928,7 +2928,7 @@
         "ui"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nBase UI の Tabs、list、trigger、content と list の variant 定義を共通スタイル付きで提供します。\n\n## 呼ばれる場面\n\nTabs、TabsList、TabsTrigger など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nTabs（8–24行）、TabsList（41–54行） など全 4 件を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/tabs.tsx` — Tabs（8–24行）",
+      "explanation": "## 役割\n\nBase UI の Tabs、list、trigger、content と list の variant 定義を共通スタイル付きで提供します。\n\n## 呼ばれる場面\n\nTabs、TabsList、TabsTrigger など が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nTabs（8–24行）、TabsList（41–54行） など全 4 件を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n内容を切り替えるタブ部品群です。タブ一覧、切り替えボタン、表示内容を共通化します。横向きの配置にも対応します。\n\n## 根拠\n\n- `src/components/ui/tabs.tsx` — Tabs（8–24行）",
       "explanationStatus": "ready"
     },
     {
@@ -3011,7 +3011,7 @@
         "ui"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nvariant と size を選べる Base UI Toggle とスタイル定義を提供します。\n\n## 呼ばれる場面\n\nToggle が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  variant = \"default\",\n  size = \"default\",\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nToggle（30–43行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/components/ui/toggle.tsx` — Toggle（30–43行）",
+      "explanation": "## 役割\n\nvariant と size を選べる Base UI Toggle とスタイル定義を提供します。\n\n## 呼ばれる場面\n\nToggle が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `{\n  className,\n  variant = \"default\",\n  size = \"default\",\n  ...props\n}` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\nToggle（30–43行）を中心に処理します。\n\n## 依存・データの流れ\n\n`src/lib/utils.ts`への imports 辺があります。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nオンとオフを切り替える部品です。色や大きさの表示形式を選べます。共通のスタイルで状態を示します。\n\n## 根拠\n\n- `src/components/ui/toggle.tsx` — Toggle（30–43行）",
       "explanationStatus": "ready"
     },
     {
@@ -3043,7 +3043,7 @@
         "スタイル"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nclsx で条件付き class 名を結合し、tailwind-merge で競合を解消する cn ユーティリティです。\n\n## 呼ばれる場面\n\ncn が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `...inputs` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ncn（4–6行）を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `src/lib/utils.ts` — cn（4–6行）",
+      "explanation": "## 役割\n\nclsx で条件付き class 名を結合し、tailwind-merge で競合を解消する cn ユーティリティです。\n\n## 呼ばれる場面\n\ncn が公開されています。具体的な呼び出し元は抽出範囲で未確認です。\n\n## 入出力\n\n確認できる引数は `...inputs` です。戻り値の詳細は未確認です。\n\n## 主な処理\n\ncn（4–6行）を中心に処理します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nCSSクラス名をまとめる小さな補助関数です。条件に応じたクラス名を結合します。Tailwindの重複する指定を整理します。\n\n## 根拠\n\n- `src/lib/utils.ts` — cn（4–6行）",
       "explanationStatus": "ready"
     },
     {
@@ -3712,7 +3712,7 @@
         "logic"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nUnderstand Anythingの組み込み除外規則を説明し、生成物、依存物、秘密情報、テストなどの除外候補をコメント付きで示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n98非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `.understand-anything/.understandignore` — ファイル構造（98非空行）",
+      "explanation": "## 役割\n\nUnderstand Anythingの組み込み除外規則を説明し、生成物、依存物、秘密情報、テストなどの除外候補をコメント付きで示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n98非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの設定は、解析から外すファイルの候補を示します。生成物や依存関係を調べないために使います。利用者が画面で操作する機能はありません。\n\n## 根拠\n\n- `.understand-anything/.understandignore` — ファイル構造（98非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3740,7 +3740,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nNext.jsの推奨規則を基礎に、対象外パスを指定するESLintフラット設定です。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n18非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `eslint.config.mjs` — ファイル構造（18非空行）",
+      "explanation": "## 役割\n\nNext.jsの推奨規則を基礎に、対象外パスを指定するESLintフラット設定です。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n18非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの設定は、コードの書き方を自動で確認します。問題になりやすい書き方を開発中に知らせます。画面や利用者向けの機能は変わりません。\n\n## 根拠\n\n- `eslint.config.mjs` — ファイル構造（18非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3755,7 +3755,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nNext.jsアプリのビルド時設定を公開する設定モジュールです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n12非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `next.config.ts` — ファイル構造（12非空行）",
+      "explanation": "## 役割\n\nNext.jsアプリのビルド時設定を公開する設定モジュールです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n12非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこのファイルは、アプリを作るときの設定をまとめます。画面の表示そのものを担当する場所ではありません。設定を変えると公開用の動きに影響することがあります。\n\n## 根拠\n\n- `next.config.ts` — ファイル構造（12非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3770,7 +3770,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nNext.jsアプリをCloudflare向けに変換するOpenNext設定を定義します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n5非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `open-next.config.ts` — ファイル構造（5非空行）",
+      "explanation": "## 役割\n\nNext.jsアプリをCloudflare向けに変換するOpenNext設定を定義します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n5非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの設定は、アプリをCloudflare向けに変換します。公開先で動かすための準備に使われます。利用者が直接操作する画面はありません。\n\n## 根拠\n\n- `open-next.config.ts` — ファイル構造（5非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3785,7 +3785,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nTailwind CSSのPostCSSプラグインを有効化するビルド設定です。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n6非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `postcss.config.mjs` — ファイル構造（6非空行）",
+      "explanation": "## 役割\n\nTailwind CSSのPostCSSプラグインを有効化するビルド設定です。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n6非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの設定は、見た目のスタイルを作る仕組みを有効にします。画面の色や配置に必要な処理を準備します。利用者が直接操作する機能はありません。\n\n## 根拠\n\n- `postcss.config.mjs` — ファイル構造（6非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3800,7 +3800,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nCloudflareの静的配信に適用するHTTPレスポンスヘッダーを指定します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n2非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `public/_headers` — ファイル構造（2非空行）",
+      "explanation": "## 役割\n\nCloudflareの静的配信に適用するHTTPレスポンスヘッダーを指定します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n2非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの設定は、公開した静的ファイルの応答ヘッダーを決めます。ブラウザーが受け取る配信情報に使われます。画面に表示する内容を直接作るファイルではありません。\n\n## 根拠\n\n- `public/_headers` — ファイル構造（2非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3816,7 +3816,7 @@
         "security"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\nlocalまたはremoteのSupabase設定を検証し、安全な一時ファイル経由で`.env.local`を切り替えるCLIです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`parseEnv`を提供します。\n\n## 主な処理\n\n主要単位は `parseEnv`（27-39行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `scripts/supabase-env.mjs` — `parseEnv` 27-39行\n",
+      "explanation": "## 役割\n\nlocalまたはremoteのSupabase設定を検証し、安全な一時ファイル経由で`.env.local`を切り替えるCLIです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`parseEnv`を提供します。\n\n## 主な処理\n\n主要単位は `parseEnv`（27-39行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこのスクリプトは、接続先のSupabase設定を切り替えます。ローカル用とリモート用の設定を確認します。利用者がアプリ画面で使う機能ではありません。\n\n## 根拠\n\n- `scripts/supabase-env.mjs` — `parseEnv` 27-39行\n",
       "explanationStatus": "ready"
     },
     {
@@ -3865,7 +3865,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n空き時間ページの遷移中にヘッダーとカレンダー領域のスケルトンを表示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Loading`を提供します。\n\n## 主な処理\n\n主要単位は `Loading`（5-17行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/availability/loading.tsx` — `Loading` 5-17行\n",
+      "explanation": "## 役割\n\n空き時間ページの遷移中にヘッダーとカレンダー領域のスケルトンを表示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Loading`を提供します。\n\n## 主な処理\n\n主要単位は `Loading`（5-17行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの画面は、空き時間ページを開く間だけ表示されます。ヘッダーとカレンダーの形を先に見せます。データが届くと通常の画面に置き換わります。\n\n## 根拠\n\n- `src/app/availability/loading.tsx` — `Loading` 5-17行\n",
       "explanationStatus": "ready"
     },
     {
@@ -3897,7 +3897,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nイベントページの遷移中にカレンダー画面を模したスケルトンを表示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Loading`を提供します。\n\n## 主な処理\n\n主要単位は `Loading`（5-19行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/events/loading.tsx` — `Loading` 5-19行\n",
+      "explanation": "## 役割\n\nイベントページの遷移中にカレンダー画面を模したスケルトンを表示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Loading`を提供します。\n\n## 主な処理\n\n主要単位は `Loading`（5-19行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの画面は、イベントページを開く間だけ表示されます。カレンダー画面に近い形を先に見せます。データが届くと通常のカレンダーに替わります。\n\n## 根拠\n\n- `src/app/events/loading.tsx` — `Loading` 5-19行\n",
       "explanationStatus": "ready"
     },
     {
@@ -3930,7 +3930,7 @@
         "responsive"
       ],
       "complexity": "complex",
-      "explanation": "## 役割\n\n配色トークン、夜の海辺テーマ、カレンダー状態、レスポンシブ表示を含むアプリ全体のスタイルを定義します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n532非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/globals.css` — ファイル構造（532非空行）",
+      "explanation": "## 役割\n\n配色トークン、夜の海辺テーマ、カレンダー状態、レスポンシブ表示を含むアプリ全体のスタイルを定義します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n532非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこのファイルは、アプリ全体の色や配置を決めます。夜の海辺を思わせる見た目にも使われます。カレンダーの状態や画面幅ごとの表示も整えます。\n\n## 根拠\n\n- `src/app/globals.css` — ファイル構造（532非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -3945,7 +3945,7 @@
         "component"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n全ページのHTML骨格、メタデータ、グローバルCSS、通知Toasterを組み立てるNext.jsルートレイアウトです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importは2件で、`RootLayout`を提供します。\n\n## 主な処理\n\n主要単位は `RootLayout`（28-41行）です。\n\n## 依存・データの流れ\n\n`src/app/globals.css` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/layout.tsx` — `RootLayout` 28-41行\n- `src/app/globals.css` — imports",
+      "explanation": "## 役割\n\n全ページのHTML骨格、メタデータ、グローバルCSS、通知Toasterを組み立てるNext.jsルートレイアウトです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n内部importは2件で、`RootLayout`を提供します。\n\n## 主な処理\n\n主要単位は `RootLayout`（28-41行）です。\n\n## 依存・データの流れ\n\n`src/app/globals.css` へのimportsがあります。\n\n## 変更時の影響\n\nimport先との契約確認が必要です。\n\n## 初心者向けまとめ\n\nこのファイルは、すべての画面に共通の土台を作ります。ページの基本情報と共通の見た目を読み込みます。通知を表示する場所も用意します。\n\n## 根拠\n\n- `src/app/layout.tsx` — `RootLayout` 28-41行\n- `src/app/globals.css` — imports",
       "explanationStatus": "ready"
     },
     {
@@ -3977,7 +3977,7 @@
         "logic"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n企画ページの遷移中にフォーム領域のスケルトンを表示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Loading`を提供します。\n\n## 主な処理\n\n主要単位は `Loading`（5-13行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/app/planning/loading.tsx` — `Loading` 5-13行\n",
+      "explanation": "## 役割\n\n企画ページの遷移中にフォーム領域のスケルトンを表示します。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Loading`を提供します。\n\n## 主な処理\n\n主要単位は `Loading`（5-13行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nこの画面は、日程調整ページを開く間だけ表示されます。入力欄に近い形を先に見せます。データが届くと日程調整の画面に替わります。\n\n## 根拠\n\n- `src/app/planning/loading.tsx` — `Loading` 5-13行\n",
       "explanationStatus": "ready"
     },
     {
@@ -4009,7 +4009,7 @@
         "theme"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n現在のテーマに応じた色とアイコンを設定してsonnerの通知Toasterを提供するUIラッパーです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Toaster`を提供します。\n\n## 主な処理\n\n主要単位は `Toaster`（7-47行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `src/components/ui/sonner.tsx` — `Toaster` 7-47行\n",
+      "explanation": "## 役割\n\n現在のテーマに応じた色とアイコンを設定してsonnerの通知Toasterを提供するUIラッパーです。\n\n## 呼ばれる場面\n\n検証済みの呼び出し元はありません。\n\n## 入出力\n\n`Toaster`を提供します。\n\n## 主な処理\n\n主要単位は `Toaster`（7-47行）です。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n操作結果などを知らせる通知表示を提供します。現在のテーマに合わせて色とアイコンを設定します。Toasterを画面側で使える形にします。\n\n## 根拠\n\n- `src/components/ui/sonner.tsx` — `Toaster` 7-47行\n",
       "explanationStatus": "ready"
     },
     {
@@ -4067,7 +4067,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nイベント削除RPCと関連スキーマ制約がmigrationに存在することを静的に検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n18非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/cancel-event-schema.test.ts` — ファイル構造（18非空行）",
+      "explanation": "## 役割\n\nイベント削除RPCと関連スキーマ制約がmigrationに存在することを静的に検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n18非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\nイベント削除RPCと関連制約を確認するテストです。migrationファイルの内容を読み取ります。必要なSQL定義があるかを自動判定します。\n\n## 根拠\n\n- `tests/cancel-event-schema.test.ts` — ファイル構造（18非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4082,7 +4082,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nイベントカレンダーが日曜始まりの月グリッドと曜日表示を維持することを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n33非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/event-calendar-sunday-start.test.ts` — ファイル構造（33非空行）",
+      "explanation": "## 役割\n\nイベントカレンダーが日曜始まりの月グリッドと曜日表示を維持することを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n33非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n月カレンダーが日曜始まりになることを確認します。曜日表示の並びも検証します。実装の表示ルールを守れているか自動確認します。\n\n## 根拠\n\n- `tests/event-calendar-sunday-start.test.ts` — ファイル構造（33非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4097,7 +4097,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\nイベント送信時の二重実行防止とボタン無効化が実装されていることを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n25非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/event-submit-guard.test.ts` — ファイル構造（25非空行）",
+      "explanation": "## 役割\n\nイベント送信時の二重実行防止とボタン無効化が実装されていることを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n25非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n予定送信時の二重実行防止を確認するテストです。送信中にボタンを無効にする実装を検証します。画面操作の安全性を確認します。\n\n## 根拠\n\n- `tests/event-submit-guard.test.ts` — ファイル構造（25非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4112,7 +4112,7 @@
         "validation"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n許可メール、プロフィール、認証境界に関するDBポリシーと画面側の扱いを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n55非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/member-access.test.ts` — ファイル構造（55非空行）",
+      "explanation": "## 役割\n\n許可メール、プロフィール、認証境界に関するDBポリシーと画面側の扱いを検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n55非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n利用者のアクセス条件を確認するテストです。許可メールやプロフィールの制約を検証します。管理画面と予定画面の扱いも確認します。\n\n## 根拠\n\n- `tests/member-access.test.ts` — ファイル構造（55非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4127,7 +4127,7 @@
         "validation"
       ],
       "complexity": "moderate",
-      "explanation": "## 役割\n\n夜の海辺テーマのCSSトークンと主要コンポーネントでの適用を静的に検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n67非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/night-beach-theme.test.ts` — ファイル構造（67非空行）",
+      "explanation": "## 役割\n\n夜の海辺テーマのCSSトークンと主要コンポーネントでの適用を静的に検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n67非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n夜の海辺テーマを確認するテストです。背景の層や固定配置、主要部品を検証します。動きを減らす設定にも対応しているか確認します。\n\n## 根拠\n\n- `tests/night-beach-theme.test.ts` — ファイル構造（67非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4142,7 +4142,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n個人イベントの作成・表示・削除に必要なスキーマと画面実装を検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n41非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/personal-events.test.ts` — ファイル構造（41非空行）",
+      "explanation": "## 役割\n\n個人イベントの作成・表示・削除に必要なスキーマと画面実装を検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n41非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n個人予定の動きを確認するテストです。所有者だけが扱えることや共有予定との差を検証します。作成画面の選択肢と月表示も確認します。\n\n## 根拠\n\n- `tests/personal-events.test.ts` — ファイル構造（41非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4157,7 +4157,7 @@
         "validation"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\n共通空き時間から企画画面へ日付・時刻・メンバーを渡す遷移実装を検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n26非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n画面または処理の一部を担うファイルです。\n\n## 根拠\n\n- `tests/planning-navigation.test.ts` — ファイル構造（26非空行）",
+      "explanation": "## 役割\n\n共通空き時間から企画画面へ日付・時刻・メンバーを渡す遷移実装を検証します。\n\n## 呼ばれる場面\n\nテスト実行時に対象契約を検査します。\n\n## 入出力\n\n内部importはなく、内容を直接利用します。\n\n## 主な処理\n\n26非空行をファイル単位で扱います。\n\n## 依存・データの流れ\n\n検証済みの内部importはありません。\n\n## 変更時の影響\n\n参照元への影響確認が必要です。\n\n## 初心者向けまとめ\n\n企画画面への遷移を確認するテストです。日付や時刻、利用者IDの入力検証を調べます。空き時間から自動作成せず移動することも確認します。\n\n## 根拠\n\n- `tests/planning-navigation.test.ts` — ファイル構造（26非空行）",
       "explanationStatus": "ready"
     },
     {
@@ -4172,7 +4172,7 @@
         "回帰テスト"
       ],
       "complexity": "simple",
-      "explanation": "## 役割\n\npreset-panel.tsx のソースを読み取り、モバイル選択レール、編集権限、パターン管理ダイアログへの受け渡しを正規表現で検証します。\n\n## 呼ばれる場面\n\nNode.js の test runner から実行され、preset-panel.tsx の UI 契約をソース文字列として検査します。\n\n## 入出力\n\n`src/app/availability/_components/preset-panel.tsx` のソース文字列を入力とし、assert の成否をテスト結果として返します。\n\n## 主な処理\n\nモバイルレールを切り出し、選択属性、編集可否、管理ダイアログへの遷移を正規表現で検証します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\nこのファイルは上記の役割を一か所にまとめています。\n\n## 根拠\n\n- `tests/preset-panel.test.ts` — ファイル全体",
+      "explanation": "## 役割\n\npreset-panel.tsx のソースを読み取り、モバイル選択レール、編集権限、パターン管理ダイアログへの受け渡しを正規表現で検証します。\n\n## 呼ばれる場面\n\nNode.js の test runner から実行され、preset-panel.tsx の UI 契約をソース文字列として検査します。\n\n## 入出力\n\n`src/app/availability/_components/preset-panel.tsx` のソース文字列を入力とし、assert の成否をテスト結果として返します。\n\n## 主な処理\n\nモバイルレールを切り出し、選択属性、編集可否、管理ダイアログへの遷移を正規表現で検証します。\n\n## 依存・データの流れ\n\nbatchImportData ではプロジェクト内部への imports 辺はありません。\n\n## 変更時の影響\n\n公開処理と確認済み依存先に影響し得ます。\n\n## 初心者向けまとめ\n\n空き時間パターンの選択と管理を確認するテストです。モバイルの選択欄や編集権限、管理画面への受け渡しを検証します。追加や編集後に管理画面へ戻れることも確認します。\n\n## 根拠\n\n- `tests/preset-panel.test.ts` — ファイル全体",
       "explanationStatus": "ready"
     }
   ],

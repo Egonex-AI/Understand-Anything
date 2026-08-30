@@ -23,7 +23,9 @@ where `.understand-anything/` is intentionally ignored by Git.
 the knowledge graph (262 nodes, 424 edges), configuration, fingerprints, and
 the intermediate assembly and batch outputs used to build the graph. Its 81
 `type: "file"` nodes all have `explanationStatus: "ready"` with explanations
-using the eight required Japanese headings.
+using the eight required Japanese headings. Their `初心者向けまとめ` sections
+contain 3–5 Japanese sentences of at most 40 characters each, and were audited
+against the source evidence; the mechanical checks do not replace that audit.
 
 The source snapshot at the original directory's `repo/` path and transient
 `tmp/` logs are deliberately excluded: this fixture tracks analysis artifacts,

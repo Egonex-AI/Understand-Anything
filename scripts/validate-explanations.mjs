@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { validateExplanations } from "./lib/explanation-validator.mjs";
 
 function usage() {
-  return "Usage: node scripts/validate-explanations.mjs <knowledge-graph.json> [--expected-files N] [--min-ready-ratio R] [--no-integrity]";
+  return "Usage: node scripts/validate-explanations.mjs <knowledge-graph.json> [--expected-files N] [--min-ready-ratio R] [--beginner-quality] [--no-integrity]";
 }
 
 function parseArgs(args) {
@@ -25,6 +25,8 @@ function parseArgs(args) {
       options.minimumReadyRatio = value;
     } else if (arg === "--no-integrity") {
       options.checkGraphIntegrity = false;
+    } else if (arg === "--beginner-quality") {
+      options.beginnerQuality = true;
     } else if (!graphPath) {
       graphPath = arg;
     } else {
