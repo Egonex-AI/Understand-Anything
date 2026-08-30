@@ -201,6 +201,7 @@ export const ru = {
     source: "Исходник",
     chooseDestination: "Выберите назначение",
     openDestination: "Открыть назначение",
+    viewMode: "Режим просмотра", code: "Код", explanation: "Описание",
   },
   customNode: {
     tested: "Покрыт тестами",

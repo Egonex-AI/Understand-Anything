@@ -201,6 +201,7 @@ export const ja = {
     source: "ソース",
     chooseDestination: "移動先を選択",
     openDestination: "移動先を開く",
+    viewMode: "表示モード", code: "コード", explanation: "解説",
   },
   customNode: {
     tested: "テスト済み",

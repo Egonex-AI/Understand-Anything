@@ -120,6 +120,8 @@ interface DashboardStore {
   codeViewerOpen: boolean;
   codeViewerNodeId: string | null;
   codeViewerExpanded: boolean;
+  codeViewerMode: "code" | "split";
+  setCodeViewerMode: (mode: "code" | "split") => void;
 
   // File explanations are pre-generated and persisted in the graph. This
   // state only remembers whether the reader has opened one in this dashboard.
@@ -312,6 +314,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
+  codeViewerMode: "code",
   explanationExpandedNodeIds: new Set<string>(),
 
   tourActive: false,
@@ -592,6 +595,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false }),
   expandCodeViewer: () => set({ codeViewerExpanded: true }),
   collapseCodeViewer: () => set({ codeViewerExpanded: false }),
+  setCodeViewerMode: (codeViewerMode) => set({ codeViewerMode }),
 
   toggleExplanation: (nodeId) =>
     set((state) => {

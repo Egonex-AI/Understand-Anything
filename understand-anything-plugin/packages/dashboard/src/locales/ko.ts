@@ -201,6 +201,7 @@ export const ko = {
     source: "소스",
     chooseDestination: "대상 선택",
     openDestination: "대상 열기",
+    viewMode: "보기 모드", code: "코드", explanation: "설명",
   },
   customNode: {
     tested: "테스트됨",

@@ -201,6 +201,7 @@ export const zhTW = {
     source: "原始碼",
     chooseDestination: "選擇目標位置",
     openDestination: "開啟目標位置",
+    viewMode: "檢視模式", code: "程式碼", explanation: "說明",
   },
   customNode: {
     tested: "已測試",

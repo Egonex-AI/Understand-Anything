@@ -201,6 +201,7 @@ export const zh = {
     source: "源码",
     chooseDestination: "选择目标位置",
     openDestination: "打开目标位置",
+    viewMode: "查看模式", code: "代码", explanation: "说明",
   },
   customNode: {
     tested: "已测试",

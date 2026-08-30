@@ -201,6 +201,7 @@ export const en = {
     source: "Source",
     chooseDestination: "Choose destination",
     openDestination: "Open destination",
+    viewMode: "Viewer mode", code: "Code", explanation: "Explanation",
   },
   customNode: {
     tested: "Tested",

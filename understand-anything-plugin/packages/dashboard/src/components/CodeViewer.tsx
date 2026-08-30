@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,6 +10,7 @@ import {
   isImportSpecifierToken,
   sourceFileIdForNode,
 } from "../utils/navigationIndex";
+import { explanationForPersona } from "../utils/explanationSections";
 
 interface CodeViewerProps {
   accessToken: string;
@@ -136,6 +137,9 @@ export default function CodeViewer({
   const codeViewerNodeId = useDashboardStore((s) => s.codeViewerNodeId);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
   const navigateToCodeFile = useDashboardStore((s) => s.navigateToCodeFile);
+  const persona = useDashboardStore((s) => s.persona);
+  const codeViewerMode = useDashboardStore((s) => s.codeViewerMode);
+  const setCodeViewerMode = useDashboardStore((s) => s.setCodeViewerMode);
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
   // Files tab always builds its tree from the structural graph, so a node ID opened from
   // there may not exist in the active (domain) graph — fall back to the structural graph.
@@ -152,6 +156,7 @@ export default function CodeViewer({
   // source for line numbers / lineRange highlighting.
   const [mdView, setMdView] = useState<"rendered" | "source">("rendered");
   const [choices, setChoices] = useState<string[]>([]);
+  const [mobilePane, setMobilePane] = useState<"code" | "explanation">("code");
   const { t } = useI18n();
   const navigationIndex = useMemo(() => graph ? buildNavigationIndex(graph) : null, [graph]);
 
@@ -216,6 +221,18 @@ export default function CodeViewer({
   const isModal = presentation === "modal";
   const handleClose = onClose ?? closeCodeViewer;
   const navigate = (fileId: string) => { setChoices([]); navigateToCodeFile(fileId); };
+  const explanation = node.explanation ? explanationForPersona(node.explanation, persona) : null;
+  const activeMobilePane = codeViewerMode === "code" ? "code" : mobilePane;
+  const selectMobilePane = (pane: "code" | "explanation") => {
+    setMobilePane(pane);
+    setCodeViewerMode(pane === "code" ? "code" : "split");
+  };
+  const handleMobilePaneKeyDown = (event: KeyboardEvent<HTMLButtonElement>, pane: "code" | "explanation") => {
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      selectMobilePane(pane === "code" ? "explanation" : "code");
+    }
+  };
 
   return (
     <div className="h-full w-full flex flex-col bg-surface overflow-hidden">
@@ -310,6 +327,9 @@ export default function CodeViewer({
                   </div>
                 )}
                 <span>{formatBytes(source.sizeBytes)}</span>
+                <div className="hidden md:flex rounded border border-border-subtle overflow-hidden" role="group" aria-label={t.codeViewer.viewMode}>
+                  {(["code", "split"] as const).map((mode) => <button key={mode} type="button" onClick={() => setCodeViewerMode(mode)} aria-pressed={codeViewerMode === mode} className={`px-2 py-0.5 ${codeViewerMode === mode ? "bg-accent/15 text-accent" : ""}`}>{mode === "code" ? t.codeViewer.code : t.codeViewer.explanation}</button>)}
+                </div>
               </div>
             </div>
             {choices.length > 0 && (
@@ -321,9 +341,32 @@ export default function CodeViewer({
                 </select>
               </div>
             )}
-            {showRendered && <MarkdownView content={source.content} />}
-            {!showRendered && (
-            <Highlight code={source.content} language={language} theme={themes.vsDark}>
+            <div className="md:hidden flex border-b border-border-subtle bg-surface" role="tablist" aria-label={t.codeViewer.viewMode}>
+              {(["code", "explanation"] as const).map((pane) => (
+                <button
+                  key={pane}
+                  type="button"
+                  role="tab"
+                  id={`code-viewer-tab-${pane}`}
+                  aria-controls={`code-viewer-panel-${pane}`}
+                  aria-selected={activeMobilePane === pane}
+                  tabIndex={activeMobilePane === pane ? 0 : -1}
+                  onClick={() => selectMobilePane(pane)}
+                  onKeyDown={(event) => handleMobilePaneKeyDown(event, pane)}
+                  className={`flex-1 px-3 py-2 text-xs ${activeMobilePane === pane ? "bg-accent/15 text-accent" : "text-text-muted"}`}
+                >
+                  {pane === "code" ? t.codeViewer.code : t.codeViewer.explanation}
+                </button>
+              ))}
+            </div>
+            <div className={codeViewerMode === "split" ? "block md:grid md:grid-cols-2" : "block"}>
+            <div
+              id="code-viewer-panel-code"
+              role="tabpanel"
+              aria-labelledby="code-viewer-tab-code"
+              className={codeViewerMode === "split" && activeMobilePane === "explanation" ? "hidden md:block" : "block"}
+            >
+            {showRendered ? <MarkdownView content={source.content} /> : <Highlight code={source.content} language={language} theme={themes.vsDark}>
               {({ className, style, tokens, getLineProps, getTokenProps }) => (
                 <pre
                   className={`${className} min-w-max p-0 m-0 ${
@@ -371,7 +414,10 @@ export default function CodeViewer({
                 </pre>
               )}
             </Highlight>
-            )}
+            }
+            </div>
+            {codeViewerMode === "split" && <div id="code-viewer-panel-explanation" role="tabpanel" aria-labelledby="code-viewer-tab-explanation" className={`border-t md:border-t-0 md:border-l border-border-subtle p-4 prose prose-invert prose-sm max-w-none ${activeMobilePane === "code" ? "hidden md:block" : "block"}`}><ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation ?? (node.explanationStatus === "generating" ? t.nodeInfo.explanationGenerating : node.explanationStatus === "failed" ? node.explanationError ?? t.nodeInfo.explanationFailed : t.nodeInfo.personaExplanationUnavailable)}</ReactMarkdown></div>}
+            </div>
           </>
         )}
       </div>
