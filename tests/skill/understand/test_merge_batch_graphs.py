@@ -2032,7 +2032,7 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
             "calls",
         ), edge_pairs)
 
-    def test_duplicate_function_node_id_target_is_skipped(self) -> None:
+    def test_same_named_method_in_another_class_in_target_file_is_skipped(self) -> None:
         assembled = {
             "nodes": [
                 _file_node("Services/Service.cs"),
@@ -2093,6 +2093,152 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
                     {"name": "Run", "startLine": 3, "endLine": 3, "params": [], "typedParams": []},
                     {"name": "Run", "startLine": 8, "endLine": 8, "params": [], "typedParams": []},
                 ],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(assembled["edges"], [])
+
+    def test_inherited_method_is_not_linked_to_base_class(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Services/Consumer.cs"),
+                _class_node("Services/Consumer.cs", "Consumer"),
+                _function_node("Services/Consumer.cs", "Run"),
+                _file_node("Services/BaseService.cs"),
+                _class_node("Services/BaseService.cs", "BaseService"),
+                _function_node("Services/BaseService.cs", "Validate"),
+                _file_node("Services/DerivedService.cs"),
+                _class_node("Services/DerivedService.cs", "DerivedService"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Services/Consumer.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Consumer",
+                    "startLine": 1,
+                    "endLine": 6,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Consumer",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "service", "type": "DerivedService"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 3, "endLine": 5, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "service.Validate", "lineNumber": 4}],
+            },
+            {
+                "path": "Services/BaseService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "BaseService",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.BaseService",
+                    "methods": ["Validate"],
+                    "properties": [],
+                }],
+                "functions": [{"name": "Validate", "startLine": 3, "endLine": 3, "params": [], "typedParams": []}],
+            },
+            {
+                "path": "Services/DerivedService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "DerivedService",
+                    "startLine": 1,
+                    "endLine": 3,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.DerivedService",
+                    "methods": [],
+                    "properties": [],
+                    "baseTypes": ["BaseService"],
+                }],
+                "functions": [],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["callsAdded"], 0)
+        self.assertNotIn("calls", {edge["type"] for edge in assembled["edges"]})
+
+    def test_extension_method_is_not_linked_as_instance_method(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Services/Consumer.cs"),
+                _class_node("Services/Consumer.cs", "Consumer"),
+                _function_node("Services/Consumer.cs", "Run"),
+                _file_node("Models/Target.cs"),
+                _class_node("Models/Target.cs", "Target"),
+                _file_node("Extensions/TargetExtensions.cs"),
+                _class_node("Extensions/TargetExtensions.cs", "TargetExtensions"),
+                _function_node("Extensions/TargetExtensions.cs", "Validate"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Services/Consumer.cs",
+                "language": "csharp",
+                "imports": [{"source": "App.Models", "kind": "namespace", "line": 1}],
+                "classes": [{
+                    "name": "Consumer",
+                    "startLine": 3,
+                    "endLine": 8,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Consumer",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "target", "type": "Target"}],
+                }],
+                "functions": [{"name": "Run", "startLine": 5, "endLine": 7, "params": [], "typedParams": []}],
+                "callGraph": [{"caller": "Run", "callee": "target.Validate", "lineNumber": 6}],
+            },
+            {
+                "path": "Models/Target.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Target",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "class",
+                    "namespace": "App.Models",
+                    "fullName": "App.Models.Target",
+                    "methods": [],
+                    "properties": [],
+                }],
+                "functions": [],
+            },
+            {
+                "path": "Extensions/TargetExtensions.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "TargetExtensions",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "class",
+                    "namespace": "App.Extensions",
+                    "fullName": "App.Extensions.TargetExtensions",
+                    "methods": ["Validate"],
+                    "properties": [],
+                }],
+                "functions": [{
+                    "name": "Validate",
+                    "startLine": 3,
+                    "endLine": 3,
+                    "params": ["target"],
+                    "typedParams": [{"name": "target", "type": "Target"}],
+                }],
             },
         ]
 
