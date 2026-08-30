@@ -285,6 +285,9 @@ export const zh = {
     exemplifies: { forward: "例证", backward: "被例证" },
     categorized_under: { forward: "归类于", backward: "归类" },
     authored_by: { forward: "作者", backward: "著作" },
+    instance_of: { forward: "是…的实例", backward: "具有实例" },
+    variant_of: { forward: "是…的变体", backward: "具有变体" },
+    uses_token: { forward: "使用令牌", backward: "被使用" },
   },
   pathFinder: {
     title: "查找节点间路径 (P)",

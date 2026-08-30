@@ -285,6 +285,9 @@ export const zhTW = {
     exemplifies: { forward: "例證", backward: "被例證" },
     categorized_under: { forward: "归类於", backward: "归类" },
     authored_by: { forward: "作者", backward: "著作" },
+    instance_of: { forward: "是…的實例", backward: "具有實例" },
+    variant_of: { forward: "是…的變體", backward: "具有變體" },
+    uses_token: { forward: "使用權杖", backward: "被使用" },
   },
   pathFinder: {
     title: "尋找節點間路徑 (P)",

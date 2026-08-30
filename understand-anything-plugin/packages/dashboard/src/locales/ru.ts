@@ -285,6 +285,9 @@ export const ru = {
     exemplifies: { forward: "иллюстрирует", backward: "иллюстрируется" },
     categorized_under: { forward: "относится к", backward: "категоризирует" },
     authored_by: { forward: "автор", backward: "автор" },
+    instance_of: { forward: "экземпляр", backward: "имеет экземпляр" },
+    variant_of: { forward: "вариант", backward: "имеет вариант" },
+    uses_token: { forward: "использует токен", backward: "используется" },
   },
   pathFinder: {
     title: "Найти путь между узлами (P)",

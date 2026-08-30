@@ -3,7 +3,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
-import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
+import { complexityLabel, edgeDirectionalLabel, nodeTypeLabel } from "../locales/displayLabels";
+import type { NodeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 // Badge color classes keyed by NodeType — must be kept in sync with core NodeType union.
 const typeBadgeColors: Record<NodeType, string> = {
@@ -41,18 +42,6 @@ const complexityBadgeColors: Record<string, string> = {
   moderate: "text-accent-dim border border-accent-dim/30 bg-accent-dim/10",
   complex: "text-[#c97070] border border-[#c97070]/30 bg-[#c97070]/10",
 };
-
-function getDirectionalLabel(edgeType: string, isSource: boolean, t: ReturnType<typeof useI18n>["t"]): string {
-  // edgeLabels only defines the labels that have explicit translations; the new
-  // design edge types (instance_of/variant_of/uses_token) intentionally fall back
-  // to the generated label below, so index it as a partial map over EdgeType.
-  const labels = (t.edgeLabels as Partial<Record<EdgeType, { forward: string; backward: string }>>)[edgeType as EdgeType];
-  if (!labels) {
-    const formatted = edgeType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    return isSource ? formatted : `${formatted} (reverse)`;
-  }
-  return isSource ? labels.forward : labels.backward;
-}
 
 function FigmaThumbnail({ node }: { node: GraphNode }) {
   const url = node.figmaMeta?.thumbnailUrl;
@@ -350,7 +339,7 @@ export default function NodeInfo() {
   const nodeHistory = useDashboardStore((s) => s.nodeHistory);
   const goBackNode = useDashboardStore((s) => s.goBackNode);
   const [languageExpanded, setLanguageExpanded] = useState(true);
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   const navigateToNode = useDashboardStore((s) => s.navigateToNode);
   const navigateToHistoryIndex = useDashboardStore((s) => s.navigateToHistoryIndex);
@@ -445,12 +434,12 @@ export default function NodeInfo() {
         <span
           className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded ${typeBadge}`}
         >
-          {node.type}
+          {nodeTypeLabel(localeKey, node.type)}
         </span>
         <span
           className={`text-[10px] font-semibold px-2 py-0.5 rounded ${complexityBadge}`}
         >
-          {node.complexity}
+          {complexityLabel(localeKey, node.complexity)}
         </span>
       </div>
 
@@ -574,11 +563,11 @@ export default function NodeInfo() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${childTypeBadge}`}>
-                      {child.type}
+                      {nodeTypeLabel(localeKey, child.type)}
                     </span>
                     <span className="text-text-primary truncate">{child.name}</span>
                     <span className={`text-[9px] ml-auto ${childComplexity} px-1 py-0.5 rounded`}>
-                      {child.complexity}
+                      {complexityLabel(localeKey, child.complexity)}
                     </span>
                   </div>
                   {child.summary && (
@@ -604,7 +593,7 @@ export default function NodeInfo() {
               const isSource = edge.source === node.id;
               const otherId = isSource ? edge.target : edge.source;
               const otherNode = activeGraph?.nodes.find((n) => n.id === otherId);
-              const dirLabel = getDirectionalLabel(edge.type, isSource, t);
+              const dirLabel = edgeDirectionalLabel(t.edgeLabels, edge.type, isSource);
               const arrow = isSource ? "\u2192" : "\u2190";
 
               return (

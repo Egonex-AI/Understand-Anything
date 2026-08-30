@@ -285,6 +285,9 @@ export const ja = {
     exemplifies: { forward: "例示", backward: "例示される" },
     categorized_under: { forward: "カテゴリ化", backward: "カテゴリ化する" },
     authored_by: { forward: "作成者", backward: "作成" },
+    instance_of: { forward: "インスタンスである", backward: "インスタンスを持つ" },
+    variant_of: { forward: "バリアントである", backward: "バリアントを持つ" },
+    uses_token: { forward: "トークンを使用する", backward: "使用される" },
   },
   pathFinder: {
     title: "ノード間のパスを検索 (P)",

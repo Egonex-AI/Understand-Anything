@@ -3,6 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import type { NodeType } from "@understand-anything/core/types";
 import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel, nodeTypeLabel } from "../locales/displayLabels";
 
 // Color maps keyed by NodeType — must be kept in sync with core NodeType union.
 const typeColors: Record<NodeType, string> = {
@@ -102,7 +103,7 @@ function CustomNodeComponent({
   const barColor = typeColors[knownType] ?? typeColors.file;
   const textColor = typeTextColors[knownType] ?? typeTextColors.file;
   const complexityColor = complexityColors[data.complexity] ?? complexityColors.simple;
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   if (import.meta.env.DEV && !(knownType in typeColors)) {
     console.warn(`[CustomNode] Unknown node type "${data.nodeType}" — using "file" colors`);
@@ -164,11 +165,11 @@ function CustomNodeComponent({
       <div className="pl-4 pr-3 py-2">
         <div className="flex items-center justify-between mb-1">
           <span className={`text-[10px] font-semibold uppercase tracking-wider ${textColor}`}>
-            {data.nodeType}
+            {nodeTypeLabel(localeKey, data.nodeType)}
           </span>
           <div className="flex items-center gap-1.5">
             <span className={`text-[9px] font-mono ${complexityColor}`}>
-              {data.complexity}
+              {complexityLabel(localeKey, data.complexity)}
             </span>
             {data.tags?.includes("tested") && (
               <span

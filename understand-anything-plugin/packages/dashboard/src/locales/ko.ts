@@ -285,6 +285,9 @@ edgeLabels: {
     exemplifies: { forward: "예시", backward: "예시됨" },
     categorized_under: { forward: "카테고리화", backward: "카테고리화함" },
     authored_by: { forward: "작성자", backward: "작성" },
+    instance_of: { forward: "인스턴스임", backward: "인스턴스 보유" },
+    variant_of: { forward: "변형임", backward: "변형 보유" },
+    uses_token: { forward: "토큰 사용", backward: "사용됨" },
   },
   pathFinder: {
     title: "노드 간 경로 찾기 (P)",

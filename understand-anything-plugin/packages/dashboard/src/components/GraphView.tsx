@@ -32,6 +32,7 @@ import type {
 } from "@understand-anything/core/types";
 import { useTheme } from "../themes/index.ts";
 import { useI18n } from "../contexts/I18nContext";
+import { edgeDirectionalLabel } from "../locales/displayLabels";
 import {
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -1011,7 +1012,7 @@ function buildCustomFlowNode(
  *   - Aggregated edges incident to an expanded container are replaced with
  *     the underlying file→file edges from `topo.filteredEdges`.
  */
-function useLayerDetailGraph() {
+function useLayerDetailGraph(edgeLabels: Parameters<typeof edgeDirectionalLabel>[0]) {
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
@@ -1280,7 +1281,7 @@ function useLayerDetailGraph() {
           id: `inflated-${key}`,
           source: realSrc,
           target: realTgt,
-          label: m.type,
+          label: edgeDirectionalLabel(edgeLabels, m.type, true),
           style: { stroke: "rgba(212,165,116,0.5)", strokeWidth: 1.5 },
           labelStyle: { fill: "#a39787", fontSize: 10 },
         });
@@ -1298,7 +1299,7 @@ function useLayerDetailGraph() {
         id: key,
         source: e.source,
         target: e.target,
-        label: e.type,
+        label: edgeDirectionalLabel(edgeLabels, e.type, true),
         style: { stroke: "rgba(212,165,116,0.5)", strokeWidth: 1.5 },
         labelStyle: { fill: "#a39787", fontSize: 10 },
       });
@@ -1310,6 +1311,7 @@ function useLayerDetailGraph() {
     topo.intraContainer,
     topo.nodeToContainer,
     expandedContainers,
+    edgeLabels,
   ]);
 
   const edges = useMemo(() => {
@@ -1372,7 +1374,7 @@ function GraphViewInner() {
   const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
-  const detailGraph = useLayerDetailGraph();
+  const detailGraph = useLayerDetailGraph(t.edgeLabels);
 
   const {
     nodes: initialNodes,

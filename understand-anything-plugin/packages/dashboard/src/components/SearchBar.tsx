@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { nodeTypeLabel } from "../locales/displayLabels";
 
 const typeBadgeColors: Record<string, string> = {
   file: "text-node-file border border-node-file/30 bg-node-file/10",
@@ -29,7 +30,7 @@ export default function SearchBar() {
   const navigateToNodeInLayer = useDashboardStore((s) => s.navigateToNodeInLayer);
   const searchMode = useDashboardStore((s) => s.searchMode);
   const setSearchMode = useDashboardStore((s) => s.setSearchMode);
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -238,7 +239,7 @@ export default function SearchBar() {
                 <span
                   className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${badgeColor} shrink-0`}
                 >
-                  {node.type}
+                  {nodeTypeLabel(localeKey, node.type)}
                 </span>
 
                 {/* Node name + file path */}

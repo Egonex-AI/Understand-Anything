@@ -51,10 +51,11 @@ export function resolveLocaleKey(lang: string | undefined): LocaleKey {
 }
 
 export function resolvePreferredLocaleKey(
+  urlLanguage: string | undefined,
   configuredLanguage: string | undefined,
   browserLanguage: string | undefined,
 ): LocaleKey {
-  return resolveLocaleKey(configuredLanguage ?? browserLanguage);
+  return resolveLocaleKey(urlLanguage ?? configuredLanguage ?? browserLanguage);
 }
 
 export { en, zh, zhTW as "zh-TW", ja, ko, ru };

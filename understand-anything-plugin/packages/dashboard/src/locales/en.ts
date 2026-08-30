@@ -285,6 +285,9 @@ export const en = {
     exemplifies: { forward: "exemplifies", backward: "exemplified by" },
     categorized_under: { forward: "categorized under", backward: "categorizes" },
     authored_by: { forward: "authored by", backward: "authored" },
+    instance_of: { forward: "instance of", backward: "has instance" },
+    variant_of: { forward: "variant of", backward: "has variant" },
+    uses_token: { forward: "uses token", backward: "used by" },
   },
   pathFinder: {
     title: "Find path between nodes (P)",

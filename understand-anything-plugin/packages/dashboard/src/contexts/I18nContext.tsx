@@ -25,9 +25,12 @@ export function I18nProvider({
   children: ReactNode;
 }) {
   const browserLanguage = typeof navigator === "undefined" ? undefined : navigator.language;
+  const urlLanguage = typeof window === "undefined"
+    ? undefined
+    : new URLSearchParams(window.location.search).get("lang") ?? undefined;
   const localeKey = useMemo(
-    () => resolvePreferredLocaleKey(language, browserLanguage),
-    [language, browserLanguage],
+    () => resolvePreferredLocaleKey(urlLanguage, language, browserLanguage),
+    [urlLanguage, language, browserLanguage],
   );
   const locale = useMemo(() => getLocale(localeKey), [localeKey]);
 
