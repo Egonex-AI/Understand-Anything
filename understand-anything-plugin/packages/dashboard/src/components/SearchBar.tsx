@@ -201,8 +201,11 @@ export default function SearchBar() {
         </div>
         {searchQuery.trim() && (
           <span className="hidden sm:inline text-xs text-text-muted shrink-0">
-            {searchResults.length} {t.search.result}{searchResults.length !== 1 ? "s" : ""}{" "}
-            <span className="text-text-muted">({searchMode})</span>
+            {searchResults.length}{" "}
+            {searchResults.length === 1 ? t.search.result : t.search.results}{" "}
+            <span className="text-text-muted">
+              ({searchMode === "fuzzy" ? t.search.fuzzy : t.search.semantic})
+            </span>
           </span>
         )}
       </div>

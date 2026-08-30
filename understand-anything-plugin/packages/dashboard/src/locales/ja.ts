@@ -238,6 +238,7 @@ export const ja = {
     fuzzy: "ファジー",
     semantic: "意味検索",
     result: "結果",
+    results: "結果",
     clear: "検索をクリア",
     moreResults: "件の追加結果",
   },

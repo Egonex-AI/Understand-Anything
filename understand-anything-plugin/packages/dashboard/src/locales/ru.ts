@@ -238,6 +238,7 @@ export const ru = {
     fuzzy: "Нечёткий",
     semantic: "Семантический",
     result: "результат",
+    results: "результатов",
     clear: "Очистить поиск",
     moreResults: "дополнительных результатов",
   },

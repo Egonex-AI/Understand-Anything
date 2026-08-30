@@ -54,6 +54,7 @@ import {
 import { deriveContainers } from "../utils/containers";
 import type { DerivedContainer } from "../utils/containers";
 import { computeLayerStats } from "../utils/layerStats";
+import { filterEdges, filterNodes } from "../utils/filters";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -241,6 +242,8 @@ function useOverviewGraph() {
   const graph = useDashboardStore((s) => s.graph);
   const nodesById = useDashboardStore((s) => s.nodesById);
   const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
+  const nodeIdToLayerIds = useDashboardStore((s) => s.nodeIdToLayerIds);
+  const filters = useDashboardStore((s) => s.filters);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
 
@@ -251,7 +254,15 @@ function useOverviewGraph() {
     if (!graph) {
       return null;
     }
-    const layers = graph.layers ?? [];
+    const graphNodes = filterNodes(graph.nodes, nodeIdToLayerIds, filters);
+    const visibleNodeIds = new Set(graphNodes.map((node) => node.id));
+    const graphEdges = filterEdges(graph.edges, visibleNodeIds, filters);
+    const layers = (graph.layers ?? [])
+      .map((layer) => ({
+        ...layer,
+        nodeIds: layer.nodeIds.filter((nodeId) => visibleNodeIds.has(nodeId)),
+      }))
+      .filter((layer) => layer.nodeIds.length > 0);
     if (layers.length === 0) {
       return null;
     }
@@ -294,7 +305,12 @@ function useOverviewGraph() {
     });
 
     // Aggregate edges between layers
-    const aggregated = aggregateLayerEdges(graph);
+    const aggregated = aggregateLayerEdges({
+      ...graph,
+      nodes: graphNodes,
+      edges: graphEdges,
+      layers,
+    });
     const flowEdges: Edge[] = aggregated.map((agg, i) => ({
       id: `le-${i}`,
       source: agg.sourceLayerId,
@@ -313,7 +329,7 @@ function useOverviewGraph() {
     }
 
     return { clusterNodes, flowEdges, dims };
-  }, [graph, nodesById, nodeIdToLayerId, searchResults, drillIntoLayer]);
+  }, [graph, nodesById, nodeIdToLayerId, nodeIdToLayerIds, filters, searchResults, drillIntoLayer]);
 
   const [overview, setOverview] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],
@@ -404,6 +420,8 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
+  const nodeIdToLayerIds = useDashboardStore((s) => s.nodeIdToLayerIds);
+  const filters = useDashboardStore((s) => s.filters);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const detailLevel = useDashboardStore((s) => s.detailLevel);
   const showFunctionsInClassView = useDashboardStore((s) => s.showFunctionsInClassView);
@@ -474,11 +492,20 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       return nodeTypeFilters[effectiveCategory] !== false;
     });
 
+    // FilterPanel uses the shared fine-grained filter model. Sub-file nodes
+    // inherit the active layer for filtering because layers list file-level
+    // nodes while the class view expands their contained children.
+    const effectiveLayerIds = new Map(nodeIdToLayerIds);
+    for (const nodeId of expandedLayerNodeIds) {
+      if (!effectiveLayerIds.has(nodeId)) {
+        effectiveLayerIds.set(nodeId, new Set([activeLayerId]));
+      }
+    }
+    filteredGraphNodes = filterNodes(filteredGraphNodes, effectiveLayerIds, filters);
+
     let filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
 
-    let filteredGraphEdges = graph.edges.filter(
-      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
-    );
+    let filteredGraphEdges = filterEdges(graph.edges, filteredNodeIds, filters);
 
     // Focus mode: 1-hop neighborhood within the layer
     if (focusNodeId && filteredNodeIds.has(focusNodeId)) {
@@ -671,6 +698,8 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     affectedNodeIds,
     focusNodeId,
     nodeTypeFilters,
+    nodeIdToLayerIds,
+    filters,
     drillIntoLayer,
     detailLevel,
     showFunctionsInClassView,

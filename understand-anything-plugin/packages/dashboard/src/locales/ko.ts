@@ -238,6 +238,7 @@ export const ko = {
     fuzzy: "퍼지",
     semantic: "시맨틱",
     result: "결과",
+    results: "결과",
     clear: "검색 지우기",
     moreResults: "개의 추가 결과",
   },

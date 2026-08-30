@@ -238,6 +238,7 @@ export const zhTW = {
     fuzzy: "模糊",
     semantic: "語意",
     result: "結果",
+    results: "結果",
     clear: "清除搜尋",
     moreResults: "筆更多結果",
   },

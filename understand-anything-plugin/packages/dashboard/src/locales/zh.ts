@@ -238,6 +238,7 @@ export const zh = {
     fuzzy: "模糊",
     semantic: "语义",
     result: "结果",
+    results: "结果",
     clear: "清除搜索",
     moreResults: "条更多结果",
   },

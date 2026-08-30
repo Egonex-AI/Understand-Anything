@@ -238,6 +238,7 @@ export const en = {
     fuzzy: "Fuzzy",
     semantic: "Semantic",
     result: "result",
+    results: "results",
     clear: "Clear search",
     moreResults: "more results",
   },
