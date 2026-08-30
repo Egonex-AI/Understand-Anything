@@ -1192,6 +1192,7 @@ def _cs_build_indexes(
             "path": file_path,
             "imports": imports,
             "classes": [],
+            "classNameCounts": Counter(),
             "functions": [],
             "functionNameCounts": Counter(),
             "callGraph": result.get("callGraph", [])
@@ -1228,6 +1229,7 @@ def _cs_build_indexes(
             cls["fullName"] = full_name
             cls["filePath"] = file_path
             file_info["classes"].append(cls)
+            file_info["classNameCounts"][name] += 1
             full_name_index.setdefault(full_name, []).append(cls)
 
     global_using_namespaces_by_project: dict[str, list[str]] = {}
@@ -1290,22 +1292,6 @@ def _cs_resolve_type(
     return "unresolved", None
 
 
-def _cs_containing_class(classes: list[dict[str, Any]], line_number: int) -> dict[str, Any] | None:
-    matches = [
-        cls for cls in classes
-        if cls["lineRange"][0] <= line_number <= cls["lineRange"][1]
-    ]
-    return matches[0] if len(matches) == 1 else None
-
-
-def _cs_containing_function(functions: list[dict[str, Any]], line_number: int) -> dict[str, Any] | None:
-    matches = [
-        fn for fn in functions
-        if fn["lineRange"][0] <= line_number <= fn["lineRange"][1]
-    ]
-    return matches[0] if len(matches) == 1 else None
-
-
 def _cs_using_applies_to_namespace(using_entry: dict[str, Any], namespace: str) -> bool:
     using_namespace = using_entry.get("namespace") if isinstance(using_entry.get("namespace"), str) else ""
     if not using_namespace:
@@ -1345,25 +1331,74 @@ def _cs_target_method_function(
     target_class: dict[str, Any],
     method_name: str,
     indexes: dict[str, Any],
-    node_ids: set[str],
-) -> str | None:
+) -> tuple[str, dict[str, Any] | None]:
     file_path = target_class.get("filePath", "")
     file_info = indexes["files"].get(file_path)
     if file_info is None:
-        return None
+        return "missing", None
 
     matches = [
         fn for fn in file_info["functions"]
         if fn.get("name") == method_name
         and target_class["lineRange"][0] <= fn["lineRange"][0] <= target_class["lineRange"][1]
     ]
+    if not matches:
+        return "missing", None
     if len(matches) != 1:
-        return None
+        return "ambiguous", None
     if file_info["functionNameCounts"].get(method_name, 0) != 1:
-        return None
+        return "ambiguous", None
+    return "resolved", matches[0]
 
-    target_id = f"function:{file_path}:{method_name}"
-    return target_id if target_id in node_ids else None
+
+def _cs_declared_dependency_types(
+    cls: dict[str, Any],
+    file_info: dict[str, Any],
+) -> list[str]:
+    references: list[str] = []
+
+    def append_types(entries: Any) -> None:
+        if not isinstance(entries, list):
+            return
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            type_text = entry.get("type")
+            if isinstance(type_text, str) and type_text:
+                references.append(type_text)
+
+    append_types(cls.get("primaryConstructorParams"))
+
+    class_name = cls.get("name", "")
+    for function in file_info["functions"]:
+        if not (
+            cls["lineRange"][0]
+            <= function["lineRange"][0]
+            <= cls["lineRange"][1]
+        ):
+            continue
+        function_kind = function.get("kind")
+        is_constructor = function_kind == "constructor" or (
+            function_kind is None and function.get("name") == class_name
+        )
+        if is_constructor:
+            append_types(function.get("typedParams"))
+
+    instance_fields = [
+        field for field in cls.get("fields", []) or []
+        if isinstance(field, dict) and field.get("isStatic") is not True
+    ]
+    append_types(instance_fields)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for reference in references:
+        normalized = _cs_strip_type(reference)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique.append(reference)
+    return unique
 
 
 def _cs_add_edge(
@@ -1391,23 +1426,165 @@ def _cs_add_edge(
     return True
 
 
+def _cs_synthesized_complexity(line_range: tuple[int, int]) -> str:
+    line_count = max(1, line_range[1] - line_range[0] + 1)
+    if line_count <= 10:
+        return "simple"
+    if line_count <= 50:
+        return "moderate"
+    return "complex"
+
+
+def _cs_ensure_endpoint_node(
+    assembled: dict[str, Any],
+    node_ids: set[str],
+    existing_edges: set[tuple[str, str, str]],
+    node_type: str,
+    file_path: str,
+    name: str,
+    line_range: tuple[int, int],
+    summary: str,
+    tags: list[str],
+    stats: dict[str, int],
+) -> str:
+    node_id = f"{node_type}:{file_path}:{name}"
+    if node_id in node_ids:
+        return node_id
+
+    assembled["nodes"].append({
+        "id": node_id,
+        "type": node_type,
+        "name": name,
+        "filePath": file_path,
+        "lineRange": [line_range[0], line_range[1]],
+        "summary": summary,
+        "tags": tags + ["auto-linked"],
+        "complexity": _cs_synthesized_complexity(line_range),
+        "deterministic": True,
+    })
+    node_ids.add(node_id)
+    stats[f"{node_type}NodesSynthesized"] += 1
+
+    file_id = f"file:{file_path}"
+    if file_id in node_ids:
+        if _cs_add_edge(
+            assembled["edges"], existing_edges, file_id, node_id, "contains", 1.0
+        ):
+            stats["containsEdgesAdded"] += 1
+    else:
+        stats["synthesizedEndpointsMissingFileNode"] += 1
+    return node_id
+
+
+def _cs_has_unique_class_endpoint(
+    cls: dict[str, Any],
+    indexes: dict[str, Any],
+) -> bool:
+    file_path = cls.get("filePath", "")
+    name = cls.get("name", "")
+    file_info = indexes["files"].get(file_path)
+    return not (
+        file_info is None
+        or not isinstance(name, str)
+        or not name
+        or file_info["classNameCounts"].get(name, 0) != 1
+    )
+
+
+def _cs_ensure_class_endpoint(
+    assembled: dict[str, Any],
+    node_ids: set[str],
+    existing_edges: set[tuple[str, str, str]],
+    cls: dict[str, Any],
+    stats: dict[str, int],
+) -> str:
+    file_path = cls.get("filePath", "")
+    name = cls.get("name", "")
+
+    kind = cls.get("kind") if isinstance(cls.get("kind"), str) else "type"
+    full_name = cls.get("fullName") if isinstance(cls.get("fullName"), str) else name
+    return _cs_ensure_endpoint_node(
+        assembled,
+        node_ids,
+        existing_edges,
+        "class",
+        file_path,
+        name,
+        cls["lineRange"],
+        f"C# {kind} {full_name}.",
+        ["csharp", kind],
+        stats,
+    )
+
+
+def _cs_ensure_function_endpoint(
+    assembled: dict[str, Any],
+    node_ids: set[str],
+    existing_edges: set[tuple[str, str, str]],
+    function: dict[str, Any],
+    containing_class: dict[str, Any],
+    file_path: str,
+    stats: dict[str, int],
+) -> str:
+    name = function.get("name", "")
+    class_name = containing_class.get("fullName") or containing_class.get("name") or "type"
+    return _cs_ensure_endpoint_node(
+        assembled,
+        node_ids,
+        existing_edges,
+        "function",
+        file_path,
+        name,
+        function["lineRange"],
+        f"C# method {class_name}.{name}.",
+        ["csharp", "method"],
+        stats,
+    )
+
+
 def link_csharp_deterministic_edges(
     assembled: dict[str, Any],
     tmp_dir: Path,
 ) -> tuple[dict[str, int], list[str]]:
-    """Add deterministic C# calls/implements/inherits edges from extraction output."""
+    """Add C# edges and synthesize uniquely proven endpoints from extraction output."""
     results, warnings = _load_csharp_extract_results(tmp_dir)
     stats = {
         "filesScanned": len(results),
+        "classNodesSynthesized": 0,
+        "functionNodesSynthesized": 0,
+        "containsEdgesAdded": 0,
+        "synthesizedEndpointsMissingFileNode": 0,
         "identifierMemberCalls": 0,
         "receiverTypesFound": 0,
         "receiverTypesResolved": 0,
         "targetMethodsResolved": 0,
         "callsAdded": 0,
         "callsSkipped": 0,
+        "callsNoContainingFunction": 0,
+        "callsAmbiguousContainingFunction": 0,
+        "callsNoContainingClass": 0,
+        "callsAmbiguousContainingClass": 0,
+        "callsAmbiguousCallerId": 0,
+        "callsNoReceiverType": 0,
+        "callsReceiverTypeUnresolved": 0,
+        "callsReceiverTypeAmbiguous": 0,
+        "callsTargetMethodMissing": 0,
+        "callsTargetMethodAmbiguous": 0,
+        "callsUnsupportedCallee": 0,
         "baseTypesScanned": 0,
         "inheritanceAdded": 0,
         "inheritanceSkipped": 0,
+        "inheritanceTypeUnresolved": 0,
+        "inheritanceTypeAmbiguous": 0,
+        "inheritanceEndpointAmbiguous": 0,
+        "inheritanceKindUnsupported": 0,
+        "declaredDependenciesScanned": 0,
+        "dependsOnAdded": 0,
+        "dependsOnSkipped": 0,
+        "dependsOnTypeUnresolved": 0,
+        "dependsOnTypeAmbiguous": 0,
+        "dependsOnEndpointAmbiguous": 0,
+        "dependsOnSelfReference": 0,
     }
     if not results:
         return stats, warnings
@@ -1424,11 +1601,24 @@ def link_csharp_deterministic_edges(
         if isinstance(edge, dict)
     }
 
-    for file_info in indexes["files"].values():
-        for cls in file_info["classes"]:
-            source_id = f"class:{file_info['path']}:{cls.get('name', '')}"
-            if source_id not in node_ids:
-                continue
+    def skip_call(reason: str) -> None:
+        stats["callsSkipped"] += 1
+        stats[reason] += 1
+
+    def skip_inheritance(reason: str) -> None:
+        stats["inheritanceSkipped"] += 1
+        stats[reason] += 1
+
+    def skip_dependency(reason: str) -> None:
+        stats["dependsOnSkipped"] += 1
+        stats[reason] += 1
+
+    for file_path in sorted(indexes["files"]):
+        file_info = indexes["files"][file_path]
+        for cls in sorted(
+            file_info["classes"],
+            key=lambda item: (item["lineRange"][0], item.get("name", "")),
+        ):
             source_kind = cls.get("kind")
             using_namespaces = _cs_using_namespaces_for(file_info, cls.get("namespace", ""), indexes)
             for base_type in cls.get("baseTypes", []) or []:
@@ -1439,12 +1629,16 @@ def link_csharp_deterministic_edges(
                     using_namespaces,
                     indexes,
                 )
-                if status != "resolved" or target is None:
-                    stats["inheritanceSkipped"] += 1
+                if status == "ambiguous":
+                    skip_inheritance("inheritanceTypeAmbiguous")
                     continue
-                target_id = f"class:{target.get('filePath', '')}:{target.get('name', '')}"
-                if target_id not in node_ids:
-                    stats["inheritanceSkipped"] += 1
+                if status != "resolved" or target is None:
+                    skip_inheritance("inheritanceTypeUnresolved")
+                    continue
+                if not _cs_has_unique_class_endpoint(cls, indexes) or not _cs_has_unique_class_endpoint(
+                    target, indexes
+                ):
+                    skip_inheritance("inheritanceEndpointAmbiguous")
                     continue
                 target_kind = target.get("kind")
                 if target_kind == "interface" and source_kind in {"class", "record", "struct"}:
@@ -1454,12 +1648,64 @@ def link_csharp_deterministic_edges(
                 elif source_kind == "interface" and target_kind == "interface":
                     edge_type = "inherits"
                 else:
-                    stats["inheritanceSkipped"] += 1
+                    skip_inheritance("inheritanceKindUnsupported")
                     continue
+                source_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, cls, stats
+                )
+                target_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, target, stats
+                )
                 if _cs_add_edge(assembled["edges"], existing_edges, source_id, target_id, edge_type, 0.8):
                     stats["inheritanceAdded"] += 1
 
-        for call in file_info["callGraph"]:
+            for dependency_type in _cs_declared_dependency_types(cls, file_info):
+                stats["declaredDependenciesScanned"] += 1
+                status, target = _cs_resolve_type(
+                    dependency_type,
+                    cls.get("namespace", ""),
+                    using_namespaces,
+                    indexes,
+                )
+                if status == "ambiguous":
+                    skip_dependency("dependsOnTypeAmbiguous")
+                    continue
+                if status != "resolved" or target is None:
+                    skip_dependency("dependsOnTypeUnresolved")
+                    continue
+                if (
+                    cls.get("filePath") == target.get("filePath")
+                    and cls.get("name") == target.get("name")
+                ):
+                    skip_dependency("dependsOnSelfReference")
+                    continue
+                if not _cs_has_unique_class_endpoint(cls, indexes) or not _cs_has_unique_class_endpoint(
+                    target, indexes
+                ):
+                    skip_dependency("dependsOnEndpointAmbiguous")
+                    continue
+                source_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, cls, stats
+                )
+                target_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, target, stats
+                )
+                if _cs_add_edge(
+                    assembled["edges"], existing_edges, source_id, target_id, "depends_on", 0.6
+                ):
+                    stats["dependsOnAdded"] += 1
+
+        for call in sorted(
+            file_info["callGraph"],
+            key=lambda item: (
+                item.get("lineNumber", -1)
+                if isinstance(item, dict) and isinstance(item.get("lineNumber"), int)
+                else -1,
+                item.get("callee", "")
+                if isinstance(item, dict) and isinstance(item.get("callee"), str)
+                else "",
+            ),
+        ):
             if not isinstance(call, dict):
                 continue
             callee = call.get("callee")
@@ -1467,17 +1713,32 @@ def link_csharp_deterministic_edges(
             if not isinstance(callee, str) or not isinstance(line_number, int):
                 continue
 
-            caller_fn = _cs_containing_function(file_info["functions"], line_number)
-            caller_cls = _cs_containing_class(file_info["classes"], line_number)
-            if caller_fn is None or caller_cls is None:
-                stats["callsSkipped"] += 1
+            caller_functions = [
+                fn for fn in file_info["functions"]
+                if fn["lineRange"][0] <= line_number <= fn["lineRange"][1]
+            ]
+            if not caller_functions:
+                skip_call("callsNoContainingFunction")
                 continue
-            caller_id = f"function:{file_info['path']}:{caller_fn.get('name', '')}"
-            if (
-                caller_id not in node_ids
-                or file_info["functionNameCounts"].get(caller_fn.get("name", ""), 0) != 1
-            ):
-                stats["callsSkipped"] += 1
+            if len(caller_functions) != 1:
+                skip_call("callsAmbiguousContainingFunction")
+                continue
+            caller_fn = caller_functions[0]
+
+            caller_classes = [
+                cls for cls in file_info["classes"]
+                if cls["lineRange"][0] <= line_number <= cls["lineRange"][1]
+            ]
+            if not caller_classes:
+                skip_call("callsNoContainingClass")
+                continue
+            if len(caller_classes) != 1:
+                skip_call("callsAmbiguousContainingClass")
+                continue
+            caller_cls = caller_classes[0]
+
+            if file_info["functionNameCounts"].get(caller_fn.get("name", ""), 0) != 1:
+                skip_call("callsAmbiguousCallerId")
                 continue
             using_namespaces = _cs_using_namespaces_for(file_info, caller_cls.get("namespace", ""), indexes)
 
@@ -1501,7 +1762,7 @@ def link_csharp_deterministic_edges(
                             receiver_type = field.get("type")
                             break
                 if receiver_type is None:
-                    stats["callsSkipped"] += 1
+                    skip_call("callsNoReceiverType")
                     continue
 
                 stats["receiverTypesFound"] += 1
@@ -1511,15 +1772,41 @@ def link_csharp_deterministic_edges(
                     using_namespaces,
                     indexes,
                 )
+                if status == "ambiguous":
+                    skip_call("callsReceiverTypeAmbiguous")
+                    continue
                 if status != "resolved" or target_class is None:
-                    stats["callsSkipped"] += 1
+                    skip_call("callsReceiverTypeUnresolved")
                     continue
                 stats["receiverTypesResolved"] += 1
-                target_id = _cs_target_method_function(target_class, method_name, indexes, node_ids)
-                if target_id is None:
-                    stats["callsSkipped"] += 1
+                target_status, target_fn = _cs_target_method_function(
+                    target_class, method_name, indexes
+                )
+                if target_status == "ambiguous":
+                    skip_call("callsTargetMethodAmbiguous")
+                    continue
+                if target_status != "resolved" or target_fn is None:
+                    skip_call("callsTargetMethodMissing")
                     continue
                 stats["targetMethodsResolved"] += 1
+                caller_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    caller_fn,
+                    caller_cls,
+                    file_info["path"],
+                    stats,
+                )
+                target_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    target_fn,
+                    target_class,
+                    target_class.get("filePath", ""),
+                    stats,
+                )
                 if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
                     stats["callsAdded"] += 1
                 continue
@@ -1530,19 +1817,38 @@ def link_csharp_deterministic_edges(
                     if fn.get("name") == callee
                     and caller_cls["lineRange"][0] <= fn["lineRange"][0] <= caller_cls["lineRange"][1]
                 ]
-                target_id = f"function:{file_info['path']}:{callee}"
+                if not containing_methods:
+                    skip_call("callsTargetMethodMissing")
+                    continue
                 if (
-                    len(containing_methods) == 1
-                    and target_id in node_ids
-                    and file_info["functionNameCounts"].get(callee, 0) == 1
+                    len(containing_methods) != 1
+                    or file_info["functionNameCounts"].get(callee, 0) != 1
                 ):
-                    if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
-                        stats["callsAdded"] += 1
-                else:
-                    stats["callsSkipped"] += 1
+                    skip_call("callsTargetMethodAmbiguous")
+                    continue
+                caller_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    caller_fn,
+                    caller_cls,
+                    file_info["path"],
+                    stats,
+                )
+                target_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    containing_methods[0],
+                    caller_cls,
+                    file_info["path"],
+                    stats,
+                )
+                if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
+                    stats["callsAdded"] += 1
                 continue
 
-            stats["callsSkipped"] += 1
+            skip_call("callsUnsupportedCallee")
 
     lines = [
         f"  C# files scanned: {stats['filesScanned']}",
@@ -1551,9 +1857,68 @@ def link_csharp_deterministic_edges(
         f"  receiver types uniquely resolved: {stats['receiverTypesResolved']}",
         f"  target methods uniquely resolved: {stats['targetMethodsResolved']}",
         f"  calls added: {stats['callsAdded']}",
+        f"  calls skipped: {stats['callsSkipped']}",
         f"  base types scanned: {stats['baseTypesScanned']}",
         f"  implements/inherits added: {stats['inheritanceAdded']}",
+        f"  implements/inherits skipped: {stats['inheritanceSkipped']}",
+        f"  constructor/field dependencies scanned: {stats['declaredDependenciesScanned']}",
+        f"  class-level depends_on added: {stats['dependsOnAdded']}",
+        f"  class-level depends_on skipped: {stats['dependsOnSkipped']}",
+        (
+            "  endpoint nodes synthesized: "
+            f"{stats['classNodesSynthesized']} class, "
+            f"{stats['functionNodesSynthesized']} function"
+        ),
     ]
+    call_skip_reasons = [
+        ("no containing function", "callsNoContainingFunction"),
+        ("ambiguous containing function", "callsAmbiguousContainingFunction"),
+        ("no containing class", "callsNoContainingClass"),
+        ("ambiguous containing class", "callsAmbiguousContainingClass"),
+        ("ambiguous caller ID", "callsAmbiguousCallerId"),
+        ("no receiver type", "callsNoReceiverType"),
+        ("unresolved receiver type", "callsReceiverTypeUnresolved"),
+        ("ambiguous receiver type", "callsReceiverTypeAmbiguous"),
+        ("missing target method", "callsTargetMethodMissing"),
+        ("ambiguous target method", "callsTargetMethodAmbiguous"),
+        ("unsupported callee", "callsUnsupportedCallee"),
+    ]
+    call_parts = [f"{label}: {stats[key]}" for label, key in call_skip_reasons if stats[key]]
+    if call_parts:
+        lines.append(f"  call skip reasons: {', '.join(call_parts)}")
+
+    inheritance_skip_reasons = [
+        ("unresolved type", "inheritanceTypeUnresolved"),
+        ("ambiguous type", "inheritanceTypeAmbiguous"),
+        ("ambiguous endpoint ID", "inheritanceEndpointAmbiguous"),
+        ("unsupported kind", "inheritanceKindUnsupported"),
+    ]
+    inheritance_parts = [
+        f"{label}: {stats[key]}"
+        for label, key in inheritance_skip_reasons
+        if stats[key]
+    ]
+    if inheritance_parts:
+        lines.append(f"  inheritance skip reasons: {', '.join(inheritance_parts)}")
+
+    dependency_skip_reasons = [
+        ("unresolved type", "dependsOnTypeUnresolved"),
+        ("ambiguous type", "dependsOnTypeAmbiguous"),
+        ("ambiguous endpoint ID", "dependsOnEndpointAmbiguous"),
+        ("self reference", "dependsOnSelfReference"),
+    ]
+    dependency_parts = [
+        f"{label}: {stats[key]}"
+        for label, key in dependency_skip_reasons
+        if stats[key]
+    ]
+    if dependency_parts:
+        lines.append(f"  depends_on skip reasons: {', '.join(dependency_parts)}")
+    if stats["synthesizedEndpointsMissingFileNode"]:
+        lines.append(
+            "  synthesized endpoints without file nodes: "
+            f"{stats['synthesizedEndpointsMissingFileNode']}"
+        )
     return stats, warnings + lines
 
 

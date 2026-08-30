@@ -37,6 +37,7 @@ const VALID_STRUCTURE_ENTRIES = {
     params: ['value'],
     returnType: 'string',
     typedParams: [{ name: 'value', type: 'string' }],
+    kind: 'constructor',
   },
   classes: {
     name: 'Runner',
@@ -48,7 +49,7 @@ const VALID_STRUCTURE_ENTRIES = {
     fullName: 'App.Services.Runner',
     baseTypes: ['IRunner'],
     primaryConstructorParams: [{ name: 'repository', type: 'IRepository' }],
-    fields: [{ name: '_repository', type: 'IRepository' }],
+    fields: [{ name: '_repository', type: 'IRepository', isStatic: true }],
   },
   imports: {
     source: './dependency.js',
@@ -120,6 +121,10 @@ const MALFORMED_STRUCTURE_ENTRIES = [
     ...VALID_STRUCTURE_ENTRIES.functions,
     typedParams: [{ name: 'value', type: 1 }],
   }],
+  ['a function with an unsupported declaration kind', 'functions', {
+    ...VALID_STRUCTURE_ENTRIES.functions,
+    kind: 'local-function',
+  }],
   ['a class with a non-string name', 'classes', {
     ...VALID_STRUCTURE_ENTRIES.classes,
     name: false,
@@ -143,6 +148,10 @@ const MALFORMED_STRUCTURE_ENTRIES = [
   ['a class with malformed primary constructor params', 'classes', {
     ...VALID_STRUCTURE_ENTRIES.classes,
     primaryConstructorParams: [{ name: 'repository', type: 1 }],
+  }],
+  ['a class with malformed static field metadata', 'classes', {
+    ...VALID_STRUCTURE_ENTRIES.classes,
+    fields: [{ name: '_repository', type: 'IRepository', isStatic: 'yes' }],
   }],
   ['an import with a non-string source', 'imports', {
     ...VALID_STRUCTURE_ENTRIES.imports,
@@ -357,6 +366,26 @@ function analyzeStructuralOutput(mode, analysis) {
 }
 
 describe('extract-structure result mapping', () => {
+  it('preserves C# constructor and static field metadata', () => {
+    const result = extractStructure.buildResult(
+      { path: 'src/Service.cs', language: 'csharp', fileCategory: 'code' },
+      3,
+      3,
+      {
+        ...validAnalysis(),
+        functions: [VALID_STRUCTURE_ENTRIES.functions],
+        classes: [VALID_STRUCTURE_ENTRIES.classes],
+      },
+      null,
+      null,
+    );
+
+    expect(result.functions[0].kind).toBe('constructor');
+    expect(result.classes[0].fields).toEqual([
+      { name: '_repository', type: 'IRepository', isStatic: true },
+    ]);
+  });
+
   it('preserves imports only for C# artifacts', () => {
     const analysis = {
       ...validAnalysis(),

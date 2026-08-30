@@ -189,6 +189,7 @@ export interface TypedParameter {
 export interface TypedField {
   name: string;
   type: string;
+  isStatic?: boolean;
 }
 
 // Plugin interfaces
@@ -199,6 +200,7 @@ export interface StructuralAnalysis {
     params: string[];
     returnType?: string;
     typedParams?: TypedParameter[];
+    kind?: "method" | "constructor";
   }>;
   classes: Array<{
     name: string;

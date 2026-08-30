@@ -1445,15 +1445,22 @@ class TestUaDirResolution(unittest.TestCase):
 class CSharpDeterministicLinkerTests(unittest.TestCase):
     """Deterministic C# calls and inheritance from extraction artifacts."""
 
-    def _link(self, assembled: dict[str, Any], results: list[dict[str, Any]]) -> dict[str, int]:
+    def _link_with_report(
+        self,
+        assembled: dict[str, Any],
+        results: list[dict[str, Any]],
+    ) -> tuple[dict[str, int], list[str]]:
         with tempfile.TemporaryDirectory(prefix="ua-csharp-link-") as tmp:
             tmp_dir = Path(tmp)
             (tmp_dir / "ua-file-extract-results-1.json").write_text(
                 mbg.json.dumps({"scriptCompleted": True, "results": results}),
                 encoding="utf-8",
             )
-            stats, _report = mbg.link_csharp_deterministic_edges(assembled, tmp_dir)
-            return stats
+            return mbg.link_csharp_deterministic_edges(assembled, tmp_dir)
+
+    def _link(self, assembled: dict[str, Any], results: list[dict[str, Any]]) -> dict[str, int]:
+        stats, _report = self._link_with_report(assembled, results)
+        return stats
 
     def test_no_csharp_results_do_not_emit_report_noise(self) -> None:
         assembled = {"nodes": [_file_node("src/index.ts")], "edges": []}
@@ -1574,7 +1581,6 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
                 _file_node("Services/FooService.cs"),
                 _class_node("Services/FooService.cs", "FooService"),
                 _function_node("Services/FooService.cs", "Run"),
-                _function_node("Services/FooService.cs", "Validate"),
                 _file_node("Repositories/IRepository.cs"),
                 _class_node("Repositories/IRepository.cs", "IRepository"),
                 _function_node("Repositories/IRepository.cs", "Save"),
@@ -1632,6 +1638,7 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
         stats = self._link(assembled, results)
 
         self.assertEqual(stats["callsAdded"], 2)
+        self.assertEqual(stats["functionNodesSynthesized"], 1)
         edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
         self.assertIn((
             "function:Services/FooService.cs:Run",
@@ -1806,6 +1813,8 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
         stats = self._link(assembled, results)
 
         self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(stats["callsReceiverTypeAmbiguous"], 1)
+        self.assertEqual(stats["callsTargetMethodAmbiguous"], 1)
         self.assertEqual(
             len([e for e in assembled["edges"] if e["type"] == "calls"]),
             1,
@@ -2032,6 +2041,385 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
             "calls",
         ), edge_pairs)
 
+    def test_synthesizes_missing_inheritance_endpoint_nodes(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Services/Service.cs"),
+                _file_node("Services/IService.cs"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Services/Service.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 1,
+                    "endLine": 3,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Service",
+                    "methods": [],
+                    "properties": [],
+                    "baseTypes": ["IService", "IDisposable"],
+                }],
+                "functions": [],
+                "callGraph": [],
+            },
+            {
+                "path": "Services/IService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IService",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "interface",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.IService",
+                    "methods": [],
+                    "properties": [],
+                }],
+                "functions": [],
+                "callGraph": [],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["classNodesSynthesized"], 2)
+        self.assertEqual(stats["containsEdgesAdded"], 2)
+        self.assertEqual(stats["inheritanceAdded"], 1)
+        self.assertEqual(stats["inheritanceSkipped"], 1)
+        self.assertEqual(stats["inheritanceTypeUnresolved"], 1)
+        nodes_by_id = {node["id"]: node for node in assembled["nodes"]}
+        synthesized = nodes_by_id["class:Services/IService.cs:IService"]
+        self.assertEqual(synthesized["lineRange"], [1, 2])
+        self.assertEqual(synthesized["complexity"], "simple")
+        self.assertIn("auto-linked", synthesized["tags"])
+        edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        self.assertIn((
+            "class:Services/Service.cs:Service",
+            "class:Services/IService.cs:IService",
+            "implements",
+        ), edge_pairs)
+        self.assertIn((
+            "file:Services/Service.cs",
+            "class:Services/Service.cs:Service",
+            "contains",
+        ), edge_pairs)
+        self.assertIn((
+            "file:Services/IService.cs",
+            "class:Services/IService.cs:IService",
+            "contains",
+        ), edge_pairs)
+
+    def test_synthesizes_missing_call_endpoints_without_replacing_llm_nodes(self) -> None:
+        results = [
+            {
+                "path": "Services/Consumer.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "Consumer",
+                    "startLine": 1,
+                    "endLine": 6,
+                    "kind": "class",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.Consumer",
+                    "methods": ["Run"],
+                    "properties": [],
+                    "primaryConstructorParams": [{"name": "service", "type": "IService"}],
+                }],
+                "functions": [{
+                    "name": "Run",
+                    "startLine": 3,
+                    "endLine": 5,
+                    "params": [],
+                    "typedParams": [],
+                }],
+                "callGraph": [{"caller": "Run", "callee": "service.Save", "lineNumber": 4}],
+            },
+            {
+                "path": "Services/IService.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IService",
+                    "startLine": 1,
+                    "endLine": 4,
+                    "kind": "interface",
+                    "namespace": "App.Services",
+                    "fullName": "App.Services.IService",
+                    "methods": ["Save"],
+                    "properties": [],
+                }],
+                "functions": [{
+                    "name": "Save",
+                    "startLine": 3,
+                    "endLine": 3,
+                    "params": [],
+                    "typedParams": [],
+                }],
+                "callGraph": [],
+            },
+        ]
+        common_nodes = [
+            _file_node("Services/Consumer.cs"),
+            _class_node("Services/Consumer.cs", "Consumer"),
+            _file_node("Services/IService.cs"),
+            _class_node("Services/IService.cs", "IService"),
+        ]
+
+        assembled = {
+            "nodes": common_nodes + [
+                _function_node("Services/Consumer.cs", "Run", summary="LLM caller summary"),
+            ],
+            "edges": [],
+        }
+        first_stats = self._link(assembled, results)
+
+        self.assertEqual(first_stats["functionNodesSynthesized"], 1)
+        self.assertEqual(first_stats["containsEdgesAdded"], 1)
+        self.assertEqual(first_stats["callsAdded"], 1)
+        nodes_by_id = {node["id"]: node for node in assembled["nodes"]}
+        self.assertEqual(
+            nodes_by_id["function:Services/Consumer.cs:Run"]["summary"],
+            "LLM caller summary",
+        )
+        self.assertIn("function:Services/IService.cs:Save", nodes_by_id)
+        first_output = mbg.json.dumps(assembled, sort_keys=True)
+
+        second_stats = self._link(assembled, results)
+
+        self.assertEqual(second_stats["functionNodesSynthesized"], 0)
+        self.assertEqual(second_stats["containsEdgesAdded"], 0)
+        self.assertEqual(second_stats["callsAdded"], 0)
+        self.assertEqual(mbg.json.dumps(assembled, sort_keys=True), first_output)
+
+        missing_caller = {
+            "nodes": common_nodes + [
+                _function_node("Services/IService.cs", "Save", summary="LLM target summary"),
+            ],
+            "edges": [],
+        }
+        caller_stats = self._link(missing_caller, results)
+
+        self.assertEqual(caller_stats["functionNodesSynthesized"], 1)
+        self.assertEqual(caller_stats["callsAdded"], 1)
+        caller_nodes = {node["id"]: node for node in missing_caller["nodes"]}
+        self.assertIn("function:Services/Consumer.cs:Run", caller_nodes)
+        self.assertEqual(
+            caller_nodes["function:Services/IService.cs:Save"]["summary"],
+            "LLM target summary",
+        )
+
+    def test_ambiguous_base_and_dependency_types_are_reported_without_synthesis(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("App/Service.cs"),
+                _file_node("A/IFoo.cs"),
+                _file_node("B/IFoo.cs"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "App/Service.cs",
+                "language": "csharp",
+                "imports": [
+                    {"source": "A", "kind": "namespace", "line": 1},
+                    {"source": "B", "kind": "namespace", "line": 2},
+                ],
+                "classes": [{
+                    "name": "Service",
+                    "startLine": 4,
+                    "endLine": 6,
+                    "kind": "class",
+                    "namespace": "App",
+                    "fullName": "App.Service",
+                    "methods": [],
+                    "properties": [],
+                    "baseTypes": ["IFoo"],
+                    "primaryConstructorParams": [{"name": "foo", "type": "IFoo"}],
+                }],
+                "functions": [],
+                "callGraph": [],
+            },
+            {
+                "path": "A/IFoo.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IFoo",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "interface",
+                    "namespace": "A",
+                    "fullName": "A.IFoo",
+                    "methods": [],
+                    "properties": [],
+                }],
+                "functions": [],
+                "callGraph": [],
+            },
+            {
+                "path": "B/IFoo.cs",
+                "language": "csharp",
+                "classes": [{
+                    "name": "IFoo",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "kind": "interface",
+                    "namespace": "B",
+                    "fullName": "B.IFoo",
+                    "methods": [],
+                    "properties": [],
+                }],
+                "functions": [],
+                "callGraph": [],
+            },
+        ]
+
+        stats, report = self._link_with_report(assembled, results)
+
+        self.assertEqual(stats["inheritanceAdded"], 0)
+        self.assertEqual(stats["inheritanceSkipped"], 1)
+        self.assertEqual(stats["inheritanceTypeAmbiguous"], 1)
+        self.assertEqual(stats["dependsOnSkipped"], 1)
+        self.assertEqual(stats["dependsOnTypeAmbiguous"], 1)
+        self.assertEqual(stats["classNodesSynthesized"], 0)
+        self.assertEqual(assembled["edges"], [])
+        self.assertIn("  inheritance skip reasons: ambiguous type: 1", report)
+        self.assertIn("  depends_on skip reasons: ambiguous type: 1", report)
+
+    def test_adds_class_dependencies_from_constructors_and_instance_fields_only(self) -> None:
+        assembled = {
+            "nodes": [
+                _file_node("Consumers.cs"),
+                _file_node("Dependencies.cs"),
+            ],
+            "edges": [],
+        }
+        results = [
+            {
+                "path": "Consumers.cs",
+                "language": "csharp",
+                "classes": [
+                    {
+                        "name": "PrimaryConsumer",
+                        "startLine": 1,
+                        "endLine": 3,
+                        "kind": "class",
+                        "namespace": "App",
+                        "fullName": "App.PrimaryConsumer",
+                        "methods": [],
+                        "properties": [],
+                        "primaryConstructorParams": [
+                            {"name": "service", "type": "IService"},
+                            {"name": "logger", "type": "IExternalLogger"},
+                        ],
+                    },
+                    {
+                        "name": "ExplicitConsumer",
+                        "startLine": 5,
+                        "endLine": 10,
+                        "kind": "class",
+                        "namespace": "App",
+                        "fullName": "App.ExplicitConsumer",
+                        "methods": ["ExplicitConsumer"],
+                        "properties": [],
+                    },
+                    {
+                        "name": "FieldConsumer",
+                        "startLine": 12,
+                        "endLine": 20,
+                        "kind": "class",
+                        "namespace": "App",
+                        "fullName": "App.FieldConsumer",
+                        "methods": ["Execute"],
+                        "properties": ["_repository", "Cache"],
+                        "fields": [
+                            {"name": "_repository", "type": "IRepository"},
+                            {"name": "Cache", "type": "ICache", "isStatic": True},
+                        ],
+                    },
+                ],
+                "functions": [
+                    {
+                        "name": "ExplicitConsumer",
+                        "startLine": 7,
+                        "endLine": 9,
+                        "params": ["repository"],
+                        "typedParams": [{"name": "repository", "type": "IRepository"}],
+                        "kind": "constructor",
+                    },
+                    {
+                        "name": "Execute",
+                        "startLine": 17,
+                        "endLine": 19,
+                        "params": ["request"],
+                        "typedParams": [{"name": "request", "type": "IRequest"}],
+                        "kind": "method",
+                    },
+                ],
+                "callGraph": [],
+            },
+            {
+                "path": "Dependencies.cs",
+                "language": "csharp",
+                "classes": [
+                    {
+                        "name": name,
+                        "startLine": line,
+                        "endLine": line,
+                        "kind": "interface",
+                        "namespace": "App",
+                        "fullName": f"App.{name}",
+                        "methods": [],
+                        "properties": [],
+                    }
+                    for line, name in enumerate(
+                        ["IService", "IRepository", "ICache", "IRequest"],
+                        start=1,
+                    )
+                ],
+                "functions": [],
+                "callGraph": [],
+            },
+        ]
+
+        stats = self._link(assembled, results)
+
+        self.assertEqual(stats["declaredDependenciesScanned"], 4)
+        self.assertEqual(stats["dependsOnAdded"], 3)
+        self.assertEqual(stats["dependsOnSkipped"], 1)
+        self.assertEqual(stats["dependsOnTypeUnresolved"], 1)
+        self.assertEqual(stats["classNodesSynthesized"], 5)
+        edge_pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        self.assertIn((
+            "class:Consumers.cs:PrimaryConsumer",
+            "class:Dependencies.cs:IService",
+            "depends_on",
+        ), edge_pairs)
+        self.assertIn((
+            "class:Consumers.cs:ExplicitConsumer",
+            "class:Dependencies.cs:IRepository",
+            "depends_on",
+        ), edge_pairs)
+        self.assertIn((
+            "class:Consumers.cs:FieldConsumer",
+            "class:Dependencies.cs:IRepository",
+            "depends_on",
+        ), edge_pairs)
+        self.assertNotIn((
+            "class:Consumers.cs:FieldConsumer",
+            "class:Dependencies.cs:ICache",
+            "depends_on",
+        ), edge_pairs)
+        self.assertNotIn((
+            "class:Consumers.cs:FieldConsumer",
+            "class:Dependencies.cs:IRequest",
+            "depends_on",
+        ), edge_pairs)
+
     def test_same_named_method_in_another_class_in_target_file_is_skipped(self) -> None:
         assembled = {
             "nodes": [
@@ -2099,7 +2487,10 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
         stats = self._link(assembled, results)
 
         self.assertEqual(stats["callsAdded"], 0)
-        self.assertEqual(assembled["edges"], [])
+        self.assertEqual(stats["callsTargetMethodAmbiguous"], 1)
+        self.assertEqual(stats["functionNodesSynthesized"], 0)
+        self.assertNotIn("calls", {edge["type"] for edge in assembled["edges"]})
+        self.assertIn("depends_on", {edge["type"] for edge in assembled["edges"]})
 
     def test_inherited_method_is_not_linked_to_base_class(self) -> None:
         assembled = {
@@ -2169,6 +2560,7 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
         stats = self._link(assembled, results)
 
         self.assertEqual(stats["callsAdded"], 0)
+        self.assertEqual(stats["callsTargetMethodMissing"], 1)
         self.assertNotIn("calls", {edge["type"] for edge in assembled["edges"]})
 
     def test_extension_method_is_not_linked_as_instance_method(self) -> None:
@@ -2245,7 +2637,9 @@ class CSharpDeterministicLinkerTests(unittest.TestCase):
         stats = self._link(assembled, results)
 
         self.assertEqual(stats["callsAdded"], 0)
-        self.assertEqual(assembled["edges"], [])
+        self.assertEqual(stats["callsTargetMethodMissing"], 1)
+        self.assertNotIn("calls", {edge["type"] for edge in assembled["edges"]})
+        self.assertIn("depends_on", {edge["type"] for edge in assembled["edges"]})
 
     def test_duplicate_function_node_id_caller_is_skipped(self) -> None:
         assembled = {

@@ -265,6 +265,8 @@ Using the script's structural data and file categories, create edges:
 | `depends_on` | File has runtime dependency on another project file (broader than imports -- includes dynamic requires, lazy loads) | `0.6` | `forward` |
 | `tested_by` | Production file is exercised by a test file. Emit when you see the test importing/using the production file. Use direction `production → test` if you can; the merge script will flip inverted edges and dedupe. | `0.5` | `forward` |
 
+For C#, the deterministic merge step supplements these edges at three levels: resolved file dependencies use `imports`, constructor and instance-field declared types use `depends_on` between class nodes, and resolved method invocations use `calls` between function nodes. Class-level dependencies target the declared project type (including interfaces), never a guessed runtime implementation; ordinary method parameters and base types are excluded from `depends_on`.
+
 **Note on `tested_by`:** It's fine to emit even if you're unsure of the direction (you typically see the relationship while analyzing the *test* file, where the import points back at production). The merge script (`merge-batch-graphs.py`) canonicalizes direction to `production → test` and drops semantically broken edges (test↔test, prod↔prod, orphan endpoint). Path-convention pairing supplements anything you miss.
 
 #### Edges for non-code files:
