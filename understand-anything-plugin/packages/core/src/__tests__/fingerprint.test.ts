@@ -5,20 +5,27 @@ import {
   extractFileFingerprint,
   compareFingerprints,
   analyzeChanges,
+  analyzeChangesAsync,
+  buildFingerprintStoreAsync,
   type FileFingerprint,
   type FingerprintStore,
 } from "../fingerprint.js";
 
-// Mock fs and path for analyzeChanges
+// Mock fs and path for analyzeChanges / analyzeChangesAsync
 vi.mock("node:fs", () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
 }));
+vi.mock("node:fs/promises", () => ({
+  readFile: vi.fn(),
+}));
 
 import { readFileSync, existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 
 const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedExistsSync = vi.mocked(existsSync);
+const mockedReadFile = vi.mocked(readFile);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -423,5 +430,261 @@ describe("analyzeChanges", () => {
 
     expect(result.deletedFiles).toHaveLength(0);
     expect(result.fileChanges).toHaveLength(0);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Async variants — same surface as the sync versions, but read via
+// `fs/promises.readFile` so I/O is pipelined. These tests are parallel
+// counterparts to the sync ones above and verify that the async path
+// produces identical results.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe("buildFingerprintStoreAsync", () => {
+  const mockRegistry = {
+    analyzeFile: vi.fn() as ReturnType<typeof vi.fn>,
+  } as unknown as Parameters<typeof buildFingerprintStoreAsync>[2];
+
+  beforeEach(() => {
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReset();
+  });
+
+  it("builds a fingerprint per file using the async read path", async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockImplementation(async (p) =>
+      String(p).endsWith("a.ts") ? "content-a" : "content-b",
+    );
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      functions: [],
+      classes: [],
+      imports: [],
+      exports: [],
+    } satisfies StructuralAnalysis);
+
+    const store = await buildFingerprintStoreAsync(
+      "/project",
+      ["src/a.ts", "src/b.ts"],
+      mockRegistry,
+      "abc1234",
+    );
+
+    expect(store.gitCommitHash).toBe("abc1234");
+    expect(store.version).toBe("1.0.0");
+    expect(Object.keys(store.files).sort()).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(store.files["src/a.ts"].contentHash).toBe(contentHash("content-a"));
+    expect(store.files["src/b.ts"].contentHash).toBe(contentHash("content-b"));
+    // readFile was used; readFileSync was NOT
+    expect(mockedReadFile).toHaveBeenCalledTimes(2);
+    expect(mockedReadFileSync).not.toHaveBeenCalled();
+  });
+
+  it("skips files that don't exist on disk (matches sync behavior)", async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).endsWith("present.ts"));
+    mockedReadFile.mockResolvedValue("present");
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      functions: [],
+      classes: [],
+      imports: [],
+      exports: [],
+    } satisfies StructuralAnalysis);
+
+    const store = await buildFingerprintStoreAsync(
+      "/project",
+      ["src/missing.ts", "src/present.ts"],
+      mockRegistry,
+      "abc",
+    );
+
+    expect(Object.keys(store.files)).toEqual(["src/present.ts"]);
+    // Only the surviving file is read — the missing one is short-circuited
+    // by existsSync before any I/O is issued.
+    expect(mockedReadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to content-hash-only when registry has no extractor", async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockResolvedValue("opaque blob\nsecond line");
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue(null);
+
+    const store = await buildFingerprintStoreAsync(
+      "/project",
+      ["src/unknown.bin"],
+      mockRegistry,
+      "abc",
+    );
+
+    expect(store.files["src/unknown.bin"].hasStructuralAnalysis).toBe(false);
+    expect(store.files["src/unknown.bin"].functions).toEqual([]);
+    expect(store.files["src/unknown.bin"].totalLines).toBe(2);
+    expect(store.files["src/unknown.bin"].contentHash).toBe(
+      contentHash("opaque blob\nsecond line"),
+    );
+  });
+
+  it("processes more files than IO_PARALLELISM (covers chunk-boundary loop)", async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockImplementation(async (p) => String(p));
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      functions: [],
+      classes: [],
+      imports: [],
+      exports: [],
+    } satisfies StructuralAnalysis);
+
+    // 200 files > the 64 chunk size — exercises >3 chunk iterations.
+    const filePaths = Array.from({ length: 200 }, (_, i) => `src/f${i}.ts`);
+    const store = await buildFingerprintStoreAsync(
+      "/project",
+      filePaths,
+      mockRegistry,
+      "abc",
+    );
+
+    expect(Object.keys(store.files)).toHaveLength(200);
+    expect(mockedReadFile).toHaveBeenCalledTimes(200);
+  });
+});
+
+describe("analyzeChangesAsync", () => {
+  const mockRegistry = {
+    analyzeFile: vi.fn() as ReturnType<typeof vi.fn>,
+  } as unknown as Parameters<typeof analyzeChangesAsync>[3];
+
+  const baselineFingerprint: FileFingerprint = {
+    filePath: "src/index.ts",
+    contentHash: "old-hash",
+    functions: [
+      { name: "main", params: [], exported: true, lineCount: 20 },
+    ],
+    classes: [],
+    imports: [],
+    exports: ["main"],
+    totalLines: 100,
+    hasStructuralAnalysis: true,
+  };
+
+  const existingStore: FingerprintStore = {
+    version: "1.0.0",
+    gitCommitHash: "abc123",
+    generatedAt: "2026-01-01T00:00:00Z",
+    files: {
+      "src/index.ts": baselineFingerprint,
+    },
+  };
+
+  beforeEach(() => {
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReset();
+  });
+
+  it("classifies new + deleted + unchanged without issuing reads when possible", async () => {
+    mockedExistsSync.mockImplementation(
+      (p) => !String(p).endsWith("src/gone.ts"),
+    );
+    mockedReadFile.mockImplementation(async (p) =>
+      String(p).endsWith("src/index.ts") ? "old content" : "totally new",
+    );
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      functions: [{ name: "main", lineRange: [1, 20], params: [] }],
+      classes: [],
+      imports: [],
+      exports: [{ name: "main", lineNumber: 1 }],
+    } satisfies StructuralAnalysis);
+
+    const store: FingerprintStore = {
+      ...existingStore,
+      files: {
+        "src/index.ts": { ...baselineFingerprint, contentHash: contentHash("old content") },
+        "src/gone.ts": { ...baselineFingerprint, filePath: "src/gone.ts" },
+      },
+    };
+
+    const result = await analyzeChangesAsync(
+      "/project",
+      ["src/gone.ts", "src/new.ts", "src/index.ts"],
+      store,
+      mockRegistry,
+    );
+
+    expect(result.deletedFiles).toEqual(["src/gone.ts"]);
+    expect(result.newFiles).toEqual(["src/new.ts"]);
+    expect(result.unchangedFiles).toEqual(["src/index.ts"]);
+
+    // Only the two files that exist now AND existed before should read disk:
+    // deleted skips read, new skips read (classified as STRUCTURAL upfront).
+    expect(mockedReadFile).toHaveBeenCalledTimes(1); // only the unchanged one
+  });
+
+  it("classifies structural changes", async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockResolvedValue("changed content");
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      // Different params → structural change
+      functions: [{ name: "main", lineRange: [1, 20], params: ["newArg"] }],
+      classes: [],
+      imports: [],
+      exports: [{ name: "main", lineNumber: 1 }],
+    } satisfies StructuralAnalysis);
+
+    const result = await analyzeChangesAsync(
+      "/project",
+      ["src/index.ts"],
+      existingStore,
+      mockRegistry,
+    );
+
+    expect(result.structurallyChangedFiles).toEqual(["src/index.ts"]);
+    expect(result.fileChanges[0].changeLevel).toBe("STRUCTURAL");
+    expect(result.fileChanges[0].details.some((d) => d.includes("params"))).toBe(true);
+  });
+
+  it("classifies cosmetic-only changes (content differs but signatures match)", async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockResolvedValue("reformatted content");
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      // Same signature as baseline
+      functions: [{ name: "main", lineRange: [1, 20], params: [] }],
+      classes: [],
+      imports: [],
+      exports: [{ name: "main", lineNumber: 1 }],
+    } satisfies StructuralAnalysis);
+
+    const result = await analyzeChangesAsync(
+      "/project",
+      ["src/index.ts"],
+      existingStore,
+      mockRegistry,
+    );
+
+    expect(result.cosmeticOnlyFiles).toEqual(["src/index.ts"]);
+    expect(result.fileChanges[0].changeLevel).toBe("COSMETIC");
+  });
+
+  it("handles >IO_PARALLELISM changed files by chunking the reads", async () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFile.mockResolvedValue("identical");
+    (mockRegistry as unknown as { analyzeFile: ReturnType<typeof vi.fn> }).analyzeFile.mockReturnValue({
+      functions: [{ name: "main", lineRange: [1, 20], params: [] }],
+      classes: [],
+      imports: [],
+      exports: [{ name: "main", lineNumber: 1 }],
+    } satisfies StructuralAnalysis);
+
+    const filePaths = Array.from({ length: 150 }, (_, i) => `src/f${i}.ts`);
+    const store: FingerprintStore = {
+      ...existingStore,
+      files: Object.fromEntries(
+        filePaths.map((p) => [p, { ...baselineFingerprint, filePath: p, contentHash: contentHash("identical") }]),
+      ),
+    };
+
+    const result = await analyzeChangesAsync(
+      "/project",
+      filePaths,
+      store,
+      mockRegistry,
+    );
+
+    expect(result.unchangedFiles).toHaveLength(150);
+    expect(mockedReadFile).toHaveBeenCalledTimes(150);
   });
 });

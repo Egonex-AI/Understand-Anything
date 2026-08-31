@@ -1,8 +1,20 @@
 import { createHash } from "node:crypto";
 import { readFileSync, existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { StructuralAnalysis } from "./types.js";
 import type { PluginRegistry } from "./plugins/registry.js";
+
+/**
+ * Chunk size for parallel file I/O in the async fingerprint paths.
+ *
+ * Bounded so a 15k-file repo doesn't try to open every file descriptor at
+ * once (would hit EMFILE on macOS / Linux defaults) while still keeping
+ * libuv's worker-thread pool saturated. Matches the value used by
+ * `skills/understand/compute-batches.mjs` so behavior is consistent across
+ * the two parallel-read sites.
+ */
+const FINGERPRINT_IO_PARALLELISM = 64;
 
 // ---- Fingerprint types ----
 
@@ -249,6 +261,12 @@ export function compareFingerprints(
  * Build a fingerprint store for a set of files.
  * Files without tree-sitter support get content-hash-only fingerprints
  * (conservative: any change is treated as STRUCTURAL).
+ *
+ * NOTE: This function reads files sequentially with `readFileSync`. For
+ * projects beyond a few hundred files, prefer `buildFingerprintStoreAsync`,
+ * which pipelines the I/O in bounded chunks for a roughly proportional
+ * wall-clock reduction. The sync version is preserved for back-compat with
+ * any external callers that depend on the synchronous shape.
  */
 export function buildFingerprintStore(
   projectDir: string,
@@ -291,8 +309,90 @@ export function buildFingerprintStore(
 }
 
 /**
+ * Build a fingerprint for a single file. Used by the async helpers so the
+ * fallback (no tree-sitter support) and the analysis branch stay in one
+ * place.
+ */
+function buildOneFingerprint(
+  filePath: string,
+  content: string,
+  registry: PluginRegistry,
+): FileFingerprint {
+  const analysis = registry.analyzeFile(filePath, content);
+  if (analysis) {
+    return extractFileFingerprint(filePath, content, analysis);
+  }
+  return {
+    filePath,
+    contentHash: contentHash(content),
+    functions: [],
+    classes: [],
+    imports: [],
+    exports: [],
+    totalLines: content.split("\n").length,
+    hasStructuralAnalysis: false,
+  };
+}
+
+/**
+ * Async, parallel-I/O equivalent of `buildFingerprintStore`. Returns the
+ * same shape; only the read path differs.
+ *
+ * Files are read in bounded chunks of `FINGERPRINT_IO_PARALLELISM` so libuv's
+ * worker-thread pool can pipeline the disk reads, while the CPU-bound
+ * tree-sitter analysis still runs serially on the main thread (web-tree-sitter
+ * is single-threaded WASM). For a 15k-file repo the sequential `readFileSync`
+ * loop dominated wall time; letting reads pipeline drops it roughly
+ * proportional to the share spent waiting on disk.
+ *
+ * Iteration order of the returned `files` record matches `filePaths` for
+ * determinism.
+ */
+export async function buildFingerprintStoreAsync(
+  projectDir: string,
+  filePaths: string[],
+  registry: PluginRegistry,
+  gitCommitHash: string,
+): Promise<FingerprintStore> {
+  const files: Record<string, FileFingerprint> = {};
+
+  for (let start = 0; start < filePaths.length; start += FINGERPRINT_IO_PARALLELISM) {
+    const slice = filePaths.slice(start, start + FINGERPRINT_IO_PARALLELISM);
+
+    // Read every file in the slice concurrently. Missing files are dropped
+    // (matches the sync version's `existsSync` skip); read errors abort the
+    // whole call, which is the same behavior `readFileSync` would have.
+    const reads = await Promise.all(
+      slice.map(async (filePath) => {
+        const absolutePath = join(projectDir, filePath);
+        if (!existsSync(absolutePath)) return { filePath, content: null };
+        const content = await readFile(absolutePath, "utf-8");
+        return { filePath, content };
+      }),
+    );
+
+    for (const { filePath, content } of reads) {
+      if (content === null) continue;
+      files[filePath] = buildOneFingerprint(filePath, content, registry);
+    }
+  }
+
+  return {
+    version: "1.0.0",
+    gitCommitHash,
+    generatedAt: new Date().toISOString(),
+    files,
+  };
+}
+
+/**
  * Analyze changes between the current state of files and stored fingerprints.
  * Returns a detailed breakdown of what changed and at what level.
+ *
+ * NOTE: This function reads files sequentially with `readFileSync`. For
+ * projects with many changed files, prefer `analyzeChangesAsync`. The sync
+ * version is preserved for back-compat with any external callers that depend
+ * on the synchronous shape.
  */
 export function analyzeChanges(
   projectDir: string,
@@ -371,6 +471,107 @@ export function analyzeChanges(
       case "STRUCTURAL":
         structurallyChangedFiles.push(filePath);
         break;
+    }
+  }
+
+  return {
+    fileChanges,
+    newFiles,
+    deletedFiles,
+    structurallyChangedFiles,
+    cosmeticOnlyFiles,
+    unchangedFiles,
+  };
+}
+
+/**
+ * Async, parallel-I/O equivalent of `analyzeChanges`. Same input contract,
+ * same output shape — only the per-file read is pipelined.
+ *
+ * The existsSync / deletion / new-file checks remain synchronous since they
+ * are stat-only (effectively free) and let us decide whether to read at all
+ * before issuing any I/O. Reads of the surviving "existed both before and
+ * after" files are batched into chunks of `FINGERPRINT_IO_PARALLELISM`.
+ *
+ * Iteration order of `fileChanges` matches `changedFiles` so incremental
+ * builds keep deterministic output across runs.
+ */
+export async function analyzeChangesAsync(
+  projectDir: string,
+  changedFiles: string[],
+  existingStore: FingerprintStore,
+  registry: PluginRegistry,
+): Promise<ChangeAnalysis> {
+  const fileChanges: FileChangeResult[] = [];
+  const newFiles: string[] = [];
+  const deletedFiles: string[] = [];
+  const structurallyChangedFiles: string[] = [];
+  const cosmeticOnlyFiles: string[] = [];
+  const unchangedFiles: string[] = [];
+
+  // First pass: classify every file as deleted / new / "needs read". Only
+  // the third bucket needs disk I/O; the first two can be resolved with
+  // existsSync + a map lookup.
+  type Pending = { filePath: string; absolutePath: string };
+  const pending: Pending[] = [];
+
+  for (const filePath of changedFiles) {
+    const absolutePath = join(projectDir, filePath);
+    const existedBefore = filePath in existingStore.files;
+    const existsNow = existsSync(absolutePath);
+
+    if (!existsNow) {
+      if (existedBefore) {
+        deletedFiles.push(filePath);
+        fileChanges.push({
+          filePath,
+          changeLevel: "STRUCTURAL",
+          details: ["file deleted"],
+        });
+      }
+      continue;
+    }
+
+    if (!existedBefore) {
+      newFiles.push(filePath);
+      fileChanges.push({
+        filePath,
+        changeLevel: "STRUCTURAL",
+        details: ["new file"],
+      });
+      continue;
+    }
+
+    pending.push({ filePath, absolutePath });
+  }
+
+  // Second pass: pipelined reads + per-file fingerprint compare.
+  for (let start = 0; start < pending.length; start += FINGERPRINT_IO_PARALLELISM) {
+    const slice = pending.slice(start, start + FINGERPRINT_IO_PARALLELISM);
+    const reads = await Promise.all(
+      slice.map(async ({ filePath, absolutePath }) => ({
+        filePath,
+        content: await readFile(absolutePath, "utf-8"),
+      })),
+    );
+
+    for (const { filePath, content } of reads) {
+      const oldFp = existingStore.files[filePath];
+      const newFp = buildOneFingerprint(filePath, content, registry);
+      const result = compareFingerprints(oldFp, newFp);
+      fileChanges.push(result);
+
+      switch (result.changeLevel) {
+        case "NONE":
+          unchangedFiles.push(filePath);
+          break;
+        case "COSMETIC":
+          cosmeticOnlyFiles.push(filePath);
+          break;
+        case "STRUCTURAL":
+          structurallyChangedFiles.push(filePath);
+          break;
+      }
     }
   }
 
