@@ -300,6 +300,18 @@ The `batchImportData` values contain only resolved project-internal paths — ex
 - **Doc files:** If the doc mentions specific files, components, or modules by name, create `documents` edges. README.md typically documents the project entry point.
 - **Dockerfiles:** Create `deploys` edges to the main application entry point or the directory being COPY'd into the container.
 - **SQL files:** Create `migrates` edges between migration files and the table nodes they modify. Create `defines_schema` edges from schema files to API handlers that serve that data.
+- **ORM migration files (Laravel, Rails, Django, etc.):** PHP/Ruby/Python migration files that manage schema are `code` fileCategory but behave like SQL migrations. They modify tables but do not always create them. Distinguish two cases:
+  - **CREATE shape** (creates a new table): emit a `table:<path>:<name>` node AND a `migrates` edge from the file node to that table node (weight 0.7).
+    - Laravel: `Schema::create('users', ...)`
+    - Rails: `create_table :users`
+    - Django: `migrations.CreateModel(name='User', ...)`
+  - **ALTER shape** (modifies an existing table): emit ONLY a `migrates` edge from the file node to the existing `table:<existing-path>:<name>` node (weight 0.7). Do NOT create a new `table:` node — that would create a duplicate sibling of the original CREATE migration's table node.
+    - Laravel: `Schema::table('users', ...)`, `Schema::rename('old', 'new')`, `Schema::drop('users')`
+    - Rails: `change_table :users`, `add_column :users, ...`, `remove_column :users, ...`, `rename_table :old, :new`
+    - Django: `migrations.AddField(model_name='user', ...)`, `migrations.RemoveField(...)`, `migrations.AlterField(...)`, `migrations.RenameModel(...)`
+  - **Resolving the target `table:` node id:** prefer the original CREATE migration's path if you can identify it from the batch input or from referenced project files. If you only have the table name and cannot resolve the original path, use the convention `table:<this-migration-path>:<name>` and rely on a later pass to merge — but PREFER linking to the existing node when possible. The merge step normalizes IDs but does not invent links, so a `migrates` edge to a slightly mis-IDed table node is still better than a bare file node with no edge.
+  - **Multi-table migrations:** a single migration file may touch several tables. Emit one `migrates` edge per touched table.
+  - **Down migrations:** treat the `down`/`reverse` method the same — it migrates the same tables in reverse. Do not emit separate edges for it.
 - **CI configs:** Create `triggers` edges to the deployment targets or test suites they invoke.
 - **GraphQL/Protobuf schemas:** Create `defines_schema` edges to the code files that implement the resolvers or service handlers.
 - **K8s manifests:** Create `serves` edges when a Service/Deployment exposes an endpoint or routes to a container. Create `deploys` edges to the application code that runs inside the container.
@@ -464,6 +476,8 @@ Use these hints for common edge patterns:
 | docker-compose references Dockerfile | `depends_on` from compose to Dockerfile |
 | CI config runs test commands | `triggers` from CI config to test files |
 | SQL migration references table name | `migrates` from migration to table definition |
+| ORM migration creates a table (`Schema::create`, `create_table`, `CreateModel`) | New `table:` node + `migrates` edge from migration to the new table |
+| ORM migration alters an existing table (`Schema::table`, `change_table`, `AddField`) | `migrates` edge to the existing `table:` node — do NOT create a duplicate `table:` node |
 | GraphQL resolver imports from code | `defines_schema` from schema to resolver |
 
 ## Critical Constraints
