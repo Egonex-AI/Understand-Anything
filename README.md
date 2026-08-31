@@ -243,6 +243,18 @@ For personal skills (available across all projects), run the `install.sh` above 
 copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
 ```
 
+### DeepSeek Harness (DSH)
+
+Understand Anything ships as a self-contained DSH bundle (`understand-anything-plugin/dsh/`). Install it into a DSH profile:
+
+```bash
+dsh plugin --profile web add /path/to/understand-anything-dsh-<version>.tgz
+# or from a local checkout:
+dsh plugin --profile web add /path/to/understand-anything-plugin/dsh
+```
+
+The bundle registers the `/understand` skill set plus the Understand Anything agents, and bundles the built `@understand-anything/core` engine and all tree-sitter grammars (WASM), so no separate build step is needed. Restart the profile, then run `/understand --full` in the project you want to analyze. See [`understand-anything-plugin/dsh/README.md`](understand-anything-plugin/dsh/README.md) for details.
+
 ### Kiro CLI / IDE
 
 ```bash
@@ -276,6 +288,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Trae | ✅ Supported | `install.sh trae` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
+| DeepSeek Harness (DSH) | ✅ Supported | `dsh plugin --profile <name> add …` (see above) |
 
 
 ---
