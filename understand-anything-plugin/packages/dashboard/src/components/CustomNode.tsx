@@ -141,11 +141,11 @@ function CustomNodeComponent({
 
   const name = data.label ?? "unnamed";
   const truncatedName =
-    name.length > 24 ? name.slice(0, 22) + "..." : name;
+    name.length > 60 ? name.slice(0, 58) + "..." : name;
 
   return (
     <div
-      className={`relative rounded-lg bg-elevated border border-border-subtle ${extraClass} min-w-[180px] max-w-[220px] overflow-hidden transition-[box-shadow,outline,opacity,filter] duration-200 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3)]`}
+      className={`relative rounded-lg bg-elevated border border-border-subtle ${extraClass} min-w-[240px] max-w-[310px] overflow-hidden transition-[box-shadow,outline,opacity,filter] duration-200 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.3)]`}
       onClick={() => data.onNodeClick?.(id)}
     >
       {/* Left color bar */}
@@ -180,11 +180,11 @@ function CustomNodeComponent({
           </div>
         </div>
 
-        <div className="text-sm font-heading text-text-primary truncate" title={data.label}>
+        <div className="text-sm font-heading text-text-primary line-clamp-2 break-words" title={data.label}>
           {truncatedName}
         </div>
 
-        <div className="text-[11px] text-text-secondary mt-1 line-clamp-2 leading-tight">
+        <div className="text-[11px] text-text-secondary mt-1 line-clamp-3 leading-tight">
           {data.summary}
         </div>
       </div>
