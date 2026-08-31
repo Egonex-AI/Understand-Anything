@@ -18,7 +18,7 @@ const hookScript = join(
   repoRoot,
   'understand-anything-plugin',
   'hooks',
-  'post-tool-use-auto-update.mjs',
+  'session-start-auto-update.mjs',
 );
 const hooksConfig = JSON.parse(
   readFileSync(
@@ -51,7 +51,6 @@ function snapshotProject(projectRoot) {
 }
 
 function runHook({
-  command = 'git commit -m "test"',
   autoUpdate = true,
   configContents,
   createConfig = true,
@@ -59,10 +58,10 @@ function runHook({
   createGraph = true,
   createMeta = true,
   dataDirName = '.understand-anything',
-  input,
   graphCommit = '0000000000000000000000000000000000000000',
+  input = {},
 } = {}) {
-  const projectRoot = mkdtempSync(join(tmpdir(), 'ua-post-tool-use-'));
+  const projectRoot = mkdtempSync(join(tmpdir(), 'ua-session-start-'));
   spawnSync('git', ['init'], { cwd: projectRoot });
   writeFileSync(join(projectRoot, 'fixture.txt'), 'fixture\n');
   spawnSync('git', ['add', 'fixture.txt'], { cwd: projectRoot });
@@ -106,12 +105,7 @@ function runHook({
   const before = snapshotProject(projectRoot);
   const result = spawnSync(process.execPath, [hookScript], {
     cwd: projectRoot,
-    input:
-      input ??
-      JSON.stringify({
-        tool_name: 'Bash',
-        tool_input: { command },
-      }),
+    input: JSON.stringify(input),
     encoding: 'utf8',
   });
   const after = snapshotProject(projectRoot);
@@ -123,22 +117,21 @@ function runHook({
   };
 }
 
-describe('PostToolUse auto-update hook', () => {
-  it('is registered as the Bash PostToolUse handler', () => {
-    const registration = hooksConfig.hooks.PostToolUse[0];
-
-    expect(registration.matcher).toBe('Bash');
-    expect(registration.hooks).toEqual([
+describe('SessionStart auto-update hook', () => {
+  it('is registered as a command hook instead of inline shell', () => {
+    expect(hooksConfig.hooks.SessionStart[0].hooks).toEqual([
       {
         type: 'command',
         command:
-          'node "${CLAUDE_PLUGIN_ROOT}/hooks/post-tool-use-auto-update.mjs"',
+          'node "${CLAUDE_PLUGIN_ROOT}/hooks/session-start-auto-update.mjs"',
       },
     ]);
   });
 
-  it('injects the auto-update instruction as PostToolUse additional context', () => {
-    const result = runHook();
+  it('emits the shared Codex and Claude Code SessionStart JSON contract', () => {
+    const result = runHook({
+      input: { hook_event_name: 'SessionStart', source: 'startup' },
+    });
     const output = JSON.parse(result.stdout);
 
     expect(result.status).toBe(0);
@@ -146,9 +139,9 @@ describe('PostToolUse auto-update hook', () => {
     expect(result.filesUnchanged).toBe(true);
     expect(output).toEqual({
       hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
+        hookEventName: 'SessionStart',
         additionalContext: expect.stringContaining(
-          '[understand-anything] Commit detected',
+          '[understand-anything] Knowledge graph is stale',
         ),
       },
     });
@@ -157,62 +150,30 @@ describe('PostToolUse auto-update hook', () => {
     );
   });
 
-  it.each(['commit', 'merge', 'cherry-pick', 'rebase'])(
-    'recognizes git %s as a graph-changing operation',
-    (operation) => {
-      const result = runHook({ command: `git ${operation} example` });
-
-      expect(result.status).toBe(0);
-      expect(
-        JSON.parse(result.stdout).hookSpecificOutput.hookEventName,
-      ).toBe('PostToolUse');
-    },
-  );
-
   it('supports the legacy .ua data directory', () => {
     const result = runHook({ dataDirName: '.ua' });
 
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout).hookSpecificOutput.hookEventName).toBe(
-      'PostToolUse',
+      'SessionStart',
     );
   });
 
-  it('stays silent for unrelated Bash commands', () => {
-    const result = runHook({ command: 'git status --short' });
-
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe('');
-    expect(result.filesUnchanged).toBe(true);
-  });
-
-  it('stays silent when automatic updates are disabled', () => {
-    const result = runHook({ autoUpdate: false });
-
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe('');
-  });
-
-  it('stays silent when the graph metadata matches the current commit', () => {
-    const result = runHook({ graphCommit: 'HEAD' });
-
-    expect(result.status).toBe(0);
-    expect(result.stdout).toBe('');
-  });
-
   it.each([
-    ['malformed stdin', { input: '{not-json' }],
-    ['a missing data directory', { createDataDir: false }],
-    ['a missing config', { createConfig: false }],
-    ['a malformed config', { configContents: '{not-json' }],
-    ['a missing graph', { createGraph: false }],
+    ['automatic updates disabled', { autoUpdate: false }],
+    ['missing data directory', { createDataDir: false }],
+    ['missing config', { createConfig: false }],
+    ['malformed config', { configContents: '{not-json' }],
+    ['missing graph', { createGraph: false }],
     ['missing metadata', { createMeta: false }],
+    ['malformed metadata', { graphCommit: '' }],
+    ['fresh graph', { graphCommit: 'HEAD' }],
   ])('stays silent for %s', (_scenario, options) => {
     const result = runHook(options);
 
     expect(result.status).toBe(0);
-    expect(result.stderr).toBe('');
     expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('');
     expect(result.filesUnchanged).toBe(true);
   });
 });

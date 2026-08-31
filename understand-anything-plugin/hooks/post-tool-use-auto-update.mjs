@@ -1,19 +1,9 @@
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  autoUpdatePromptPath,
+  graphNeedsUpdate,
+} from './auto-update-state.mjs';
 
 const COMMIT_COMMAND = /git\s+(commit|merge|cherry-pick|rebase)/;
-
-function findDataDir() {
-  return existsSync('.understand-anything') ? '.understand-anything' : '.ua';
-}
-
-function autoUpdateEnabled(dataDir) {
-  try {
-    const config = JSON.parse(readFileSync(`${dataDir}/config.json`, 'utf8'));
-    return config.autoUpdate === true;
-  } catch {
-    return false;
-  }
-}
 
 async function readStdin() {
   let input = '';
@@ -33,14 +23,11 @@ async function main() {
   const command = payload?.tool_input?.command;
   if (typeof command !== 'string' || !COMMIT_COMMAND.test(command)) return;
 
-  const dataDir = findDataDir();
-  if (!autoUpdateEnabled(dataDir)) return;
-  if (!existsSync(`${dataDir}/knowledge-graph.json`)) return;
+  if (!graphNeedsUpdate()) return;
 
-  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT ?? '';
   const additionalContext =
     `[understand-anything] Commit detected with auto-update enabled. ` +
-    `You MUST read the file at ${pluginRoot}/hooks/auto-update-prompt.md ` +
+    `You MUST read the file at ${autoUpdatePromptPath()} ` +
     'and execute its instructions to incrementally update the knowledge graph. ' +
     'Do not ask the user for confirmation — just do it.';
 
