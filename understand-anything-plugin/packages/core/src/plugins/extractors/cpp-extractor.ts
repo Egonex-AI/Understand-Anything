@@ -239,6 +239,37 @@ export class CppExtractor implements LanguageExtractor {
           break;
         }
 
+        case "preproc_ifdef":
+        case "preproc_if":
+        case "preproc_else":
+        case "preproc_elif": {
+          // Include guards (`#ifndef __X_H__ … #endif`) and other preprocessor
+          // conditionals wrap their contents in a preproc_* node. tree-sitter nests the
+          // guarded declarations as children of this node, so recurse into it — otherwise
+          // every header that uses an include guard yields zero symbols.
+          this.walkTopLevel(node, functions, classes, imports, exports, methodsByClass);
+          break;
+        }
+
+        case "template_declaration": {
+          // `template <...> class/struct/void foo(...)` parses as a template_declaration
+          // wrapping the underlying entity. Unwrap and dispatch to the existing extractors
+          // so templated classes, structs, and functions are captured (not skipped).
+          const tClass = findChild(node, "class_specifier");
+          if (tClass) {
+            this.extractClassOrStruct(tClass, "class", classes, functions, exports);
+          }
+          const tStruct = findChild(node, "struct_specifier");
+          if (tStruct) {
+            this.extractClassOrStruct(tStruct, "struct", classes, functions, exports);
+          }
+          const tFunc = findChild(node, "function_definition");
+          if (tFunc) {
+            this.extractFunctionDef(tFunc, functions, exports, methodsByClass);
+          }
+          break;
+        }
+
         case "declaration": {
           // A top-level ";" terminated statement — could be a class/struct with a trailing ;
           // e.g., `class Foo { ... };` parses the class_specifier as a child of a
@@ -346,8 +377,21 @@ export class CppExtractor implements LanguageExtractor {
           continue;
         }
 
-        if (member.type === "field_declaration") {
-          const declNode = member.childForFieldName("declarator");
+        // Unwrap templated members: `template <...> void f();` (declaration) and
+        // `template <...> void f() { … }` (definition) parse as a template_declaration
+        // wrapping a field_declaration/declaration or a function_definition. Without this,
+        // template methods (e.g. variadic `logf`) are silently dropped from the class.
+        let em = member;
+        if (member.type === "template_declaration") {
+          const inner =
+            findChild(member, "function_definition") ||
+            findChild(member, "field_declaration") ||
+            findChild(member, "declaration");
+          if (inner) em = inner;
+        }
+
+        if (em.type === "field_declaration" || em.type === "declaration") {
+          const declNode = em.childForFieldName("declarator");
           if (declNode && declNode.type === "function_declarator") {
             // Method declaration (no body)
             const info = extractFuncDeclName(declNode);
@@ -356,7 +400,7 @@ export class CppExtractor implements LanguageExtractor {
               if (currentAccess === "public") {
                 exports.push({
                   name: info.name,
-                  lineNumber: member.startPosition.row + 1,
+                  lineNumber: em.startPosition.row + 1,
                 });
               }
             }
@@ -369,9 +413,9 @@ export class CppExtractor implements LanguageExtractor {
           }
         }
 
-        if (member.type === "function_definition") {
+        if (em.type === "function_definition") {
           // Inline method definition
-          const funcDecl = member.childForFieldName("declarator");
+          const funcDecl = em.childForFieldName("declarator");
           if (funcDecl && funcDecl.type === "function_declarator") {
             const info = extractFuncDeclName(funcDecl);
             if (info) {
@@ -382,17 +426,17 @@ export class CppExtractor implements LanguageExtractor {
               functions.push({
                 name: info.name,
                 lineRange: [
-                  member.startPosition.row + 1,
-                  member.endPosition.row + 1,
+                  em.startPosition.row + 1,
+                  em.endPosition.row + 1,
                 ],
                 params: extractParams(paramsNode),
-                returnType: extractReturnType(member),
+                returnType: extractReturnType(em),
               });
 
               if (currentAccess === "public") {
                 exports.push({
                   name: info.name,
-                  lineNumber: member.startPosition.row + 1,
+                  lineNumber: em.startPosition.row + 1,
                 });
               }
             }
