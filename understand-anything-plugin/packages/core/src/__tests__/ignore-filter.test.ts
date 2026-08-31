@@ -84,6 +84,57 @@ describe("IgnoreFilter", () => {
       expect(filter.isIgnored(".idea/workspace.xml")).toBe(true);
       expect(filter.isIgnored(".vscode/settings.json")).toBe(true);
     });
+
+    it("does not throw on './'-prefixed paths and matches correctly", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("./dist/index.js")).toBe(true);
+      expect(filter.isIgnored("./src/index.ts")).toBe(false);
+    });
+
+    it("treats the empty relative path (project root) as not ignored", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("")).toBe(false);
+    });
+
+    it("does not throw on the input shapes that ignore@7 rejects", () => {
+      const filter = createIgnoreFilter(testDir);
+      // These are the previously-throwing inputs from the PR body. The whole
+      // point of the fix is that they return a boolean rather than throw.
+      expect(() => filter.isIgnored("")).not.toThrow();
+      expect(() => filter.isIgnored("./")).not.toThrow();
+      expect(() => filter.isIgnored("./dist/index.js")).not.toThrow();
+      expect(() => filter.isIgnored("././foo.log")).not.toThrow();
+      expect(() => filter.isIgnored(".//foo.log")).not.toThrow();
+      expect(() => filter.isIgnored("../escapes/root.ts")).not.toThrow();
+      expect(() => filter.isIgnored("dist\\index.js")).not.toThrow();
+      expect(() => filter.isIgnored(".\\dist\\index.js")).not.toThrow();
+    });
+
+    it("treats a bare './' (trim-to-empty / project root) as not ignored", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("./")).toBe(false);
+    });
+
+    it("collapses repeated leading './' and duplicate slash runs", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("././dist/index.js")).toBe(true);
+      expect(filter.isIgnored(".//dist/index.js")).toBe(true);
+      expect(filter.isIgnored("./src//index.ts")).toBe(false);
+    });
+
+    it("normalizes Windows backslash separators", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("dist\\index.js")).toBe(true);
+      expect(filter.isIgnored(".\\dist\\index.js")).toBe(true);
+      expect(filter.isIgnored("src\\index.ts")).toBe(false);
+    });
+
+    it("treats out-of-root '../' paths as not ignored instead of throwing", () => {
+      const filter = createIgnoreFilter(testDir);
+      expect(filter.isIgnored("../foo")).toBe(false);
+      expect(filter.isIgnored("..")).toBe(false);
+      expect(filter.isIgnored("..\\foo")).toBe(false);
+    });
   });
 
   describe("createIgnoreFilter with user .understandignore", () => {
