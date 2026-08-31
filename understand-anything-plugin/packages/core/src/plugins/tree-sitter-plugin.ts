@@ -116,7 +116,10 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
   private languageKeyFromPath(filePath: string): string | null {
     const ext = extname(filePath).toLowerCase();
 
-    // Special case: .tsx needs its own grammar
+    // Special case: only .tsx needs the dedicated TSX grammar (it carries JSX).
+    // .mts / .cts deliberately fall through to the plain TypeScript grammar via
+    // _extensionToLang — they cannot contain JSX, so do NOT add them to this
+    // branch by analogy with the .mjs-treated-as-JS pattern.
     if (ext === ".tsx") return "tsx";
 
     return this._extensionToLang.get(ext) ?? null;
