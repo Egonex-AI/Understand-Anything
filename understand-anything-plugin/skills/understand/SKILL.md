@@ -21,6 +21,44 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in the pr
 
 ---
 
+## Model Cost-Tier Recommendations (per-phase)
+
+This pipeline is a mix of high-fan-out, largely-deterministic phases (where every dispatch piles onto premium-model spend with little marginal quality benefit) and low-fan-out, synthesis-heavy phases (where the strongest model materially improves the output). When the orchestrator (Claude Code, opencode, codex, etc.) supports per-dispatch model selection, prefer the cost tier below.
+
+> **Why this lives in SKILL.md and not in agent frontmatter.** A `model:` field in an agent's frontmatter would be the cleanest place for this, but `model: inherit` was a Claude Code-only keyword that broke opencode and similar orchestrators with `ProviderModelNotFoundError` (issue #167, PR #200). To stay portable across every supported platform, agent frontmatter intentionally omits `model:` so each platform falls back to its configured default. These recommendations are therefore advisory — the orchestrator is expected to apply them when dispatching, and platforms that cannot route per-agent simply fall back to the session model with no behaviour change.
+>
+> See also issue #314 — high-fan-out `file-analyzer` dispatches were the original motivation for this guidance.
+
+| Phase | Agent | Suggested tier | Why |
+|---|---|---|---|
+| 1 | `project-scanner` | Cheap (Haiku) or mid (Sonnet) | Mostly deterministic — runs `scan-project.mjs` + `extract-import-map.mjs`; LLM only writes a short narrative `name`/`description`/`frameworks` blurb from README + manifest. |
+| 2 | `file-analyzer` (**high fan-out — dozens to hundreds per run**) | Cheap (Haiku) or mid (Sonnet) | Dispatched once per batch with up to 5 concurrent. Phase 1.5 + the bundled `extract-structure.mjs` already give it the import map and tree-sitter facts; the LLM emits templated summaries/tags/edges. This is the single biggest cost lever — defaulting it to Opus drains premium budgets disproportionately. |
+| 3 | `assemble-reviewer` | Mid (Sonnet) | Reviews already-merged graph for residual issues the merge script can't catch. One dispatch. |
+| 4 | `architecture-analyzer` | Strong (Opus) | One dispatch, synthesis-heavy: looks across the whole graph to decide layer boundaries. Quality here propagates everywhere. |
+| 5 | `tour-builder` | Strong (Opus) | One dispatch, pedagogy-heavy: needs to weave a narrative across the full graph. |
+| 6 | `graph-reviewer` (only with `--review`) | Mid (Sonnet) or Strong (Opus) | One dispatch. Default path uses a deterministic Node script and skips the LLM entirely. |
+
+**Inline reminders** appear next to each phase's dispatch step below — search for "Cost tier:".
+
+**Config-level opt-in (future / not yet wired):** A future iteration may honour a `models` map in `.understand-anything/config.json` of the form below; this PR is documentation-only and does not wire it into the runtime. Recording the shape now so downstream tooling can converge on it:
+
+```json
+{
+  "models": {
+    "project-scanner": "haiku",
+    "file-analyzer": "haiku",
+    "assemble-reviewer": "sonnet",
+    "architecture-analyzer": "opus",
+    "tour-builder": "opus",
+    "graph-reviewer": "sonnet"
+  }
+}
+```
+
+Until the runtime reads this field, treat the table above as guidance for the orchestrator's per-dispatch routing.
+
+---
+
 ## Progress Reporting
 
 Throughout execution, report progress to the user at each phase transition and during batch processing. This keeps users informed on large codebases where analysis can take a long time.
@@ -232,6 +270,8 @@ Set up and verify the `.understandignore` file before scanning.
 
 Report to the user: `[Phase 1/7] Scanning project files...`
 
+> **Cost tier:** Cheap (Haiku) or mid (Sonnet). Most of project-scanner's work is deterministic (bundled `scan-project.mjs` + `extract-import-map.mjs`); the LLM only writes a short narrative from README + manifest. See "Model Cost-Tier Recommendations" above.
+
 Dispatch a subagent using the `project-scanner` agent definition (at `agents/project-scanner.md`). Append the following additional context:
 
 > **Additional context from main session:**
@@ -299,6 +339,8 @@ If the script exits non-zero, the failure is hard — relay the full stderr to t
 Load `$UA_DIR/intermediate/batches.json` (produced by Phase 1.5). Iterate the `batches[]` array.
 
 Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
+
+> **Cost tier:** Cheap (Haiku) or mid (Sonnet). **This is the highest fan-out phase in the entire pipeline** — one dispatch per batch, with dozens-to-hundreds of dispatches on a real codebase. Phase 1.5 + bundled `extract-structure.mjs` already give the analyzer the import map and tree-sitter facts; the LLM emits templated summaries/tags/edges. Routing every analyzer to the strongest model drains premium budgets disproportionately (issue #314). Reserve the strongest model for Phase 4 (`architecture-analyzer`) and Phase 5 (`tour-builder`).
 
 For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
 
@@ -390,6 +432,8 @@ After batches complete:
 
 Report to the user: `[Phase 3/7] Reviewing assembled graph...`
 
+> **Cost tier:** Mid (Sonnet). One dispatch — review of the already-merged graph for residual issues the merge script can't catch.
+
 Dispatch a subagent using the `assemble-reviewer` agent definition (at `agents/assemble-reviewer.md`).
 
 Pass these parameters in the dispatch prompt:
@@ -416,6 +460,8 @@ After the subagent completes, read `$UA_DIR/intermediate/assemble-review.json` a
 ## Phase 4 — ARCHITECTURE
 
 Report to the user: `[Phase 4/7] Identifying architectural layers...`
+
+> **Cost tier:** Strong (Opus or equivalent). One dispatch — synthesis-heavy: looks across the whole graph to decide layer boundaries. Quality here propagates to the dashboard layout, tour structure, and every downstream consumer of the graph.
 
 **Build the combined prompt template:**
  1. Use the `architecture-analyzer` agent definition (at `agents/architecture-analyzer.md`).
@@ -499,6 +545,8 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 ## Phase 5 — TOUR
 
 Report to the user: `[Phase 5/7] Building guided tour...`
+
+> **Cost tier:** Strong (Opus or equivalent). One dispatch — pedagogy-heavy: needs to weave a narrative across the full graph and pick the right 5-15 nodes for a newcomer's mental model.
 
 Dispatch a subagent using the `tour-builder` agent definition (at `agents/tour-builder.md`). Append the following additional context:
 
@@ -690,6 +738,8 @@ If the script exits non-zero, read stderr, fix the script, and retry once.
 ---
 
 #### `--review` path: full LLM reviewer
+
+> **Cost tier:** Mid (Sonnet) or strong (Opus). One dispatch and only when the user explicitly asks for `--review`. The default path uses a deterministic Node script and skips the LLM entirely, so most runs never pay this cost.
 
 If `--review` IS in `$ARGUMENTS`, dispatch the LLM graph-reviewer subagent as follows:
 
