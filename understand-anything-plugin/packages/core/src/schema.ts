@@ -606,11 +606,22 @@ export function validateGraph(data: unknown): ValidationResult {
 
   // Tier 3: Validate nodes individually, drop broken
   const validNodes: z.infer<typeof GraphNodeSchema>[] = [];
+  const nodeIds = new Set<string>();
   if (Array.isArray(fixed.nodes)) {
     for (let i = 0; i < fixed.nodes.length; i++) {
       const node = fixed.nodes[i] as Record<string, unknown>;
       const result = GraphNodeSchema.safeParse(node);
       if (result.success) {
+        if (nodeIds.has(result.data.id)) {
+          issues.push({
+            level: "dropped",
+            category: "duplicate-node-id",
+            message: `nodes[${i}]: duplicate id "${result.data.id}" — removed`,
+            path: `nodes[${i}].id`,
+          });
+          continue;
+        }
+        nodeIds.add(result.data.id);
         validNodes.push(result.data);
       } else {
         const name = node?.name || node?.id || `index ${i}`;
@@ -635,7 +646,6 @@ export function validateGraph(data: unknown): ValidationResult {
   }
 
   // Tier 3: Validate edges + referential integrity
-  const nodeIds = new Set(validNodes.map((n) => n.id));
   const validEdges: z.infer<typeof GraphEdgeSchema>[] = [];
   if (Array.isArray(fixed.edges)) {
     for (let i = 0; i < fixed.edges.length; i++) {
