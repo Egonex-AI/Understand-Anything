@@ -90,7 +90,7 @@ if [ -z "$PLUGIN_ROOT" ]; then
 fi
 ```
 
-Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases.
+Use `$PLUGIN_ROOT` for every reference to agent definitions and bundled scripts in subsequent phases.
 
 ### Phase 1: Detect Existing Graph
 
@@ -116,9 +116,9 @@ Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases
 
 The preprocessing script does NOT produce a domain graph — it produces **raw material** (file tree, entry points, exports/imports) so the domain-analyzer agent can focus on the actual domain analysis instead of spending dozens of tool calls exploring the codebase. Think of it as a cheat sheet: cheap Python preprocessing → expensive LLM gets a clean, small input → better results for less cost.
 
-1. Run the preprocessing script bundled with this skill, passing `$PROJECT_ROOT` from Phase 0:
-   ```
-   python ./extract-domain-context.py "$PROJECT_ROOT"
+1. Run the preprocessing script bundled with this skill through the plugin's portable Python 3 launcher, using `$PLUGIN_ROOT` and `$PROJECT_ROOT` from Phase 0:
+   ```bash
+   node "$PLUGIN_ROOT/scripts/run-python.mjs" "$PLUGIN_ROOT/skills/understand-domain/extract-domain-context.py" "$PROJECT_ROOT"
    ```
    This outputs `$UA_DIR/intermediate/domain-context.json` containing:
    - File tree (respecting `.gitignore`)

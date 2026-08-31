@@ -171,9 +171,9 @@ Determine whether to run a full analysis or incremental update.
     - **Note:** Newly added `--exclude` patterns require a `--full` scan to take effect.
 
 4. **Check for subdomain knowledge graphs to merge:**
-   List all `*knowledge-graph*.json` files in `$UA_DIR/` **excluding** `knowledge-graph.json` itself (e.g. `frontend-knowledge-graph.json`, `backend-knowledge-graph.json`). If any subdomain graphs exist, run the merge script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
+   List all `*knowledge-graph*.json` files in `$UA_DIR/` **excluding** `knowledge-graph.json` itself (e.g. `frontend-knowledge-graph.json`, `backend-knowledge-graph.json`). If any subdomain graphs exist, run the bundled merge script through the plugin's portable Python 3 launcher:
    ```bash
-   python "<SKILL_DIR>/merge-subdomain-graphs.py" "$PROJECT_ROOT"
+   node "$PLUGIN_ROOT/scripts/run-python.mjs" "$PLUGIN_ROOT/skills/understand/merge-subdomain-graphs.py" "$PROJECT_ROOT"
    ```
    The script discovers subdomain graphs, loads the existing `knowledge-graph.json` as a base (if present), and merges everything into `knowledge-graph.json` (deduplicating nodes and edges). Report the merge summary to the user, then continue with the merged graph.
 
@@ -338,9 +338,9 @@ Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 
 After ALL batches complete, report to the user: `Phase 2 complete. All <totalBatches> batches analyzed.`
 
-Run the merge-and-normalize script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
+Run the bundled merge-and-normalize script through the plugin's portable Python 3 launcher:
 ```bash
-python "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
+node "$PLUGIN_ROOT/scripts/run-python.mjs" "$PLUGIN_ROOT/skills/understand/merge-batch-graphs.py" "$PROJECT_ROOT"
 ```
 
 This script reads all `batch-*.json` files (including `batch-<i>-part-<k>.json` produced by file-analyzers that split their output) from `$UA_DIR/intermediate/`, then in one pass:
@@ -379,9 +379,9 @@ After batches complete:
 1. Remove old nodes whose `filePath` matches any changed file from the existing graph
 2. Remove old edges whose `source` or `target` references a removed node
 3. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory
-4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
+4. Run the same merge script through the portable Python 3 launcher — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
    ```bash
-   python "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
+   node "$PLUGIN_ROOT/scripts/run-python.mjs" "$PLUGIN_ROOT/skills/understand/merge-batch-graphs.py" "$PROJECT_ROOT"
    ```
 
 ---

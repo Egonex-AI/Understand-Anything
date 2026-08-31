@@ -1026,7 +1026,12 @@ describe('Git metadata probes', () => {
 
   afterEach(() => {
     for (const path of cleanup.splice(0)) {
-      rmSync(path, { recursive: true, force: true });
+      rmSync(path, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   });
 
