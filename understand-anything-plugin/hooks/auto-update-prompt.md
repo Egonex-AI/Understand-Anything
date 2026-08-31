@@ -29,15 +29,17 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
    ```
    If no files changed: update `meta.json` with the new commit hash and **STOP**.
 
-7. Filter to source files only (`.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`, `.java`, `.rb`, `.cpp`, `.c`, `.h`, `.cs`, `.swift`, `.kt`, `.php`).
+7. Before filtering by extension, remove every path under the selected `$UA_DIR` from the changed-file list. The selected data directory (`.ua/` or legacy `.understand-anything/`) contains generated graph artefacts, not project source changes. Do **not** update `meta.json` merely because files in this directory changed. If no paths remain after removing `$UA_DIR`, report "Only generated graph artefacts changed. The graph baseline remains associated with the analysed source commit." and **STOP** without writing `meta.json`.
+
+8. Filter the remaining paths to source files only (`.ts`, `.tsx`, `.js`, `.jsx`, `.py`, `.go`, `.rs`, `.java`, `.rb`, `.cpp`, `.c`, `.h`, `.cs`, `.swift`, `.kt`, `.php`).
    If no source files changed: update `meta.json` with the new commit hash, report "Only non-source files changed. Metadata updated." and **STOP**.
 
-8. Create intermediate directory:
+9. Create intermediate directory:
    ```bash
    mkdir -p "$UA_DIR/intermediate"
    ```
 
-9. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
+10. **Apply `.understandignore` exclusions** (same semantics as `/understand` Step 2.5 in `agents/project-scanner.md`).
 
    Without this step, files in user-excluded paths (migrations, vendored code, tests) are counted as structural changes and can spuriously escalate the action to `FULL_UPDATE` even when the real change set is tiny.
 

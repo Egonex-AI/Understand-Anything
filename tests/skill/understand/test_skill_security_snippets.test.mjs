@@ -39,6 +39,19 @@ describe('skill command hardening', () => {
     expect(content).not.toMatch(/rm\s+-rf\s+<TARGET_DIR>/);
   });
 
+  it('does not rewrite metadata for generated-only commits', () => {
+    const content = readRepoFile(
+      'understand-anything-plugin/hooks/auto-update-prompt.md',
+    );
+
+    expect(content).toMatch(
+      /Before filtering by extension, remove every path under the selected `\$UA_DIR`/,
+    );
+    expect(content).toMatch(
+      /If no paths remain after removing `\$UA_DIR`[\s\S]*without writing `meta\.json`/,
+    );
+  });
+
   it('quotes dashboard cd targets and GRAPH_DIR assignment', () => {
     const content = readRepoFile('understand-anything-plugin/skills/understand-dashboard/SKILL.md');
 

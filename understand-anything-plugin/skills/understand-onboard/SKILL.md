@@ -75,5 +75,6 @@ The knowledge graph JSON has this structure:
    - **Complexity Hotspots**: areas to approach carefully (from complexity values)
 
 10. Format as clean markdown
-11. Offer to save the guide to `docs/ONBOARDING.md` in the project
+11. Offer to save the guide to `docs/UA_ONBOARDING.md` in the project
 12. Suggest the user commit it to the repo for the team
+
