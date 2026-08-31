@@ -124,6 +124,7 @@ function buildSkill(skillName) {
   const registration = {
     name: skillName,
     description: frontmatter.description || `Understand Anything skill: ${skillName}`,
+    source: 'bundled',
     resourceBase: {
       kind: 'directory',
       path: skillDir,
