@@ -47,6 +47,13 @@ describe("MarkdownParser", () => {
     expect(refs[0].target).toBe("./file.md");
   });
 
+  it("keeps local files whose name starts with 'http'", () => {
+    const content = "[client](http-client.md) and [ext](https://example.com)";
+    const refs = parser.extractReferences!("README.md", content);
+    expect(refs).toHaveLength(1);
+    expect(refs[0].target).toBe("http-client.md");
+  });
+
   it("returns empty sections for empty content", () => {
     const result = parser.analyzeFile("empty.md", "");
     expect(result.sections).toHaveLength(0);
