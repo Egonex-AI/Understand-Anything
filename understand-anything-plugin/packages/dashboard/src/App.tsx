@@ -250,6 +250,12 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         const result = validateGraph(data);
         if (result.success && result.data) {
           setDomainGraph(result.data);
+          // Deep-link: `?view=domain` opens straight on the domain flow view.
+          // Applied here (not at init) because the domain graph must be loaded
+          // before the domain view can render — otherwise App falls back to structural.
+          if (new URLSearchParams(window.location.search).get("view") === "domain") {
+            useDashboardStore.getState().setViewMode("domain");
+          }
         } else if (result.fatal) {
           console.warn(`[domain-graph] validation failed: ${result.fatal}`);
         }
