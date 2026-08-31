@@ -377,9 +377,10 @@ Then dispatch file-analyzer subagents per the same template as the full path.
 
 After batches complete:
 1. Remove old nodes whose `filePath` matches any changed file from the existing graph
-2. Remove old edges whose `source` or `target` references a removed node
+2. **Prune by source only:** Keep each existing edge iff its `source` node survives the prune in step 1. Edges whose `target` was removed are intentionally retained. This preserves inbound edges from unchanged files — when file F is changed, `U imports F`, `U calls F`, and `U tests F` edges (where U is unchanged) would otherwise be silently dropped because U is never re-analyzed and therefore never regenerates them. A naive `source OR target` prune erodes inbound edges on every incremental run.
+   - Trade-off: an inbound function-level edge into a since-deleted function inside F (e.g. `function:U.ts:caller → function:F.ts:removedFn`) may briefly persist past this step. The merge script's existing dangling-edge sweep (Step 6) drops it once `function:F.ts:removedFn` does not reappear in the fresh batch. Over-keeping is the right trade-off: the dangling sweep cleans up safely, but a deleted inbound edge from an unchanged source can never be recovered until the next full re-analysis.
 3. Write the pruned existing nodes/edges as `batch-existing.json` in the intermediate directory
-4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files:
+4. Run the same merge script — it will combine `batch-existing.json` with the fresh `batch-*.json` files. The merge's edge dedup `(source, target, type, direction)` absorbs any overlap with regenerated outbound edges, and its dangling-edge drop removes any edges whose target node never reappears:
    ```bash
    python "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
    ```
