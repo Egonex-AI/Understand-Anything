@@ -1,4 +1,5 @@
 import type { AnalyzerPlugin, StructuralAnalysis, ReferenceResolution } from "../../types.js";
+import { countBracesPerLine, SHELL_SYNTAX } from "./brace-matcher.js";
 
 /**
  * Parses shell scripts (.sh, .bash) to extract function definitions and source references.
@@ -42,6 +43,7 @@ export class ShellParser implements AnalyzerPlugin {
   private extractFunctions(content: string): Array<{ name: string; lineRange: [number, number]; params: string[] }> {
     const functions: Array<{ name: string; lineRange: [number, number]; params: string[] }> = [];
     const lines = content.split("\n");
+    const braceCounts = countBracesPerLine(content, SHELL_SYNTAX);
 
     for (let i = 0; i < lines.length; i++) {
       // Match function name() { or function name { — but require an opening
@@ -65,10 +67,7 @@ export class ShellParser implements AnalyzerPlugin {
       let depth = 0;
       let endLine = startBraceLine;
       for (let j = startBraceLine; j < lines.length; j++) {
-        for (const ch of lines[j]) {
-          if (ch === "{") depth++;
-          if (ch === "}") depth--;
-        }
+        depth += (braceCounts[j]?.open ?? 0) - (braceCounts[j]?.close ?? 0);
         if (depth === 0) {
           endLine = j;
           break;
