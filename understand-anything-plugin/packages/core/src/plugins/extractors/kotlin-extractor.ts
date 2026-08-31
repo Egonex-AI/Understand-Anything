@@ -130,6 +130,39 @@ function collectClassBody(
       // the graph builder to keep the relationship without exploding scope.
       const name = extractDeclarationName(member);
       if (name) properties.push(name);
+    } else if (member.type === "companion_object") {
+      // `companion object { ... }` is its OWN node type in
+      // tree-sitter-kotlin (@tree-sitter-grammars/tree-sitter-kotlin), a
+      // sibling branch of class_member_declaration — NOT a subtype of
+      // object_declaration — so it does not match the branch above. The
+      // companion name is optional (`companion object Factory` vs the
+      // common anonymous `companion object`); surface it as a property when
+      // present, and recurse into its `class_body` so the companion's
+      // functions/properties land in methods[]/functions[]/exports[].
+      const name = extractDeclarationName(member);
+      if (name) properties.push(name);
+      const companionBody = findChild(member, "class_body");
+      if (companionBody) {
+        collectClassBody(
+          companionBody,
+          methods,
+          properties,
+          functions,
+          exports,
+        );
+      }
+    } else if (member.type === "enum_entry") {
+      // Enum constants (e.g. NORTH, SOUTH) are `enum_entry` direct children
+      // of `enum_class_body` in tree-sitter-kotlin, each carrying its name
+      // as an `identifier` child. They are the canonical members of an enum,
+      // so surface them as properties (parallels primary-constructor
+      // val/var handling). Enum entries are always public, hence also
+      // exported.
+      const id = findChild(member, "identifier");
+      if (id) {
+        properties.push(id.text);
+        exports.push({ name: id.text, lineNumber: member.startPosition.row + 1 });
+      }
     }
   }
 }
@@ -294,7 +327,13 @@ export class KotlinExtractor implements LanguageExtractor {
 
     // 2. Body members (if any). Some Kotlin declarations have no body
     //    (e.g. `class Empty` or `data class Point(...)` without `{}`).
-    const body = findChild(declNode, "class_body");
+    //    An `enum class` body is parsed as `enum_class_body`, not
+    //    `class_body` (node name per the
+    //    @tree-sitter-grammars/tree-sitter-kotlin grammar's
+    //    `enum_class_body` rule).
+    const body =
+      findChild(declNode, "class_body") ??
+      findChild(declNode, "enum_class_body");
     if (body) {
       collectClassBody(body, methods, properties, functions, exports);
     }
