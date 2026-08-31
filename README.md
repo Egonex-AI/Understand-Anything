@@ -117,7 +117,7 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 /plugin install understand-anything
 ```
 
-> **Using a local model?** For privacy or enterprise setups, point your platform at a local model provider such as [Ollama](https://docs.ollama.com/integrations) — follow their integration guide to change the model provider.
+> **Using a local model or model gateway?** For privacy, enterprise setups, or managed model routing, point your platform at a compatible provider such as [Ollama](https://docs.ollama.com/integrations) or an OpenAI/Anthropic-compatible gateway. See the [EvoLink provider configuration example](docs/model-providers/evolink.md) for one tested setup.
 
 ### 2. Analyze your codebase
 
