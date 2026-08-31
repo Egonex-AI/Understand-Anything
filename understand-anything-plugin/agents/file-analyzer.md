@@ -246,7 +246,23 @@ For significant functions and classes from the script output (code files only), 
 
 Skip trivial one-liners, type aliases, simple re-exports, and auto-generated boilerplate.
 
-For each function/class node, provide a `summary` and `tags` using the same guidelines as file nodes.
+For each function/class node, provide its own symbol-specific `summary` and `tags`. Use the file-node summary guidelines only as a quality standard (clear, concrete, project-specific), not as a template to reuse. A function/class summary must describe that specific symbol's documented intent or implementation behavior: what inputs/state it works with, what it returns or mutates, what important calls it makes, and how it participates in the surrounding module.
+
+**Function/class summary quality:** Summaries for function and class nodes must be specific to that symbol, not generic boilerplate. A good summary should explain what the function/class does in this project, what inputs/state it works with, what it returns or mutates, and how it participates in the surrounding module. Avoid vague summaries that could apply to any function or class in the file.
+
+**Use documentation comments first:** If the function or class has an attached docstring or documentation comment, use that as the primary source for the summary. This includes Python docstrings, JSDoc/TSDoc (`/** ... */`), Rust doc comments (`///` or `//!`), Go doc comments, Java/Kotlin/C# XML/Javadoc-style comments, Ruby comments, PHPDoc, and similar language-specific documentation blocks. Summarize the documented intent first, then inspect the implementation only as needed to verify side effects, return values, important calls, or project-specific context. If no docstring/comment exists, read the implementation body and infer the summary from actual code.
+
+**Bad vs good summaries:**
+
+- Bad: `"Handles logic for this module."`
+
+- Good: `"Builds the LangGraph conversation state from the user's latest message, invokes the compiled graph, and returns the assistant response for display."`
+
+- Bad: `"Class defined in main.py that encapsulates state, data models, errors, or business capability."`
+
+- Good: `"Pydantic state model that stores the chat message history passed between LangGraph nodes, allowing each node to read prior messages and append new assistant output."`
+
+**Self-check before writing:** If two different functions/classes receive the same summary, or if a summary does not mention any concrete symbol, input, output, state, side effect, framework concept, or project-specific behavior, rewrite it before saving the batch output.
 
 ### Step 3 -- Create Edges
 
