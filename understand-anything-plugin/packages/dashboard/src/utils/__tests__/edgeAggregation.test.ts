@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { aggregateContainerEdges } from "../edgeAggregation";
-import type { GraphEdge, EdgeType } from "@understand-anything/core/types";
+import {
+  aggregateContainerEdges,
+  aggregateLayerEdges,
+  computePortals,
+} from "../edgeAggregation";
+import type {
+  GraphEdge,
+  EdgeType,
+  KnowledgeGraph,
+  Layer,
+} from "@understand-anything/core/types";
 
 const ce = (source: string, target: string, type: EdgeType = "calls"): GraphEdge => ({
   source,
@@ -8,6 +17,29 @@ const ce = (source: string, target: string, type: EdgeType = "calls"): GraphEdge
   type,
   direction: "forward",
   weight: 1,
+});
+
+const makeGraph = (layers: Layer[], edges: GraphEdge[]): KnowledgeGraph => ({
+  version: "1.0.0",
+  project: {
+    name: "test",
+    languages: [],
+    frameworks: [],
+    description: "",
+    analyzedAt: "",
+    gitCommitHash: "",
+  },
+  nodes: [],
+  edges,
+  layers,
+  tour: [],
+});
+
+const layer = (id: string, nodeIds: string[]): Layer => ({
+  id,
+  name: id,
+  description: "",
+  nodeIds,
 });
 
 describe("aggregateContainerEdges", () => {
@@ -75,5 +107,29 @@ describe("aggregateContainerEdges", () => {
     ]);
     const r = aggregateContainerEdges([ce("a", "b"), ce("c", "d")], m);
     expect(r.interContainerAggregated).toHaveLength(2);
+  });
+});
+
+describe("aggregateLayerEdges / computePortals", () => {
+  it("does not collide when layer ids contain the '|' separator character", () => {
+    // Pre-fix: key was `${a}|${b}` so the sorted pair ("x|y","z") -> "x|y|z"
+    // and the sorted pair ("x","y|z") -> "x|y|z" both map to one key,
+    // silently dropping one layer-edge. Length-prefixing the first id fixes it.
+    const graph = makeGraph(
+      [
+        layer("x|y", ["a"]),
+        layer("z", ["b"]),
+        layer("x", ["c"]),
+        layer("y|z", ["d"]),
+      ],
+      [ce("a", "b"), ce("c", "d")],
+    );
+
+    expect(aggregateLayerEdges(graph)).toHaveLength(2);
+
+    const portals = computePortals(graph, "x");
+    expect(portals).toHaveLength(1);
+    expect(portals[0].layerId).toBe("y|z");
+    expect(portals[0].connectionCount).toBe(1);
   });
 });
