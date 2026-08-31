@@ -322,6 +322,85 @@ use App\\Models\\Post;
       tree.delete();
       parser.delete();
     });
+
+    // ---- include / require imports (#367) ----
+
+    it("captures include/require with a plain string literal as imports (#367)", () => {
+      const { tree, parser, root } = parse(`<?php
+include 'config.php';
+include_once "lib/util.php";
+require 'data.php';
+require_once 'autoload.php';
+`);
+      const result = extractor.extractStructure(root);
+
+      const sources = result.imports.map((i) => i.source);
+      expect(sources).toContain("config.php");
+      expect(sources).toContain("lib/util.php");
+      expect(sources).toContain("data.php");
+      expect(sources).toContain("autoload.php");
+      expect(result.imports).toHaveLength(4);
+
+      // All include/require imports have empty specifiers (no named bindings).
+      for (const imp of result.imports) {
+        expect(imp.specifiers).toEqual([]);
+      }
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("resolves __DIR__ . '/path' concatenation in require_once (#367)", () => {
+      const { tree, parser, root } = parse(`<?php
+require_once __DIR__ . '/helpers.php';
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toHaveLength(1);
+      // We preserve __DIR__ verbatim and concatenate the literal suffix so
+      // downstream consumers can resolve relative to the current file.
+      expect(result.imports[0].source).toBe("__DIR__/helpers.php");
+      expect(result.imports[0].specifiers).toEqual([]);
+      expect(result.imports[0].lineNumber).toBe(2);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures include/require alongside use statements (#367)", () => {
+      const { tree, parser, root } = parse(`<?php
+use App\\Models\\User;
+require_once __DIR__ . '/helpers.php';
+include 'config.php';
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toHaveLength(3);
+      const sources = result.imports.map((i) => i.source);
+      expect(sources).toContain("App\\Models\\User");
+      expect(sources).toContain("__DIR__/helpers.php");
+      expect(sources).toContain("config.php");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("records non-resolvable include path as raw text (#367)", () => {
+      // Variable path — not statically determinable. We still emit the edge so
+      // the dependency isn't silently lost; downstream code can flag it.
+      const { tree, parser, root } = parse(`<?php
+$path = 'dynamic.php';
+include $path;
+`);
+      const result = extractor.extractStructure(root);
+
+      // We expect at least one import entry pointing at the variable text.
+      const sources = result.imports.map((i) => i.source);
+      expect(sources).toContain("$path");
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Exports ----
@@ -454,15 +533,48 @@ class Service {
       parser.delete();
     });
 
-    it("ignores top-level calls (no caller)", () => {
+    it("attributes top-level calls to the synthetic <file> caller (#367)", () => {
+      // Procedural PHP — calls happen at file scope, outside any function/method.
+      // These used to be silently dropped, killing call-graph coverage on
+      // page-style PHP. We now record them under a synthetic <file> caller.
       const { tree, parser, root } = parse(`<?php
-echo "hello";
 main();
+$obj->run();
+Helper::go();
 `);
       const result = extractor.extractCallGraph(root);
 
-      // Top-level calls have no enclosing function, so they are skipped
-      expect(result).toHaveLength(0);
+      expect(result).toHaveLength(3);
+      expect(result.every((e) => e.caller === "<file>")).toBe(true);
+      const callees = result.map((e) => e.callee);
+      expect(callees).toContain("main");
+      expect(callees).toContain("$obj->run");
+      expect(callees).toContain("Helper::go");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("mixes file-scope and in-function calls in a single file (#367)", () => {
+      // A page that calls a helper at top level and also defines/calls
+      // a function. Both kinds of calls must be captured.
+      const { tree, parser, root } = parse(`<?php
+bootstrap();
+
+function handleRequest(): void {
+    process_input();
+}
+
+handleRequest();
+`);
+      const result = extractor.extractCallGraph(root);
+
+      const byCaller = (caller: string) =>
+        result.filter((e) => e.caller === caller).map((e) => e.callee);
+
+      expect(byCaller("<file>")).toContain("bootstrap");
+      expect(byCaller("<file>")).toContain("handleRequest");
+      expect(byCaller("handleRequest")).toContain("process_input");
 
       tree.delete();
       parser.delete();
