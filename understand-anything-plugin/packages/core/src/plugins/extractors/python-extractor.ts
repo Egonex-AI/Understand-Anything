@@ -284,10 +284,17 @@ export class PythonExtractor implements LanguageExtractor {
       const alias = ai.children.find(
         (c) => c.type === "identifier",
       );
-      if (dottedName) {
+      if (dottedName && alias) {
+        // Build via null-prototype map so keys like `__proto__` stay own
+        // properties, then copy to a plain object for JSON-safe output.
+        const aliasMap = Object.create(null) as Record<string, string>;
+        aliasMap[alias.text] = dottedName.text;
         imports.push({
           source: dottedName.text,
-          specifiers: [alias ? alias.text : dottedName.text],
+          specifiers: [alias.text],
+          aliases: Object.fromEntries(
+            Object.keys(aliasMap).map((k) => [k, aliasMap[k]]),
+          ),
           lineNumber: node.startPosition.row + 1,
         });
       }
@@ -304,6 +311,8 @@ export class PythonExtractor implements LanguageExtractor {
     const moduleNodeId = moduleNode?.id;
 
     const specifiers: string[] = [];
+    // null-prototype map so keys like `__proto__` stay own properties
+    const aliases = Object.create(null) as Record<string, string>;
 
     // Collect dotted_name specifiers (non-aliased)
     // Skip the module_name dotted_name (compare by node id, not reference)
@@ -316,12 +325,14 @@ export class PythonExtractor implements LanguageExtractor {
     // Collect aliased imports: `from foo import bar as baz`
     const aliasedImports = findChildren(node, "aliased_import");
     for (const ai of aliasedImports) {
+      const original = findChild(ai, "dotted_name");
       // The alias identifier follows the `as` keyword
       const alias = ai.children.find(
         (c) => c.type === "identifier",
       );
-      if (alias) {
+      if (original && alias) {
         specifiers.push(alias.text);
+        aliases[alias.text] = original.text;
       }
     }
 
@@ -330,9 +341,13 @@ export class PythonExtractor implements LanguageExtractor {
       specifiers.push("*");
     }
 
+    const aliasKeys = Object.keys(aliases);
     imports.push({
       source,
       specifiers,
+      ...(aliasKeys.length
+        ? { aliases: Object.fromEntries(aliasKeys.map((k) => [k, aliases[k]])) }
+        : {}),
       lineNumber: node.startPosition.row + 1,
     });
   }

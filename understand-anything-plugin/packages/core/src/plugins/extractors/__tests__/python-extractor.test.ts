@@ -331,6 +331,50 @@ from foo import bar as baz
       parser.delete();
     });
 
+    it("preserves aliased import bindings", () => {
+      const { tree, parser, root } = parse(`
+from package.service import run as execute
+import package.helpers as helpers
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        {
+          source: "package.service",
+          specifiers: ["execute"],
+          aliases: { execute: "run" },
+          lineNumber: 2,
+        },
+        {
+          source: "package.helpers",
+          specifiers: ["helpers"],
+          aliases: { helpers: "package.helpers" },
+          lineNumber: 3,
+        },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("preserves __proto__ alias as an own property", () => {
+      const { tree, parser, root } = parse(`
+from package.service import run as __proto__
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toHaveLength(1);
+      expect(result.imports[0].specifiers).toEqual(["__proto__"]);
+      expect(Object.prototype.hasOwnProperty.call(result.imports[0].aliases, "__proto__")).toBe(
+        true,
+      );
+      expect(result.imports[0].aliases?.["__proto__"]).toBe("run");
+      expect((result.imports[0].aliases as any).polluted).toBeUndefined();
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts dotted module imports", () => {
       const { tree, parser, root } = parse(`
 import os.path

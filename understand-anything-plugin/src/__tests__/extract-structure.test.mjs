@@ -31,6 +31,54 @@ describe("extract-structure buildResult", () => {
     });
   });
 
+  it("preserves deterministic import bindings", () => {
+    const result = buildResult(
+      file(),
+      10,
+      8,
+      analysis({
+        imports: [{
+          source: "package.service",
+          specifiers: ["execute"],
+          aliases: { execute: "run" },
+          lineNumber: 2,
+        }],
+      }),
+      [{ caller: "main", callee: "execute", lineNumber: 5 }],
+      {},
+    );
+
+    expect(result.imports).toEqual([{
+      source: "package.service",
+      specifiers: ["execute"],
+      aliases: { execute: "run" },
+      lineNumber: 2,
+    }]);
+  });
+
+  it("copies __proto__ alias keys as own properties", () => {
+    const aliases = Object.create(null);
+    aliases.__proto__ = "run";
+    const result = buildResult(
+      file(),
+      10,
+      8,
+      analysis({
+        imports: [{
+          source: "package.service",
+          specifiers: ["__proto__"],
+          aliases,
+          lineNumber: 2,
+        }],
+      }),
+      null,
+      {},
+    );
+
+    expect(Object.prototype.hasOwnProperty.call(result.imports[0].aliases, "__proto__")).toBe(true);
+    expect(result.imports[0].aliases.__proto__).toBe("run");
+  });
+
   describe("importCount fallback", () => {
     // Only relative imports count toward the fallback metric — external
     // package imports would never produce edges so counting them would be
