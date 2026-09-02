@@ -14,7 +14,7 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--full` — Force a full rebuild, ignoring any existing graph
   - `--auto-update` — Enable automatic graph updates on commit (writes `autoUpdate: true` to `.understand-anything/config.json`)
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
-  - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
+  - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation. Opt-in because it adds a subagent dispatch's cost and latency to Phase 6; the default inline validator covers the same critical checks deterministically for free.
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
   - `--version` — Print the installed plugin version and stop; runs no preflight, no build, and no pipeline phase
   - `--doctor` — Check that Node.js and pnpm are installed at a supported version and report whether the plugin is built, then stop; performs no writes and does not trigger the build
@@ -338,7 +338,7 @@ Load `.understand-anything/intermediate/batches.json` (produced by Phase 1.5). I
 
 Report: `[Phase 2/7] Analyzing files — <totalFiles> files in <totalBatches> batches (up to 5 concurrent)...`
 
-For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently**. Append the following additional context:
+For each batch, dispatch a subagent using the `file-analyzer` agent definition (at `agents/file-analyzer.md`). Run up to **5 subagents concurrently** (empirical default; not measured). Append the following additional context:
 
 > **Additional context from main session:**
 >
@@ -852,33 +852,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 ## Reference: KnowledgeGraph Schema
 
-### Node Types (13 total)
-| Type | Description | ID Convention |
-|---|---|---|
-| `file` | Source code file | `file:<relative-path>` |
-| `function` | Function or method | `function:<relative-path>:<name>` |
-| `class` | Class, interface, or type | `class:<relative-path>:<name>` |
-| `module` | Logical module or package | `module:<name>` |
-| `concept` | Abstract concept or pattern | `concept:<name>` |
-| `config` | Configuration file (YAML, JSON, TOML, env) | `config:<relative-path>` |
-| `document` | Documentation file (Markdown, RST, TXT) | `document:<relative-path>` |
-| `service` | Deployable service definition (Dockerfile, K8s) | `service:<relative-path>` |
-| `table` | Database table or migration | `table:<relative-path>:<table-name>` |
-| `endpoint` | API endpoint or route definition | `endpoint:<relative-path>:<endpoint-name>` |
-| `pipeline` | CI/CD pipeline configuration | `pipeline:<relative-path>` |
-| `schema` | Schema definition (GraphQL, Protobuf, Prisma) | `schema:<relative-path>` |
-| `resource` | Infrastructure resource (Terraform, CloudFormation) | `resource:<relative-path>` |
-
-### Edge Types (26 total)
-| Category | Types |
-|---|---|
-| Structural | `imports`, `exports`, `contains`, `inherits`, `implements` |
-| Behavioral | `calls`, `subscribes`, `publishes`, `middleware` |
-| Data flow | `reads_from`, `writes_to`, `transforms`, `validates` |
-| Dependencies | `depends_on`, `tested_by`, `configures` |
-| Semantic | `related`, `similar_to` |
-| Infrastructure | `deploys`, `serves`, `provisions`, `triggers` |
-| Schema/Data | `migrates`, `documents`, `routes`, `defines_schema` |
+There are 21 node types (13 structural + 3 domain + 5 knowledge) and 35 edge types (26 structural + 3 domain + 6 knowledge) in the current schema. Full type table: see `agents/graph-reviewer.md` (canonical).
 
 ### Edge Weight Conventions
 | Edge Type | Weight |
