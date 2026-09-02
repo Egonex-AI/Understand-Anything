@@ -498,7 +498,7 @@ edgeCount = edges.length
 ```
 
 **Step B — Decide split.**
-- If `nodeCount ≤ 60` AND `edgeCount ≤ 120`: write ONE file to `.understand-anything/intermediate/batch-<batchIndex>.json`. Done. Skip to Step F.
+- If `nodeCount ≤ 60` AND `edgeCount ≤ 120` (thresholds keep subagent output under the tool result limit): write ONE file to `.understand-anything/intermediate/batch-<batchIndex>.json`. Done. Skip to Step F.
 - Otherwise: `parts = ceil(max(nodeCount / 60, edgeCount / 120))`.
 
 **Step C — Partition.**

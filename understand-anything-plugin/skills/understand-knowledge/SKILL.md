@@ -65,7 +65,7 @@ Dispatch `article-analyzer` subagents to extract implicit knowledge:
    
    The agent will write `analysis-batch-{N}.json` to the intermediate directory.
 
-4. Run up to 3 batches concurrently. Wait for all batches to complete.
+4. Run up to 3 batches concurrently (empirical default; not measured). Wait for all batches to complete.
 
 5. If any batch fails, log a warning but continue — the scan-manifest provides a solid base graph even without LLM analysis.
 
