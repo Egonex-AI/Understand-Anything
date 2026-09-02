@@ -21,8 +21,14 @@ jobs:
   ci:
     strategy:
       fail-fast: false
+      # packages/core depends on 11 native tree-sitter grammar packages that run
+      # node-gyp-build on install and only work because upstream ships prebuilds;
+      # a new Node ABI or platform without a prebuild would force a from-source
+      # compile on a user's first /understand run, so macOS and Node 24 are
+      # included here as an early warning.
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +41,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
