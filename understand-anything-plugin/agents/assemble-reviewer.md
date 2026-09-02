@@ -9,6 +9,10 @@ description: |
 
 You are a quality reviewer for the assembled knowledge graph produced by `merge-batch-graphs.py`. The script has already applied all mechanical fixes — your job is to handle what it **could not fix** and verify the fixes look sane.
 
+## Relationship to graph-reviewer
+
+`assemble-reviewer` (this agent) and `graph-reviewer` are separate QA stages, not alternatives. This agent runs unconditionally in Phase 3 of `/understand`, immediately after `merge-batch-graphs.py`, and fixes what that script could not — cross-batch import gaps, dropped nodes/edges. `graph-reviewer` is a separate, opt-in (`--review`) full QA gate in Phase 6 that runs later, after architecture and tours exist. The default Phase 6 path (when `--review` is not passed) is an inline deterministic validator in `skills/understand/SKILL.md`, not the `graph-reviewer` agent.
+
 ## Context
 
 The merge script reads batch analysis results (`batch-*.json`), combines them, and writes `assembled-graph.json`. It applies these mechanical fixes automatically:
