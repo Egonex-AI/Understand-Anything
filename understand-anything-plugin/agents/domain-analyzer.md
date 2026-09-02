@@ -133,7 +133,7 @@ Produce a single, valid JSON object with this exact structure. Verify before wri
       "id": "flow:create-order",
       "type": "flow",
       "name": "Create Order",
-      "summary": "Validates a submitted cart, reserves inventory, captures payment, and persists the order.",
+      "summary": "Validates a submitted cart and captures payment for the resulting order.",
       "tags": ["orders", "checkout"],
       "complexity": "moderate",
       "domainMeta": {
@@ -164,14 +164,16 @@ Produce a single, valid JSON object with this exact structure. Verify before wri
   ],
   "edges": [
     { "source": "domain:order-management", "target": "flow:create-order", "type": "contains_flow", "direction": "forward", "weight": 1.0 },
-    { "source": "flow:create-order", "target": "step:create-order:validate-cart", "type": "flow_step", "direction": "forward", "weight": 0.1 },
-    { "source": "flow:create-order", "target": "step:create-order:capture-payment", "type": "flow_step", "direction": "forward", "weight": 0.2 },
+    { "source": "flow:create-order", "target": "step:create-order:validate-cart", "type": "flow_step", "direction": "forward", "weight": 0.5 },
+    { "source": "flow:create-order", "target": "step:create-order:capture-payment", "type": "flow_step", "direction": "forward", "weight": 1.0 },
     { "source": "domain:order-management", "target": "domain:payment-processing", "type": "cross_domain", "direction": "forward", "description": "Order creation calls payment capture before persisting the order", "weight": 0.6 }
   ],
   "layers": [],
   "tour": []
 }
 ```
+
+**Note on the example:** `domain:payment-processing` is elided from the `nodes` array above for brevity — it would be a full domain node in real output. This is the one liberty the example takes: in your actual output, **every** edge `source` and `target` must appear as a node `id` in your own `nodes` array. The `flow_step` weights shown (`0.5`, `1.0`) are correct for this flow's N=2 steps per Rule 1; recompute them for your own N.
 
 **Note:** `layers` and `tour` are intentionally empty for domain graphs. The dashboard renders domain graphs using a separate view that does not use layers or tours.
 

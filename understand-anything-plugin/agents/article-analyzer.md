@@ -148,20 +148,20 @@ Write a single, valid JSON file to `$INTERMEDIATE_DIR/analysis-batch-$BATCH_NUM.
   ],
   "edges": [
     {
-      "source": "article:decisions/decision-typescript-python",
-      "target": "claim:decision-typescript-python:ts-core-py-clones",
+      "source": "entity:tree-sitter",
+      "target": "article:concepts/concept-incremental-parsing",
       "type": "exemplifies",
       "direction": "forward",
       "weight": 0.7,
-      "description": "The decision record states this claim as its conclusion"
+      "description": "tree-sitter is the concrete implementation the incremental-parsing concept describes"
     },
     {
       "source": "article:decisions/decision-typescript-python",
-      "target": "entity:tree-sitter",
+      "target": "source:raw/karpathy-wiki-gist.md",
       "type": "cites",
       "direction": "forward",
       "weight": 0.7,
-      "description": "The article cites tree-sitter as the parsing dependency behind the choice"
+      "description": "The decision record quotes the raw gist when justifying the language split"
     },
     {
       "source": "article:concepts/concept-brain",
