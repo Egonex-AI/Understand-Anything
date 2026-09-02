@@ -39,6 +39,13 @@ body:
     validations:
       required: true
 
+  - type: textarea
+    id: doctor
+    attributes:
+      label: /understand --doctor output
+      description: Run `/understand --doctor` and paste the output here.
+      render: shell
+
   - type: dropdown
     id: platform
     attributes:

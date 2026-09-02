@@ -110,6 +110,14 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+- Node.js >= 22
+- pnpm >= 10
+- git
+
+The first `/understand` run installs the plugin's dependencies and builds it, which needs network access. Run `/understand --doctor` any time to check your setup.
+
 ### 1. Install the plugin
 
 ```bash
@@ -183,6 +191,12 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 # Scope to a subdirectory (for huge monorepos)
 /understand src/frontend
 ```
+
+### Troubleshooting
+
+- **"Cannot find the understand-anything plugin root"** — the plugin isn't installed where `/understand` expects. The error message lists every path it checked; make sure one of them actually contains the plugin.
+- **Node.js or pnpm missing / too old** — install the versions listed under [Prerequisites](#prerequisites), then re-run `/understand`.
+- **First run is slow** — that's expected; it's installing dependencies and building the plugin once. Subsequent runs skip this.
 
 ---
 

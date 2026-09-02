@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: "[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>]"
+argument-hint: "[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>|--version|--doctor]"
 ---
 
 # /understand
@@ -16,6 +16,8 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
+  - `--version` — Print the installed plugin version and stop; runs no preflight, no build, and no pipeline phase
+  - `--doctor` — Check that Node.js and pnpm are installed at a supported version and report whether the plugin is built, then stop; performs no writes and does not trigger the build
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
 
 ---
@@ -112,13 +114,65 @@ Determine whether to run a full analysis or incremental update.
      echo "Make sure the plugin is installed correctly."
      exit 1
    fi
+   ```
 
+   **`--version`.** If `--version` is in `$ARGUMENTS`, print the plugin version and stop here — do not run the preflight below, do not build, do not run any pipeline phase:
+
+   ```bash
+   VERSION=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version)' "$PLUGIN_ROOT/.claude-plugin/plugin.json")
+   echo "understand-anything $VERSION"
+   ```
+
+   **Preflight.** Run this check only if `$PLUGIN_ROOT/packages/core/dist/index.js` does not exist yet, or `--doctor` is in `$ARGUMENTS`. Users with an already-built plugin who did not pass `--doctor` skip this entirely — they must not pay its cost or risk a false failure:
+
+   ```bash
+   if ! command -v node >/dev/null 2>&1; then
+     echo "Error: Node.js is not installed or not on PATH. Install Node.js >= 22 (https://nodejs.org) and re-run /understand."
+     exit 1
+   fi
+   NODE_MAJOR=$(node -v)
+   NODE_MAJOR="${NODE_MAJOR#v}"
+   NODE_MAJOR="${NODE_MAJOR%%.*}"
+   if [ "$NODE_MAJOR" -lt 22 ]; then
+     echo "Error: Node.js $(node -v) is too old. understand-anything needs Node.js >= 22."
+     exit 1
+   fi
+
+   if ! command -v pnpm >/dev/null 2>&1; then
+     echo "Error: pnpm is not installed or not on PATH. Install pnpm >= 10 (e.g. \`npm install -g pnpm\` or \`corepack enable\`) and re-run /understand."
+     exit 1
+   fi
+   PNPM_MAJOR=$(pnpm -v)
+   PNPM_MAJOR="${PNPM_MAJOR%%.*}"
+   if [ "$PNPM_MAJOR" -lt 10 ]; then
+     echo "Error: pnpm $(pnpm -v) is too old. understand-anything needs pnpm >= 10."
+     exit 1
+   fi
+   ```
+
+   The preflight above prints an actionable error and exits 1 the moment it finds a problem. If it fires, surface that error to the user verbatim and stop — do not attempt to install Node.js or pnpm on the user's behalf.
+
+   **`--doctor`.** If `--doctor` is in `$ARGUMENTS`, the preflight above just ran unconditionally (whether or not the plugin is built) and passed. Print a status report and stop here — do not build, do not run any pipeline phase. `--doctor` performs no writes:
+
+   ```bash
+   echo "Plugin root: $PLUGIN_ROOT"
+   echo "Plugin version: $(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version)' "$PLUGIN_ROOT/.claude-plugin/plugin.json")"
+   echo "node -v: $(node -v)"
+   echo "pnpm -v: $(pnpm -v)"
+   if [ -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
+     echo "Build status: built"
+   else
+     echo "Build status: not built — will build on first /understand run"
+   fi
+   ```
+
+   Otherwise, continue:
+
+   ```bash
    if [ ! -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
      cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
    fi
    ```
-
-   If `pnpm` is missing, report to the user: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
 
 2. Get the current git commit hash:
    ```bash
