@@ -20,7 +20,8 @@ Swift repo and verified the dashboard shows non-empty edges" is better. -->
 
 <!-- If this PR ships a user-visible behavior change, bump the version in ALL
 five manifests per CLAUDE.md. If it's docs/tests/internal-only, leave them
-alone and the maintainer will bump on merge. -->
+alone and the maintainer will bump on merge. `pnpm test` now enforces that all
+five manifests match, so a partial bump fails CI. -->
 
 - [ ] Version bumped in all five manifests, OR
 - [ ] N/A — internal/docs-only change

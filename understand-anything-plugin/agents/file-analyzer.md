@@ -131,12 +131,11 @@ Read `$PROJECT_ROOT/.understand-anything/tmp/ua-file-extract-results-<batchIndex
 
 When any of these arrays is present and non-empty, you MUST iterate it and emit nodes for the significant entries (don't just create the parent file node and call it done). The corresponding `metrics.serviceCount` / `metrics.endpointCount` / `metrics.resourceCount` / `metrics.stepCount` / `metrics.definitionCount` fields tell you how many were extracted at a glance.
 
-**Supported file categories:** The bundled script handles all file categories — `code` (10 languages with tree-sitter: TypeScript, JavaScript, Python, Go, Rust, Java, Ruby, PHP, C/C++, C#), `config`, `docs`, `infra`, `data`, `script`, and `markup`. For languages without tree-sitter support (Swift, Kotlin, PowerShell, Batch, shell scripts of fileCategory `script`), the script outputs basic metrics with empty structural data — you MUST then read the source and supplement at least the function definitions, so these files don't end up as bare `file` nodes:
+**Supported file categories:** The bundled script handles all file categories — `code` (13 languages with tree-sitter: TypeScript, JavaScript, Python, Go, Rust, Java, Ruby, PHP, C/C++, C#, Dart, Kotlin, Swift), `config`, `docs`, `infra`, `data`, `script`, and `markup`. For languages without tree-sitter support (PowerShell, Batch, shell scripts of fileCategory `script`), the script outputs basic metrics with empty structural data — you MUST then read the source and supplement at least the function definitions, so these files don't end up as bare `file` nodes:
 
 - **PowerShell** (`.ps1`): match top-level `function NAME { ... }` blocks (case-insensitive); name = `NAME`, params from the param block when present
 - **Bash / shell** (`.sh`, `.bash`): match top-level `NAME() { ... }` and `function NAME { ... }`
 - **Batch** (`.bat`, `.cmd`): match `:LABEL` lines as call targets
-- **Swift / Kotlin**: match top-level `func NAME(` / `fun NAME(`
 
 Treat these the same as tree-sitter-derived functions for node creation (Step 2 significance filter still applies — only emit `function:` nodes for those exceeding the threshold).
 
