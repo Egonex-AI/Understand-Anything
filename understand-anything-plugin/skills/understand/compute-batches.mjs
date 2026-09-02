@@ -598,10 +598,10 @@ async function main() {
     return { batchIndex: b.batchIndex, files: analysisFiles, batchImportData, neighborMap };
   };
 
-  const batches = mergedBareBatches.map(b => buildBatchPayload(b));
-
-  let finalBatches = batches;
-  if (changedFiles) {
+  let finalBatches;
+  if (!changedFiles) {
+    finalBatches = mergedBareBatches.map(b => buildBatchPayload(b));
+  } else {
     finalBatches = mergedBareBatches
       .map(b => {
         const changedBatchFiles = b.files.filter(f =>
