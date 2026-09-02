@@ -34,7 +34,7 @@ Write a script (prefer Node.js; fall back to Python if unavailable) that reads t
 
 **Check 1 -- Schema Validation (Critical)**
 
-> **Canonical node/edge type reference** — other agent and skill files link here rather than restating this table. Source of truth: `understand-anything-plugin/packages/core/src/schema.ts`.
+> **Canonical node/edge type reference** — other agent and skill files link here rather than restating this table. Source of truth: `packages/core/src/types.ts` (`NodeType`) and `packages/core/src/schema.ts` (`EdgeTypeSchema`).
 
 Verify every **node** has ALL required fields with correct types:
 

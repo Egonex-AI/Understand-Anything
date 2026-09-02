@@ -14,7 +14,7 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in `.unde
   - `--full` — Force a full rebuild, ignoring any existing graph
   - `--auto-update` — Enable automatic graph updates on commit (writes `autoUpdate: true` to `.understand-anything/config.json`)
   - `--no-auto-update` — Disable automatic graph updates (writes `autoUpdate: false` to `.understand-anything/config.json`)
-  - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation. Opt-in because it adds a subagent dispatch's cost and latency to Phase 6; the default inline validator covers the same critical checks deterministically for free.
+  - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation. Opt-in because it adds a subagent dispatch's cost and latency to Phase 6; the default inline validator covers referential integrity, duplicate IDs, required fields and layer coverage deterministically for free; the LLM reviewer adds type-enum validation and quality judgment on top, at the cost of latency and tokens.
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `.understand-anything/config.json` for consistency across incremental updates.
   - `--version` — Print the installed plugin version and stop; runs no preflight, no build, and no pipeline phase
   - `--doctor` — Check that Node.js and pnpm are installed at a supported version and report whether the plugin is built, then stop; performs no writes and does not trigger the build
@@ -119,8 +119,10 @@ Determine whether to run a full analysis or incremental update.
    **`--version`.** If `--version` is in `$ARGUMENTS`, print the plugin version and stop here — do not run the preflight below, do not build, do not run any pipeline phase:
 
    ```bash
+   command -v node >/dev/null 2>&1 || { echo "Error: Node.js is not installed or not on PATH. Install Node.js >= 22 (https://nodejs.org) and re-run /understand."; exit 1; }
    VERSION=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version)' "$PLUGIN_ROOT/.claude-plugin/plugin.json")
    echo "understand-anything $VERSION"
+   exit 0
    ```
 
    **Preflight.** Run this check only if `$PLUGIN_ROOT/packages/core/dist/index.js` does not exist yet, or `--doctor` is in `$ARGUMENTS`. Users with an already-built plugin who did not pass `--doctor` skip this entirely — they must not pay its cost or risk a false failure:
@@ -152,7 +154,7 @@ Determine whether to run a full analysis or incremental update.
 
    The preflight above prints an actionable error and exits 1 the moment it finds a problem. If it fires, surface that error to the user verbatim and stop — do not attempt to install Node.js or pnpm on the user's behalf.
 
-   **`--doctor`.** If `--doctor` is in `$ARGUMENTS`, the preflight above just ran unconditionally (whether or not the plugin is built) and passed. Print a status report and stop here — do not build, do not run any pipeline phase. `--doctor` performs no writes:
+   **`--doctor`.** If `--doctor` is in `$ARGUMENTS`, the preflight above ran regardless of build state. If it passed, print this status report and stop — do not build, do not run any pipeline phase. `--doctor` performs no writes:
 
    ```bash
    echo "Plugin root: $PLUGIN_ROOT"
@@ -164,6 +166,7 @@ Determine whether to run a full analysis or incremental update.
    else
      echo "Build status: not built — will build on first /understand run"
    fi
+   exit 0
    ```
 
    Otherwise, continue:

@@ -82,7 +82,7 @@ Relationships between articles that go beyond simple wikilink association. Only 
 Edge format:
 ```json
 {
-  "source": "article:...",
+  "source": "article:... or entity:... (exemplifies may originate from an entity)",
   "target": "article:... or entity:... or claim:... or source:...",
   "type": "builds_on",
   "direction": "forward",
