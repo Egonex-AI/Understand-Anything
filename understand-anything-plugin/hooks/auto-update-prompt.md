@@ -97,35 +97,31 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
 
 ## Phase 1 — Structural Fingerprint Check (Zero LLM Tokens)
 
-This phase runs a deterministic Node.js script that compares file structures against stored fingerprints. It costs **zero LLM tokens** — only the script execution cost.
+This phase runs the bundled deterministic script that compares file structures against stored fingerprints. It costs **zero LLM tokens** — only the script execution cost.
 
-1. Write and execute a Node.js script (`$UA_DIR/intermediate/fingerprint-check.mjs`):
+**Do NOT hand-write a fingerprint-check script.** The baseline in `fingerprints.json` is produced with tree-sitter (core `fingerprint.ts`); an ad-hoc regex extraction systematically disagrees with it, so cosmetic changes get misclassified as STRUCTURAL and the zero-token path never triggers. The bundled script uses the exact same extraction pipeline as the baseline builder.
 
-```javascript
-// The script should:
-// 1. Read fingerprints.json from the data directory (.ua/fingerprints.json, or .understand-anything/fingerprints.json when that legacy directory is present — resolve UA_DIR the same way as the other scripts)
-// 2. For each changed source file:
-//    a. Read the file content
-//    b. Compute SHA-256 content hash
-//    c. If content hash matches stored hash → NONE (skip)
-//    d. Extract structural elements via regex:
-//       - Functions: match patterns like `function NAME(`, `const NAME = (`, `export function NAME(`
-//       - Classes: match `class NAME`, `export class NAME`
-//       - Imports: match `import ... from '...'`, `import '...'`
-//       - Exports: match `export { ... }`, `export default`, `export function`, `export class`, `export const`
-//    e. Compare extracted elements against stored fingerprint
-//    f. Classify as NONE, COSMETIC, or STRUCTURAL
-// 3. For new files (not in fingerprints.json): classify as STRUCTURAL
-// 4. For deleted files (in fingerprints.json but not on disk): classify as STRUCTURAL
-// 5. Determine overall decision:
-//    - All NONE/COSMETIC → action: "SKIP"
-//    - Some STRUCTURAL, ≤10 files, same directories → action: "PARTIAL_UPDATE"
-//    - New/deleted directories or >10 structural files → action: "ARCHITECTURE_UPDATE"
-//    - >30 structural files or >50% of graph → action: "FULL_UPDATE"
-// 6. Write result to <UA_DIR>/intermediate/change-analysis.json (.ua/, or .understand-anything/ when that legacy directory is present)
-```
+1. Resolve the skill directory from `$PLUGIN_ROOT` (resolved in Phase 0 step 10.3; if that step was skipped because no `.understandignore` exists, resolve `$PLUGIN_ROOT` the same way now):
+   ```bash
+   SKILL_DIR="$PLUGIN_ROOT/skills/understand"
+   ```
 
-The output JSON should have this shape:
+2. Write the input file `$UA_DIR/intermediate/fingerprint-check-input.json`:
+   ```json
+   {
+     "projectRoot": "<absolute $PROJECT_ROOT>",
+     "changedFilePaths": [<the filtered changed-file list from Phase 0 (the `kept` array when step 10 ran, otherwise the step 8 list), as a JSON array of relative paths>]
+   }
+   ```
+
+3. Run the bundled script:
+   ```bash
+   node "$SKILL_DIR/check-fingerprints.mjs" \
+     "$UA_DIR/intermediate/fingerprint-check-input.json"
+   ```
+   It loads `fingerprints.json`, compares each changed file with tree-sitter extraction (content-hash fast path for unchanged files), classifies NONE / COSMETIC / STRUCTURAL, handles new and deleted files, and writes the decision to `$UA_DIR/intermediate/change-analysis.json` via core's `analyzeChanges` + `classifyUpdate`. If the baseline is missing it degrades conservatively (all changed files STRUCTURAL, `baselineMissing: true`).
+
+The output JSON has this shape:
 ```json
 {
   "action": "SKIP | PARTIAL_UPDATE | ARCHITECTURE_UPDATE | FULL_UPDATE",
@@ -136,7 +132,13 @@ The output JSON should have this shape:
   "fileChanges": [
     { "filePath": "src/utils.ts", "changeLevel": "COSMETIC", "details": ["internal logic changed"] },
     { "filePath": "src/new-feature.ts", "changeLevel": "STRUCTURAL", "details": ["new function: handleRequest"] }
-  ]
+  ],
+  "newFiles": ["src/new-feature.ts"],
+  "deletedFiles": [],
+  "structurallyChangedFiles": [],
+  "cosmeticOnlyFiles": ["src/utils.ts"],
+  "unchangedFiles": [],
+  "baselineMissing": false
 }
 ```
 
@@ -246,59 +248,34 @@ Perform lightweight validation (no graph-reviewer agent):
 
 3. **Update fingerprints (LOAD-PATCH-SAVE, not OVERWRITE).**
 
-   The most common failure mode here: writing only the freshly-computed batch entries to `fingerprints.json`, discarding every other file's fingerprint. The next auto-update then sees all those files as new (no stored fingerprint), classifies them as STRUCTURAL, and escalates to FULL_UPDATE permanently (issue #152). The script must LOAD ALL existing entries, PATCH only the re-analyzed ones, and SAVE the full dict back.
+   The most common failure mode here: writing only the freshly-computed batch entries to `fingerprints.json`, discarding every other file's fingerprint. The next auto-update then sees all those files as new (no stored fingerprint), classifies them as STRUCTURAL, and escalates to FULL_UPDATE permanently (issue #152). A second failure mode: patching entries at the top level of the JSON instead of inside the store's `files` map — the real store shape is `{ version, gitCommitHash, generatedAt, files: { <path>: <fingerprint> } }`, so top-level patches are invisible to the next check and every re-analyzed file looks "new" forever.
 
-   Write and execute a Node.js script in this exact ordering:
+   **Do NOT hand-write this script.** Run the bundled one, which loads the full store, patches only the changed paths with the same tree-sitter extraction as the baseline, removes deleted files, and saves the full store back:
 
-   ```javascript
-   import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-   import { createHash } from 'node:crypto';
-   import path from 'node:path';
+   1. Write `$UA_DIR/intermediate/fingerprint-update-input.json`:
+      ```json
+      {
+        "projectRoot": "<absolute $PROJECT_ROOT>",
+        "changedFilePaths": [<`filesToReanalyze` plus `deletedFiles` from change-analysis.json, as a JSON array>],
+        "gitCommitHash": "<current commit hash>"
+      }
+      ```
 
-   const UA_DIR = existsSync(path.join(PROJECT_ROOT, '.understand-anything')) ? '.understand-anything' : '.ua';
-   const fpPath = path.join(PROJECT_ROOT, UA_DIR, 'fingerprints.json');
-   const existedAndNonEmpty = existsSync(fpPath) && readFileSync(fpPath, 'utf-8').trim().length > 0;
+   2. Run it:
+      ```bash
+      node "$SKILL_DIR/update-fingerprints.mjs" \
+        "$UA_DIR/intermediate/fingerprint-update-input.json"
+      ```
 
-   // 1. LOAD ALL existing entries (NEVER skip — preserves un-analyzed files)
-   const all = existedAndNonEmpty
-     ? JSON.parse(readFileSync(fpPath, 'utf-8'))
-     : {};
-   const before = Object.keys(all).length;
+   The script refuses to run when no baseline exists (writing a partial baseline would reproduce issue #152); in that case report that `/understand` must be re-run to re-baseline, and continue with the remaining steps.
 
-   // 2. PATCH (file still exists) or REMOVE (file deleted) for each re-analyzed path.
-   //    `filesToReanalyze` may include paths that were deleted in this commit —
-   //    handle both branches inline rather than expecting a separate deleted list.
-   for (const filePath of filesToReanalyze) {
-     const fullPath = path.join(PROJECT_ROOT, filePath);
-     if (!existsSync(fullPath)) {
-       delete all[filePath];
-       continue;
-     }
-     const content = readFileSync(fullPath, 'utf-8');
-     const contentHash = createHash('sha256').update(content).digest('hex');
-     // Extract functions, classes, imports, exports via the same regex as Phase 1.
-     all[filePath] = { contentHash, functions, classes, imports, exports };
-   }
-
-   // 3. GUARD against silent load failure: if fingerprints.json existed and was
-   //    non-empty but `before` came out as 0, refuse to overwrite — something
-   //    went wrong reading the file and writing now would clobber every entry.
-   if (existedAndNonEmpty && before === 0) {
-     throw new Error('fingerprints.json existed and was non-empty but loaded as {} — refusing to overwrite');
-   }
-
-   // 4. SAVE ALL entries back (full dict — not just the patched subset)
-   writeFileSync(fpPath, JSON.stringify(all, null, 2));
-   console.log(`Fingerprints: ${before} → ${Object.keys(all).length}`);
-   ```
-
-   The `existedAndNonEmpty && before === 0` guard catches the silent-load-failure case before it corrupts the store. If the count shrinks from N to a small number that matches the batch size, the LOAD step was skipped — abort the write rather than persist the wrong dict.
-
-4. Clean up intermediate files:
+4. Clean up intermediate files — **preserving `scan-result.json`**. `/understand` Phase 7 deliberately keeps `scan-result.json` in the intermediate dir so future incremental runs can skip the ~157k-token Phase 1 re-scan (issue #293); deleting the whole directory here silently destroys that optimization on the very next commit. Use the same trash-based move as `/understand` Phase 7 (avoids `rm -rf` on just-created dirs, issue #301):
    ```bash
-   INTERMEDIATE_DIR="$UA_DIR/intermediate"
-   if [ -n "$PROJECT_ROOT" ] && [ -d "$INTERMEDIATE_DIR" ]; then
-     rm -rf "$INTERMEDIATE_DIR"
+   TRASH="$UA_DIR/.trash-$(date +%s)"
+   mkdir -p "$TRASH"
+   INTER="$UA_DIR/intermediate"
+   if [ -d "$INTER" ]; then
+     find "$INTER" -mindepth 1 -maxdepth 1 -not -name 'scan-result.json' -exec mv {} "$TRASH/" \; 2>/dev/null || true
    fi
    ```
 
@@ -315,7 +292,7 @@ Perform lightweight validation (no graph-reviewer agent):
 ## Error Handling
 
 - If the fingerprint check script fails: fall back to treating all changed files as STRUCTURAL (conservative approach).
-- If `fingerprints.json` doesn't exist: treat all changed files as STRUCTURAL and regenerate fingerprints after the update.
+- If `fingerprints.json` doesn't exist: the check script degrades to all-STRUCTURAL on its own (`baselineMissing: true`). Do NOT write a partial baseline from just the changed files — report that `/understand` should be re-run to rebuild the full baseline.
 - If a subagent dispatch fails: retry once. If it fails again, save partial results and report the error.
 - ALWAYS save partial results — a partially updated graph is better than no update.
 
@@ -324,5 +301,5 @@ Perform lightweight validation (no graph-reviewer agent):
 ## Notes
 
 - This skill reuses the same `file-analyzer` and `architecture-analyzer` agent definitions as `/understand` — no separate agent prompts needed.
-- The fingerprint comparison in Phase 1 uses regex-based extraction (not tree-sitter) because it runs as a temporary Node.js script and doesn't need full AST accuracy — just signature-level detection.
+- The fingerprint comparison in Phase 1 (`check-fingerprints.mjs`) and the patch in Phase 3 (`update-fingerprints.mjs`) use the SAME core tree-sitter pipeline as the baseline builder (`build-fingerprints.mjs`). Never substitute regex-based extraction: mixing regex-extracted fingerprints with the tree-sitter baseline misclassifies cosmetic changes as STRUCTURAL and defeats the zero-token path.
 - The authoritative fingerprints stored in `fingerprints.json` are generated by `/understand` Phase 7 using the core `fingerprint.ts` module (which uses tree-sitter for precise extraction).

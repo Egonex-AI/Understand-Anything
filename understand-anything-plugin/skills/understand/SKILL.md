@@ -739,6 +739,8 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 2. **Generate structural fingerprints baseline.** This creates the basis for future automatic incremental updates and **must succeed before `meta.json` is written** — otherwise auto-update sees a fresh commit hash with no fingerprints to compare against, classifies every file as STRUCTURAL, and escalates to `FULL_UPDATE` on every subsequent commit (issue #152).
 
+   **`sourceFilePaths` MUST be the FULL project file inventory, never just the changed files.** On a full run that is the Phase 1 file list. On an **incremental run** (where Phase 1 was skipped), read the preserved `$UA_DIR/intermediate/scan-result.json` and use its complete `files[].path` list. `build-fingerprints.mjs` overwrites `fingerprints.json` wholesale — passing only the changed files writes a partial baseline, so every OTHER file looks "new" (STRUCTURAL) to the next auto-update and the action escalates to `FULL_UPDATE` on every subsequent commit (the same issue #152 spiral, reintroduced). If `scan-result.json` is missing on an incremental run, run the bundled `scan-project.mjs` (deterministic, zero LLM tokens) to regenerate the inventory before building fingerprints.
+
    Write the input file:
    ```bash
    node - "$PROJECT_ROOT" "$UA_DIR/intermediate/fingerprint-input.json" <<'NODE'
@@ -747,7 +749,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
    const outputPath = process.argv[3];
    const input = {
      projectRoot,
-     sourceFilePaths: [<all source file paths from Phase 1, as JSON array>],
+     sourceFilePaths: [<ALL source file paths — Phase 1 list on a full run, scan-result.json files[].path on an incremental run; never only the changed files>],
      gitCommitHash: "<current commit hash>",
    };
    fs.writeFileSync(outputPath, JSON.stringify(input, null, 2));
