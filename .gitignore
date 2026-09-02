@@ -1,6 +1,7 @@
 node_modules
 dist
 .understand-anything
+.ua
 *.tsbuildinfo
 .DS_Store
 .env

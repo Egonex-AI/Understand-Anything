@@ -20,10 +20,8 @@ import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import {
-  analyzeFileWithOutcomes,
-  buildResult as buildExtractResult,
-} from './extract-structure-result.mjs';
+import { analyzeFileWithOutcomes,buildResult as buildExtractResult } from './extract-structure-result.mjs';
+import { readTreeSitterExtensionLanguageMap } from './config.mjs';
 
 export {
   analyzeFileWithOutcomes,
@@ -50,7 +48,13 @@ try {
   core = await import(pathToFileURL(resolve(pluginRoot, 'packages/core/dist/index.js')).href);
 }
 
-const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers } = core;
+const {
+  TreeSitterPlugin,
+  PluginRegistry,
+  LanguageRegistry,
+  builtinLanguageConfigs,
+  registerAllParsers,
+} = core;
 
 // ---------------------------------------------------------------------------
 // Main
@@ -71,13 +75,28 @@ async function main() {
     throw new Error('Invalid input: must contain projectRoot and batchFiles array');
   }
 
+  const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
+  validLanguageIds.add('tsx');
+  const treeSitterExtensionLanguageMap = readTreeSitterExtensionLanguageMap(
+    projectRoot,
+    { validLanguageIds },
+  );
+
   // Create tree-sitter plugin with all configs that have WASM grammars
   const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
-  const tsPlugin = new TreeSitterPlugin(tsConfigs);
+  const tsPlugin = new TreeSitterPlugin(tsConfigs, undefined, {
+    extensionLanguageMap: treeSitterExtensionLanguageMap,
+  });
   await tsPlugin.init();
 
   // Create registry and register tree-sitter + all non-code parsers
-  const registry = new PluginRegistry();
+  const languageRegistry = LanguageRegistry.createDefault();
+  for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
+    // tsx is a synthetic grammar key for tree-sitter selection — it is
+    // NOT a LanguageRegistry id, so map it to typescript for registration.
+    languageRegistry.registerExtensionAlias(ext, languageId === 'tsx' ? 'typescript' : languageId);
+  }
+  const registry = new PluginRegistry(languageRegistry);
   registry.register(tsPlugin);
   registerAllParsers(registry);
 

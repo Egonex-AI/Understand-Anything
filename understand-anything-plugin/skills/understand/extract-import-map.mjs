@@ -38,6 +38,7 @@ import { dirname, resolve, join, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { readTreeSitterExtensionLanguageMap } from './config.mjs';
 
 /**
  * Read a list of files concurrently while preserving result order. Failures
@@ -81,7 +82,13 @@ try {
   core = await import(pathToFileURL(resolve(pluginRoot, 'packages/core/dist/index.js')).href);
 }
 
-const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers } = core;
+const {
+  TreeSitterPlugin,
+  PluginRegistry,
+  LanguageRegistry,
+  builtinLanguageConfigs,
+  registerAllParsers,
+} = core;
 
 // ---------------------------------------------------------------------------
 // Path helpers
@@ -561,7 +568,7 @@ const NODENEXT_REWRITES = {
  * For NodeNext-style imports (`./foo.js` where only `./foo.ts` exists), apply
  * the source-extension rewrite — see NODENEXT_REWRITES above.
  */
-function probeWithExtensions(basePath, fileSet) {
+function probeWithExtensions(basePath, fileSet, extraExtProbes = null) {
   if (!basePath) return null;
   // Exact match (import already had an extension that resolves on disk)
   if (fileSet.has(basePath)) return basePath;
@@ -588,6 +595,16 @@ function probeWithExtensions(basePath, fileSet) {
     const candidate = basePath + ext;
     if (fileSet.has(candidate)) return candidate;
   }
+
+  // Probe configured extension aliases for TS/JS languages (e.g. .customts
+  // mapped to typescript → a.customts importing ./b should find b.customts).
+  if (extraExtProbes) {
+    for (const ext of extraExtProbes) {
+      const candidate = basePath + ext;
+      if (fileSet.has(candidate)) return candidate;
+    }
+  }
+
   return null;
 }
 
@@ -600,7 +617,7 @@ function probeWithExtensions(basePath, fileSet) {
  * targets are anchored at THAT tsconfig's directory, matching the way the
  * TypeScript compiler resolves nested project configs.
  */
-export function resolveTsJsImport(rawImport, file, ctx) {
+export function resolveTsJsImport(rawImport, file, ctx, extraExtProbes = null) {
   if (!rawImport || typeof rawImport !== 'string') return null;
   const src = rawImport.trim();
   if (!src) return null;
@@ -610,7 +627,7 @@ export function resolveTsJsImport(rawImport, file, ctx) {
   // Relative imports: ./foo, ../foo — tsconfig has no bearing here.
   if (src.startsWith('./') || src.startsWith('../')) {
     const base = resolveRelative(importerDir, src);
-    return probeWithExtensions(base, ctx.fileSet);
+    return probeWithExtensions(base, ctx.fileSet, extraExtProbes);
   }
 
   // tsconfig path aliases. Walk up from the importer to find the nearest
@@ -648,7 +665,7 @@ export function resolveTsJsImport(rawImport, file, ctx) {
           );
           // Defensive: tsconfig targets shouldn't escape the project root.
           if (candidate.startsWith('..')) continue;
-          const probed = probeWithExtensions(candidate, ctx.fileSet);
+          const probed = probeWithExtensions(candidate, ctx.fileSet, extraExtProbes);
           if (probed) return probed;
         }
       }
@@ -1735,7 +1752,7 @@ function resolveImport(imp, file, ctx) {
   const lang = file.language;
   const src = imp.source;
   if (TS_JS_LANGS.has(lang)) {
-    const out = resolveTsJsImport(src, file, ctx);
+    const out = resolveTsJsImport(src, file, ctx, ctx.tsJsExtProbes ?? null);
     return out ? [out] : [];
   }
   if (lang === 'python') {
@@ -1812,6 +1829,13 @@ async function main() {
     throw new Error('Invalid input: must contain projectRoot and files array');
   }
 
+  const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
+  validLanguageIds.add('tsx');
+  const treeSitterExtensionLanguageMap = readTreeSitterExtensionLanguageMap(
+    projectRoot,
+    { validLanguageIds },
+  );
+
   // Create tree-sitter plugin with all configs that have WASM grammars.
   //
   // WHY graceful init: the most likely real-world failure mode is the WASM
@@ -1825,9 +1849,17 @@ async function main() {
   let treeSitterReady = false;
   try {
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
-    const tsPlugin = new TreeSitterPlugin(tsConfigs);
+    const tsPlugin = new TreeSitterPlugin(tsConfigs, undefined, {
+      extensionLanguageMap: treeSitterExtensionLanguageMap,
+    });
     await tsPlugin.init();
-    registry = new PluginRegistry();
+    const languageRegistry = LanguageRegistry.createDefault();
+    for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
+      // tsx is a synthetic grammar key for tree-sitter selection — it is
+      // NOT a LanguageRegistry id, so map it to typescript.
+      languageRegistry.registerExtensionAlias(ext, languageId === 'tsx' ? 'typescript' : languageId);
+    }
+    registry = new PluginRegistry(languageRegistry);
     registry.register(tsPlugin);
     registerAllParsers(registry);
     treeSitterReady = true;
@@ -1843,6 +1875,21 @@ async function main() {
   // tsconfig/go.mod/composer.json files inside is parallelised — see
   // `buildResolutionContext`.
   const ctx = await buildResolutionContext(projectRoot, files);
+
+  // Inject configured extension aliases into the TS/JS resolution probes
+  // so that imports between custom-extension files are found (e.g.
+  // .customts → typescript: a.customts importing ./b must resolve to
+  // b.customts, not only b.ts/b.tsx/b.js).
+  const tsJsCustomExts = [];
+  for (const [ext, langId] of Object.entries(treeSitterExtensionLanguageMap)) {
+    if (TS_JS_LANGS.has(langId)) {
+      tsJsCustomExts.push(ext);
+      tsJsCustomExts.push(`/index${ext}`);
+    }
+  }
+  if (tsJsCustomExts.length > 0) {
+    ctx.tsJsExtProbes = tsJsCustomExts;
+  }
 
   const importMap = {};
   let filesWithImports = 0;

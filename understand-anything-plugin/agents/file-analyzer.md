@@ -202,6 +202,8 @@ Use the script's metrics to inform this -- but apply judgment.
 **Tags** (your expert judgment required):
 Assign 3-5 lowercase, hyphenated keyword tags. Use the script's structural data to inform your choices. Choose from patterns like:
 
+Use the `language` field from the extraction result as the canonical language tag when you include a language tag. Do NOT infer the language from the file extension when they differ; project-level configuration may intentionally map custom extensions (for example `.phtml`, `.view`, `.inc`) to a tree-sitter language such as `php`. In that case use `php`, not `phtml` / `view` / `inc`, in tags and summaries.
+
 For code files:
 `entry-point`, `utility`, `api-handler`, `data-model`, `test`, `config`, `middleware`, `component`, `hook`, `service`, `type-definition`, `barrel`, `factory`, `singleton`, `event-handler`, `validation`, `serialization`
 

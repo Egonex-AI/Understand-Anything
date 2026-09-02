@@ -31,6 +31,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { readTreeSitterExtensionLanguageMap } from './config.mjs';
 
 /**
  * Chunk size for parallel file I/O. Bounded so a 15k-file repo doesn't try
@@ -50,7 +51,13 @@ try {
 } catch {
   core = await import(pathToFileURL(resolve(PLUGIN_ROOT, 'packages/core/dist/index.js')).href);
 }
-const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllParsers, resolveUaDir } = core;
+const {
+  TreeSitterPlugin,
+  PluginRegistry,
+  LanguageRegistry,
+  builtinLanguageConfigs,
+  registerAllParsers,
+} = core;
 
 import Graph from 'graphology';
 import louvain from 'graphology-communities-louvain';
@@ -65,10 +72,24 @@ import louvain from 'graphology-communities-louvain';
 async function extractExports(projectRoot, codeFiles) {
   let registry;
   try {
+    const validLanguageIds = new Set(builtinLanguageConfigs.map((config) => config.id));
+    validLanguageIds.add('tsx');
+    const treeSitterExtensionLanguageMap = readTreeSitterExtensionLanguageMap(
+      projectRoot,
+      { validLanguageIds },
+    );
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
-    const tsPlugin = new TreeSitterPlugin(tsConfigs);
+    const tsPlugin = new TreeSitterPlugin(tsConfigs, undefined, {
+      extensionLanguageMap: treeSitterExtensionLanguageMap,
+    });
     await tsPlugin.init();
-    registry = new PluginRegistry();
+    const languageRegistry = LanguageRegistry.createDefault();
+    for (const [ext, languageId] of Object.entries(treeSitterExtensionLanguageMap)) {
+      // tsx is a synthetic grammar key for tree-sitter selection — it is
+      // NOT a LanguageRegistry id, so map it to typescript.
+      languageRegistry.registerExtensionAlias(ext, languageId === 'tsx' ? 'typescript' : languageId);
+    }
+    registry = new PluginRegistry(languageRegistry);
     registry.register(tsPlugin);
     registerAllParsers(registry);
   } catch (err) {

@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>AI는 사람을 대체하는 것이 아니라, 사람을 도와야 합니다.</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -22,8 +28,11 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/홈페이지-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/라이브_데모-00c853" alt="Live Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
@@ -128,10 +137,30 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 # 지원 언어: en(기본값), zh, zh-TW, ja, ko, ru
 ```
 
+프로젝트에서의 **첫 실행 시** — `--language`를 지정하지 않고 저장된 언어 설정도 없을 때 — `/understand`는 대화에서 사용 중인 언어를 감지합니다. 영어가 아닌 것이 감지되면, 생성 전에 해당 언어를 사용할지 다른 언어로 변경할지 확인합니다. 영어 대화에는 영향이 없습니다. 선택 결과는 `.ua/config.json`에 저장되어 이후 실행에서도 재사용됩니다.
+
+**프로젝트 수준 tree-sitter 확장 별칭:** 코드베이스에서 커스텀 파일 확장자를 사용하는 경우, `.ua/config.json`에 추가할 수 있습니다 (또는 프로젝트가 기존 `.understand-anything/` 디렉토리를 사용 중이라면 해당 디렉토리의 `config.json`):
+
+```json
+{
+  "treeSitter": {
+    "extensionLanguageMap": {
+      ".customts": "typescript",
+      ".custompy": "python"
+    }
+  }
+}
+```
+
+이렇게 하면 `/understand`가 tree-sitter 기반 구조 스캔에서 해당 확장자를 지정된 언어로 처리합니다.
+
 `--language` 매개변수는 다음에 영향합니다:
 - 지식 그래프의 노드 요약과 설명
 - 대시보드 UI의 레이블, 버튼, 툴팁
 - 가이드 투어의 설명
+- `/understand-domain` 출력 (도메인, 흐름, 단계의 이름/요약)
+- `/understand-onboard` 생성된 온보딩 가이드 텍스트
+- `/understand-knowledge` 추론된 엔티티/주장/관계 설명
 
 ### 3. 대시보드 탐색
 
@@ -145,7 +174,7 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 
 ```bash
 # 코드베이스에 대해 무엇이든 질문하기
-/understand-chat How does the payment flow work?
+/understand-chat 결제 흐름은 어떻게 작동하나요?
 
 # 현재 변경 사항의 영향 분석
 /understand-diff
@@ -158,6 +187,15 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 
 # 비즈니스 도메인 지식 추출 (도메인, 흐름, 단계)
 /understand-domain
+
+# 한국어로 도메인 지식 추출 (config.json에도 저장됨)
+/understand-domain --language ko
+
+# 한국어로 온보딩 가이드 생성
+/understand-onboard --language ko
+
+# 한국어로 Karpathy wiki 분석 및 추론된 지식 출력
+/understand-knowledge ~/path/to/wiki --language ko
 
 # Karpathy 패턴 LLM 위키 지식 베이스 분석
 /understand-knowledge ~/path/to/wiki
@@ -185,7 +223,7 @@ Understand-Anything은 다양한 AI 코딩 플랫폼에서 사용할 수 있습�
 /plugin install understand-anything
 ```
 
-### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
 
 **macOS / Linux:**
 ```bash
@@ -203,7 +241,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"* 처럼 자연어로 요청하면 됩니다.
 
-- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
 - 이후 업데이트: `./install.sh --update`
 - 제거: `./install.sh --uninstall <platform>`
 
@@ -255,6 +293,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Hermes | ✅ 지원 | `install.sh hermes` |
 | Cline | ✅ 지원 | `install.sh cline` |
 | KIMI CLI | ✅ 지원 | `install.sh kimi` |
+| Trae | ✅ 지원 | `install.sh trae` |
 | Nanobot | ✅ 지원 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 지원 | `install.sh kiro` |
 
