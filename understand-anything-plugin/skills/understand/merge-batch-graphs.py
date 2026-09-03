@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-merge-batch-graphs.py — Merge and normalize batch analysis results.
+merge-batch-graphs.py, Merge and normalize batch analysis results.
 
 Combines batch-*.json files from the intermediate directory into a single
 assembled graph with normalized IDs, complexity values, and cleaned edges.
@@ -45,7 +45,7 @@ VALID_NODE_PREFIXES = {
 
 # Precompiled once at import time. The previous inline form rebuilt and
 # re-escaped this 24-alternative pattern *string* on every node (the regex
-# cache keys on the final string, so only the compile was cached — the
+# cache keys on the final string, so only the compile was cached, the
 # join + re.escape work was not). Benchmarked ~15x faster on large graphs.
 # The `:`-delimited group + anchoring makes alternation order (and hence the
 # unordered-set iteration order) irrelevant to matching, so hoisting is
@@ -101,7 +101,7 @@ VALID_COMPLEXITY = {"simple", "moderate", "complex"}
 _JS_TS_EXTS: tuple[str, ...] = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue")
 _JS_TS_TEST_EXTS: frozenset[str] = frozenset(_JS_TS_EXTS)
 
-# Mirrored production roots — when a test sits under `tests/`, it might be
+# Mirrored production roots, when a test sits under `tests/`, it might be
 # mirroring `src/`, `app/`, `lib/`, or the project root.
 _MIRROR_PRODUCTION_ROOTS: tuple[str, ...] = ("src", "app", "lib", "")
 
@@ -266,9 +266,9 @@ def normalize_complexity(value: Any) -> tuple[str, str]:
     """Normalize a complexity value. Returns (normalized, status).
 
     status is one of:
-      "valid"    — already a valid value, no change needed
-      "mapped"   — known alias, confidently mapped (goes to Fixed report)
-      "unknown"  — unrecognized value, defaulted to moderate (goes to Could-not-fix report)
+      "valid"   , already a valid value, no change needed
+      "mapped"  , known alias, confidently mapped (goes to Fixed report)
+      "unknown" , unrecognized value, defaulted to moderate (goes to Could-not-fix report)
     """
     if isinstance(value, str):
         lower = value.strip().lower()
@@ -276,7 +276,7 @@ def normalize_complexity(value: Any) -> tuple[str, str]:
             return lower, "valid"
         if lower in COMPLEXITY_MAP:
             return COMPLEXITY_MAP[lower], "mapped"
-        # Unknown string — default but flag it
+        # Unknown string, default but flag it
         return "moderate", "unknown"
     elif isinstance(value, (int, float)):
         n = int(value)
@@ -286,7 +286,7 @@ def normalize_complexity(value: Any) -> tuple[str, str]:
             return "moderate", "mapped"
         else:
             return "complex", "mapped"
-    # None or other type — default but flag it
+    # None or other type, default but flag it
     return "moderate", "unknown"
 
 
@@ -294,17 +294,17 @@ def normalize_complexity(value: Any) -> tuple[str, str]:
 #
 # Two-pass linker. Both passes produce canonical `production → test` edges.
 #
-# Pass 1 — preserve LLM semantics, fix direction.
+# Pass 1, preserve LLM semantics, fix direction.
 #   The LLM sees the relationship only when analyzing a *test* file
 #   (production files don't import their tests), so its emitted direction
 #   is systematically wrong: source = the file it was analyzing = a test.
-#   We do NOT strip these edges — the *pairing* is real evidence (the LLM
+#   We do NOT strip these edges, the *pairing* is real evidence (the LLM
 #   saw an import / using / same-package call). We just flip direction
 #   when source is test + target is production. Edges that are
 #   semantically broken (test↔test, production↔production, orphan endpoints)
 #   are dropped.
 #
-# Pass 2 — supplement with path-convention pairings.
+# Pass 2, supplement with path-convention pairings.
 #   For test files the LLM didn't link to anything, fall back to filename
 #   conventions (sibling `_test.go`, JS/TS `__tests__/`, Maven `src/test/`,
 #   etc.) to find a production counterpart. Pairs already covered by
@@ -403,7 +403,7 @@ def production_candidates(test_path: str) -> list[str]:
             for c in _js_ts_sibling_candidates(dir_path, base_stem):
                 _add_unique(candidates, c)
 
-            # 2. Walk out of test-segregating subdir — drop the trailing
+            # 2. Walk out of test-segregating subdir, drop the trailing
             # __tests__/test/spec/tests segment. Some JS/TS projects use
             # `<dir>/test/foo.spec.ts` or `<dir>/spec/foo.spec.ts` instead of
             # the more idiomatic `__tests__/`; treat them the same.
@@ -566,15 +566,36 @@ def production_candidates(test_path: str) -> list[str]:
     return candidates
 
 
+# Node ID prefixes that stand for a whole file, mirroring the `fileLevelTypes`
+# set the skill's Phase 6 validator uses (SKILL.md). Every one of these carries
+# a project-relative path in its ID, so any of them can sit on either end of a
+# `tested_by` edge. Sub-file and logical types (`function`, `class`, `module`,
+# `concept`) have no single path and stay out.
+_FILE_LEVEL_PREFIXES: frozenset[str] = frozenset({
+    "file", "config", "document", "service",
+    "pipeline", "table", "schema", "resource", "endpoint",
+})
+
+# `table:` and `endpoint:` IDs are `<prefix>:<relative-path>:<name>` (SKILL.md
+# schema reference), so the trailing name has to come off before what is left
+# is a path. The other file-level prefixes are `<prefix>:<relative-path>`.
+_NAMED_FILE_LEVEL_PREFIXES: frozenset[str] = frozenset({"table", "endpoint"})
+
+
 def _file_node_path(node: dict[str, Any]) -> str | None:
-    """Return the relative project path for a `file:`-prefixed node, else None."""
+    """Return the relative project path for a file-level node, else None."""
     nid = node.get("id", "")
-    if not isinstance(nid, str) or not nid.startswith("file:"):
+    if not isinstance(nid, str):
+        return None
+    prefix, sep, rest = nid.partition(":")
+    if not sep or prefix not in _FILE_LEVEL_PREFIXES:
         return None
     fp = node.get("filePath")
     if isinstance(fp, str) and fp:
         return fp
-    return nid[len("file:"):]
+    if prefix in _NAMED_FILE_LEVEL_PREFIXES and ":" in rest:
+        rest = rest.rsplit(":", 1)[0]
+    return rest or None
 
 
 def _swap_tested_by_in_place(
@@ -600,7 +621,7 @@ def _ensure_tested_tag(node: dict[str, Any]) -> bool:
     fresh list. Returns True if the tag was newly added.
 
     `tags` from raw LLM batch JSON may be missing, None, a string, or
-    another non-list value — the TypeScript autoFixGraph normalizer that
+    another non-list value, the TypeScript autoFixGraph normalizer that
     handles this runs downstream of this script, so we defend here.
     """
     tags = node.get("tags")
@@ -626,8 +647,8 @@ def link_tests(
          (production → test) edges as-is. Flip inverted (test → production)
          edges so the swap preserves the LLM's pairing evidence with the
          right direction. Drop edges that don't classify cleanly as
-         file ↔ file or where one endpoint is missing — they have no
-         recoverable meaning.
+         file-level ↔ file-level or where one endpoint is missing, they
+         have no recoverable meaning.
       2. For every test file not yet paired by Pass 1, walk path-convention
          candidates and emit a fresh `production → test` edge for the first
          match.
@@ -646,10 +667,10 @@ def link_tests(
       swapped: pre-existing `tested_by` edges flipped (test → production
                became production → test)
     """
-    # ── Index file nodes by relative path; classify each as test/production.
-    # `is_prod` here means "is a known file node AND is not a test by
-    # path convention" — used both to validate edge endpoints and to drive
-    # path-convention candidate matching.
+    # ── Index file-level nodes by relative path; classify each as
+    # test/production. `is_prod` here means "is a known file-level node AND
+    # is not a test by path convention", used both to validate edge
+    # endpoints and to drive path-convention candidate matching.
     file_paths_to_nodes: dict[str, dict[str, Any]] = {}
     node_id_to_classification: dict[str, str] = {}  # id → "test" | "prod"
     test_nodes: list[tuple[str, dict[str, Any]]] = []
@@ -666,12 +687,12 @@ def link_tests(
 
     # ── Pass 1: walk existing tested_by edges, canonicalize or drop.
     # `covered` tracks (production_id, test_id) pairs that have a kept edge
-    # after this pass — used both to deduplicate within Pass 1 and to
+    # after this pass, used both to deduplicate within Pass 1 and to
     # suppress duplicate supplements in Pass 2.
     # `pair_to_idx` maps each kept pair to its slot in the compacted edges
     # list, so a duplicate that arrives later with a higher weight can
     # replace the earlier slot in place (mirrors Step 6's
-    # `weight > existing.weight` rule — without this, a 0.3-weight edge
+    # `weight > existing.weight` rule, without this, a 0.3-weight edge
     # from batch 1 would silently outrank a 0.9-weight edge from batch 2
     # because Step 6 only ever sees one of them).
     # `swapped_pairs` records which surviving pairs came from a flipped
@@ -693,9 +714,9 @@ def link_tests(
         src_class = node_id_to_classification.get(src)
         tgt_class = node_id_to_classification.get(tgt)
 
-        # Both endpoints must be known file nodes; one test, one production.
-        # Anything else (orphan, test↔test, prod↔prod, non-file endpoint)
-        # has no recoverable meaning — drop it.
+        # Both endpoints must be known file-level nodes; one test, one
+        # production. Anything else (orphan, test↔test, prod↔prod, sub-file
+        # or logical endpoint) has no recoverable meaning, drop it.
         if (src_class, tgt_class) == ("prod", "test"):
             pair = (src, tgt)
             needs_swap = False
@@ -713,18 +734,18 @@ def link_tests(
             existing_idx = pair_to_idx[pair]
             existing = edges[existing_idx]
             if _num(edge.get("weight", 0)) > _num(existing.get("weight", 0)):
-                # Heavier — replace existing slot. Apply the swap (or not)
+                # Heavier, replace existing slot. Apply the swap (or not)
                 # only on the survivor, so we never spend cycles canonicalizing
                 # an edge we're about to drop.
                 if needs_swap:
                     _swap_tested_by_in_place(edge, src, tgt)
                     swapped_pairs.add(pair)
                 else:
-                    # Replacement is canonical — if the previous winner came
+                    # Replacement is canonical, if the previous winner came
                     # from a swap, the surviving slot is no longer a swap.
                     swapped_pairs.discard(pair)
                 edges[existing_idx] = edge
-            # else: existing is heavier or equal — keep it, drop the new edge.
+            # else: existing is heavier or equal, keep it, drop the new edge.
             dropped += 1
             continue
 
@@ -899,7 +920,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
     report: list[str] = []
     report.append(f"Input: {total_input_nodes} nodes, {total_input_edges} edges")
 
-    # Fixed section — grouped by pattern
+    # Fixed section, grouped by pattern
     fixed_lines: list[str] = []
     if id_fix_patterns:
         for pattern, count in id_fix_patterns.most_common():
@@ -929,7 +950,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         report.append(f"Fixed ({total_fixes} corrections):")
         report.extend(fixed_lines)
 
-    # Tested-by linker section — separate from Fixed since these are net-new
+    # Tested-by linker section, separate from Fixed since these are net-new
     # additions, not corrections.
     if tested_by_added or tested_by_tagged:
         report.append("")
@@ -937,7 +958,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
         report.append(f"  {tested_by_added:>4} × tested_by edges produced (path-convention supplement, production → test)")
         report.append(f"  {tested_by_tagged:>4} × production nodes tagged \"tested\"")
 
-    # Could not fix section — unknown patterns (grouped) + individual details
+    # Could not fix section, unknown patterns (grouped) + individual details
     unfixable_total = (
         len(unfixable)
         + sum(complexity_unknown_patterns.values())
@@ -945,7 +966,7 @@ def merge_and_normalize(batches: list[dict[str, Any]]) -> tuple[dict[str, Any], 
     )
     if unfixable_total:
         report.append("")
-        report.append(f"Could not fix ({unfixable_total} issues — needs agent review):")
+        report.append(f"Could not fix ({unfixable_total} issues, needs agent review):")
         # Unknown node types (grouped by count)
         for ntype, count in unknown_node_types.most_common():
             report.append(f"  {count:>4} × unknown node type \"{ntype}\" (not in schema, kept as-is)")
@@ -984,16 +1005,16 @@ def recover_imports_from_scan(
     Returns (recovered_count, report_lines).
     """
     if not scan_result_path.is_file():
-        return 0, [f"  importMap recovery skipped — {scan_result_path.name} not found"]
+        return 0, [f"  importMap recovery skipped, {scan_result_path.name} not found"]
 
     try:
         scan = json.loads(scan_result_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
-        return 0, [f"  importMap recovery skipped — could not parse {scan_result_path.name}: {e}"]
+        return 0, [f"  importMap recovery skipped, could not parse {scan_result_path.name}: {e}"]
 
     import_map = scan.get("importMap")
     if not isinstance(import_map, dict):
-        return 0, [f"  importMap recovery skipped — no importMap field in {scan_result_path.name}"]
+        return 0, [f"  importMap recovery skipped, no importMap field in {scan_result_path.name}"]
 
     # Build the set of file: node ids actually present in the assembled graph.
     file_node_ids: set[str] = set()
@@ -1087,7 +1108,7 @@ def main() -> None:
     # files from multi-part file-analyzer outputs. Files that don't match the
     # `batch-existing.json` / `batch-<N>.json` / `batch-<N>-part-<K>.json`
     # pattern (e.g. fused `batch-fused-8-13.json`, range `batch-8-13.json`)
-    # would otherwise be silently dropped during load — flag them loudly
+    # would otherwise be silently dropped during load, flag them loudly
     # instead so the user can fix the file-analyzer agent.
     from collections import defaultdict as _dd
     by_batch = _dd(list)
@@ -1109,8 +1130,8 @@ def main() -> None:
         )
         print(
             f"Warning: merge-batch-graphs: {len(unrecognized_batch_files)} "
-            f"batch file(s) with unrecognized filenames will be DROPPED — "
-            f"files: {preview}{suffix} — fix the file-analyzer agent to use "
+            f"batch file(s) with unrecognized filenames will be DROPPED, "
+            f"files: {preview}{suffix}, fix the file-analyzer agent to use "
             f"only batch-<N>.json or batch-<N>-part-<K>.json patterns",
             file=sys.stderr,
         )
@@ -1125,7 +1146,7 @@ def main() -> None:
 
     # Missing-part detection: for any logical batch with parts (len > 1), the
     # set of part numbers MUST be contiguous starting at 1. Gaps suggest a
-    # truncated write — emit a visible warning so the user can investigate.
+    # truncated write, emit a visible warning so the user can investigate.
     # Collect into `missing_part_warnings` so they also surface in the final
     # phase report; stderr alone gets buried under the per-batch load lines.
     missing_part_warnings: list[str] = []
@@ -1139,13 +1160,13 @@ def main() -> None:
         if missing:
             msg = (
                 f"batch {idx} has parts {sorted(present)} but "
-                f"missing part {missing} — possible truncated write — "
+                f"missing part {missing}, possible truncated write, "
                 f"affected nodes/edges may be lost"
             )
             print(f"Warning: merge: {msg}", file=sys.stderr)
             missing_part_warnings.append(msg)
 
-    # Load batches — skip unrecognized filenames so they don't pollute the
+    # Load batches, skip unrecognized filenames so they don't pollute the
     # merged graph with content the agent labeled incorrectly.
     unrecognized_set = set(unrecognized_batch_files)
     batches: list[dict[str, Any]] = []
@@ -1160,11 +1181,11 @@ def main() -> None:
             e = len(batch.get("edges", []))
             print(f"  {f.name}: {n} nodes, {e} edges", file=sys.stderr)
             # A file that parses but contributes nothing is how a silent
-            # partial merge looks from the outside (see #484) — flag it
+            # partial merge looks from the outside (see #484), flag it
             # loudly instead of relying on a downstream reviewer to notice.
             if n == 0 and e == 0:
                 msg = (
-                    f"{f.name} loaded but contributed 0 nodes and 0 edges — "
+                    f"{f.name} loaded but contributed 0 nodes and 0 edges, "
                     f"either the analyzer wrote an empty batch or the file "
                     f"was read mid-write; inspect it directly"
                 )
@@ -1180,20 +1201,20 @@ def main() -> None:
 
     # Surface missing multi-part files to the phase report (parallel to
     # unrecognized-filename handling below). Stderr lines emitted during
-    # batch discovery get buried under per-batch load output — re-emitting
+    # batch discovery get buried under per-batch load output, re-emitting
     # via the report list ensures the Phase 4 review and final summary see
     # the data-loss signal.
     if missing_part_warnings:
         report.append("")
         report.append(
             f"Warning: {len(missing_part_warnings)} batch(es) with missing parts "
-            f"— some nodes/edges silently dropped:"
+            f", some nodes/edges silently dropped:"
         )
         for w in missing_part_warnings:
             report.append(f"  - {w}")
 
     # Surface empty-contribution batches to the phase report (same rationale
-    # as missing_part_warnings above — stderr alone gets buried).
+    # as missing_part_warnings above, stderr alone gets buried).
     if empty_batch_warnings:
         report.append("")
         report.append(
@@ -1215,7 +1236,7 @@ def main() -> None:
         report.append("")
         report.append(
             f"Warning: dropped {len(unrecognized_batch_files)} batch file(s) "
-            f"with unrecognized filenames — files: {preview}{suffix} — "
+            f"with unrecognized filenames, files: {preview}{suffix}, "
             f"fix the file-analyzer agent to use only batch-<N>.json or "
             f"batch-<N>-part-<K>.json patterns (every node/edge in these "
             f"files was excluded from the final graph)"
