@@ -54,6 +54,7 @@ describe("CSharpExtractor", () => {
       expect(result.functions).toHaveLength(2);
 
       expect(result.functions[0].name).toBe("GetName");
+      expect(result.functions[0].kind).toBe("method");
       expect(result.functions[0].params).toEqual(["id"]);
       expect(result.functions[0].returnType).toBe("string");
 
@@ -78,6 +79,7 @@ describe("CSharpExtractor", () => {
 
       expect(result.functions).toHaveLength(1);
       expect(result.functions[0].name).toBe("Foo");
+      expect(result.functions[0].kind).toBe("constructor");
       expect(result.functions[0].params).toEqual(["name", "value"]);
       expect(result.functions[0].returnType).toBeUndefined();
 
@@ -298,6 +300,51 @@ namespace App {
 
       expect(result.imports[0].lineNumber).toBe(1);
       expect(result.imports[1].lineNumber).toBe(3);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("preserves alias, static, global, and namespace-scoped using metadata", () => {
+      const { tree, parser, root } = parse(`global using System;
+using static System.Math;
+using Repo = App.Repositories;
+namespace App.Services {
+    using App.Repositories;
+    public class Service {}
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        {
+          source: "System",
+          specifiers: ["System"],
+          lineNumber: 1,
+          kind: "namespace",
+          isGlobal: true,
+        },
+        {
+          source: "System.Math",
+          specifiers: ["Math"],
+          lineNumber: 2,
+          kind: "static",
+        },
+        {
+          source: "App.Repositories",
+          specifiers: ["Repositories"],
+          lineNumber: 3,
+          kind: "alias",
+          alias: "Repo",
+        },
+        {
+          source: "App.Repositories",
+          specifiers: ["Repositories"],
+          lineNumber: 5,
+          kind: "namespace",
+          namespace: "App.Services",
+        },
+      ]);
 
       tree.delete();
       parser.delete();
@@ -587,10 +634,10 @@ namespace App.Services
 `);
       const result = extractor.extractStructure(root);
 
-      // Functions: UserService (constructor), GetUsers, Log
-      expect(result.functions).toHaveLength(3);
+      // Functions: UserService (constructor), GetUsers, Log, and interface signatures
+      expect(result.functions).toHaveLength(5);
       expect(result.functions.map((f) => f.name).sort()).toEqual(
-        ["GetUsers", "Log", "UserService"].sort(),
+        ["FindAll", "FindById", "GetUsers", "Log", "UserService"].sort(),
       );
 
       // Constructor has params but no return type
@@ -697,6 +744,102 @@ describe("CSharpExtractor - modern type declarations", () => {
 
     expect(result.classes.some((c) => c.name === "Point")).toBe(true);
     expect(result.exports.some((e) => e.name === "Point")).toBe(true);
+
+    tree.delete();
+    parser.delete();
+  });
+
+  it("preserves namespace, declaration kind, base types, and primary constructor params", () => {
+    const { tree, parser, root } = parse(`using App.Repositories;
+namespace App.Services;
+
+public sealed class Service(IRepository repository) : BaseService, IService
+{
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    const service = result.classes.find((c) => c.name === "Service");
+    expect(service).toBeDefined();
+    expect(service!.kind).toBe("class");
+    expect(service!.namespace).toBe("App.Services");
+    expect(service!.fullName).toBe("App.Services.Service");
+    expect(service!.baseTypes).toEqual(["BaseService", "IService"]);
+    expect(service!.primaryConstructorParams).toEqual([
+      { name: "repository", type: "IRepository" },
+    ]);
+
+    tree.delete();
+    parser.delete();
+  });
+
+  it("preserves block and nested namespaces", () => {
+    const { tree, parser, root } = parse(`namespace Outer {
+  namespace Inner {
+    public interface IService { }
+  }
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    const service = result.classes.find((c) => c.name === "IService");
+    expect(service).toBeDefined();
+    expect(service!.namespace).toBe("Outer.Inner");
+    expect(service!.fullName).toBe("Outer.Inner.IService");
+    expect(service!.kind).toBe("interface");
+
+    tree.delete();
+    parser.delete();
+  });
+
+  it("preserves typed method parameters and typed fields", () => {
+    const { tree, parser, root } = parse(`namespace App;
+
+public class Service
+{
+    private readonly IRepository _repository;
+    private static readonly ICache Cache;
+    public void Run(IRepository repository) { }
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    const service = result.classes.find((c) => c.name === "Service");
+    expect(service).toBeDefined();
+    expect(service!.fields).toEqual([
+      { name: "_repository", type: "IRepository" },
+      { name: "Cache", type: "ICache", isStatic: true },
+    ]);
+
+    const run = result.functions.find((fn) => fn.name === "Run");
+    expect(run).toBeDefined();
+    expect(run!.params).toEqual(["repository"]);
+    expect(run!.kind).toBe("method");
+    expect(run!.typedParams).toEqual([
+      { name: "repository", type: "IRepository" },
+    ]);
+
+    tree.delete();
+    parser.delete();
+  });
+
+  it("emits interface methods as function nodes", () => {
+    const { tree, parser, root } = parse(`namespace App;
+
+public interface IService
+{
+    Task RunAsync(int id);
+}
+`);
+    const result = extractor.extractStructure(root);
+
+    const service = result.classes.find((c) => c.name === "IService");
+    expect(service).toBeDefined();
+    expect(service!.methods).toEqual(["RunAsync"]);
+    const run = result.functions.find((fn) => fn.name === "RunAsync");
+    expect(run).toBeDefined();
+    expect(run!.returnType).toBe("Task");
+    expect(run!.typedParams).toEqual([{ name: "id", type: "int" }]);
 
     tree.delete();
     parser.delete();

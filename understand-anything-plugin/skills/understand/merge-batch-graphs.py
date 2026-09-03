@@ -1058,6 +1058,870 @@ def recover_imports_from_scan(
     return recovered, lines
 
 
+# ── Deterministic C# linker from extraction artifacts ─────────────────────
+
+_CS_BUILTIN_TYPES = {
+    "bool", "byte", "sbyte", "char", "decimal", "double", "float",
+    "int", "uint", "long", "ulong", "object", "short", "ushort",
+    "string", "void", "dynamic",
+}
+
+_CS_MEMBER_CALL_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)$")
+_CS_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _cs_line_range(entry: dict[str, Any]) -> tuple[int, int] | None:
+    start = entry.get("startLine")
+    end = entry.get("endLine")
+    if isinstance(start, int) and isinstance(end, int):
+        return start, end
+    rng = entry.get("lineRange")
+    if (
+        isinstance(rng, list)
+        and len(rng) == 2
+        and isinstance(rng[0], int)
+        and isinstance(rng[1], int)
+    ):
+        return rng[0], rng[1]
+    return None
+
+
+def _cs_strip_type(type_text: Any) -> str:
+    out = str(type_text or "").strip()
+    while out.endswith("?"):
+        out = out[:-1].strip()
+    while out.endswith("[]"):
+        out = out[:-2].strip()
+    generic_start = out.find("<")
+    if generic_start != -1:
+        out = out[:generic_start].strip()
+    return out
+
+
+def _cs_dir_of(path: str) -> str:
+    return path.rsplit("/", 1)[0] if "/" in path else ""
+
+
+def _cs_is_project_path(path: str) -> bool:
+    return path.lower().endswith(".csproj")
+
+
+def _cs_project_dirs(paths: list[str]) -> list[str]:
+    return sorted({_cs_dir_of(path) for path in paths if _cs_is_project_path(path)})
+
+
+def _cs_path_inside_dir(path: str, directory: str) -> bool:
+    return directory == "" or path == directory or path.startswith(f"{directory}/")
+
+
+def _cs_project_key_for_path(file_path: str, project_dirs: list[str]) -> str | None:
+    if len(project_dirs) <= 1:
+        return project_dirs[0] if project_dirs else "__implicit_csharp_project__"
+    matches = [
+        directory
+        for directory in project_dirs
+        if _cs_path_inside_dir(file_path, directory)
+    ]
+    if not matches:
+        return None
+    return sorted(matches, key=lambda directory: (-len(directory.split("/")), directory))[0]
+
+
+def _cs_project_paths_from_assembled(assembled: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    for node in assembled.get("nodes", []):
+        if not isinstance(node, dict):
+            continue
+        path = node.get("filePath")
+        if not isinstance(path, str) or not path:
+            node_id = node.get("id")
+            if isinstance(node_id, str) and node_id.startswith("file:"):
+                path = node_id[len("file:"):]
+        if isinstance(path, str) and _cs_is_project_path(path):
+            paths.append(path)
+    return paths
+
+
+def _load_csharp_extract_results(tmp_dir: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    if not tmp_dir.is_dir():
+        return [], []
+
+    results: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    for path in sorted(tmp_dir.glob("ua-file-extract-results-*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            warnings.append(f"  Skipped {path.name}: {e}")
+            continue
+        entries = data.get("results")
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if isinstance(entry, dict) and entry.get("language") == "csharp":
+                results.append(entry)
+    return results, warnings
+
+
+def _cs_build_indexes(
+    results: list[dict[str, Any]],
+    project_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    files: dict[str, dict[str, Any]] = {}
+    full_name_index: dict[str, list[dict[str, Any]]] = {}
+    project_dirs = _cs_project_dirs(
+        [result.get("path", "") for result in results if isinstance(result.get("path"), str)]
+        + (project_paths or [])
+    )
+
+    for result in results:
+        file_path = result.get("path")
+        if not isinstance(file_path, str) or not file_path:
+            continue
+        imports = []
+        for imp in result.get("imports", []):
+            if not isinstance(imp, dict) or not isinstance(imp.get("source"), str):
+                continue
+            imports.append({
+                "source": imp.get("source"),
+                "kind": imp.get("kind", "namespace"),
+                "namespace": imp.get("namespace", ""),
+                "isGlobal": imp.get("isGlobal") is True,
+            })
+        file_info = {
+            "path": file_path,
+            "imports": imports,
+            "classes": [],
+            "classNameCounts": Counter(),
+            "functions": [],
+            "functionNameCounts": Counter(),
+            "callGraph": result.get("callGraph", [])
+            if isinstance(result.get("callGraph"), list)
+            else [],
+        }
+        files[file_path] = file_info
+
+        for raw_fn in result.get("functions", []) or []:
+            if not isinstance(raw_fn, dict):
+                continue
+            rng = _cs_line_range(raw_fn)
+            if rng is None or not isinstance(raw_fn.get("name"), str):
+                continue
+            fn = dict(raw_fn)
+            fn["lineRange"] = rng
+            file_info["functions"].append(fn)
+            file_info["functionNameCounts"][fn["name"]] += 1
+
+        for raw_cls in result.get("classes", []) or []:
+            if not isinstance(raw_cls, dict):
+                continue
+            rng = _cs_line_range(raw_cls)
+            name = raw_cls.get("name")
+            if rng is None or not isinstance(name, str):
+                continue
+            namespace = raw_cls.get("namespace") if isinstance(raw_cls.get("namespace"), str) else ""
+            full_name = raw_cls.get("fullName") if isinstance(raw_cls.get("fullName"), str) else ""
+            if not full_name:
+                full_name = f"{namespace}.{name}" if namespace else name
+            cls = dict(raw_cls)
+            cls["lineRange"] = rng
+            cls["namespace"] = namespace
+            cls["fullName"] = full_name
+            cls["filePath"] = file_path
+            file_info["classes"].append(cls)
+            file_info["classNameCounts"][name] += 1
+            full_name_index.setdefault(full_name, []).append(cls)
+
+    global_using_namespaces_by_project: dict[str, list[str]] = {}
+    global_using_namespace_sets: dict[str, set[str]] = {}
+    for file_info in files.values():
+        project_key = _cs_project_key_for_path(file_info["path"], project_dirs)
+        if project_key is None:
+            continue
+        namespace_set = global_using_namespace_sets.setdefault(project_key, set())
+        for imp in file_info["imports"]:
+            if (
+                imp.get("isGlobal") is True
+                and imp.get("kind", "namespace") == "namespace"
+                and isinstance(imp.get("source"), str)
+                and imp.get("source")
+            ):
+                namespace_set.add(imp["source"])
+    for project_key, namespaces in global_using_namespace_sets.items():
+        global_using_namespaces_by_project[project_key] = sorted(namespaces)
+
+    return {
+        "files": files,
+        "fullNameIndex": full_name_index,
+        "projectDirs": project_dirs,
+        "globalUsingNamespacesByProject": global_using_namespaces_by_project,
+    }
+
+
+def _cs_resolve_type(
+    type_text: Any,
+    namespace: str,
+    using_namespaces: list[str],
+    indexes: dict[str, Any],
+) -> tuple[str, dict[str, Any] | None]:
+    type_name = _cs_strip_type(type_text)
+    if not type_name or type_name in _CS_BUILTIN_TYPES:
+        return "unresolved", None
+
+    candidates: list[str]
+    if "." in type_name:
+        candidates = [type_name]
+    else:
+        candidates = [f"{namespace}.{type_name}" if namespace else type_name]
+        candidates.extend(f"{using_namespace}.{type_name}" for using_namespace in using_namespaces)
+
+    matches: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for candidate in candidates:
+        for decl in indexes["fullNameIndex"].get(candidate, []):
+            key = (decl.get("fullName", ""), decl.get("filePath", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            matches.append(decl)
+
+    if len(matches) == 1:
+        return "resolved", matches[0]
+    if len(matches) > 1:
+        return "ambiguous", None
+    return "unresolved", None
+
+
+def _cs_using_applies_to_namespace(using_entry: dict[str, Any], namespace: str) -> bool:
+    using_namespace = using_entry.get("namespace") if isinstance(using_entry.get("namespace"), str) else ""
+    if not using_namespace:
+        return True
+    return namespace == using_namespace or namespace.startswith(f"{using_namespace}.")
+
+
+def _cs_using_namespaces_for(
+    file_info: dict[str, Any],
+    namespace: str,
+    indexes: dict[str, Any],
+) -> list[str]:
+    project_key = _cs_project_key_for_path(file_info["path"], indexes.get("projectDirs", []))
+    global_namespaces = (
+        indexes.get("globalUsingNamespacesByProject", {}).get(project_key, [])
+        if project_key is not None
+        else []
+    )
+    namespaces: set[str] = set(global_namespaces)
+    for imp in file_info.get("imports", []):
+        if not isinstance(imp, dict):
+            continue
+        if imp.get("isGlobal") is True:
+            continue
+        if imp.get("kind", "namespace") != "namespace":
+            continue
+        source = imp.get("source")
+        if not isinstance(source, str) or not source:
+            continue
+        if not _cs_using_applies_to_namespace(imp, namespace):
+            continue
+        namespaces.add(source)
+    return sorted(namespaces)
+
+
+def _cs_target_method_function(
+    target_class: dict[str, Any],
+    method_name: str,
+    indexes: dict[str, Any],
+) -> tuple[str, dict[str, Any] | None]:
+    file_path = target_class.get("filePath", "")
+    file_info = indexes["files"].get(file_path)
+    if file_info is None:
+        return "missing", None
+
+    matches = [
+        fn for fn in file_info["functions"]
+        if fn.get("name") == method_name
+        and target_class["lineRange"][0] <= fn["lineRange"][0] <= target_class["lineRange"][1]
+    ]
+    if not matches:
+        return "missing", None
+    if len(matches) != 1:
+        return "ambiguous", None
+    if file_info["functionNameCounts"].get(method_name, 0) != 1:
+        return "ambiguous", None
+    return "resolved", matches[0]
+
+
+def _cs_declared_dependency_types(
+    cls: dict[str, Any],
+    file_info: dict[str, Any],
+) -> list[str]:
+    references: list[str] = []
+
+    def append_types(entries: Any) -> None:
+        if not isinstance(entries, list):
+            return
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            type_text = entry.get("type")
+            if isinstance(type_text, str) and type_text:
+                references.append(type_text)
+
+    append_types(cls.get("primaryConstructorParams"))
+
+    class_name = cls.get("name", "")
+    for function in file_info["functions"]:
+        if not (
+            cls["lineRange"][0]
+            <= function["lineRange"][0]
+            <= cls["lineRange"][1]
+        ):
+            continue
+        function_kind = function.get("kind")
+        is_constructor = function_kind == "constructor" or (
+            function_kind is None and function.get("name") == class_name
+        )
+        if is_constructor:
+            append_types(function.get("typedParams"))
+
+    instance_fields = [
+        field for field in cls.get("fields", []) or []
+        if isinstance(field, dict) and field.get("isStatic") is not True
+    ]
+    append_types(instance_fields)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for reference in references:
+        normalized = _cs_strip_type(reference)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique.append(reference)
+    return unique
+
+
+def _cs_add_edge(
+    edges: list[dict[str, Any]],
+    existing: set[tuple[str, str, str]],
+    source: str,
+    target: str,
+    edge_type: str,
+    weight: float,
+) -> bool:
+    if source == target:
+        return False
+    key = (source, target, edge_type)
+    if key in existing:
+        return False
+    edges.append({
+        "source": source,
+        "target": target,
+        "type": edge_type,
+        "direction": "forward",
+        "weight": weight,
+        "deterministic": True,
+    })
+    existing.add(key)
+    return True
+
+
+def _cs_synthesized_complexity(line_range: tuple[int, int]) -> str:
+    line_count = max(1, line_range[1] - line_range[0] + 1)
+    if line_count <= 10:
+        return "simple"
+    if line_count <= 50:
+        return "moderate"
+    return "complex"
+
+
+def _cs_ensure_endpoint_node(
+    assembled: dict[str, Any],
+    node_ids: set[str],
+    existing_edges: set[tuple[str, str, str]],
+    node_type: str,
+    file_path: str,
+    name: str,
+    line_range: tuple[int, int],
+    summary: str,
+    tags: list[str],
+    stats: dict[str, int],
+) -> str:
+    node_id = f"{node_type}:{file_path}:{name}"
+    if node_id in node_ids:
+        return node_id
+
+    assembled["nodes"].append({
+        "id": node_id,
+        "type": node_type,
+        "name": name,
+        "filePath": file_path,
+        "lineRange": [line_range[0], line_range[1]],
+        "summary": summary,
+        "tags": tags + ["auto-linked"],
+        "complexity": _cs_synthesized_complexity(line_range),
+        "deterministic": True,
+    })
+    node_ids.add(node_id)
+    stats[f"{node_type}NodesSynthesized"] += 1
+
+    file_id = f"file:{file_path}"
+    if file_id in node_ids:
+        if _cs_add_edge(
+            assembled["edges"], existing_edges, file_id, node_id, "contains", 1.0
+        ):
+            stats["containsEdgesAdded"] += 1
+    else:
+        stats["synthesizedEndpointsMissingFileNode"] += 1
+    return node_id
+
+
+def _cs_has_unique_class_endpoint(
+    cls: dict[str, Any],
+    indexes: dict[str, Any],
+) -> bool:
+    file_path = cls.get("filePath", "")
+    name = cls.get("name", "")
+    file_info = indexes["files"].get(file_path)
+    return not (
+        file_info is None
+        or not isinstance(name, str)
+        or not name
+        or file_info["classNameCounts"].get(name, 0) != 1
+    )
+
+
+def _cs_ensure_class_endpoint(
+    assembled: dict[str, Any],
+    node_ids: set[str],
+    existing_edges: set[tuple[str, str, str]],
+    cls: dict[str, Any],
+    stats: dict[str, int],
+) -> str:
+    file_path = cls.get("filePath", "")
+    name = cls.get("name", "")
+
+    kind = cls.get("kind") if isinstance(cls.get("kind"), str) else "type"
+    full_name = cls.get("fullName") if isinstance(cls.get("fullName"), str) else name
+    return _cs_ensure_endpoint_node(
+        assembled,
+        node_ids,
+        existing_edges,
+        "class",
+        file_path,
+        name,
+        cls["lineRange"],
+        f"C# {kind} {full_name}.",
+        ["csharp", kind],
+        stats,
+    )
+
+
+def _cs_ensure_function_endpoint(
+    assembled: dict[str, Any],
+    node_ids: set[str],
+    existing_edges: set[tuple[str, str, str]],
+    function: dict[str, Any],
+    containing_class: dict[str, Any],
+    file_path: str,
+    stats: dict[str, int],
+) -> str:
+    name = function.get("name", "")
+    class_name = containing_class.get("fullName") or containing_class.get("name") or "type"
+    return _cs_ensure_endpoint_node(
+        assembled,
+        node_ids,
+        existing_edges,
+        "function",
+        file_path,
+        name,
+        function["lineRange"],
+        f"C# method {class_name}.{name}.",
+        ["csharp", "method"],
+        stats,
+    )
+
+
+def link_csharp_deterministic_edges(
+    assembled: dict[str, Any],
+    tmp_dir: Path,
+) -> tuple[dict[str, int], list[str]]:
+    """Add C# edges and synthesize uniquely proven endpoints from extraction output."""
+    results, warnings = _load_csharp_extract_results(tmp_dir)
+    stats = {
+        "filesScanned": len(results),
+        "classNodesSynthesized": 0,
+        "functionNodesSynthesized": 0,
+        "containsEdgesAdded": 0,
+        "synthesizedEndpointsMissingFileNode": 0,
+        "identifierMemberCalls": 0,
+        "receiverTypesFound": 0,
+        "receiverTypesResolved": 0,
+        "targetMethodsResolved": 0,
+        "callsAdded": 0,
+        "callsSkipped": 0,
+        "callsNoContainingFunction": 0,
+        "callsAmbiguousContainingFunction": 0,
+        "callsNoContainingClass": 0,
+        "callsAmbiguousContainingClass": 0,
+        "callsAmbiguousCallerId": 0,
+        "callsNoReceiverType": 0,
+        "callsReceiverTypeUnresolved": 0,
+        "callsReceiverTypeAmbiguous": 0,
+        "callsTargetMethodMissing": 0,
+        "callsTargetMethodAmbiguous": 0,
+        "callsUnsupportedCallee": 0,
+        "baseTypesScanned": 0,
+        "inheritanceAdded": 0,
+        "inheritanceSkipped": 0,
+        "inheritanceTypeUnresolved": 0,
+        "inheritanceTypeAmbiguous": 0,
+        "inheritanceEndpointAmbiguous": 0,
+        "inheritanceKindUnsupported": 0,
+        "declaredDependenciesScanned": 0,
+        "dependsOnAdded": 0,
+        "dependsOnSkipped": 0,
+        "dependsOnTypeUnresolved": 0,
+        "dependsOnTypeAmbiguous": 0,
+        "dependsOnEndpointAmbiguous": 0,
+        "dependsOnSelfReference": 0,
+    }
+    if not results:
+        return stats, warnings
+
+    indexes = _cs_build_indexes(results, _cs_project_paths_from_assembled(assembled))
+    node_ids = {
+        node.get("id")
+        for node in assembled.get("nodes", [])
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
+    existing_edges = {
+        (edge.get("source", ""), edge.get("target", ""), edge.get("type", ""))
+        for edge in assembled.get("edges", [])
+        if isinstance(edge, dict)
+    }
+
+    def skip_call(reason: str) -> None:
+        stats["callsSkipped"] += 1
+        stats[reason] += 1
+
+    def skip_inheritance(reason: str) -> None:
+        stats["inheritanceSkipped"] += 1
+        stats[reason] += 1
+
+    def skip_dependency(reason: str) -> None:
+        stats["dependsOnSkipped"] += 1
+        stats[reason] += 1
+
+    for file_path in sorted(indexes["files"]):
+        file_info = indexes["files"][file_path]
+        for cls in sorted(
+            file_info["classes"],
+            key=lambda item: (item["lineRange"][0], item.get("name", "")),
+        ):
+            source_kind = cls.get("kind")
+            using_namespaces = _cs_using_namespaces_for(file_info, cls.get("namespace", ""), indexes)
+            for base_type in cls.get("baseTypes", []) or []:
+                stats["baseTypesScanned"] += 1
+                status, target = _cs_resolve_type(
+                    base_type,
+                    cls.get("namespace", ""),
+                    using_namespaces,
+                    indexes,
+                )
+                if status == "ambiguous":
+                    skip_inheritance("inheritanceTypeAmbiguous")
+                    continue
+                if status != "resolved" or target is None:
+                    skip_inheritance("inheritanceTypeUnresolved")
+                    continue
+                if not _cs_has_unique_class_endpoint(cls, indexes) or not _cs_has_unique_class_endpoint(
+                    target, indexes
+                ):
+                    skip_inheritance("inheritanceEndpointAmbiguous")
+                    continue
+                target_kind = target.get("kind")
+                if target_kind == "interface" and source_kind in {"class", "record", "struct"}:
+                    edge_type = "implements"
+                elif source_kind in {"class", "record"} and target_kind in {"class", "record"}:
+                    edge_type = "inherits"
+                elif source_kind == "interface" and target_kind == "interface":
+                    edge_type = "inherits"
+                else:
+                    skip_inheritance("inheritanceKindUnsupported")
+                    continue
+                source_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, cls, stats
+                )
+                target_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, target, stats
+                )
+                if _cs_add_edge(assembled["edges"], existing_edges, source_id, target_id, edge_type, 0.8):
+                    stats["inheritanceAdded"] += 1
+
+            for dependency_type in _cs_declared_dependency_types(cls, file_info):
+                stats["declaredDependenciesScanned"] += 1
+                status, target = _cs_resolve_type(
+                    dependency_type,
+                    cls.get("namespace", ""),
+                    using_namespaces,
+                    indexes,
+                )
+                if status == "ambiguous":
+                    skip_dependency("dependsOnTypeAmbiguous")
+                    continue
+                if status != "resolved" or target is None:
+                    skip_dependency("dependsOnTypeUnresolved")
+                    continue
+                if (
+                    cls.get("filePath") == target.get("filePath")
+                    and cls.get("name") == target.get("name")
+                ):
+                    skip_dependency("dependsOnSelfReference")
+                    continue
+                if not _cs_has_unique_class_endpoint(cls, indexes) or not _cs_has_unique_class_endpoint(
+                    target, indexes
+                ):
+                    skip_dependency("dependsOnEndpointAmbiguous")
+                    continue
+                source_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, cls, stats
+                )
+                target_id = _cs_ensure_class_endpoint(
+                    assembled, node_ids, existing_edges, target, stats
+                )
+                if _cs_add_edge(
+                    assembled["edges"], existing_edges, source_id, target_id, "depends_on", 0.6
+                ):
+                    stats["dependsOnAdded"] += 1
+
+        for call in sorted(
+            file_info["callGraph"],
+            key=lambda item: (
+                item.get("lineNumber", -1)
+                if isinstance(item, dict) and isinstance(item.get("lineNumber"), int)
+                else -1,
+                item.get("callee", "")
+                if isinstance(item, dict) and isinstance(item.get("callee"), str)
+                else "",
+            ),
+        ):
+            if not isinstance(call, dict):
+                continue
+            callee = call.get("callee")
+            line_number = call.get("lineNumber")
+            if not isinstance(callee, str) or not isinstance(line_number, int):
+                continue
+
+            caller_functions = [
+                fn for fn in file_info["functions"]
+                if fn["lineRange"][0] <= line_number <= fn["lineRange"][1]
+            ]
+            if not caller_functions:
+                skip_call("callsNoContainingFunction")
+                continue
+            if len(caller_functions) != 1:
+                skip_call("callsAmbiguousContainingFunction")
+                continue
+            caller_fn = caller_functions[0]
+
+            caller_classes = [
+                cls for cls in file_info["classes"]
+                if cls["lineRange"][0] <= line_number <= cls["lineRange"][1]
+            ]
+            if not caller_classes:
+                skip_call("callsNoContainingClass")
+                continue
+            if len(caller_classes) != 1:
+                skip_call("callsAmbiguousContainingClass")
+                continue
+            caller_cls = caller_classes[0]
+
+            if file_info["functionNameCounts"].get(caller_fn.get("name", ""), 0) != 1:
+                skip_call("callsAmbiguousCallerId")
+                continue
+            using_namespaces = _cs_using_namespaces_for(file_info, caller_cls.get("namespace", ""), indexes)
+
+            member_match = _CS_MEMBER_CALL_RE.match(callee)
+            if member_match:
+                stats["identifierMemberCalls"] += 1
+                receiver, method_name = member_match.groups()
+                receiver_type = None
+                for param in caller_fn.get("typedParams", []) or []:
+                    if isinstance(param, dict) and param.get("name") == receiver:
+                        receiver_type = param.get("type")
+                        break
+                if receiver_type is None:
+                    for param in caller_cls.get("primaryConstructorParams", []) or []:
+                        if isinstance(param, dict) and param.get("name") == receiver:
+                            receiver_type = param.get("type")
+                            break
+                if receiver_type is None:
+                    for field in caller_cls.get("fields", []) or []:
+                        if isinstance(field, dict) and field.get("name") == receiver:
+                            receiver_type = field.get("type")
+                            break
+                if receiver_type is None:
+                    skip_call("callsNoReceiverType")
+                    continue
+
+                stats["receiverTypesFound"] += 1
+                status, target_class = _cs_resolve_type(
+                    receiver_type,
+                    caller_cls.get("namespace", ""),
+                    using_namespaces,
+                    indexes,
+                )
+                if status == "ambiguous":
+                    skip_call("callsReceiverTypeAmbiguous")
+                    continue
+                if status != "resolved" or target_class is None:
+                    skip_call("callsReceiverTypeUnresolved")
+                    continue
+                stats["receiverTypesResolved"] += 1
+                target_status, target_fn = _cs_target_method_function(
+                    target_class, method_name, indexes
+                )
+                if target_status == "ambiguous":
+                    skip_call("callsTargetMethodAmbiguous")
+                    continue
+                if target_status != "resolved" or target_fn is None:
+                    skip_call("callsTargetMethodMissing")
+                    continue
+                stats["targetMethodsResolved"] += 1
+                caller_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    caller_fn,
+                    caller_cls,
+                    file_info["path"],
+                    stats,
+                )
+                target_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    target_fn,
+                    target_class,
+                    target_class.get("filePath", ""),
+                    stats,
+                )
+                if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
+                    stats["callsAdded"] += 1
+                continue
+
+            if _CS_IDENTIFIER_RE.match(callee):
+                containing_methods = [
+                    fn for fn in file_info["functions"]
+                    if fn.get("name") == callee
+                    and caller_cls["lineRange"][0] <= fn["lineRange"][0] <= caller_cls["lineRange"][1]
+                ]
+                if not containing_methods:
+                    skip_call("callsTargetMethodMissing")
+                    continue
+                if (
+                    len(containing_methods) != 1
+                    or file_info["functionNameCounts"].get(callee, 0) != 1
+                ):
+                    skip_call("callsTargetMethodAmbiguous")
+                    continue
+                caller_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    caller_fn,
+                    caller_cls,
+                    file_info["path"],
+                    stats,
+                )
+                target_id = _cs_ensure_function_endpoint(
+                    assembled,
+                    node_ids,
+                    existing_edges,
+                    containing_methods[0],
+                    caller_cls,
+                    file_info["path"],
+                    stats,
+                )
+                if _cs_add_edge(assembled["edges"], existing_edges, caller_id, target_id, "calls", 0.8):
+                    stats["callsAdded"] += 1
+                continue
+
+            skip_call("callsUnsupportedCallee")
+
+    lines = [
+        f"  C# files scanned: {stats['filesScanned']}",
+        f"  identifier.Method calls: {stats['identifierMemberCalls']}",
+        f"  receiver types found: {stats['receiverTypesFound']}",
+        f"  receiver types uniquely resolved: {stats['receiverTypesResolved']}",
+        f"  target methods uniquely resolved: {stats['targetMethodsResolved']}",
+        f"  calls added: {stats['callsAdded']}",
+        f"  calls skipped: {stats['callsSkipped']}",
+        f"  base types scanned: {stats['baseTypesScanned']}",
+        f"  implements/inherits added: {stats['inheritanceAdded']}",
+        f"  implements/inherits skipped: {stats['inheritanceSkipped']}",
+        f"  constructor/field dependencies scanned: {stats['declaredDependenciesScanned']}",
+        f"  class-level depends_on added: {stats['dependsOnAdded']}",
+        f"  class-level depends_on skipped: {stats['dependsOnSkipped']}",
+        (
+            "  endpoint nodes synthesized: "
+            f"{stats['classNodesSynthesized']} class, "
+            f"{stats['functionNodesSynthesized']} function"
+        ),
+    ]
+    call_skip_reasons = [
+        ("no containing function", "callsNoContainingFunction"),
+        ("ambiguous containing function", "callsAmbiguousContainingFunction"),
+        ("no containing class", "callsNoContainingClass"),
+        ("ambiguous containing class", "callsAmbiguousContainingClass"),
+        ("ambiguous caller ID", "callsAmbiguousCallerId"),
+        ("no receiver type", "callsNoReceiverType"),
+        ("unresolved receiver type", "callsReceiverTypeUnresolved"),
+        ("ambiguous receiver type", "callsReceiverTypeAmbiguous"),
+        ("missing target method", "callsTargetMethodMissing"),
+        ("ambiguous target method", "callsTargetMethodAmbiguous"),
+        ("unsupported callee", "callsUnsupportedCallee"),
+    ]
+    call_parts = [f"{label}: {stats[key]}" for label, key in call_skip_reasons if stats[key]]
+    if call_parts:
+        lines.append(f"  call skip reasons: {', '.join(call_parts)}")
+
+    inheritance_skip_reasons = [
+        ("unresolved type", "inheritanceTypeUnresolved"),
+        ("ambiguous type", "inheritanceTypeAmbiguous"),
+        ("ambiguous endpoint ID", "inheritanceEndpointAmbiguous"),
+        ("unsupported kind", "inheritanceKindUnsupported"),
+    ]
+    inheritance_parts = [
+        f"{label}: {stats[key]}"
+        for label, key in inheritance_skip_reasons
+        if stats[key]
+    ]
+    if inheritance_parts:
+        lines.append(f"  inheritance skip reasons: {', '.join(inheritance_parts)}")
+
+    dependency_skip_reasons = [
+        ("unresolved type", "dependsOnTypeUnresolved"),
+        ("ambiguous type", "dependsOnTypeAmbiguous"),
+        ("ambiguous endpoint ID", "dependsOnEndpointAmbiguous"),
+        ("self reference", "dependsOnSelfReference"),
+    ]
+    dependency_parts = [
+        f"{label}: {stats[key]}"
+        for label, key in dependency_skip_reasons
+        if stats[key]
+    ]
+    if dependency_parts:
+        lines.append(f"  depends_on skip reasons: {', '.join(dependency_parts)}")
+    if stats["synthesizedEndpointsMissingFileNode"]:
+        lines.append(
+            "  synthesized endpoints without file nodes: "
+            f"{stats['synthesizedEndpointsMissingFileNode']}"
+        )
+    return stats, warnings + lines
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1230,6 +2094,14 @@ def main() -> None:
         report.append("")
         report.append("Imports edge recovery:")
         report.extend(recovery_report)
+
+    csharp_stats, csharp_report = link_csharp_deterministic_edges(
+        assembled, resolve_ua_dir(project_root) / "tmp"
+    )
+    if csharp_report:
+        report.append("")
+        report.append("C# deterministic linker:")
+        report.extend(csharp_report)
 
     # Print report
     print("", file=sys.stderr)

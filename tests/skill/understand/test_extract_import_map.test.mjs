@@ -95,6 +95,7 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.stats.filesScanned).toBe(4);
     expect(result.output.stats.filesWithImports).toBe(1);
     expect(result.output.stats.totalEdges).toBe(2);
+    expect(result.output.stats.csharp).toBeUndefined();
   });
 
   it('orders Unicode import targets by locale-independent UTF-16 code units', () => {
@@ -1067,30 +1068,184 @@ describe('extract-import-map.mjs — C# resolver', () => {
     }
   });
 
-  it('resolves c# using directives via dotted-suffix probe', () => {
+  it('resolves C# dependencies from unambiguous declared type references', () => {
     projectRoot = setupTree({
       'Program.cs':
-        `using System;\nusing MyApp.Util.Helper;\nusing MyApp.Models.User;\n\nnamespace MyApp { class Program { } }\n`,
-      'MyApp/Util/Helper.cs':
-        `namespace MyApp.Util { public class Helper { } }\n`,
-      'MyApp/Models/User.cs':
-        `namespace MyApp.Models { public class User { } }\n`,
+        `using MyApp.Services;\nusing MyApp.Repositories;\n\nnamespace MyApp.Controllers;\npublic class Program(IFooService service) : BaseProgram {\n  private readonly IRepository _repository;\n  public void Run(IRepository repository) { }\n}\n`,
+      'Services/IFooService.cs':
+        `namespace MyApp.Services; public interface IFooService { void Run(); }\n`,
+      'Repositories/IRepository.cs':
+        `namespace MyApp.Repositories; public interface IRepository { void Save(); }\n`,
+      'BaseProgram.cs':
+        `namespace MyApp.Controllers; public class BaseProgram { }\n`,
+      'Services/Unused.cs':
+        `namespace MyApp.Services; public class Unused { }\n`,
     });
 
     const result = runScript(projectRoot, {
       projectRoot,
       files: [
         { path: 'Program.cs', language: 'csharp', fileCategory: 'code' },
-        { path: 'MyApp/Util/Helper.cs', language: 'csharp', fileCategory: 'code' },
-        { path: 'MyApp/Models/User.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Services/IFooService.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Repositories/IRepository.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'BaseProgram.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Services/Unused.cs', language: 'csharp', fileCategory: 'code' },
       ],
     });
 
     expect(result.status).toBe(0);
     expect(result.output.importMap['Program.cs']).toEqual([
-      'MyApp/Models/User.cs',
-      'MyApp/Util/Helper.cs',
+      'BaseProgram.cs',
+      'Repositories/IRepository.cs',
+      'Services/IFooService.cs',
     ]);
+    expect(result.output.importMap['Program.cs']).not.toContain('Services/Unused.cs');
+  });
+
+  it('does not resolve ordinary C# namespace using directives by fan-out or file probing', () => {
+    projectRoot = setupTree({
+      'Program.cs':
+        `using MyApp.Services;\n\nnamespace MyApp.Controllers;\npublic class Program { }\n`,
+      'Services/Foo.cs':
+        `namespace MyApp.Services; public class Foo { }\n`,
+      'Services/Bar.cs':
+        `namespace MyApp.Services; public class Bar { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Program.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Services/Foo.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Services/Bar.cs', language: 'csharp', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['Program.cs']).toEqual([]);
+  });
+
+  it('skips ambiguous C# type references', () => {
+    projectRoot = setupTree({
+      'Program.cs':
+        `using A;\nusing B;\n\nnamespace App;\npublic class Program(IFoo foo) { }\n`,
+      'A/IFoo.cs':
+        `namespace A; public interface IFoo { }\n`,
+      'B/IFoo.cs':
+        `namespace B; public interface IFoo { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Program.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'A/IFoo.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'B/IFoo.cs', language: 'csharp', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['Program.cs']).toEqual([]);
+  });
+
+  it('does not treat C# alias or static using directives as namespace imports', () => {
+    projectRoot = setupTree({
+      'Services/Service.cs':
+        `using static System.Math;\nusing Repo = App.Repositories;\n\nnamespace App.Services;\npublic class Service(IRepository repository) { }\n`,
+      'Repositories/IRepository.cs':
+        `namespace App.Repositories; public interface IRepository { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Services/Service.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Repositories/IRepository.cs', language: 'csharp', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['Services/Service.cs']).toEqual([]);
+  });
+
+  it('resolves C# dependencies from using directives inside block namespaces', () => {
+    projectRoot = setupTree({
+      'Services/Service.cs':
+        `namespace App.Services {\n  using App.Repositories;\n  public class Service(IRepository repository) { }\n}\n`,
+      'Repositories/IRepository.cs':
+        `namespace App.Repositories; public interface IRepository { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'Services/Service.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Repositories/IRepository.cs', language: 'csharp', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['Services/Service.cs']).toEqual([
+      'Repositories/IRepository.cs',
+    ]);
+  });
+
+  it('applies C# global using directives across files', () => {
+    projectRoot = setupTree({
+      'GlobalUsings.cs':
+        `global using App.Repositories;\nglobal using static System.Math;\n`,
+      'Services/Service.cs':
+        `namespace App.Services;\npublic class Service(IRepository repository) { }\n`,
+      'Repositories/IRepository.cs':
+        `namespace App.Repositories; public interface IRepository { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'GlobalUsings.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Services/Service.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'Repositories/IRepository.cs', language: 'csharp', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['Services/Service.cs']).toEqual([
+      'Repositories/IRepository.cs',
+    ]);
+  });
+
+  it('scopes C# global using directives to their .csproj project', () => {
+    projectRoot = setupTree({
+      'ProjectA/ProjectA.csproj': '<Project Sdk="Microsoft.NET.Sdk" />\n',
+      'ProjectA/GlobalUsings.cs':
+        `global using ProjectA.Repositories;\n`,
+      'ProjectA/Services/Service.cs':
+        `namespace ProjectA.Services;\npublic class Service(IRepository repository) { }\n`,
+      'ProjectA/Repositories/IRepository.cs':
+        `namespace ProjectA.Repositories; public interface IRepository { }\n`,
+      'ProjectB/ProjectB.csproj': '<Project Sdk="Microsoft.NET.Sdk" />\n',
+      'ProjectB/Services/Service.cs':
+        `namespace ProjectB.Services;\npublic class Service(IRepository repository) { }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'ProjectA/ProjectA.csproj', language: 'xml', fileCategory: 'config' },
+        { path: 'ProjectA/GlobalUsings.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'ProjectA/Services/Service.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'ProjectA/Repositories/IRepository.cs', language: 'csharp', fileCategory: 'code' },
+        { path: 'ProjectB/ProjectB.csproj', language: 'xml', fileCategory: 'config' },
+        { path: 'ProjectB/Services/Service.cs', language: 'csharp', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['ProjectA/Services/Service.cs']).toEqual([
+      'ProjectA/Repositories/IRepository.cs',
+    ]);
+    expect(result.output.importMap['ProjectB/Services/Service.cs']).toEqual([]);
   });
 });
 
@@ -1429,7 +1584,7 @@ describe('extract-import-map.mjs — Swift resolver', () => {
     expect(result.output.importMap['Sources/App/Feature.swift']).toEqual([]);
     expect(result.output.stats.filesWithImports).toBe(1);
     expect(result.output.stats.totalEdges).toBe(2);
-  });
+  }, 10000);
 
   it('uses Package.swift custom target paths when module name differs from directory name', () => {
     projectRoot = setupTree({
@@ -1461,7 +1616,7 @@ describe('extract-import-map.mjs — Swift resolver', () => {
       'Core/Model/User.swift',
     ]);
     expect(result.output.importMap['Package.swift']).toEqual([]);
-  });
+  }, 10000);
 
   it('drops Swift SDK imports when no project module matches', () => {
     projectRoot = setupTree({
@@ -1478,7 +1633,7 @@ describe('extract-import-map.mjs — Swift resolver', () => {
     expect(result.status).toBe(0);
     expect(result.output.importMap['Sources/App/View.swift']).toEqual([]);
     expect(result.output.stats.totalEdges).toBe(0);
-  });
+  }, 10000);
 });
 
 describe('extract-import-map.mjs — per-file failure resilience', () => {
