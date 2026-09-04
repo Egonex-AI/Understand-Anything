@@ -1,0 +1,4622 @@
+{
+  "version": "1.0.0",
+  "gitCommitHash": "ea1f309f69435edd36d94c7d839e7a30bf2d4446",
+  "generatedAt": "2026-08-29T10:14:37.584Z",
+  "files": {
+    ".agents/skills/find-skills/SKILL.md": {
+      "filePath": ".agents/skills/find-skills/SKILL.md",
+      "contentHash": "c00eeea0e13e74fe4a9d84ba0a8542205a1b736d65f13134fe1a6647eb14976f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 142,
+      "hasStructuralAnalysis": true
+    },
+    ".codex/agents/README.md": {
+      "filePath": ".codex/agents/README.md",
+      "contentHash": "3441ef4daaace05b957b45a6efcdde65456f05b4a3dbf71871377b243fd06669",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 27,
+      "hasStructuralAnalysis": true
+    },
+    ".codex/agents/auditor.toml": {
+      "filePath": ".codex/agents/auditor.toml",
+      "contentHash": "8d5543150ad21be067c3fc70fb59d7d05e1d045122eb8c45736b0c87c4518d60",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 18,
+      "hasStructuralAnalysis": true
+    },
+    ".codex/agents/coder.toml": {
+      "filePath": ".codex/agents/coder.toml",
+      "contentHash": "1a902a5150d0065f5e27ca9b57f2384d02b47e30c18b902f16c4d1115807d032",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 16,
+      "hasStructuralAnalysis": true
+    },
+    ".codex/config.toml": {
+      "filePath": ".codex/config.toml",
+      "contentHash": "63f126ce810ca0d08df96ccbb14bae1611bf0bab39cb9ba4fe3afd2a619e69e4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 12,
+      "hasStructuralAnalysis": true
+    },
+    ".env.local.example": {
+      "filePath": ".env.local.example",
+      "contentHash": "5b257290025c51aee3d73de6d9cc08343a78997c8de09ece6404e0ed5bd26a74",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 18,
+      "hasStructuralAnalysis": false
+    },
+    ".github/workflows/backup-supabase-to-r2.yml": {
+      "filePath": ".github/workflows/backup-supabase-to-r2.yml",
+      "contentHash": "81250845bc39a73b5f8ddb0ef22d2d6d20c26f5ac23c50194aed654152484122",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 159,
+      "hasStructuralAnalysis": true
+    },
+    ".github/workflows/keep-supabase-alive.yml": {
+      "filePath": ".github/workflows/keep-supabase-alive.yml",
+      "contentHash": "04c37692e39b8ddddbee7e741995406b262f96743ade798d8cdc3c8e19ed0bef",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 35,
+      "hasStructuralAnalysis": true
+    },
+    "AGENTS.md": {
+      "filePath": "AGENTS.md",
+      "contentHash": "50641c5f57d5cdca60b88d877cc350c6352e3cb7b84690de1f424187184ed842",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 28,
+      "hasStructuralAnalysis": true
+    },
+    "CLAUDE.md": {
+      "filePath": "CLAUDE.md",
+      "contentHash": "eb260cae7906732c4cb74ce05916e89005e5057fefb44166b0f424b4e9ce9a15",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 33,
+      "hasStructuralAnalysis": true
+    },
+    "PROGRESS.md": {
+      "filePath": "PROGRESS.md",
+      "contentHash": "61058e5c72f48a78b758e599bbd561ef085116d338ff85f4877aa6b597ddcb47",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 203,
+      "hasStructuralAnalysis": true
+    },
+    "README.md": {
+      "filePath": "README.md",
+      "contentHash": "fe2eef406d9f239ebcb32f9d382cd40aeea3a9cab342ad96410da921fd82f135",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 178,
+      "hasStructuralAnalysis": true
+    },
+    "REQUIREMENTS.md": {
+      "filePath": "REQUIREMENTS.md",
+      "contentHash": "cf3573ce0c76ec748f76b3b009bedfce1378dbe0ec24cfd3195ef6f85a9eab24",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 193,
+      "hasStructuralAnalysis": true
+    },
+    "components.json": {
+      "filePath": "components.json",
+      "contentHash": "7f89b1e9e3995be8620be3162df8e08b7dd512f894fb0accb559193138fdc390",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 26,
+      "hasStructuralAnalysis": true
+    },
+    "eslint.config.mjs": {
+      "filePath": "eslint.config.mjs",
+      "contentHash": "2da93702cdee2f5177bbfa8df0d99b0f3fff39cc135d557aa68af1731b4917b5",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "eslint/config",
+          "specifiers": [
+            "defineConfig",
+            "globalIgnores"
+          ]
+        },
+        {
+          "source": "eslint-config-next/core-web-vitals",
+          "specifiers": [
+            "nextVitals"
+          ]
+        },
+        {
+          "source": "eslint-config-next/typescript",
+          "specifiers": [
+            "nextTs"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 21,
+      "hasStructuralAnalysis": true
+    },
+    "next.config.ts": {
+      "filePath": "next.config.ts",
+      "contentHash": "28f9e911b761fbc18686d1d71a49a61acdb4b69b4fe5e101fb3ba04502a2a8c6",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next",
+          "specifiers": [
+            "NextConfig"
+          ]
+        },
+        {
+          "source": "@opennextjs/cloudflare",
+          "specifiers": [
+            "initOpenNextCloudflareForDev"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 16,
+      "hasStructuralAnalysis": true
+    },
+    "open-next.config.ts": {
+      "filePath": "open-next.config.ts",
+      "contentHash": "3dfa628cd2ff5b82664eda8d40b9631844d14013497f8f1e80a943d24cd04d43",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@opennextjs/cloudflare",
+          "specifiers": [
+            "defineCloudflareConfig"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 7,
+      "hasStructuralAnalysis": true
+    },
+    "package.json": {
+      "filePath": "package.json",
+      "contentHash": "9f1f47506d1de3456c41290a8717bd1e931569e13d6b825139a0791bfec86770",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 55,
+      "hasStructuralAnalysis": true
+    },
+    "postcss.config.mjs": {
+      "filePath": "postcss.config.mjs",
+      "contentHash": "dfac7ac2d86d326a0e5adb024e7943c181393ed17a5fcb8f0315b24c7da6ddde",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 8,
+      "hasStructuralAnalysis": true
+    },
+    "public/_headers": {
+      "filePath": "public/_headers",
+      "contentHash": "90137f0fac2f988faf25c5910b0cfa1b6df9d31596a6b21f4ce4bba6ede5b569",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 3,
+      "hasStructuralAnalysis": false
+    },
+    "scripts/supabase-env.mjs": {
+      "filePath": "scripts/supabase-env.mjs",
+      "contentHash": "6be74e6e2a3beaa4743c3e70e447d31b0a1977039f74d9911cda8a79e909a307",
+      "functions": [
+        {
+          "name": "usage",
+          "params": [],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "parseEnv",
+          "params": [
+            "contents"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "isLoopbackHost",
+          "params": [
+            "hostname"
+          ],
+          "exported": false,
+          "lineCount": 4
+        },
+        {
+          "name": "isSafeValue",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "isExpectedUrl",
+          "params": [
+            "value",
+            "environment"
+          ],
+          "exported": false,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:child_process",
+          "specifiers": [
+            "execFileSync"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "existsSync",
+            "readFileSync",
+            "renameSync",
+            "unlinkSync",
+            "writeFileSync"
+          ]
+        },
+        {
+          "source": "node:path",
+          "specifiers": [
+            "dirname",
+            "resolve"
+          ]
+        },
+        {
+          "source": "node:url",
+          "specifiers": [
+            "fileURLToPath"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 142,
+      "hasStructuralAnalysis": true
+    },
+    "skills-lock.json": {
+      "filePath": "skills-lock.json",
+      "contentHash": "0e7ecfa07bc10ff0a197d3837a7e546ebb14883f162521f0691a08fd26c3c245",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 12,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/access-denied/page.tsx": {
+      "filePath": "src/app/access-denied/page.tsx",
+      "contentHash": "619a69f2441643bc224ebc9b1f9e755f59e935904eb7d678f7e70f6eddc49794",
+      "functions": [
+        {
+          "name": "AccessDeniedPage",
+          "params": [],
+          "exported": true,
+          "lineCount": 16
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@/components/sign-out-button",
+          "specifiers": [
+            "SignOutButton"
+          ]
+        }
+      ],
+      "exports": [
+        "AccessDeniedPage"
+      ],
+      "totalLines": 19,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/admin/admin-panel.tsx": {
+      "filePath": "src/app/admin/admin-panel.tsx",
+      "contentHash": "37b3e1d1cdce32842509e718915bcf42e7e9e51ef80c586bf4c63ccff85b0011",
+      "functions": [
+        {
+          "name": "AdminPanel",
+          "params": [
+            "{ initialEntries, role, actorEmail, preview = false }"
+          ],
+          "exported": true,
+          "lineCount": 62
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState"
+          ]
+        },
+        {
+          "source": "next/link",
+          "specifiers": [
+            "Link"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "AllowedEmailRole",
+            "ManagedAllowedEmail"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        }
+      ],
+      "exports": [
+        "AdminPanel"
+      ],
+      "totalLines": 74,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/admin/page.tsx": {
+      "filePath": "src/app/admin/page.tsx",
+      "contentHash": "e2d8ccce285cfd2fe7fde3aaaf63e78e26f5d083decfb0134425a064363b56a3",
+      "functions": [
+        {
+          "name": "AdminPage",
+          "params": [],
+          "exported": true,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "redirect"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "isDevPreviewEnabled"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "AllowedEmailRole",
+            "ManagedAllowedEmail"
+          ]
+        },
+        {
+          "source": "./admin-panel",
+          "specifiers": [
+            "AdminPanel"
+          ]
+        }
+      ],
+      "exports": [
+        "AdminPage"
+      ],
+      "totalLines": 21,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/api/events/cancel/route.ts": {
+      "filePath": "src/app/api/events/cancel/route.ts",
+      "contentHash": "5c6000bc81e77adf9172d4d23778d0533296ced01cc694b81112d65030a4c9e2",
+      "functions": [
+        {
+          "name": "dateLabel",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "POST",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 59
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextResponse"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/admin",
+          "specifiers": [
+            "createAdminClient"
+          ]
+        },
+        {
+          "source": "@/lib/cancellation-email",
+          "specifiers": [
+            "sendCancellationEmail"
+          ]
+        }
+      ],
+      "exports": [
+        "POST"
+      ],
+      "totalLines": 69,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/api/events/sync/route.ts": {
+      "filePath": "src/app/api/events/sync/route.ts",
+      "contentHash": "fde2cd51336d24096c84ca0035bbc7ac616fa902112d9ec62c582c2a7f36b8ea",
+      "functions": [
+        {
+          "name": "POST",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 80
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextResponse"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/admin",
+          "specifiers": [
+            "createAdminClient"
+          ]
+        },
+        {
+          "source": "@/lib/google-calendar",
+          "specifiers": [
+            "syncEventToGoogle",
+            "isConfigured",
+            "checkSyncPermission"
+          ]
+        }
+      ],
+      "exports": [
+        "POST"
+      ],
+      "totalLines": 90,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/auth/callback/route.ts": {
+      "filePath": "src/app/auth/callback/route.ts",
+      "contentHash": "6fe7692241e50b1d9791b9a5e84e50af76115d017535e1993afc58e52938fcd1",
+      "functions": [
+        {
+          "name": "safeNextPath",
+          "params": [
+            "value",
+            "origin"
+          ],
+          "exported": false,
+          "lineCount": 19
+        },
+        {
+          "name": "GET",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextResponse"
+          ]
+        },
+        {
+          "source": "@/lib/cloudflare-access",
+          "specifiers": [
+            "appOriginForRequest"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        }
+      ],
+      "exports": [
+        "GET"
+      ],
+      "totalLines": 40,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/auth/cloudflare/logout/route.ts": {
+      "filePath": "src/app/auth/cloudflare/logout/route.ts",
+      "contentHash": "d956e963fb448ac1a9a7f3d43069575908e5236f0dc703631df6f04ee9bc435b",
+      "functions": [
+        {
+          "name": "GET",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 9
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextResponse"
+          ]
+        },
+        {
+          "source": "@/lib/cloudflare-access",
+          "specifiers": [
+            "appOriginForRequest",
+            "cloudflareLogoutUrl"
+          ]
+        }
+      ],
+      "exports": [
+        "GET"
+      ],
+      "totalLines": 13,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/auth/cloudflare/route.ts": {
+      "filePath": "src/app/auth/cloudflare/route.ts",
+      "contentHash": "2ebae85c51d75d35454180ed92b02f947d17d8f6496e84b5bafa9f0f97eb7a37",
+      "functions": [
+        {
+          "name": "GET",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 46
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@supabase/ssr",
+          "specifiers": [
+            "createServerClient"
+          ]
+        },
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextRequest",
+            "NextResponse"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/admin",
+          "specifiers": [
+            "createAdminClient"
+          ]
+        },
+        {
+          "source": "@/lib/cloudflare-access",
+          "specifiers": [
+            "appOriginForRequest",
+            "cloudflareAccessToken",
+            "verifyCloudflareAccessToken"
+          ]
+        },
+        {
+          "source": "@/lib/cloudflare-auth-bridge",
+          "specifiers": [
+            "generateSupabaseMagicLinkIfAllowed",
+            "safeNextPath"
+          ]
+        }
+      ],
+      "exports": [
+        "GET"
+      ],
+      "totalLines": 54,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/availability-board.tsx": {
+      "filePath": "src/app/availability/_components/availability-board.tsx",
+      "contentHash": "449eecb8c429f6c98a630afa11053ae9822ab9b4cb94a988b804ddb65f0932ea",
+      "functions": [
+        {
+          "name": "AvailabilityBoard",
+          "params": [
+            "{\n  currentUser,\n  members,\n  initialPresets,\n  initialSlots = [],\n  preview = false,\n  compact = false,\n  onAvailabilityChanged,\n}"
+          ],
+          "exported": true,
+          "lineCount": 301
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useCallback",
+            "useEffect",
+            "useMemo",
+            "useRef",
+            "useState"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "addDays",
+            "addMonths",
+            "eachDayOfInterval",
+            "endOfMonth",
+            "format",
+            "isSameMonth",
+            "startOfMonth"
+          ]
+        },
+        {
+          "source": "date-fns/locale",
+          "specifiers": [
+            "ja"
+          ]
+        },
+        {
+          "source": "sonner",
+          "specifiers": [
+            "toast"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "ChevronLeft",
+            "ChevronRight",
+            "X",
+            "ArrowLeft"
+          ]
+        },
+        {
+          "source": "next/link",
+          "specifiers": [
+            "Link"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/components/app-header",
+          "specifiers": [
+            "AppHeader"
+          ]
+        },
+        {
+          "source": "@/components/night-beach-scene",
+          "specifiers": [
+            "NightScene"
+          ]
+        },
+        {
+          "source": "@/components/ui/tabs",
+          "specifiers": [
+            "Tabs",
+            "TabsList",
+            "TabsTrigger"
+          ]
+        },
+        {
+          "source": "@/components/ui/dialog",
+          "specifiers": [
+            "Dialog",
+            "DialogContent",
+            "DialogDescription",
+            "DialogFooter",
+            "DialogHeader",
+            "DialogTitle"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "jstNow",
+            "monthGridRange",
+            "registrableWindow",
+            "applyAvailabilityOperations"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "AvailabilityOperation"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset",
+            "Profile",
+            "Slot"
+          ]
+        },
+        {
+          "source": "./member-list",
+          "specifiers": [
+            "MemberList"
+          ]
+        },
+        {
+          "source": "./preset-panel",
+          "specifiers": [
+            "PresetPanel"
+          ]
+        },
+        {
+          "source": "./month-calendar",
+          "specifiers": [
+            "MonthCalendar"
+          ]
+        },
+        {
+          "source": "./week-calendar",
+          "specifiers": [
+            "WeekCalendar"
+          ]
+        }
+      ],
+      "exports": [
+        "AvailabilityBoard"
+      ],
+      "totalLines": 336,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/member-list.tsx": {
+      "filePath": "src/app/availability/_components/member-list.tsx",
+      "contentHash": "546fc847f332673837354d6abf65ae82a4d417bd24ed7db7d935f07426fb83ec",
+      "functions": [
+        {
+          "name": "MemberList",
+          "params": [
+            "{\n  members,\n  currentUserId,\n  visibleIds,\n  onToggle,\n  registrationStatus,\n}"
+          ],
+          "exported": true,
+          "lineCount": 57
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@/components/ui/checkbox",
+          "specifiers": [
+            "Checkbox"
+          ]
+        },
+        {
+          "source": "@/components/sign-out-button",
+          "specifiers": [
+            "SignOutButton"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Profile"
+          ]
+        }
+      ],
+      "exports": [
+        "MemberList"
+      ],
+      "totalLines": 64,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/month-calendar.tsx": {
+      "filePath": "src/app/availability/_components/month-calendar.tsx",
+      "contentHash": "432c1009a6bad7eb69c51f0a51c6da4b129cba1f072660b8a22712763ecbb6d4",
+      "functions": [
+        {
+          "name": "MonthCalendar",
+          "params": [
+            "{\n  cursorDate,\n  members,\n  visibleIds,\n  currentUserId,\n  slots,\n  activePreset,\n  window: editableWindow,\n  onPaint,\n  canEdit,\n  onSelectDate,\n}"
+          ],
+          "exported": true,
+          "lineCount": 154
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useMemo"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "addDays",
+            "format",
+            "isSameMonth"
+          ]
+        },
+        {
+          "source": "date-fns/locale",
+          "specifiers": [
+            "ja"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "computeDaySummaries",
+            "formatTimeLabel",
+            "isDateEditable",
+            "isRangeCovered",
+            "monthGridRange",
+            "startMinutes",
+            "endMinutes"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "TimeRange"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset",
+            "Profile",
+            "Slot"
+          ]
+        },
+        {
+          "source": "./use-drag-paint",
+          "specifiers": [
+            "useDragPaint"
+          ]
+        }
+      ],
+      "exports": [
+        "MonthCalendar"
+      ],
+      "totalLines": 168,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/preset-dialog.tsx": {
+      "filePath": "src/app/availability/_components/preset-dialog.tsx",
+      "contentHash": "6bd4229d7926cfdf8e62cfa820e161c614c1bbb1341ca436739768fb9518e903",
+      "functions": [
+        {
+          "name": "PresetDialog",
+          "params": [
+            "{\n  open,\n  onOpenChange,\n  userId,\n  preset,\n  nextSortOrder,\n  onSaved,\n  onDeleted,\n  preview = false,\n}"
+          ],
+          "exported": true,
+          "lineCount": 46
+        },
+        {
+          "name": "PresetForm",
+          "params": [
+            "{\n  userId,\n  preset,\n  nextSortOrder,\n  onSaved,\n  onDeleted,\n  preview,\n}"
+          ],
+          "exported": false,
+          "lineCount": 194
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState"
+          ]
+        },
+        {
+          "source": "sonner",
+          "specifiers": [
+            "toast"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/components/ui/input",
+          "specifiers": [
+            "Input"
+          ]
+        },
+        {
+          "source": "@/components/ui/label",
+          "specifiers": [
+            "Label"
+          ]
+        },
+        {
+          "source": "@/components/ui/dialog",
+          "specifiers": [
+            "Dialog",
+            "DialogContent",
+            "DialogDescription",
+            "DialogFooter",
+            "DialogHeader",
+            "DialogTitle"
+          ]
+        },
+        {
+          "source": "@/components/ui/checkbox",
+          "specifiers": [
+            "Checkbox"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset"
+          ]
+        }
+      ],
+      "exports": [
+        "PresetDialog"
+      ],
+      "totalLines": 272,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/preset-panel.tsx": {
+      "filePath": "src/app/availability/_components/preset-panel.tsx",
+      "contentHash": "6857a92010c3afadf07ce12dc2e98d3fc33e16ae8f082a4eff9d442f119aa193",
+      "functions": [
+        {
+          "name": "PresetPanel",
+          "params": [
+            "{\n  userId,\n  presets,\n  activePresetId,\n  onActivate,\n  onPresetsChange,\n  preview = false,\n  canEdit = true,\n  canActivate = true,\n  inline = false,\n  horizontal = false,\n  editDisabledHint,\n}"
+          ],
+          "exported": true,
+          "lineCount": 312
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "Settings2"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/components/ui/toggle",
+          "specifiers": [
+            "Toggle"
+          ]
+        },
+        {
+          "source": "@/components/ui/dialog",
+          "specifiers": [
+            "Dialog",
+            "DialogContent",
+            "DialogDescription",
+            "DialogHeader",
+            "DialogTitle"
+          ]
+        },
+        {
+          "source": "./preset-dialog",
+          "specifiers": [
+            "PresetDialog"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "formatTimeLabel"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset"
+          ]
+        }
+      ],
+      "exports": [
+        "PresetPanel"
+      ],
+      "totalLines": 330,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/use-drag-paint.ts": {
+      "filePath": "src/app/availability/_components/use-drag-paint.ts",
+      "contentHash": "066804475445a2cb315b50c59c9f20cfff5e12bcbb10480f85dd1e96f1f9cfc2",
+      "functions": [
+        {
+          "name": "useDragPaint",
+          "params": [
+            "{ canEdit, activePreset, onPaint, isEditable, isApplied, selector = \"[data-date]\" }"
+          ],
+          "exported": true,
+          "lineCount": 57
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useEffect",
+            "useRef",
+            "useState"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset"
+          ]
+        }
+      ],
+      "exports": [
+        "useDragPaint"
+      ],
+      "totalLines": 63,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/_components/week-calendar.tsx": {
+      "filePath": "src/app/availability/_components/week-calendar.tsx",
+      "contentHash": "d82890a23c6aef0a496610e1231eb53ba9b76db20fda50368d469bba0ef5a8e2",
+      "functions": [
+        {
+          "name": "displayTime",
+          "params": [
+            "minutes"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "WeekCalendar",
+          "params": [
+            "{\n  cursorDate,\n  members,\n  visibleIds,\n  currentUserId,\n  slots,\n  activePreset,\n  canEdit,\n  window: editableWindow,\n  onPaint,\n}"
+          ],
+          "exported": true,
+          "lineCount": 138
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useMemo"
+          ]
+        },
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "useRouter"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "addDays",
+            "format"
+          ]
+        },
+        {
+          "source": "date-fns/locale",
+          "specifiers": [
+            "ja"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "computeDaySummaries",
+            "endMinutes",
+            "expandToSlots",
+            "isDateEditable",
+            "isRangeCovered",
+            "minutesToTime",
+            "startMinutes"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset",
+            "Profile",
+            "Slot"
+          ]
+        },
+        {
+          "source": "./use-drag-paint",
+          "specifiers": [
+            "useDragPaint"
+          ]
+        }
+      ],
+      "exports": [
+        "WeekCalendar"
+      ],
+      "totalLines": 162,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/loading.tsx": {
+      "filePath": "src/app/availability/loading.tsx",
+      "contentHash": "bdf758952cfdf88437c31c5b0370b219096c1ca02e9b2001b19a8385f60a1826",
+      "functions": [
+        {
+          "name": "Skeleton",
+          "params": [
+            "{ className = \"\" }"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "Loading",
+          "params": [],
+          "exported": true,
+          "lineCount": 13
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "Loading"
+      ],
+      "totalLines": 18,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/availability/page.tsx": {
+      "filePath": "src/app/availability/page.tsx",
+      "contentHash": "a197754872107455244ff4bdf2eed56d99f84b6004152ba6662429c6c40d76f3",
+      "functions": [
+        {
+          "name": "AvailabilityPage",
+          "params": [],
+          "exported": true,
+          "lineCount": 39
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "redirect"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "getDevAvailabilityData",
+            "isDevPreviewEnabled"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "ActiveProfile"
+          ]
+        },
+        {
+          "source": "./_components/availability-board",
+          "specifiers": [
+            "AvailabilityBoard"
+          ]
+        }
+      ],
+      "exports": [
+        "AvailabilityPage"
+      ],
+      "totalLines": 46,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/dashboard/dashboard.tsx": {
+      "filePath": "src/app/dashboard/dashboard.tsx",
+      "contentHash": "371b35e55174c21421b4b0fcdec16a08971111046f1ac587d93d948dce09b32b",
+      "functions": [
+        {
+          "name": "Dashboard",
+          "params": [
+            "{ currentUser, members, slots, presets, events, participants, role, preview = false }"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "CompactPlanning",
+          "params": [
+            "{ currentUser, members, initialSlots, preview, onCreated }"
+          ],
+          "exported": false,
+          "lineCount": 41
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useEffect",
+            "useMemo",
+            "useRef",
+            "useState"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "addDays",
+            "format",
+            "startOfWeek"
+          ]
+        },
+        {
+          "source": "date-fns/locale",
+          "specifiers": [
+            "ja"
+          ]
+        },
+        {
+          "source": "sonner",
+          "specifiers": [
+            "toast"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "addDevEvent"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "expandToSlots",
+            "minutesToTime",
+            "jstToday",
+            "TimeRange"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset",
+            "Profile",
+            "Slot"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/app/availability/_components/availability-board",
+          "specifiers": [
+            "AvailabilityBoard"
+          ]
+        },
+        {
+          "source": "@/app/events/event-calendar",
+          "specifiers": [
+            "EventCalendar"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "AllowedEmailRole"
+          ]
+        }
+      ],
+      "exports": [
+        "Dashboard"
+      ],
+      "totalLines": 76,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/dev-preview/page.tsx": {
+      "filePath": "src/app/dev-preview/page.tsx",
+      "contentHash": "5157c95d2b54002dec8e876b9ef03836d79126fb9afa86621fd501a22e653f8f",
+      "functions": [
+        {
+          "name": "DevPreviewPage",
+          "params": [
+            "{ searchParams }"
+          ],
+          "exported": true,
+          "lineCount": 18
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "notFound"
+          ]
+        },
+        {
+          "source": "@/app/events/event-calendar",
+          "specifiers": [
+            "EventCalendar"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "getDevPreviewData",
+            "getDevAvailabilityData",
+            "getDevPlanningData",
+            "isDevPreviewEnabled"
+          ]
+        },
+        {
+          "source": "@/app/availability/_components/availability-board",
+          "specifiers": [
+            "AvailabilityBoard"
+          ]
+        },
+        {
+          "source": "@/app/planning/_components/planning-board",
+          "specifiers": [
+            "PlanningBoard"
+          ]
+        }
+      ],
+      "exports": [
+        "DevPreviewPage"
+      ],
+      "totalLines": 25,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/events/event-calendar.tsx": {
+      "filePath": "src/app/events/event-calendar.tsx",
+      "contentHash": "82f9fb4cf5304eecc6a25e13a9ae4a4822909a271855372b771487a47fa6e60d",
+      "functions": [
+        {
+          "name": "time",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "asJstCalendarDate",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "EventCalendar",
+          "params": [
+            "{ currentUser, initialEvents, initialParticipants, people, role, preview = false, compact = false }"
+          ],
+          "exported": true,
+          "lineCount": 151
+        },
+        {
+          "name": "EventDetail",
+          "params": [
+            "{ event, participants, names, currentUser, onRespond, onEdit, onCancel, onDelete, onResync, preview }"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "EventForm",
+          "params": [
+            "{ event, isPersonal, onSubmit, onClose }"
+          ],
+          "exported": false,
+          "lineCount": 19
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useEffect",
+            "useMemo",
+            "useRef",
+            "useState"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "addMonths",
+            "addWeeks",
+            "eachDayOfInterval",
+            "endOfMonth",
+            "endOfWeek",
+            "format",
+            "isSameDay",
+            "isSameMonth",
+            "startOfMonth",
+            "startOfWeek",
+            "subMonths",
+            "subWeeks"
+          ]
+        },
+        {
+          "source": "date-fns/locale",
+          "specifiers": [
+            "ja"
+          ]
+        },
+        {
+          "source": "date-fns-tz",
+          "specifiers": [
+            "formatInTimeZone",
+            "toZonedTime"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "ChevronLeft",
+            "ChevronRight",
+            "CircleX",
+            "Pencil",
+            "Plus",
+            "Shield",
+            "Trash2",
+            "Users",
+            "X"
+          ]
+        },
+        {
+          "source": "sonner",
+          "specifiers": [
+            "toast"
+          ]
+        },
+        {
+          "source": "next/link",
+          "specifiers": [
+            "Link"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "AllowedEmailRole",
+            "Database",
+            "EventParticipantStatus",
+            "EventStatus",
+            "GoogleSyncStatus"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Profile"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/components/ui/input",
+          "specifiers": [
+            "Input"
+          ]
+        },
+        {
+          "source": "@/components/ui/dialog",
+          "specifiers": [
+            "Dialog",
+            "DialogContent",
+            "DialogDescription",
+            "DialogHeader",
+            "DialogTitle"
+          ]
+        },
+        {
+          "source": "@/components/sign-out-button",
+          "specifiers": [
+            "SignOutButton"
+          ]
+        },
+        {
+          "source": "@/components/app-header",
+          "specifiers": [
+            "AppHeader"
+          ]
+        },
+        {
+          "source": "@/components/night-beach-scene",
+          "specifiers": [
+            "NightScene"
+          ]
+        },
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "useRouter"
+          ]
+        }
+      ],
+      "exports": [
+        "EventCalendar"
+      ],
+      "totalLines": 213,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/events/loading.tsx": {
+      "filePath": "src/app/events/loading.tsx",
+      "contentHash": "4d4e4a8ff8dfec94e97d87368040ef44ec772efaeb2c24ae305419880edaedfd",
+      "functions": [
+        {
+          "name": "Skeleton",
+          "params": [
+            "{ className = \"\" }"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "Loading",
+          "params": [],
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "Loading"
+      ],
+      "totalLines": 20,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/events/page.tsx": {
+      "filePath": "src/app/events/page.tsx",
+      "contentHash": "32beb876864be4661d432011c5afc209dde497656806f17a8f7b84ed33d80877",
+      "functions": [
+        {
+          "name": "EventsPage",
+          "params": [],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "redirect"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "AllowedEmailRole"
+          ]
+        },
+        {
+          "source": "./event-calendar",
+          "specifiers": [
+            "EventCalendar"
+          ]
+        }
+      ],
+      "exports": [
+        "EventsPage"
+      ],
+      "totalLines": 26,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/globals.css": {
+      "filePath": "src/app/globals.css",
+      "contentHash": "7364c6d2c6e1e412861e7e2d60c22872c4dafc0be7e45d76d015f5c42d0294d4",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 533,
+      "hasStructuralAnalysis": false
+    },
+    "src/app/layout.tsx": {
+      "filePath": "src/app/layout.tsx",
+      "contentHash": "1bb011f62356268fb195cb3905d0f75490ceafe817329abea62d7e71056d4dfd",
+      "functions": [
+        {
+          "name": "RootLayout",
+          "params": [
+            "{ children }"
+          ],
+          "exported": true,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next",
+          "specifiers": [
+            "Metadata"
+          ]
+        },
+        {
+          "source": "next/font/google",
+          "specifiers": [
+            "Geist",
+            "Geist_Mono",
+            "Zen_Kaku_Gothic_New"
+          ]
+        },
+        {
+          "source": "@/components/ui/sonner",
+          "specifiers": [
+            "Toaster"
+          ]
+        },
+        {
+          "source": "./globals.css",
+          "specifiers": []
+        }
+      ],
+      "exports": [
+        "metadata",
+        "RootLayout"
+      ],
+      "totalLines": 42,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/login/login-button.tsx": {
+      "filePath": "src/app/login/login-button.tsx",
+      "contentHash": "74075b6f14ecdf4e2a2f35a8e03bd5172acb80ff72ae8580fad9f8ca76461b9d",
+      "functions": [
+        {
+          "name": "LoginButton",
+          "params": [
+            "{ next, local }"
+          ],
+          "exported": true,
+          "lineCount": 67
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button",
+            "buttonVariants"
+          ]
+        }
+      ],
+      "exports": [
+        "LoginButton"
+      ],
+      "totalLines": 74,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/login/page.tsx": {
+      "filePath": "src/app/login/page.tsx",
+      "contentHash": "39ab5a6c0ed6e0d93122afc23e902e542521eda5621a018029088c5ed713383a",
+      "functions": [
+        {
+          "name": "isLocalSupabaseUrl",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 13
+        },
+        {
+          "name": "LoginPage",
+          "params": [
+            "{\n  searchParams,\n}"
+          ],
+          "exported": true,
+          "lineCount": 24
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "./login-button",
+          "specifiers": [
+            "LoginButton"
+          ]
+        }
+      ],
+      "exports": [
+        "LoginPage"
+      ],
+      "totalLines": 41,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/page.tsx": {
+      "filePath": "src/app/page.tsx",
+      "contentHash": "0fa6580210e0106d8c8328f16277dacc810027438ee29a507cf6b5803d34b3be",
+      "functions": [
+        {
+          "name": "HomePage",
+          "params": [],
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "redirect"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "getDevPreviewData",
+            "isDevPreviewEnabled"
+          ]
+        },
+        {
+          "source": "./events/event-calendar",
+          "specifiers": [
+            "EventCalendar"
+          ]
+        }
+      ],
+      "exports": [
+        "HomePage"
+      ],
+      "totalLines": 12,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/planning/_components/planning-board.tsx": {
+      "filePath": "src/app/planning/_components/planning-board.tsx",
+      "contentHash": "4df7d99e6259f988b0e53d4d6ec494f52501d950e266c07bf31983fad10ecd6f",
+      "functions": [
+        {
+          "name": "PlanningBoard",
+          "params": [
+            "{ currentUser, members, initialSlots = [], preview = false, onEventCreated, initialDate, initialStart, initialMemberIds }"
+          ],
+          "exported": true,
+          "lineCount": 345
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useCallback",
+            "useEffect",
+            "useMemo",
+            "useRef",
+            "useState"
+          ]
+        },
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "useRouter",
+            "useSearchParams"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "addDays",
+            "format",
+            "isToday",
+            "startOfWeek"
+          ]
+        },
+        {
+          "source": "date-fns/locale",
+          "specifiers": [
+            "ja"
+          ]
+        },
+        {
+          "source": "sonner",
+          "specifiers": [
+            "toast"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "CalendarPlus",
+            "ChevronLeft",
+            "ChevronRight"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "addDevEvent"
+          ]
+        },
+        {
+          "source": "@/lib/availability",
+          "specifiers": [
+            "expandToSlots",
+            "jstToday",
+            "minutesToTime",
+            "TimeRange"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Profile",
+            "Slot"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/components/ui/input",
+          "specifiers": [
+            "Input"
+          ]
+        },
+        {
+          "source": "@/components/ui/checkbox",
+          "specifiers": [
+            "Checkbox"
+          ]
+        },
+        {
+          "source": "@/components/app-header",
+          "specifiers": [
+            "AppHeader"
+          ]
+        },
+        {
+          "source": "@/components/night-beach-scene",
+          "specifiers": [
+            "NightScene"
+          ]
+        }
+      ],
+      "exports": [
+        "PlanningBoard"
+      ],
+      "totalLines": 371,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/planning/loading.tsx": {
+      "filePath": "src/app/planning/loading.tsx",
+      "contentHash": "91ebb302458a1a5a0f2370a54251c8c8d9f82e28e5e9416d3561c3b2f429ff7f",
+      "functions": [
+        {
+          "name": "Skeleton",
+          "params": [
+            "{ className = \"\" }"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "Loading",
+          "params": [],
+          "exported": true,
+          "lineCount": 9
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "Loading"
+      ],
+      "totalLines": 14,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/planning/page.tsx": {
+      "filePath": "src/app/planning/page.tsx",
+      "contentHash": "d539df96776c9a455a3cc767635a05116050d9092e86ccfe80e93ad03724e53a",
+      "functions": [
+        {
+          "name": "parsePlanningQuery",
+          "params": [
+            "params",
+            "allowedIds"
+          ],
+          "returnType": "PlanningQuery",
+          "exported": true,
+          "lineCount": 8
+        },
+        {
+          "name": "PlanningPage",
+          "params": [
+            "{ searchParams }"
+          ],
+          "exported": true,
+          "lineCount": 18
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "redirect"
+          ]
+        },
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "format",
+            "isValid",
+            "parseISO"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/server",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "getDevPlanningData",
+            "isDevPreviewEnabled"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "ActiveProfile"
+          ]
+        },
+        {
+          "source": "./_components/planning-board",
+          "specifiers": [
+            "PlanningBoard"
+          ]
+        }
+      ],
+      "exports": [
+        "parsePlanningQuery",
+        "PlanningPage"
+      ],
+      "totalLines": 41,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/setup-nickname/nickname-form.tsx": {
+      "filePath": "src/app/setup-nickname/nickname-form.tsx",
+      "contentHash": "c452d6f29cebe2abf6e07f866b36c26d3404e6e09ed71aa42783f2319bbe182f",
+      "functions": [
+        {
+          "name": "NicknameForm",
+          "params": [],
+          "exported": true,
+          "lineCount": 58
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState"
+          ]
+        },
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "useRouter"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "@/components/ui/input",
+          "specifiers": [
+            "Input"
+          ]
+        },
+        {
+          "source": "@/components/ui/label",
+          "specifiers": [
+            "Label"
+          ]
+        }
+      ],
+      "exports": [
+        "NicknameForm"
+      ],
+      "totalLines": 68,
+      "hasStructuralAnalysis": true
+    },
+    "src/app/setup-nickname/page.tsx": {
+      "filePath": "src/app/setup-nickname/page.tsx",
+      "contentHash": "b139961cea99613a32f38cb418acf8f052c7aab7e70a6913550f8cce985dd10c",
+      "functions": [
+        {
+          "name": "SetupNicknamePage",
+          "params": [],
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "./nickname-form",
+          "specifiers": [
+            "NicknameForm"
+          ]
+        }
+      ],
+      "exports": [
+        "SetupNicknamePage"
+      ],
+      "totalLines": 18,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/app-header.tsx": {
+      "filePath": "src/components/app-header.tsx",
+      "contentHash": "32b1ed267b9bd469e62b8ac7a655bbf5aa2d34d03012fdde6bcf0cfdedd2cf7a",
+      "functions": [
+        {
+          "name": "AppHeader",
+          "params": [
+            "{\n  current,\n  children,\n  onBeforeNavigate,\n}"
+          ],
+          "exported": true,
+          "lineCount": 37
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/link",
+          "specifiers": [
+            "Link"
+          ]
+        },
+        {
+          "source": "react",
+          "specifiers": [
+            "ReactNode"
+          ]
+        }
+      ],
+      "exports": [
+        "AppHeader"
+      ],
+      "totalLines": 51,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/night-beach-scene.tsx": {
+      "filePath": "src/components/night-beach-scene.tsx",
+      "contentHash": "6f89119bc5d2439c4ecc05cabfd381ef0434b8d09b443200ca725b95da0fed52",
+      "functions": [
+        {
+          "name": "NightScene",
+          "params": [],
+          "exported": true,
+          "lineCount": 46
+        }
+      ],
+      "classes": [],
+      "imports": [],
+      "exports": [
+        "NightScene"
+      ],
+      "totalLines": 47,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/sign-out-button.tsx": {
+      "filePath": "src/components/sign-out-button.tsx",
+      "contentHash": "1251d5f96bc96a8ffdb6fb58626efde9ae3a55cf83c78d46592b2cba4d658e26",
+      "functions": [
+        {
+          "name": "SignOutButton",
+          "params": [
+            "{\n  variant = \"outline\",\n}"
+          ],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "useState"
+          ]
+        },
+        {
+          "source": "next/navigation",
+          "specifiers": [
+            "useRouter"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/client",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        }
+      ],
+      "exports": [
+        "SignOutButton"
+      ],
+      "totalLines": 28,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/badge.tsx": {
+      "filePath": "src/components/ui/badge.tsx",
+      "contentHash": "968b0403af74a785c9408ca69a677235e49d0c80b2c27fb9858ad421a8778c7d",
+      "functions": [
+        {
+          "name": "Badge",
+          "params": [
+            "{\n  className,\n  variant = \"default\",\n  render,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 21
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@base-ui/react/merge-props",
+          "specifiers": [
+            "mergeProps"
+          ]
+        },
+        {
+          "source": "@base-ui/react/use-render",
+          "specifiers": [
+            "useRender"
+          ]
+        },
+        {
+          "source": "class-variance-authority",
+          "specifiers": [
+            "cva",
+            "VariantProps"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Badge",
+        "badgeVariants"
+      ],
+      "totalLines": 53,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/button.tsx": {
+      "filePath": "src/components/ui/button.tsx",
+      "contentHash": "d14549ab3ba7a9d5d1f424c2599233bffa0b317121abf3b6efa2fb902d5e2781",
+      "functions": [
+        {
+          "name": "Button",
+          "params": [
+            "{\n  className,\n  variant = \"default\",\n  size = \"default\",\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@base-ui/react/button",
+          "specifiers": [
+            "ButtonPrimitive"
+          ]
+        },
+        {
+          "source": "class-variance-authority",
+          "specifiers": [
+            "cva",
+            "VariantProps"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Button",
+        "buttonVariants"
+      ],
+      "totalLines": 59,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/checkbox.tsx": {
+      "filePath": "src/components/ui/checkbox.tsx",
+      "contentHash": "3d2d0b3d87a19aad65821e4cdb1c4bb149209778bea271b1f98265383cddd6d5",
+      "functions": [
+        {
+          "name": "Checkbox",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 20
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@base-ui/react/checkbox",
+          "specifiers": [
+            "CheckboxPrimitive"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "CheckIcon"
+          ]
+        }
+      ],
+      "exports": [
+        "Checkbox"
+      ],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/dialog.tsx": {
+      "filePath": "src/components/ui/dialog.tsx",
+      "contentHash": "1d852f10325188ef93f03c963111264ae8dc4c05588aa3c03abb58d5c416dc53",
+      "functions": [
+        {
+          "name": "Dialog",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "DialogTrigger",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "DialogPortal",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "DialogClose",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "DialogOverlay",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "DialogContent",
+          "params": [
+            "{\n  className,\n  children,\n  showCloseButton = true,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 40
+        },
+        {
+          "name": "DialogHeader",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "DialogFooter",
+          "params": [
+            "{\n  className,\n  showCloseButton = false,\n  children,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "DialogTitle",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "DialogDescription",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 15
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "* as React"
+          ]
+        },
+        {
+          "source": "@base-ui/react/dialog",
+          "specifiers": [
+            "DialogPrimitive"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        },
+        {
+          "source": "@/components/ui/button",
+          "specifiers": [
+            "Button"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "XIcon"
+          ]
+        }
+      ],
+      "exports": [
+        "Dialog",
+        "DialogClose",
+        "DialogContent",
+        "DialogDescription",
+        "DialogFooter",
+        "DialogHeader",
+        "DialogOverlay",
+        "DialogPortal",
+        "DialogTitle",
+        "DialogTrigger"
+      ],
+      "totalLines": 161,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/input.tsx": {
+      "filePath": "src/components/ui/input.tsx",
+      "contentHash": "f7d6ecff9a4d631feeaf401c02bb87e26ddb38131c55d15a43b9290747390847",
+      "functions": [
+        {
+          "name": "Input",
+          "params": [
+            "{ className, type, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 13
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "* as React"
+          ]
+        },
+        {
+          "source": "@base-ui/react/input",
+          "specifiers": [
+            "InputPrimitive"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Input"
+      ],
+      "totalLines": 21,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/label.tsx": {
+      "filePath": "src/components/ui/label.tsx",
+      "contentHash": "7f19b8476658d25ff197c84030e58cd7395059d876a54630e025951e474ebdae",
+      "functions": [
+        {
+          "name": "Label",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 12
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "* as React"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Label"
+      ],
+      "totalLines": 21,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/popover.tsx": {
+      "filePath": "src/components/ui/popover.tsx",
+      "contentHash": "67aa5f28d07c6b149d9d30d173af78d6640f9bca18138bfb16b98e66973974b9",
+      "functions": [
+        {
+          "name": "Popover",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "PopoverTrigger",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "PopoverContent",
+          "params": [
+            "{\n  className,\n  align = \"center\",\n  alignOffset = 0,\n  side = \"bottom\",\n  sideOffset = 4,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 33
+        },
+        {
+          "name": "PopoverHeader",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "PopoverTitle",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "PopoverDescription",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 12
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "* as React"
+          ]
+        },
+        {
+          "source": "@base-ui/react/popover",
+          "specifiers": [
+            "PopoverPrimitive"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Popover",
+        "PopoverContent",
+        "PopoverDescription",
+        "PopoverHeader",
+        "PopoverTitle",
+        "PopoverTrigger"
+      ],
+      "totalLines": 91,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/select.tsx": {
+      "filePath": "src/components/ui/select.tsx",
+      "contentHash": "ca3bd1b370ea67b84632d435c22d8270752fa6013c06c365162af265e4a0e87e",
+      "functions": [
+        {
+          "name": "SelectGroup",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "SelectValue",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "SelectTrigger",
+          "params": [
+            "{\n  className,\n  size = \"default\",\n  children,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "SelectContent",
+          "params": [
+            "{\n  className,\n  children,\n  side = \"bottom\",\n  sideOffset = 4,\n  align = \"center\",\n  alignOffset = 0,\n  alignItemWithTrigger = true,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 38
+        },
+        {
+          "name": "SelectLabel",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "SelectItem",
+          "params": [
+            "{\n  className,\n  children,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 27
+        },
+        {
+          "name": "SelectSeparator",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "SelectScrollUpButton",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "SelectScrollDownButton",
+          "params": [
+            "{\n  className,\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 18
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "react",
+          "specifiers": [
+            "* as React"
+          ]
+        },
+        {
+          "source": "@base-ui/react/select",
+          "specifiers": [
+            "SelectPrimitive"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "ChevronDownIcon",
+            "CheckIcon",
+            "ChevronUpIcon"
+          ]
+        }
+      ],
+      "exports": [
+        "Select",
+        "SelectContent",
+        "SelectGroup",
+        "SelectItem",
+        "SelectLabel",
+        "SelectScrollDownButton",
+        "SelectScrollUpButton",
+        "SelectSeparator",
+        "SelectTrigger",
+        "SelectValue"
+      ],
+      "totalLines": 202,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/separator.tsx": {
+      "filePath": "src/components/ui/separator.tsx",
+      "contentHash": "75085bd84ff6965e4a356c53a4689799cabf65caa93c0bba064d5a0c6fa78f13",
+      "functions": [
+        {
+          "name": "Separator",
+          "params": [
+            "{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 17
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@base-ui/react/separator",
+          "specifiers": [
+            "SeparatorPrimitive"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Separator"
+      ],
+      "totalLines": 26,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/sonner.tsx": {
+      "filePath": "src/components/ui/sonner.tsx",
+      "contentHash": "2dd975ad2170ba2570b00e58713dcbda90f26a7fffdaceb1ef7255f450c2d2a6",
+      "functions": [
+        {
+          "name": "Toaster",
+          "params": [
+            "{ ...props }"
+          ],
+          "exported": true,
+          "lineCount": 41
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next-themes",
+          "specifiers": [
+            "useTheme"
+          ]
+        },
+        {
+          "source": "sonner",
+          "specifiers": [
+            "Sonner",
+            "ToasterProps"
+          ]
+        },
+        {
+          "source": "lucide-react",
+          "specifiers": [
+            "CircleCheckIcon",
+            "InfoIcon",
+            "TriangleAlertIcon",
+            "OctagonXIcon",
+            "Loader2Icon"
+          ]
+        }
+      ],
+      "exports": [
+        "Toaster"
+      ],
+      "totalLines": 50,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/tabs.tsx": {
+      "filePath": "src/components/ui/tabs.tsx",
+      "contentHash": "8bf9ee3935ab86c268a2a71cb5b4b67d3d5587ca9f2e0bf25f37ffdb1980434c",
+      "functions": [
+        {
+          "name": "Tabs",
+          "params": [
+            "{\n  className,\n  orientation = \"horizontal\",\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 17
+        },
+        {
+          "name": "TabsList",
+          "params": [
+            "{\n  className,\n  variant = \"default\",\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 14
+        },
+        {
+          "name": "TabsTrigger",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "TabsContent",
+          "params": [
+            "{ className, ...props }"
+          ],
+          "exported": true,
+          "lineCount": 9
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@base-ui/react/tabs",
+          "specifiers": [
+            "TabsPrimitive"
+          ]
+        },
+        {
+          "source": "class-variance-authority",
+          "specifiers": [
+            "cva",
+            "VariantProps"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Tabs",
+        "TabsList",
+        "TabsTrigger",
+        "TabsContent",
+        "tabsListVariants"
+      ],
+      "totalLines": 83,
+      "hasStructuralAnalysis": true
+    },
+    "src/components/ui/toggle.tsx": {
+      "filePath": "src/components/ui/toggle.tsx",
+      "contentHash": "290d2cd01c768d1e3c894bfebcf9c3d1532191ae7ec1e48da1e405dab0a95c4c",
+      "functions": [
+        {
+          "name": "Toggle",
+          "params": [
+            "{\n  className,\n  variant = \"default\",\n  size = \"default\",\n  ...props\n}"
+          ],
+          "exported": true,
+          "lineCount": 14
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@base-ui/react/toggle",
+          "specifiers": [
+            "TogglePrimitive"
+          ]
+        },
+        {
+          "source": "class-variance-authority",
+          "specifiers": [
+            "cva",
+            "VariantProps"
+          ]
+        },
+        {
+          "source": "@/lib/utils",
+          "specifiers": [
+            "cn"
+          ]
+        }
+      ],
+      "exports": [
+        "Toggle",
+        "toggleVariants"
+      ],
+      "totalLines": 46,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/availability.ts": {
+      "filePath": "src/lib/availability.ts",
+      "contentHash": "a002fd7701ca49b0eafc7d9e19a0f39a91ef7ebcfbdfa866dbb3405ac9a47890",
+      "functions": [
+        {
+          "name": "jstNow",
+          "params": [],
+          "returnType": "Date",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "jstToday",
+          "params": [],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "registrableWindow",
+          "params": [],
+          "returnType": "{ min: string; max: string }",
+          "exported": true,
+          "lineCount": 12
+        },
+        {
+          "name": "isDateEditable",
+          "params": [
+            "dateStr",
+            "window"
+          ],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "monthGridRange",
+          "params": [
+            "date"
+          ],
+          "returnType": "{ start: Date; end: Date }",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "applyAvailabilityOperations",
+          "params": [
+            "serverSlots",
+            "operations",
+            "currentUserId"
+          ],
+          "returnType": "import(\"./types\").Slot[]",
+          "exported": true,
+          "lineCount": 54
+        },
+        {
+          "name": "endMinutes",
+          "params": [
+            "time"
+          ],
+          "returnType": "number",
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "startMinutes",
+          "params": [
+            "time"
+          ],
+          "returnType": "number",
+          "exported": true,
+          "lineCount": 4
+        },
+        {
+          "name": "minutesToTime",
+          "params": [
+            "min"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 6
+        },
+        {
+          "name": "isRangeCovered",
+          "params": [
+            "ranges",
+            "start",
+            "end"
+          ],
+          "exported": true,
+          "lineCount": 15
+        },
+        {
+          "name": "formatTimeLabel",
+          "params": [
+            "time",
+            "isEnd"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "expandToSlots",
+          "params": [
+            "ranges"
+          ],
+          "returnType": "string[]",
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "cellsToRanges",
+          "params": [
+            "cells"
+          ],
+          "returnType": "TimeRange[]",
+          "exported": false,
+          "lineCount": 16
+        },
+        {
+          "name": "computeDaySummaries",
+          "params": [
+            "dates",
+            "members",
+            "visibleIds",
+            "slots"
+          ],
+          "returnType": "Map<string, DaySummary>",
+          "exported": true,
+          "lineCount": 37
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "date-fns",
+          "specifiers": [
+            "endOfMonth",
+            "endOfWeek",
+            "startOfMonth",
+            "startOfWeek"
+          ]
+        },
+        {
+          "source": "date-fns-tz",
+          "specifiers": [
+            "formatInTimeZone",
+            "toZonedTime"
+          ]
+        }
+      ],
+      "exports": [
+        "APP_TIME_ZONE",
+        "jstNow",
+        "jstToday",
+        "registrableWindow",
+        "isDateEditable",
+        "monthGridRange",
+        "applyAvailabilityOperations",
+        "endMinutes",
+        "startMinutes",
+        "minutesToTime",
+        "isRangeCovered",
+        "formatTimeLabel",
+        "expandToSlots",
+        "computeDaySummaries"
+      ],
+      "totalLines": 243,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/cancellation-email.ts": {
+      "filePath": "src/lib/cancellation-email.ts",
+      "contentHash": "bf1849032e9d8cac8e2e2c3d07aea7eca6d49a2a0ed616d056688d1ebd616a15",
+      "functions": [
+        {
+          "name": "escapeHtml",
+          "params": [
+            "value"
+          ],
+          "exported": false,
+          "lineCount": 1
+        },
+        {
+          "name": "buildCancellationEmail",
+          "params": [
+            "to",
+            "event",
+            "from"
+          ],
+          "exported": true,
+          "lineCount": 11
+        },
+        {
+          "name": "sendCancellationEmail",
+          "params": [
+            "to",
+            "event",
+            "options"
+          ],
+          "returnType": "Promise<ResendResult>",
+          "exported": true,
+          "lineCount": 21
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "server-only",
+          "specifiers": []
+        }
+      ],
+      "exports": [
+        "buildCancellationEmail",
+        "sendCancellationEmail"
+      ],
+      "totalLines": 47,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/cloudflare-access.ts": {
+      "filePath": "src/lib/cloudflare-access.ts",
+      "contentHash": "27602dfc547a4018c4e1991e8814440fb76e54117c4be1cf236d4172f6e0b8c3",
+      "functions": [
+        {
+          "name": "required",
+          "params": [
+            "name"
+          ],
+          "exported": false,
+          "lineCount": 5
+        },
+        {
+          "name": "isLoopbackSupabaseUrl",
+          "params": [
+            "value"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "isLocalAuthAllowed",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "teamDomain",
+          "params": [],
+          "exported": false,
+          "lineCount": 8
+        },
+        {
+          "name": "cloudflareAppOrigin",
+          "params": [],
+          "exported": true,
+          "lineCount": 16
+        },
+        {
+          "name": "isExpectedCloudflareAppRequest",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 7
+        },
+        {
+          "name": "appOriginForRequest",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 5
+        },
+        {
+          "name": "verifyCloudflareAccessToken",
+          "params": [
+            "token"
+          ],
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "cloudflareLogoutUrl",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "cloudflareAccessToken",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "server-only",
+          "specifiers": []
+        },
+        {
+          "source": "jose",
+          "specifiers": [
+            "createRemoteJWKSet",
+            "jwtVerify"
+          ]
+        }
+      ],
+      "exports": [
+        "isLoopbackSupabaseUrl",
+        "isLocalAuthAllowed",
+        "cloudflareAppOrigin",
+        "isExpectedCloudflareAppRequest",
+        "appOriginForRequest",
+        "verifyCloudflareAccessToken",
+        "cloudflareLogoutUrl",
+        "cloudflareAccessToken"
+      ],
+      "totalLines": 103,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/cloudflare-auth-bridge.ts": {
+      "filePath": "src/lib/cloudflare-auth-bridge.ts",
+      "contentHash": "4303f809464330641e197751a13819761be31efc9b17121f7843700c657f92cd",
+      "functions": [
+        {
+          "name": "safeNextPath",
+          "params": [
+            "value",
+            "origin"
+          ],
+          "exported": true,
+          "lineCount": 9
+        },
+        {
+          "name": "generateSupabaseMagicLinkIfAllowed",
+          "params": [
+            "admin",
+            "email"
+          ],
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "generateSupabaseMagicLink",
+          "params": [
+            "admin",
+            "email"
+          ],
+          "exported": true,
+          "lineCount": 7
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "server-only",
+          "specifiers": []
+        }
+      ],
+      "exports": [
+        "safeNextPath",
+        "generateSupabaseMagicLinkIfAllowed",
+        "generateSupabaseMagicLink"
+      ],
+      "totalLines": 62,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/database.types.ts": {
+      "filePath": "src/lib/database.types.ts",
+      "contentHash": "79c9e31c334ac60eb2361a535654647d9a728c346cd9d5d33fe29d30f3cb52fd",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 256,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/dev-auth.ts": {
+      "filePath": "src/lib/dev-auth.ts",
+      "contentHash": "7bfe0ab198284aac6370555fc903a3ccc34fb429cf66f2295700a7195a382b13",
+      "functions": [
+        {
+          "name": "isDevPreviewEnabled",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "getDevPreviewData",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "getDevAvailabilityData",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "getDevPlanningData",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "addDevEvent",
+          "params": [
+            "event"
+          ],
+          "returnType": "Event",
+          "exported": true,
+          "lineCount": 5
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Profile"
+          ]
+        },
+        {
+          "source": "@/lib/types",
+          "specifiers": [
+            "Preset",
+            "Slot"
+          ]
+        }
+      ],
+      "exports": [
+        "isDevPreviewEnabled",
+        "getDevPreviewData",
+        "getDevAvailabilityData",
+        "getDevPlanningData",
+        "addDevEvent"
+      ],
+      "totalLines": 135,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/google-calendar.ts": {
+      "filePath": "src/lib/google-calendar.ts",
+      "contentHash": "deec83e36c2a82a3a9f4324ac29a3761cc49e897c2b4741c9bda5d9e71fd0c80",
+      "functions": [
+        {
+          "name": "getConfig",
+          "params": [],
+          "returnType": "{ credentials: ServiceAccountCredentials; calendarId: string } | null",
+          "exported": false,
+          "lineCount": 11
+        },
+        {
+          "name": "isConfigured",
+          "params": [],
+          "returnType": "boolean",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "parseTokenError",
+          "params": [
+            "res"
+          ],
+          "returnType": "Promise<string>",
+          "exported": false,
+          "lineCount": 14
+        },
+        {
+          "name": "getAccessToken",
+          "params": [
+            "creds"
+          ],
+          "returnType": "Promise<string>",
+          "exported": true,
+          "lineCount": 37
+        },
+        {
+          "name": "resetTokenCache",
+          "params": [],
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "appEventIdToGoogleId",
+          "params": [
+            "uuid"
+          ],
+          "returnType": "string",
+          "exported": true,
+          "lineCount": 3
+        },
+        {
+          "name": "toGoogleEvent",
+          "params": [
+            "event"
+          ],
+          "returnType": "GoogleCalendarEventBody",
+          "exported": true,
+          "lineCount": 13
+        },
+        {
+          "name": "calendarFetch",
+          "params": [
+            "token",
+            "path",
+            "init"
+          ],
+          "exported": false,
+          "lineCount": 10
+        },
+        {
+          "name": "upsertGoogleEvent",
+          "params": [
+            "token",
+            "calendarId",
+            "appEventId",
+            "body"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "deleteGoogleEvent",
+          "params": [
+            "token",
+            "calendarId",
+            "appEventId"
+          ],
+          "returnType": "Promise<void>",
+          "exported": true,
+          "lineCount": 18
+        },
+        {
+          "name": "syncEventToGoogle",
+          "params": [
+            "event"
+          ],
+          "returnType": "Promise<SyncResult>",
+          "exported": true,
+          "lineCount": 26
+        },
+        {
+          "name": "checkSyncPermission",
+          "params": [
+            "params"
+          ],
+          "returnType": "{ ok: true } | { ok: false; status: number; error: string }",
+          "exported": true,
+          "lineCount": 12
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "server-only",
+          "specifiers": []
+        },
+        {
+          "source": "jose",
+          "specifiers": [
+            "importPKCS8",
+            "SignJWT"
+          ]
+        }
+      ],
+      "exports": [
+        "isConfigured",
+        "getAccessToken",
+        "resetTokenCache",
+        "appEventIdToGoogleId",
+        "toGoogleEvent",
+        "upsertGoogleEvent",
+        "deleteGoogleEvent",
+        "syncEventToGoogle",
+        "checkSyncPermission"
+      ],
+      "totalLines": 211,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/supabase/admin.ts": {
+      "filePath": "src/lib/supabase/admin.ts",
+      "contentHash": "33abcc72cd1bd444efd9b08d9a3a49bfa708cd3da24aa16f27111a5213dfc1a0",
+      "functions": [
+        {
+          "name": "createAdminClient",
+          "params": [],
+          "exported": true,
+          "lineCount": 10
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "server-only",
+          "specifiers": []
+        },
+        {
+          "source": "@supabase/supabase-js",
+          "specifiers": [
+            "createClient"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        }
+      ],
+      "exports": [
+        "createAdminClient"
+      ],
+      "totalLines": 17,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/supabase/client.ts": {
+      "filePath": "src/lib/supabase/client.ts",
+      "contentHash": "bf6115d8311b1031f52c6dd826b5b0fc8d99c71833dddc196a46de98efa31869",
+      "functions": [
+        {
+          "name": "createClient",
+          "params": [],
+          "exported": true,
+          "lineCount": 6
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@supabase/ssr",
+          "specifiers": [
+            "createBrowserClient"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        }
+      ],
+      "exports": [
+        "createClient"
+      ],
+      "totalLines": 10,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/supabase/proxy.ts": {
+      "filePath": "src/lib/supabase/proxy.ts",
+      "contentHash": "fe59a9b9d516b77f0ac6595b00809dad0a2484c6308fec907b2bdcf4e185ab8e",
+      "functions": [
+        {
+          "name": "isPublicPath",
+          "params": [
+            "pathname"
+          ],
+          "exported": false,
+          "lineCount": 3
+        },
+        {
+          "name": "updateSession",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 129
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@supabase/ssr",
+          "specifiers": [
+            "createServerClient"
+          ]
+        },
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextResponse",
+            "NextRequest"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        },
+        {
+          "source": "@/lib/dev-auth",
+          "specifiers": [
+            "isDevPreviewEnabled"
+          ]
+        },
+        {
+          "source": "@/lib/cloudflare-access",
+          "specifiers": [
+            "cloudflareAccessToken",
+            "isExpectedCloudflareAppRequest",
+            "isLocalAuthAllowed",
+            "verifyCloudflareAccessToken"
+          ]
+        }
+      ],
+      "exports": [
+        "updateSession"
+      ],
+      "totalLines": 147,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/supabase/server.ts": {
+      "filePath": "src/lib/supabase/server.ts",
+      "contentHash": "c9160f151a20f753ab81719fd3bff9abbb077ba72bd908a5f451d054fa379f6a",
+      "functions": [
+        {
+          "name": "createClient",
+          "params": [],
+          "exported": true,
+          "lineCount": 25
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "@supabase/ssr",
+          "specifiers": [
+            "createServerClient"
+          ]
+        },
+        {
+          "source": "next/headers",
+          "specifiers": [
+            "cookies"
+          ]
+        },
+        {
+          "source": "@/lib/database.types",
+          "specifiers": [
+            "Database"
+          ]
+        }
+      ],
+      "exports": [
+        "createClient"
+      ],
+      "totalLines": 31,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/types.ts": {
+      "filePath": "src/lib/types.ts",
+      "contentHash": "779d82217ec37c74987463446ef3ca6dce228e2dbb6ea5c41cef772105cb4bfc",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 25,
+      "hasStructuralAnalysis": true
+    },
+    "src/lib/utils.ts": {
+      "filePath": "src/lib/utils.ts",
+      "contentHash": "7c8c3dfc0cdd370d44932828eb067ef771c8fe7996693221d5d4b90af6d54f2d",
+      "functions": [
+        {
+          "name": "cn",
+          "params": [
+            "...inputs"
+          ],
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "clsx",
+          "specifiers": [
+            "clsx",
+            "ClassValue"
+          ]
+        },
+        {
+          "source": "tailwind-merge",
+          "specifiers": [
+            "twMerge"
+          ]
+        }
+      ],
+      "exports": [
+        "cn"
+      ],
+      "totalLines": 7,
+      "hasStructuralAnalysis": true
+    },
+    "src/middleware.ts": {
+      "filePath": "src/middleware.ts",
+      "contentHash": "b69629bbf5a3447b2db88458247e0a5d341ba3c8b2bb041522d8c9465872946b",
+      "functions": [
+        {
+          "name": "middleware",
+          "params": [
+            "request"
+          ],
+          "exported": true,
+          "lineCount": 3
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "next/server",
+          "specifiers": [
+            "NextRequest"
+          ]
+        },
+        {
+          "source": "@/lib/supabase/proxy",
+          "specifiers": [
+            "updateSession"
+          ]
+        }
+      ],
+      "exports": [
+        "middleware",
+        "config"
+      ],
+      "totalLines": 16,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/config.toml": {
+      "filePath": "supabase/config.toml",
+      "contentHash": "f8979327b4d9beca02d086029fad2dbbd721231fd86c86c521b5be012bfa3239",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 415,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/local/README.md": {
+      "filePath": "supabase/local/README.md",
+      "contentHash": "e63c131ca333c816a8401b2a4ae3cf73e106a267f6ca83a1cbba267022545dde",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 46,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/local/cleanup.sql": {
+      "filePath": "supabase/local/cleanup.sql",
+      "contentHash": "d18c22584782699d094d47e5053c1c59894bad24481a1ec962193b5b0ee25139",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 26,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/local/fixture.sql": {
+      "filePath": "supabase/local/fixture.sql",
+      "contentHash": "a39db4ae4f53ed212a7570835bd800c3a499b8dc521b381d40dc623e3197d3a8",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 85,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/manual/README.md": {
+      "filePath": "supabase/manual/README.md",
+      "contentHash": "e1ad5b42a1e01656aaf6b8c88b95c29c4a75a465f1e3a79e53a4cbc7576d4543",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 22,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/manual/cleanup_real_google_ui_fixture.sql": {
+      "filePath": "supabase/manual/cleanup_real_google_ui_fixture.sql",
+      "contentHash": "16e9bf959b29c40d64d27116f850a17a66be5e2383c8d40c08872b863721cd92",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 54,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/manual/real_google_ui_fixture.sql": {
+      "filePath": "supabase/manual/real_google_ui_fixture.sql",
+      "contentHash": "1e4cf943844f2aa52e6716065d30abb0b519cd77b094561589adef5aa6a0dd17",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 135,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0001_init.sql": {
+      "filePath": "supabase/migrations/0001_init.sql",
+      "contentHash": "42d093bd1c49c8917af799f9b705c79735fa9341f1924da0f7a5a2f4e63e2294",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 475,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0002_secure_profile_and_availability_writes.sql": {
+      "filePath": "supabase/migrations/0002_secure_profile_and_availability_writes.sql",
+      "contentHash": "1901a5e1d212ec1a52b60235d8cf852c0aa4a6483b85f8eaa6714825745a46d8",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 50,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0003_harden_authorization_and_availability.sql": {
+      "filePath": "supabase/migrations/0003_harden_authorization_and_availability.sql",
+      "contentHash": "ea465f89b2c0e474176d776d04e3ae8ca569a41e15f70695fc055875094fdf78",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 168,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0004_admin_roles.sql": {
+      "filePath": "supabase/migrations/0004_admin_roles.sql",
+      "contentHash": "038eeb180f900facefe5c624f6a6fa12a65b43550b3cd5b2dfa9faee9346f321",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 123,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0005_admin_access_controls.sql": {
+      "filePath": "supabase/migrations/0005_admin_access_controls.sql",
+      "contentHash": "24264bb2427eac04b0fb8706d3437af489d3ede7eebb27902a2199bc957ed528",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 98,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0006_batch_availability.sql": {
+      "filePath": "supabase/migrations/0006_batch_availability.sql",
+      "contentHash": "488bf7f75a72ab37990c2f722c395a7b54a2bb49d1b6df985f440165e26d291a",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 102,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0007_super_user_delete_event.sql": {
+      "filePath": "supabase/migrations/0007_super_user_delete_event.sql",
+      "contentHash": "93af5d71b994623bb5fe5995817ac42c7fd784072e4a6df1b0894e911faa3004",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 31,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0008_google_calendar_sync.sql": {
+      "filePath": "supabase/migrations/0008_google_calendar_sync.sql",
+      "contentHash": "5ea8fe8ee8e4d246188b5f6f372fd5e9d04ccc2a97e2a492de78439ab3c6aaf3",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 9,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0009_active_members_and_admin_nicknames.sql": {
+      "filePath": "supabase/migrations/0009_active_members_and_admin_nicknames.sql",
+      "contentHash": "dc667faafd459f480fa91af8f26cc11e2ffe2a377974dfab441b43c68d791507",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 62,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0010_admin_self_access_protection.sql": {
+      "filePath": "supabase/migrations/0010_admin_self_access_protection.sql",
+      "contentHash": "1b3b92f0fc6722f786406e7b56fcfa1e051b0bf1fa880fb9e371bb5aee087818",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 101,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0011_cancel_event_notifications.sql": {
+      "filePath": "supabase/migrations/0011_cancel_event_notifications.sql",
+      "contentHash": "1f9dd1c5df10ec240e498e9b07523aba02e7ef0baa467b30aae2283c81c0c995",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 123,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/migrations/0012_personal_events.sql": {
+      "filePath": "supabase/migrations/0012_personal_events.sql",
+      "contentHash": "3022df3850ce8ea1edb8d7e9c3a7e604c6c672b8c2f2c470d4d04956c54b9c8d",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 113,
+      "hasStructuralAnalysis": true
+    },
+    "supabase/seed.sql": {
+      "filePath": "supabase/seed.sql",
+      "contentHash": "006f81d52bcd574c82cbd871fa0e2e4241027dc37e36a6de53ee19ff9c1c2744",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 7,
+      "hasStructuralAnalysis": true
+    },
+    "tests/cancel-event-schema.test.ts": {
+      "filePath": "tests/cancel-event-schema.test.ts",
+      "contentHash": "3d24e5b8282be70ecfa6cff9e229603138a11eba20637e6ead6ef46e579194c9",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "fs"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 23,
+      "hasStructuralAnalysis": true
+    },
+    "tests/cancellation-email.test.ts": {
+      "filePath": "tests/cancellation-email.test.ts",
+      "contentHash": "c79f76d09be6a3209223fa20e29bb16d7f683792f4df4a616b1b2ed1faeff75a",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "afterEach",
+            "test"
+          ]
+        },
+        {
+          "source": "../src/lib/cancellation-email.ts",
+          "specifiers": [
+            "buildCancellationEmail",
+            "sendCancellationEmail"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 39,
+      "hasStructuralAnalysis": true
+    },
+    "tests/cloudflare-access.test.ts": {
+      "filePath": "tests/cloudflare-access.test.ts",
+      "contentHash": "2e08970a31a0e4a458da17a8fea0a303721307135b0ed6b6b4c2f385babc1ef1",
+      "functions": [
+        {
+          "name": "token",
+          "params": [
+            "overrides",
+            "key"
+          ],
+          "exported": false,
+          "lineCount": 11
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "before",
+            "test"
+          ]
+        },
+        {
+          "source": "jose",
+          "specifiers": [
+            "exportJWK",
+            "generateKeyPair",
+            "SignJWT"
+          ]
+        },
+        {
+          "source": "../src/lib/cloudflare-access.ts",
+          "specifiers": [
+            "appOriginForRequest",
+            "cloudflareAppOrigin",
+            "isExpectedCloudflareAppRequest",
+            "isLocalAuthAllowed",
+            "isLoopbackSupabaseUrl",
+            "verifyCloudflareAccessToken"
+          ]
+        },
+        {
+          "source": "../src/lib/cloudflare-auth-bridge.ts",
+          "specifiers": [
+            "generateSupabaseMagicLink",
+            "generateSupabaseMagicLinkIfAllowed",
+            "safeNextPath"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 218,
+      "hasStructuralAnalysis": true
+    },
+    "tests/day-summary.test.ts": {
+      "filePath": "tests/day-summary.test.ts",
+      "contentHash": "0bca7e2b670fb2bd5bd6c3d4b8bb250af124e27bad61e89e0d93c3cd4aa8d7ff",
+      "functions": [
+        {
+          "name": "slot",
+          "params": [
+            "user_id",
+            "start_time",
+            "end_time"
+          ],
+          "exported": false,
+          "lineCount": 1
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../src/lib/availability.ts",
+          "specifiers": [
+            "computeDaySummaries"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 51,
+      "hasStructuralAnalysis": true
+    },
+    "tests/event-calendar-sunday-start.test.ts": {
+      "filePath": "tests/event-calendar-sunday-start.test.ts",
+      "contentHash": "d8bb3f74946a1f0a27e04da414fafd31b6892fb73acd0bce5638b2a1ffa993e9",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 38,
+      "hasStructuralAnalysis": true
+    },
+    "tests/event-submit-guard.test.ts": {
+      "filePath": "tests/event-submit-guard.test.ts",
+      "contentHash": "11e4b0e08f104b1cde9f2b7b9949c3f2fc87a75fc8acdee7df5e1ef6b729368e",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "tests/google-calendar.test.ts": {
+      "filePath": "tests/google-calendar.test.ts",
+      "contentHash": "a1ca5e8e6d79e867041157612f6fd0a24ccdbda9bff07b94f31c165a8dabedb9",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "fs"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "before",
+            "afterEach",
+            "test"
+          ]
+        },
+        {
+          "source": "jose",
+          "specifiers": [
+            "generateKeyPair",
+            "exportPKCS8",
+            "decodeJwt",
+            "decodeProtectedHeader"
+          ]
+        },
+        {
+          "source": "../src/lib/google-calendar.ts",
+          "specifiers": [
+            "appEventIdToGoogleId",
+            "toGoogleEvent",
+            "getAccessToken",
+            "upsertGoogleEvent",
+            "deleteGoogleEvent",
+            "syncEventToGoogle",
+            "checkSyncPermission",
+            "resetTokenCache"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 402,
+      "hasStructuralAnalysis": true
+    },
+    "tests/member-access.test.ts": {
+      "filePath": "tests/member-access.test.ts",
+      "contentHash": "9446dfc4d05f0e4c8e7defa075c1ea1744000cdf2c9908c09360fbfb70a3004b",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 63,
+      "hasStructuralAnalysis": true
+    },
+    "tests/month-calendar-label.test.ts": {
+      "filePath": "tests/month-calendar-label.test.ts",
+      "contentHash": "b1ebce92154859f20e26901f86b1ddca8aee436809f355baf8133015dac775f1",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "../src/lib/availability.ts",
+          "specifiers": [
+            "formatTimeLabel"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 25,
+      "hasStructuralAnalysis": true
+    },
+    "tests/night-beach-theme.test.ts": {
+      "filePath": "tests/night-beach-theme.test.ts",
+      "contentHash": "b4f8769c8952327d1246fc7d965e67d9db6eda61378493849409bcce9e3ddc39",
+      "functions": [
+        {
+          "name": "read",
+          "params": [
+            "path"
+          ],
+          "exported": false,
+          "lineCount": 1
+        }
+      ],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        },
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 85,
+      "hasStructuralAnalysis": true
+    },
+    "tests/personal-events.test.ts": {
+      "filePath": "tests/personal-events.test.ts",
+      "contentHash": "db12fdfe9dbf24182987361435fceb05984d54534f1ad84ce973d15785294ecf",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 48,
+      "hasStructuralAnalysis": true
+    },
+    "tests/planning-navigation.test.ts": {
+      "filePath": "tests/planning-navigation.test.ts",
+      "contentHash": "ad2b8b4730348add8eee67f697f0b37846e9828b44484c75954a9b74454d2a38",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 31,
+      "hasStructuralAnalysis": true
+    },
+    "tests/preset-panel.test.ts": {
+      "filePath": "tests/preset-panel.test.ts",
+      "contentHash": "fff757edd5489ab6e35714712827209f9a3c018d1603da2e59585f3baf234f60",
+      "functions": [],
+      "classes": [],
+      "imports": [
+        {
+          "source": "node:assert/strict",
+          "specifiers": [
+            "assert"
+          ]
+        },
+        {
+          "source": "node:fs",
+          "specifiers": [
+            "readFileSync"
+          ]
+        },
+        {
+          "source": "node:test",
+          "specifiers": [
+            "test"
+          ]
+        }
+      ],
+      "exports": [],
+      "totalLines": 30,
+      "hasStructuralAnalysis": true
+    },
+    "tsconfig.json": {
+      "filePath": "tsconfig.json",
+      "contentHash": "4bb55bc87db08cf6be0c5a46fe203f57bece35c1f6517136c1a237e1e9bae5d0",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 36,
+      "hasStructuralAnalysis": true
+    },
+    "wrangler.jsonc": {
+      "filePath": "wrangler.jsonc",
+      "contentHash": "66ad81c785986afb9a3a995b0d797db50ec173fe4e0880010b0567f3ed01309f",
+      "functions": [],
+      "classes": [],
+      "imports": [],
+      "exports": [],
+      "totalLines": 21,
+      "hasStructuralAnalysis": true
+    }
+  }
+}

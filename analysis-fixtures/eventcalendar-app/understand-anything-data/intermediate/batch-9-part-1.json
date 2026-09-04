@@ -1,0 +1,2335 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/components/ui/select.tsx",
+      "type": "file",
+      "name": "select.tsx",
+      "filePath": "src/components/ui/select.tsx",
+      "summary": "src/components/ui/select.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectGroup",
+      "type": "function",
+      "name": "SelectGroup",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        11,
+        19
+      ],
+      "summary": "SelectGroupはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectValue",
+      "type": "function",
+      "name": "SelectValue",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        21,
+        29
+      ],
+      "summary": "SelectValueはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectTrigger",
+      "type": "function",
+      "name": "SelectTrigger",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        31,
+        57
+      ],
+      "summary": "SelectTriggerはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectContent",
+      "type": "function",
+      "name": "SelectContent",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        59,
+        96
+      ],
+      "summary": "SelectContentはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectLabel",
+      "type": "function",
+      "name": "SelectLabel",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        98,
+        109
+      ],
+      "summary": "SelectLabelはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectItem",
+      "type": "function",
+      "name": "SelectItem",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        111,
+        137
+      ],
+      "summary": "SelectItemはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectSeparator",
+      "type": "function",
+      "name": "SelectSeparator",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        139,
+        150
+      ],
+      "summary": "SelectSeparatorはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectScrollUpButton",
+      "type": "function",
+      "name": "SelectScrollUpButton",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        152,
+        169
+      ],
+      "summary": "SelectScrollUpButtonはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/select.tsx:SelectScrollDownButton",
+      "type": "function",
+      "name": "SelectScrollDownButton",
+      "filePath": "src/components/ui/select.tsx",
+      "lineRange": [
+        171,
+        188
+      ],
+      "summary": "SelectScrollDownButtonはselect.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/separator.tsx",
+      "type": "file",
+      "name": "separator.tsx",
+      "filePath": "src/components/ui/separator.tsx",
+      "summary": "src/components/ui/separator.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/separator.tsx:Separator",
+      "type": "function",
+      "name": "Separator",
+      "filePath": "src/components/ui/separator.tsx",
+      "lineRange": [
+        7,
+        23
+      ],
+      "summary": "Separatorはseparator.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/sonner.tsx",
+      "type": "file",
+      "name": "sonner.tsx",
+      "filePath": "src/components/ui/sonner.tsx",
+      "summary": "src/components/ui/sonner.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/sonner.tsx:Toaster",
+      "type": "function",
+      "name": "Toaster",
+      "filePath": "src/components/ui/sonner.tsx",
+      "lineRange": [
+        7,
+        47
+      ],
+      "summary": "Toasterはsonner.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/tabs.tsx",
+      "type": "file",
+      "name": "tabs.tsx",
+      "filePath": "src/components/ui/tabs.tsx",
+      "summary": "src/components/ui/tabs.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/tabs.tsx:Tabs",
+      "type": "function",
+      "name": "Tabs",
+      "filePath": "src/components/ui/tabs.tsx",
+      "lineRange": [
+        8,
+        24
+      ],
+      "summary": "Tabsはtabs.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/tabs.tsx:TabsList",
+      "type": "function",
+      "name": "TabsList",
+      "filePath": "src/components/ui/tabs.tsx",
+      "lineRange": [
+        41,
+        54
+      ],
+      "summary": "TabsListはtabs.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/tabs.tsx:TabsTrigger",
+      "type": "function",
+      "name": "TabsTrigger",
+      "filePath": "src/components/ui/tabs.tsx",
+      "lineRange": [
+        56,
+        70
+      ],
+      "summary": "TabsTriggerはtabs.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/tabs.tsx:TabsContent",
+      "type": "function",
+      "name": "TabsContent",
+      "filePath": "src/components/ui/tabs.tsx",
+      "lineRange": [
+        72,
+        80
+      ],
+      "summary": "TabsContentはtabs.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/toggle.tsx",
+      "type": "file",
+      "name": "toggle.tsx",
+      "filePath": "src/components/ui/toggle.tsx",
+      "summary": "src/components/ui/toggle.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/toggle.tsx:Toggle",
+      "type": "function",
+      "name": "Toggle",
+      "filePath": "src/components/ui/toggle.tsx",
+      "lineRange": [
+        30,
+        43
+      ],
+      "summary": "Toggleはtoggle.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/availability.ts",
+      "type": "file",
+      "name": "availability.ts",
+      "filePath": "src/lib/availability.ts",
+      "summary": "src/lib/availability.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/lib/availability.ts:jstNow",
+      "type": "function",
+      "name": "jstNow",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        13,
+        15
+      ],
+      "summary": "jstNowはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:jstToday",
+      "type": "function",
+      "name": "jstToday",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        17,
+        19
+      ],
+      "summary": "jstTodayはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:registrableWindow",
+      "type": "function",
+      "name": "registrableWindow",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        23,
+        34
+      ],
+      "summary": "registrableWindowはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:isDateEditable",
+      "type": "function",
+      "name": "isDateEditable",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        36,
+        38
+      ],
+      "summary": "isDateEditableはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:monthGridRange",
+      "type": "function",
+      "name": "monthGridRange",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        41,
+        46
+      ],
+      "summary": "monthGridRangeはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "type": "function",
+      "name": "applyAvailabilityOperations",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        62,
+        115
+      ],
+      "summary": "applyAvailabilityOperationsはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/availability.ts:endMinutes",
+      "type": "function",
+      "name": "endMinutes",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        120,
+        124
+      ],
+      "summary": "endMinutesはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:startMinutes",
+      "type": "function",
+      "name": "startMinutes",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        126,
+        129
+      ],
+      "summary": "startMinutesはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:minutesToTime",
+      "type": "function",
+      "name": "minutesToTime",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        131,
+        136
+      ],
+      "summary": "minutesToTimeはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:isRangeCovered",
+      "type": "function",
+      "name": "isRangeCovered",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        140,
+        154
+      ],
+      "summary": "isRangeCoveredはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:formatTimeLabel",
+      "type": "function",
+      "name": "formatTimeLabel",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        159,
+        163
+      ],
+      "summary": "formatTimeLabelはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:expandToSlots",
+      "type": "function",
+      "name": "expandToSlots",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        166,
+        176
+      ],
+      "summary": "expandToSlotsはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:cellsToRanges",
+      "type": "function",
+      "name": "cellsToRanges",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        188,
+        203
+      ],
+      "summary": "cellsToRangesはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/availability.ts:computeDaySummaries",
+      "type": "function",
+      "name": "computeDaySummaries",
+      "filePath": "src/lib/availability.ts",
+      "lineRange": [
+        206,
+        242
+      ],
+      "summary": "computeDaySummariesはavailability.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/cancellation-email.ts",
+      "type": "file",
+      "name": "cancellation-email.ts",
+      "filePath": "src/lib/cancellation-email.ts",
+      "summary": "src/lib/cancellation-email.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cancellation-email.ts:buildCancellationEmail",
+      "type": "function",
+      "name": "buildCancellationEmail",
+      "filePath": "src/lib/cancellation-email.ts",
+      "lineRange": [
+        14,
+        24
+      ],
+      "summary": "buildCancellationEmailはcancellation-email.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cancellation-email.ts:sendCancellationEmail",
+      "type": "function",
+      "name": "sendCancellationEmail",
+      "filePath": "src/lib/cancellation-email.ts",
+      "lineRange": [
+        26,
+        46
+      ],
+      "summary": "sendCancellationEmailはcancellation-email.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/cloudflare-access.ts",
+      "type": "file",
+      "name": "cloudflare-access.ts",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "summary": "src/lib/cloudflare-access.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:isLoopbackSupabaseUrl",
+      "type": "function",
+      "name": "isLoopbackSupabaseUrl",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        12,
+        24
+      ],
+      "summary": "isLoopbackSupabaseUrlはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:isLocalAuthAllowed",
+      "type": "function",
+      "name": "isLocalAuthAllowed",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        26,
+        28
+      ],
+      "summary": "isLocalAuthAllowedはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:cloudflareAppOrigin",
+      "type": "function",
+      "name": "cloudflareAppOrigin",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        44,
+        59
+      ],
+      "summary": "cloudflareAppOriginはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:isExpectedCloudflareAppRequest",
+      "type": "function",
+      "name": "isExpectedCloudflareAppRequest",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        61,
+        67
+      ],
+      "summary": "isExpectedCloudflareAppRequestはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:appOriginForRequest",
+      "type": "function",
+      "name": "appOriginForRequest",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        69,
+        73
+      ],
+      "summary": "appOriginForRequestはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:verifyCloudflareAccessToken",
+      "type": "function",
+      "name": "verifyCloudflareAccessToken",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        75,
+        92
+      ],
+      "summary": "verifyCloudflareAccessTokenはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:cloudflareLogoutUrl",
+      "type": "function",
+      "name": "cloudflareLogoutUrl",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        94,
+        96
+      ],
+      "summary": "cloudflareLogoutUrlはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-access.ts:cloudflareAccessToken",
+      "type": "function",
+      "name": "cloudflareAccessToken",
+      "filePath": "src/lib/cloudflare-access.ts",
+      "lineRange": [
+        98,
+        102
+      ],
+      "summary": "cloudflareAccessTokenはcloudflare-access.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/cloudflare-auth-bridge.ts",
+      "type": "file",
+      "name": "cloudflare-auth-bridge.ts",
+      "filePath": "src/lib/cloudflare-auth-bridge.ts",
+      "summary": "src/lib/cloudflare-auth-bridge.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "authentication",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/cloudflare-auth-bridge.ts:safeNextPath",
+      "type": "function",
+      "name": "safeNextPath",
+      "filePath": "src/lib/cloudflare-auth-bridge.ts",
+      "lineRange": [
+        3,
+        11
+      ],
+      "summary": "safeNextPathはcloudflare-auth-bridge.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLinkIfAllowed",
+      "type": "function",
+      "name": "generateSupabaseMagicLinkIfAllowed",
+      "filePath": "src/lib/cloudflare-auth-bridge.ts",
+      "lineRange": [
+        41,
+        53
+      ],
+      "summary": "generateSupabaseMagicLinkIfAllowedはcloudflare-auth-bridge.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLink",
+      "type": "function",
+      "name": "generateSupabaseMagicLink",
+      "filePath": "src/lib/cloudflare-auth-bridge.ts",
+      "lineRange": [
+        55,
+        61
+      ],
+      "summary": "generateSupabaseMagicLinkはcloudflare-auth-bridge.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/database.types.ts",
+      "type": "file",
+      "name": "database.types.ts",
+      "filePath": "src/lib/database.types.ts",
+      "summary": "src/lib/database.types.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/lib/dev-auth.ts",
+      "type": "file",
+      "name": "dev-auth.ts",
+      "filePath": "src/lib/dev-auth.ts",
+      "summary": "src/lib/dev-auth.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "authentication",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/dev-auth.ts:isDevPreviewEnabled",
+      "type": "function",
+      "name": "isDevPreviewEnabled",
+      "filePath": "src/lib/dev-auth.ts",
+      "lineRange": [
+        8,
+        10
+      ],
+      "summary": "isDevPreviewEnabledはdev-auth.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/dev-auth.ts:getDevPreviewData",
+      "type": "function",
+      "name": "getDevPreviewData",
+      "filePath": "src/lib/dev-auth.ts",
+      "lineRange": [
+        118,
+        120
+      ],
+      "summary": "getDevPreviewDataはdev-auth.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/dev-auth.ts:getDevAvailabilityData",
+      "type": "function",
+      "name": "getDevAvailabilityData",
+      "filePath": "src/lib/dev-auth.ts",
+      "lineRange": [
+        122,
+        124
+      ],
+      "summary": "getDevAvailabilityDataはdev-auth.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/dev-auth.ts:getDevPlanningData",
+      "type": "function",
+      "name": "getDevPlanningData",
+      "filePath": "src/lib/dev-auth.ts",
+      "lineRange": [
+        126,
+        128
+      ],
+      "summary": "getDevPlanningDataはdev-auth.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/dev-auth.ts:addDevEvent",
+      "type": "function",
+      "name": "addDevEvent",
+      "filePath": "src/lib/dev-auth.ts",
+      "lineRange": [
+        130,
+        134
+      ],
+      "summary": "addDevEventはdev-auth.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/google-calendar.ts",
+      "type": "file",
+      "name": "google-calendar.ts",
+      "filePath": "src/lib/google-calendar.ts",
+      "summary": "src/lib/google-calendar.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:getConfig",
+      "type": "function",
+      "name": "getConfig",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        22,
+        32
+      ],
+      "summary": "getConfigはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:isConfigured",
+      "type": "function",
+      "name": "isConfigured",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        34,
+        36
+      ],
+      "summary": "isConfiguredはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:parseTokenError",
+      "type": "function",
+      "name": "parseTokenError",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        38,
+        51
+      ],
+      "summary": "parseTokenErrorはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:getAccessToken",
+      "type": "function",
+      "name": "getAccessToken",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        53,
+        89
+      ],
+      "summary": "getAccessTokenはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:resetTokenCache",
+      "type": "function",
+      "name": "resetTokenCache",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        91,
+        93
+      ],
+      "summary": "resetTokenCacheはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:appEventIdToGoogleId",
+      "type": "function",
+      "name": "appEventIdToGoogleId",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        95,
+        97
+      ],
+      "summary": "appEventIdToGoogleIdはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:toGoogleEvent",
+      "type": "function",
+      "name": "toGoogleEvent",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        99,
+        111
+      ],
+      "summary": "toGoogleEventはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:calendarFetch",
+      "type": "function",
+      "name": "calendarFetch",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        115,
+        124
+      ],
+      "summary": "calendarFetchはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "type": "function",
+      "name": "upsertGoogleEvent",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        126,
+        151
+      ],
+      "summary": "upsertGoogleEventはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:deleteGoogleEvent",
+      "type": "function",
+      "name": "deleteGoogleEvent",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        153,
+        170
+      ],
+      "summary": "deleteGoogleEventはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "type": "function",
+      "name": "syncEventToGoogle",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        172,
+        197
+      ],
+      "summary": "syncEventToGoogleはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/google-calendar.ts:checkSyncPermission",
+      "type": "function",
+      "name": "checkSyncPermission",
+      "filePath": "src/lib/google-calendar.ts",
+      "lineRange": [
+        199,
+        210
+      ],
+      "summary": "checkSyncPermissionはgoogle-calendar.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/supabase/admin.ts",
+      "type": "file",
+      "name": "admin.ts",
+      "filePath": "src/lib/supabase/admin.ts",
+      "summary": "src/lib/supabase/admin.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/supabase/admin.ts:createAdminClient",
+      "type": "function",
+      "name": "createAdminClient",
+      "filePath": "src/lib/supabase/admin.ts",
+      "lineRange": [
+        7,
+        16
+      ],
+      "summary": "createAdminClientはadmin.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectGroup",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectGroup",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectValue",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectValue",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectTrigger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectTrigger",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectContent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectContent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectLabel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectLabel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectItem",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectItem",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectSeparator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectSeparator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectScrollUpButton",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectScrollUpButton",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectScrollDownButton",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/select.tsx",
+      "target": "function:src/components/ui/select.tsx:SelectScrollDownButton",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/separator.tsx",
+      "target": "function:src/components/ui/separator.tsx:Separator",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/separator.tsx",
+      "target": "function:src/components/ui/separator.tsx:Separator",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/sonner.tsx",
+      "target": "function:src/components/ui/sonner.tsx:Toaster",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/sonner.tsx",
+      "target": "function:src/components/ui/sonner.tsx:Toaster",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:Tabs",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:Tabs",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:TabsList",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:TabsList",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:TabsTrigger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:TabsTrigger",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:TabsContent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/tabs.tsx",
+      "target": "function:src/components/ui/tabs.tsx:TabsContent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/toggle.tsx",
+      "target": "function:src/components/ui/toggle.tsx:Toggle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/toggle.tsx",
+      "target": "function:src/components/ui/toggle.tsx:Toggle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:jstNow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:jstNow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:jstToday",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:jstToday",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:registrableWindow",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:registrableWindow",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:isDateEditable",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:isDateEditable",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:monthGridRange",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:monthGridRange",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:isRangeCovered",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:isRangeCovered",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:formatTimeLabel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:formatTimeLabel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:expandToSlots",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:expandToSlots",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:cellsToRanges",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:computeDaySummaries",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/availability.ts",
+      "target": "function:src/lib/availability.ts:computeDaySummaries",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cancellation-email.ts",
+      "target": "function:src/lib/cancellation-email.ts:buildCancellationEmail",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cancellation-email.ts",
+      "target": "function:src/lib/cancellation-email.ts:buildCancellationEmail",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cancellation-email.ts",
+      "target": "function:src/lib/cancellation-email.ts:sendCancellationEmail",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cancellation-email.ts",
+      "target": "function:src/lib/cancellation-email.ts:sendCancellationEmail",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:isLoopbackSupabaseUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:isLoopbackSupabaseUrl",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:isLocalAuthAllowed",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:isLocalAuthAllowed",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareAppOrigin",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareAppOrigin",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:isExpectedCloudflareAppRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:isExpectedCloudflareAppRequest",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:appOriginForRequest",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:appOriginForRequest",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:verifyCloudflareAccessToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:verifyCloudflareAccessToken",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareLogoutUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareLogoutUrl",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareAccessToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-access.ts",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareAccessToken",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-auth-bridge.ts",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:safeNextPath",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-auth-bridge.ts",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:safeNextPath",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-auth-bridge.ts",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLinkIfAllowed",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-auth-bridge.ts",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLinkIfAllowed",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/cloudflare-auth-bridge.ts",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLink",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/cloudflare-auth-bridge.ts",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLink",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:isDevPreviewEnabled",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:isDevPreviewEnabled",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:getDevPreviewData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:getDevPreviewData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:getDevAvailabilityData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:getDevAvailabilityData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:getDevPlanningData",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:getDevPlanningData",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:addDevEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/dev-auth.ts",
+      "target": "function:src/lib/dev-auth.ts:addDevEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:getConfig",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:isConfigured",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:isConfigured",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:parseTokenError",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:getAccessToken",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:getAccessToken",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:resetTokenCache",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:resetTokenCache",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:appEventIdToGoogleId",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:appEventIdToGoogleId",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:toGoogleEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:toGoogleEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:calendarFetch",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:deleteGoogleEvent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:deleteGoogleEvent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:checkSyncPermission",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/google-calendar.ts",
+      "target": "function:src/lib/google-calendar.ts:checkSyncPermission",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/supabase/admin.ts",
+      "target": "function:src/lib/supabase/admin.ts:createAdminClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/supabase/admin.ts",
+      "target": "function:src/lib/supabase/admin.ts:createAdminClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:registrableWindow",
+      "target": "function:src/lib/availability.ts:jstToday",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:isDateEditable",
+      "target": "function:src/lib/availability.ts:registrableWindow",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:applyAvailabilityOperations",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:isRangeCovered",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:isRangeCovered",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:isRangeCovered",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:isRangeCovered",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:expandToSlots",
+      "target": "function:src/lib/availability.ts:startMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:expandToSlots",
+      "target": "function:src/lib/availability.ts:endMinutes",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:expandToSlots",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:cellsToRanges",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:cellsToRanges",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:cellsToRanges",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:cellsToRanges",
+      "target": "function:src/lib/availability.ts:minutesToTime",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:computeDaySummaries",
+      "target": "function:src/lib/availability.ts:expandToSlots",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/availability.ts:computeDaySummaries",
+      "target": "function:src/lib/availability.ts:cellsToRanges",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/cancellation-email.ts:sendCancellationEmail",
+      "target": "function:src/lib/cancellation-email.ts:buildCancellationEmail",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/cloudflare-access.ts:isLocalAuthAllowed",
+      "target": "function:src/lib/cloudflare-access.ts:isLoopbackSupabaseUrl",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/cloudflare-access.ts:isExpectedCloudflareAppRequest",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareAppOrigin",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/cloudflare-access.ts:appOriginForRequest",
+      "target": "function:src/lib/cloudflare-access.ts:cloudflareAppOrigin",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLinkIfAllowed",
+      "target": "function:src/lib/cloudflare-auth-bridge.ts:generateSupabaseMagicLink",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:isConfigured",
+      "target": "function:src/lib/google-calendar.ts:getConfig",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:getAccessToken",
+      "target": "function:src/lib/google-calendar.ts:parseTokenError",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "target": "function:src/lib/google-calendar.ts:appEventIdToGoogleId",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "target": "function:src/lib/google-calendar.ts:calendarFetch",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "target": "function:src/lib/google-calendar.ts:calendarFetch",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:deleteGoogleEvent",
+      "target": "function:src/lib/google-calendar.ts:appEventIdToGoogleId",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:deleteGoogleEvent",
+      "target": "function:src/lib/google-calendar.ts:calendarFetch",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "target": "function:src/lib/google-calendar.ts:getConfig",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "target": "function:src/lib/google-calendar.ts:getAccessToken",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "target": "function:src/lib/google-calendar.ts:deleteGoogleEvent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "target": "function:src/lib/google-calendar.ts:upsertGoogleEvent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/lib/google-calendar.ts:syncEventToGoogle",
+      "target": "function:src/lib/google-calendar.ts:toGoogleEvent",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

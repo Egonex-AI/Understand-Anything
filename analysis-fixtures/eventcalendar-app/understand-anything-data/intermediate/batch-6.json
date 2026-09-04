@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {"id":"document:supabase/manual/README.md","type":"document","name":"README.md","filePath":"supabase/manual/README.md","summary":"実Supabase環境でGoogle Calendar連携UIを確認するための手動fixture手順を説明します。","tags":["documentation","supabase","google-calendar","manual-testing"],"complexity":"simple"},
+    {"id":"table:supabase/manual/cleanup_real_google_ui_fixture.sql","type":"table","name":"cleanup_real_google_ui_fixture.sql","filePath":"supabase/manual/cleanup_real_google_ui_fixture.sql","summary":"実環境向けGoogle Calendar UI確認用fixtureのデータを削除するクリーンアップSQLです。","tags":["database","cleanup","google-calendar","manual-testing"],"complexity":"moderate"},
+    {"id":"table:supabase/manual/real_google_ui_fixture.sql","type":"table","name":"real_google_ui_fixture.sql","filePath":"supabase/manual/real_google_ui_fixture.sql","summary":"実Supabase上でGoogle Calendar同期やイベント表示を再現するためのユーザー・イベントデータを投入します。","tags":["database","fixture","google-calendar","manual-testing"],"complexity":"moderate"}
+  ],
+  "edges": [
+    {"source":"document:supabase/manual/README.md","target":"table:supabase/manual/real_google_ui_fixture.sql","type":"documents","direction":"forward","weight":0.5},
+    {"source":"document:supabase/manual/README.md","target":"table:supabase/manual/cleanup_real_google_ui_fixture.sql","type":"documents","direction":"forward","weight":0.5},
+    {"source":"table:supabase/manual/cleanup_real_google_ui_fixture.sql","target":"table:supabase/manual/real_google_ui_fixture.sql","type":"depends_on","direction":"forward","weight":0.6}
+  ]
+}

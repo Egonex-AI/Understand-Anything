@@ -201,6 +201,9 @@ export function sanitizeGraph(data: Record<string, unknown>): Record<string, unk
       if (n.filePath === null) delete n.filePath;
       if (n.lineRange === null) delete n.lineRange;
       if (n.languageNotes === null) delete n.languageNotes;
+      if (n.explanation === null) delete n.explanation;
+      if (n.explanationStatus === null) delete n.explanationStatus;
+      if (n.explanationError === null) delete n.explanationError;
       // Lowercase enum-like strings
       if (typeof n.type === "string") n.type = n.type.toLowerCase();
       if (typeof n.complexity === "string") n.complexity = n.complexity.toLowerCase();
@@ -434,6 +437,9 @@ export const GraphNodeSchema = z.object({
   tags: z.array(z.string()),
   complexity: z.enum(["simple", "moderate", "complex"]),
   languageNotes: z.string().optional(),
+  explanation: z.string().min(1).optional(),
+  explanationStatus: z.enum(["ready", "generating", "failed"]).optional(),
+  explanationError: z.string().min(1).optional(),
   domainMeta: DomainMetaSchema.optional(),
   knowledgeMeta: KnowledgeMetaSchema.optional(),
   figmaMeta: FigmaMetaSchema.optional(),

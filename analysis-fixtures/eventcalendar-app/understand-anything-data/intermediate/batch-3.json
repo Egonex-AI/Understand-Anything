@@ -1,0 +1,59 @@
+{
+  "nodes": [
+    {
+      "id": "document:.codex/agents/README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": ".codex/agents/README.md",
+      "summary": "プロジェクトで使う auditor と coder サブエージェントの役割と運用方針を説明します。",
+      "tags": [
+        "documentation",
+        "agents",
+        "development"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.codex/agents/auditor.toml",
+      "type": "config",
+      "name": "auditor.toml",
+      "filePath": ".codex/agents/auditor.toml",
+      "summary": "読み取り専用の監査エージェントを、証拠とリスクを報告する設定として定義します。",
+      "tags": [
+        "configuration",
+        "agents",
+        "security"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:.codex/agents/coder.toml",
+      "type": "config",
+      "name": "coder.toml",
+      "filePath": ".codex/agents/coder.toml",
+      "summary": "指定されたファイル範囲を実装し、関連検証を実行する coder エージェントの設定です。",
+      "tags": [
+        "configuration",
+        "agents",
+        "development"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "document:.codex/agents/README.md",
+      "target": "config:.codex/agents/auditor.toml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    },
+    {
+      "source": "document:.codex/agents/README.md",
+      "target": "config:.codex/agents/coder.toml",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

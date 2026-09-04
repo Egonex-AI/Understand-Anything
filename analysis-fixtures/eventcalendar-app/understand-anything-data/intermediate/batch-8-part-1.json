@@ -1,0 +1,659 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/app/dashboard/dashboard.tsx",
+      "type": "file",
+      "name": "dashboard.tsx",
+      "filePath": "src/app/dashboard/dashboard.tsx",
+      "summary": "src/app/dashboard/dashboard.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/dashboard/dashboard.tsx:Dashboard",
+      "type": "function",
+      "name": "Dashboard",
+      "filePath": "src/app/dashboard/dashboard.tsx",
+      "lineRange": [
+        21,
+        33
+      ],
+      "summary": "Dashboardはdashboard.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/dashboard/dashboard.tsx:CompactPlanning",
+      "type": "function",
+      "name": "CompactPlanning",
+      "filePath": "src/app/dashboard/dashboard.tsx",
+      "lineRange": [
+        35,
+        75
+      ],
+      "summary": "CompactPlanningはdashboard.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/dev-preview/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/dev-preview/page.tsx",
+      "summary": "src/app/dev-preview/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/dev-preview/page.tsx:DevPreviewPage",
+      "type": "function",
+      "name": "DevPreviewPage",
+      "filePath": "src/app/dev-preview/page.tsx",
+      "lineRange": [
+        7,
+        24
+      ],
+      "summary": "DevPreviewPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/events/event-calendar.tsx",
+      "type": "file",
+      "name": "event-calendar.tsx",
+      "filePath": "src/app/events/event-calendar.tsx",
+      "summary": "src/app/events/event-calendar.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/events/event-calendar.tsx:EventCalendar",
+      "type": "function",
+      "name": "EventCalendar",
+      "filePath": "src/app/events/event-calendar.tsx",
+      "lineRange": [
+        31,
+        181
+      ],
+      "summary": "EventCalendarはevent-calendar.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/events/event-calendar.tsx:EventDetail",
+      "type": "function",
+      "name": "EventDetail",
+      "filePath": "src/app/events/event-calendar.tsx",
+      "lineRange": [
+        183,
+        192
+      ],
+      "summary": "EventDetailはevent-calendar.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/events/event-calendar.tsx:EventForm",
+      "type": "function",
+      "name": "EventForm",
+      "filePath": "src/app/events/event-calendar.tsx",
+      "lineRange": [
+        194,
+        212
+      ],
+      "summary": "EventFormはevent-calendar.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/events/loading.tsx",
+      "type": "file",
+      "name": "loading.tsx",
+      "filePath": "src/app/events/loading.tsx",
+      "summary": "src/app/events/loading.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/events/loading.tsx:Loading",
+      "type": "function",
+      "name": "Loading",
+      "filePath": "src/app/events/loading.tsx",
+      "lineRange": [
+        5,
+        19
+      ],
+      "summary": "Loadingはloading.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/events/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/events/page.tsx",
+      "summary": "src/app/events/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/events/page.tsx:EventsPage",
+      "type": "function",
+      "name": "EventsPage",
+      "filePath": "src/app/events/page.tsx",
+      "lineRange": [
+        6,
+        25
+      ],
+      "summary": "EventsPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/layout.tsx",
+      "type": "file",
+      "name": "layout.tsx",
+      "filePath": "src/app/layout.tsx",
+      "summary": "src/app/layout.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/layout.tsx:RootLayout",
+      "type": "function",
+      "name": "RootLayout",
+      "filePath": "src/app/layout.tsx",
+      "lineRange": [
+        28,
+        41
+      ],
+      "summary": "RootLayoutはlayout.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/login/login-button.tsx",
+      "type": "file",
+      "name": "login-button.tsx",
+      "filePath": "src/app/login/login-button.tsx",
+      "summary": "src/app/login/login-button.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/login/login-button.tsx:LoginButton",
+      "type": "function",
+      "name": "LoginButton",
+      "filePath": "src/app/login/login-button.tsx",
+      "lineRange": [
+        7,
+        73
+      ],
+      "summary": "LoginButtonはlogin-button.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/login/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/login/page.tsx",
+      "summary": "src/app/login/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/login/page.tsx:isLocalSupabaseUrl",
+      "type": "function",
+      "name": "isLocalSupabaseUrl",
+      "filePath": "src/app/login/page.tsx",
+      "lineRange": [
+        3,
+        15
+      ],
+      "summary": "isLocalSupabaseUrlはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/login/page.tsx:LoginPage",
+      "type": "function",
+      "name": "LoginPage",
+      "filePath": "src/app/login/page.tsx",
+      "lineRange": [
+        17,
+        40
+      ],
+      "summary": "LoginPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/page.tsx",
+      "summary": "src/app/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/page.tsx:HomePage",
+      "type": "function",
+      "name": "HomePage",
+      "filePath": "src/app/page.tsx",
+      "lineRange": [
+        5,
+        11
+      ],
+      "summary": "HomePageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/planning/_components/planning-board.tsx",
+      "type": "file",
+      "name": "planning-board.tsx",
+      "filePath": "src/app/planning/_components/planning-board.tsx",
+      "summary": "src/app/planning/_components/planning-board.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/app/planning/_components/planning-board.tsx:PlanningBoard",
+      "type": "function",
+      "name": "PlanningBoard",
+      "filePath": "src/app/planning/_components/planning-board.tsx",
+      "lineRange": [
+        26,
+        370
+      ],
+      "summary": "PlanningBoardはplanning-board.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/app/planning/loading.tsx",
+      "type": "file",
+      "name": "loading.tsx",
+      "filePath": "src/app/planning/loading.tsx",
+      "summary": "src/app/planning/loading.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/planning/loading.tsx:Loading",
+      "type": "function",
+      "name": "Loading",
+      "filePath": "src/app/planning/loading.tsx",
+      "lineRange": [
+        5,
+        13
+      ],
+      "summary": "Loadingはloading.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/planning/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/planning/page.tsx",
+      "summary": "src/app/planning/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/planning/page.tsx:parsePlanningQuery",
+      "type": "function",
+      "name": "parsePlanningQuery",
+      "filePath": "src/app/planning/page.tsx",
+      "lineRange": [
+        14,
+        21
+      ],
+      "summary": "parsePlanningQueryはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/planning/page.tsx:PlanningPage",
+      "type": "function",
+      "name": "PlanningPage",
+      "filePath": "src/app/planning/page.tsx",
+      "lineRange": [
+        23,
+        40
+      ],
+      "summary": "PlanningPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src/app/dashboard/dashboard.tsx",
+      "target": "function:src/app/dashboard/dashboard.tsx:Dashboard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/dashboard/dashboard.tsx",
+      "target": "function:src/app/dashboard/dashboard.tsx:Dashboard",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/dashboard/dashboard.tsx",
+      "target": "function:src/app/dashboard/dashboard.tsx:CompactPlanning",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/dev-preview/page.tsx",
+      "target": "function:src/app/dev-preview/page.tsx:DevPreviewPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/dev-preview/page.tsx",
+      "target": "function:src/app/dev-preview/page.tsx:DevPreviewPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/events/event-calendar.tsx",
+      "target": "function:src/app/events/event-calendar.tsx:EventCalendar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/events/event-calendar.tsx",
+      "target": "function:src/app/events/event-calendar.tsx:EventCalendar",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/events/event-calendar.tsx",
+      "target": "function:src/app/events/event-calendar.tsx:EventDetail",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/events/event-calendar.tsx",
+      "target": "function:src/app/events/event-calendar.tsx:EventForm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/events/loading.tsx",
+      "target": "function:src/app/events/loading.tsx:Loading",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/events/loading.tsx",
+      "target": "function:src/app/events/loading.tsx:Loading",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/events/page.tsx",
+      "target": "function:src/app/events/page.tsx:EventsPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/events/page.tsx",
+      "target": "function:src/app/events/page.tsx:EventsPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/layout.tsx",
+      "target": "function:src/app/layout.tsx:RootLayout",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/layout.tsx",
+      "target": "function:src/app/layout.tsx:RootLayout",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/login/login-button.tsx",
+      "target": "function:src/app/login/login-button.tsx:LoginButton",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/login/login-button.tsx",
+      "target": "function:src/app/login/login-button.tsx:LoginButton",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/login/page.tsx",
+      "target": "function:src/app/login/page.tsx:isLocalSupabaseUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/login/page.tsx",
+      "target": "function:src/app/login/page.tsx:LoginPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/login/page.tsx",
+      "target": "function:src/app/login/page.tsx:LoginPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/page.tsx",
+      "target": "function:src/app/page.tsx:HomePage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/page.tsx",
+      "target": "function:src/app/page.tsx:HomePage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/planning/_components/planning-board.tsx",
+      "target": "function:src/app/planning/_components/planning-board.tsx:PlanningBoard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/planning/_components/planning-board.tsx",
+      "target": "function:src/app/planning/_components/planning-board.tsx:PlanningBoard",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/planning/loading.tsx",
+      "target": "function:src/app/planning/loading.tsx:Loading",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/planning/loading.tsx",
+      "target": "function:src/app/planning/loading.tsx:Loading",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/planning/page.tsx",
+      "target": "function:src/app/planning/page.tsx:parsePlanningQuery",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/planning/page.tsx",
+      "target": "function:src/app/planning/page.tsx:parsePlanningQuery",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/planning/page.tsx",
+      "target": "function:src/app/planning/page.tsx:PlanningPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/planning/page.tsx",
+      "target": "function:src/app/planning/page.tsx:PlanningPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/app/login/page.tsx:LoginPage",
+      "target": "function:src/app/login/page.tsx:isLocalSupabaseUrl",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/app/planning/page.tsx:PlanningPage",
+      "target": "function:src/app/planning/page.tsx:parsePlanningQuery",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/app/planning/page.tsx:PlanningPage",
+      "target": "function:src/app/planning/page.tsx:parsePlanningQuery",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

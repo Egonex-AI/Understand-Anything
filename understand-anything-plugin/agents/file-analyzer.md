@@ -235,6 +235,16 @@ Indicators from script data:
 **Language Notes** (optional, your expert judgment):
 If the structural data reveals notable language-specific patterns (e.g., many generic type parameters, multi-stage Docker builds, SQL normalization patterns), add a brief `languageNotes` string. Only add this when genuinely educational.
 
+**File explanation** (required for `file` nodes):
+Generate one persisted `explanation` in Markdown (roughly 200–500 characters in the requested output language). It is displayed directly by the dashboard, so use these exact Japanese headings when the output language is Japanese: `## 役割`, `## 呼ばれる場面`, `## 入出力`, `## 主な処理`, `## 依存・データの流れ`, `## 変更時の影響`, `## 初心者向けまとめ`, `## 根拠`.
+
+- Explain only facts supported by the structural extraction, `batchImportData`, `neighborMap`, or source that you had to read for a specific pattern. Do not infer a call, API, table, function, or dependency merely because its name sounds plausible.
+- In `根拠`, cite real project-relative paths plus function/class names and their extracted line ranges when available. For file-level relationships, cite the target path and edge type (for example, `src/app/events/page.tsx — imports`).
+- `呼ばれる場面`, `入出力`, and `依存・データの流れ` may say that evidence is unavailable when the file has no verified caller, input/output, or data-flow edge. Never fill a section with invented facts.
+- For `初心者向けまとめ`, write 3–5 short, readable Japanese sentences (aim for 40 characters or fewer per sentence). Avoid programming jargon where a plain expression is available: for example, say “画面” for UI, “部品” for component, “つなぎ役” for middleware, and “データの保管場所” for database/table. When verified evidence shows a user action or visible behavior, connect the explanation to that action or behavior. Keep the same evidence and no-invention rules; do not claim a user-visible effect without support.
+- Set `explanationStatus` to `"ready"` only when `explanation` is present. If the explanation cannot be produced from verified evidence, omit `explanation` and set `explanationStatus` to `"failed"` with a short, safe `explanationError`; never fabricate an explanation to avoid this state.
+- This field is generated during file analysis and stored in `knowledge-graph.json`. Preserve an unchanged file node from the existing graph during incremental updates rather than regenerating its explanation.
+
 ### Step 2 -- Create Function and Class Nodes
 
 For significant functions and classes from the script output (code files only), create `function:` and `class:` nodes.
@@ -345,7 +355,9 @@ Produce a single, valid JSON block. Before writing, verify that all arrays and o
       "summary": "Main entry point that bootstraps the application and re-exports all public modules.",
       "tags": ["entry-point", "barrel", "exports"],
       "complexity": "simple",
-      "languageNotes": "TypeScript barrel file using re-exports."
+      "languageNotes": "TypeScript barrel file using re-exports.",
+      "explanation": "## Role\n\nBootstraps the application.\n\n## Evidence\n\n- `src/index.ts`",
+      "explanationStatus": "ready"
     },
     {
       "id": "config:tsconfig.json",
@@ -440,6 +452,9 @@ Produce a single, valid JSON block. Before writing, verify that all arrays and o
 
 **Optional fields:**
 - `languageNotes` (string) -- only when there is a genuinely notable pattern
+- `explanation` (string) -- required for `file` nodes when verified evidence is sufficient; Markdown with the required explanation sections
+- `explanationStatus` (`"ready" | "generating" | "failed"`) -- use `"ready"` with `explanation`; use `"failed"` only with `explanationError`
+- `explanationError` (string) -- short safe reason for an unavailable explanation; never include secrets or raw tool output
 
 **Required fields for every edge:**
 - `source` (string) -- must reference an existing node `id` in your output or a known node from the project
