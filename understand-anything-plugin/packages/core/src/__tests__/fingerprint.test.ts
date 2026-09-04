@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { join } from "node:path";
 import type { StructuralAnalysis } from "../types.js";
 import {
   contentHash,
   extractFileFingerprint,
   compareFingerprints,
+  buildFingerprintStore,
   analyzeChanges,
   buildFingerprintStore,
   type FileFingerprint,
@@ -452,5 +454,181 @@ describe("analyzeChanges", () => {
 
     expect(result.deletedFiles).toHaveLength(0);
     expect(result.fileChanges).toHaveLength(0);
+  });
+});
+
+describe("buildFingerprintStore", () => {
+  const mockRegistry = {
+    analyzeFile: vi.fn(),
+  } as any;
+
+  beforeEach(() => {
+    mockRegistry.analyzeFile.mockReset();
+  });
+
+  it("builds a store with structural fingerprints for supported files", () => {
+    const tsContent = "export function foo() { return 1; }\n";
+    const pyContent = "def bar():\n    pass\n";
+
+    const tsPath = join("/project", "src/index.ts");
+    const pyPath = join("/project", "src/utils.py");
+
+    mockedExistsSync.mockImplementation((p: any) => {
+      return p === tsPath || p === pyPath;
+    });
+    mockedReadFileSync.mockImplementation((p: any) => {
+      if (p === tsPath) return tsContent;
+      if (p === pyPath) return pyContent;
+      return "";
+    });
+
+    mockRegistry.analyzeFile.mockImplementation((filePath: string, _content: string) => {
+      if (filePath === "src/index.ts") {
+        return {
+          functions: [{ name: "foo", lineRange: [1, 1], params: [], returnType: "number" }],
+          classes: [],
+          imports: [],
+          exports: [{ name: "foo", lineNumber: 1 }],
+        } as StructuralAnalysis;
+      }
+      if (filePath === "src/utils.py") {
+        return {
+          functions: [{ name: "bar", lineRange: [1, 2], params: [] }],
+          classes: [],
+          imports: [],
+          exports: [],
+        } as StructuralAnalysis;
+      }
+      return null;
+    });
+
+    const store = buildFingerprintStore(
+      "/project",
+      ["src/index.ts", "src/utils.py"],
+      mockRegistry,
+      "abc123",
+    );
+
+    expect(store.version).toBe("1.0.0");
+    expect(store.gitCommitHash).toBe("abc123");
+    expect(store.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    expect(Object.keys(store.files)).toHaveLength(2);
+
+    const tsFp = store.files["src/index.ts"];
+    expect(tsFp.filePath).toBe("src/index.ts");
+    expect(tsFp.hasStructuralAnalysis).toBe(true);
+    expect(tsFp.functions).toHaveLength(1);
+    expect(tsFp.functions[0].name).toBe("foo");
+    expect(tsFp.functions[0].exported).toBe(true);
+    expect(tsFp.contentHash).toBe(contentHash(tsContent));
+    expect(tsFp.totalLines).toBe(2);
+
+    const pyFp = store.files["src/utils.py"];
+    expect(pyFp.filePath).toBe("src/utils.py");
+    expect(pyFp.hasStructuralAnalysis).toBe(true);
+    expect(pyFp.functions[0].name).toBe("bar");
+    expect(pyFp.functions[0].exported).toBe(false);
+  });
+
+  it("creates content-hash-only fingerprints for unsupported files", () => {
+    const yamlContent = "version: '1.0'\nname: test\n";
+
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue(yamlContent);
+    mockRegistry.analyzeFile.mockReturnValue(null); // no tree-sitter support
+
+    const store = buildFingerprintStore(
+      "/project",
+      ["config.yaml"],
+      mockRegistry,
+      "def456",
+    );
+
+    expect(Object.keys(store.files)).toHaveLength(1);
+    const fp = store.files["config.yaml"];
+
+    expect(fp.filePath).toBe("config.yaml");
+    expect(fp.hasStructuralAnalysis).toBe(false);
+    expect(fp.contentHash).toBe(contentHash(yamlContent));
+    expect(fp.totalLines).toBe(3);
+    expect(fp.functions).toEqual([]);
+    expect(fp.classes).toEqual([]);
+    expect(fp.imports).toEqual([]);
+    expect(fp.exports).toEqual([]);
+  });
+
+  it("skips files that do not exist on disk", () => {
+    const existsPath = join("/project", "src/exists.ts");
+
+    mockedExistsSync.mockImplementation((p: any) => {
+      return p === existsPath;
+    });
+    mockedReadFileSync.mockReturnValue("const x = 1;\n");
+    mockRegistry.analyzeFile.mockReturnValue({
+      functions: [],
+      classes: [],
+      imports: [],
+      exports: [],
+    });
+
+    const store = buildFingerprintStore(
+      "/project",
+      ["src/exists.ts", "src/missing.ts"],
+      mockRegistry,
+      "abc123",
+    );
+
+    expect(Object.keys(store.files)).toHaveLength(1);
+    expect(store.files["src/exists.ts"]).toBeDefined();
+    expect(store.files["src/missing.ts"]).toBeUndefined();
+  });
+
+  it("handles empty file list", () => {
+    const store = buildFingerprintStore("/project", [], mockRegistry, "abc123");
+
+    expect(store.version).toBe("1.0.0");
+    expect(store.gitCommitHash).toBe("abc123");
+    expect(store.generatedAt).toBeTruthy();
+    expect(Object.keys(store.files)).toHaveLength(0);
+  });
+
+  it("mixes supported and unsupported files correctly", () => {
+    const tsContent = "export const x = 1;\n";
+    const mdContent = "# Hello\nworld\n";
+
+    const tsPath = join("/project", "src/index.ts");
+    const mdPath = join("/project", "README.md");
+
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockImplementation((p: any) => {
+      if (p === tsPath) return tsContent;
+      if (p === mdPath) return mdContent;
+      return "";
+    });
+
+    mockRegistry.analyzeFile.mockImplementation((filePath: string) => {
+      if (filePath === "src/index.ts") {
+        return {
+          functions: [],
+          classes: [],
+          imports: [],
+          exports: [{ name: "x", lineNumber: 1 }],
+        } as StructuralAnalysis;
+      }
+      return null; // markdown not supported by tree-sitter
+    });
+
+    const store = buildFingerprintStore(
+      "/project",
+      ["src/index.ts", "README.md"],
+      mockRegistry,
+      "mix123",
+    );
+
+    expect(Object.keys(store.files)).toHaveLength(2);
+    expect(store.files["src/index.ts"].hasStructuralAnalysis).toBe(true);
+    expect(store.files["README.md"].hasStructuralAnalysis).toBe(false);
+    expect(store.files["README.md"].contentHash).toBe(contentHash(mdContent));
+    expect(store.files["README.md"].totalLines).toBe(3);
   });
 });
