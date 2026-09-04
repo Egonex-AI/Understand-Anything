@@ -100,17 +100,61 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    DASHBOARD_DIR="$PLUGIN_ROOT/packages/dashboard"
    ```
 
-4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball; run it pinned to the installed plugin version:
+4. **Fast path — try the prebuilt viewer first (no install, no build).** Each GitHub release ships a self-contained viewer tarball. Run it pinned to the installed plugin version, and **automatically fall back to the latest published release if that version has no viewer asset** (the plugin's `package.json` version can be ahead of the latest published viewer — e.g. `2.9.4` with no release while the viewer ships under `2.9.0`):
    ```bash
    : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
    : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
+   DASH_LOG=/tmp/ua-dashboard.log
+   : > "$DASH_LOG"
+
+   launch_viewer () {
+     local ver="$1"
+     local url="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${ver}/understand-anything-viewer.tgz"
+     echo ">> trying viewer v${ver}" | tee -a "$DASH_LOG"
+     npx --yes "$url" "$PROJECT_DIR" >> "$DASH_LOG" 2>&1 &
+     local pid=$!
+     for i in $(seq 1 40); do
+       if grep -q "Dashboard URL" "$DASH_LOG" 2>/dev/null; then
+         echo ">> viewer v${ver} started (pid $pid)" | tee -a "$DASH_LOG"
+         return 0
+       fi
+       if ! kill -0 "$pid" 2>/dev/null; then
+         echo ">> viewer v${ver} failed/exited (asset likely missing)" | tee -a "$DASH_LOG"
+         return 1
+       fi
+       sleep 1
+     done
+     echo ">> viewer v${ver} had no Dashboard URL within 40s" | tee -a "$DASH_LOG"
+     return 1
+   }
+
    PLUGIN_VERSION=$(node -p "require('$PLUGIN_ROOT/package.json').version")
-   VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
-   npx --yes "$VIEWER_URL" "$PROJECT_DIR"
+   LAUNCHED=""
+   if launch_viewer "$PLUGIN_VERSION"; then
+     LAUNCHED="$PLUGIN_VERSION"
+   else
+     # Fallback: the pinned version has no published viewer — use the latest release.
+     echo ">> version-pinned viewer unavailable, resolving latest release…" | tee -a "$DASH_LOG"
+     LATEST=$( (gh release list --repo Egonex-AI/Understand-Anything --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null) \
+               || (curl -fsSL https://api.github.com/repos/Egonex-AI/Understand-Anything/releases/latest 2>/dev/null \
+                   | grep -o '"tag_name": *"[^"]*"' | head -1 | sed -E 's/.*"([^"]*)".*/\1/') )
+     echo ">> latest release: $LATEST" | tee -a "$DASH_LOG"
+     if [ -n "$LATEST" ] && launch_viewer "${LATEST#v}"; then
+       LAUNCHED="$LATEST"
+     fi
+   fi
+
+   if [ -n "$LAUNCHED" ]; then
+     URL=$(grep -o 'http://127.0.0.1:[0-9]*/?token=[a-f0-9]*' "$DASH_LOG" | head -1)
+     echo "LAUNCHED_VERSION=$LAUNCHED"
+     [ -n "$URL" ] && echo "DASHBOARD_URL=$URL"
+   else
+     echo ">> prebuilt viewer unavailable; falling back to local build (steps 5-6)."
+   fi
    ```
-   Run this in the background. It prints the same `🔑  Dashboard URL` line as the dev server:
-   - If the line appears, **skip steps 5-6** and continue at step 7.
-   - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
+   Run this in the background (the script backgrounds `npx` internally and polls up to 40s for the `🔑  Dashboard URL` line). Read the result from `/tmp/ua-dashboard.log` — the `DASHBOARD_URL=` line has the full tokenized URL:
+   - If a viewer launched, **skip steps 5-6** and continue at step 7.
+   - If neither the pinned nor the latest-release viewer launched (no network, or no release assets at all), fall back to the local build in steps 5-6.
 
 5. Fallback: install dependencies and build if needed:
    ```bash
@@ -149,7 +193,8 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Notes
 
-- The fast path (step 4) downloads a version-pinned, self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs
+- The fast path (step 4) downloads a self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs. It first tries the version pinned in the plugin's `package.json`, then **automatically falls back to the latest published release** if that version has no viewer asset (the plugin version can be ahead of the latest published viewer, e.g. `2.9.4` with no release while the viewer ships under `2.9.0`).
+- The viewer's tokenized URL is printed to the terminal as `DASHBOARD_URL=...` and also logged to `/tmp/ua-dashboard.log`.
 - The dashboard auto-opens in the default browser (both the viewer and Vite's `--open`)
 - If port 5173 is already in use, the next available port is picked (both paths)
 - In the fallback, the `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph
