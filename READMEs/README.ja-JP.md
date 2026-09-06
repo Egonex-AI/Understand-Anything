@@ -279,11 +279,12 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **例：** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) —— コミット済みのグラフを含む Go / Java / Python / Node のリファレンスプロジェクト。
 
-**コミット対象：** `.ua/` 内のすべてのファイル。ただし `intermediate/` と `diff-overlay.json` は除きます（これらはローカルの一時ファイルです）。（レガシープロジェクトは `.understand-anything/` を使用します。そのディレクトリが存在する場合は、以下のディレクトリ名をそれに置き換えてください。）
+**コミット対象：** `.ua/` 内のすべてのファイル。ただし `intermediate/`、`diff-overlay.json`、`.trash-*/` は除きます（これらはローカルの一時ファイルです）。（レガシープロジェクトは `.understand-anything/` を使用します。そのディレクトリが存在する場合は、以下のディレクトリ名をそれに置き換えてください。）
 
 ```gitignore
 .ua/intermediate/
 .ua/diff-overlay.json
+.ua/.trash-*/
 ```
 
 **最新状態を保つ：** `/understand --auto-update` を有効にすると、post-commit フックがグラフを増分的に更新し、各コミットに対応するグラフが揃います。またはリリース前に `/understand` を手動で再実行します。

@@ -266,11 +266,12 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 
 > **示例：** [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo) —— 包含已提交图谱的 Go / Java / Python / Node 多语言参考项目。
 
-**需要提交的内容：** `.ua/` 下的全部文件，*除了* `intermediate/` 和 `diff-overlay.json`（这些是本地临时文件）。（旧项目使用 `.understand-anything/`——如果存在的是该目录，请将下方的目录名替换为它。）
+**需要提交的内容：** `.ua/` 下的全部文件，*除了* `intermediate/`、`diff-overlay.json` 和 `.trash-*/`（这些是本地临时文件）。（旧项目使用 `.understand-anything/`——如果存在的是该目录，请将下方的目录名替换为它。）
 
 ```gitignore
 .ua/intermediate/
 .ua/diff-overlay.json
+.ua/.trash-*/
 ```
 
 **保持最新：** 启用 `/understand --auto-update` —— 一个 post-commit 钩子会增量更新图谱，每次提交都能得到匹配的图谱版本。也可以在发布前手动重跑 `/understand`。
