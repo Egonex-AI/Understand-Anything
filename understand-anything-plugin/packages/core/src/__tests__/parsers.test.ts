@@ -353,6 +353,53 @@ type Mutation {
     const result = parser.analyzeFile("schema.graphql", content);
     expect(result.definitions!.some(d => d.name === "Role" && d.kind === "enum")).toBe(true);
   });
+
+  it("does not let a scalar inherit a following type's fields or line range", () => {
+    // Arrange — a custom scalar declared above an object type (a ubiquitous
+    // pattern, e.g. `scalar DateTime`). scalar has no brace body of its own.
+    const content = `scalar DateTime
+
+type User {
+  id: ID!
+  name: String!
+}`;
+
+    // Act
+    const result = parser.analyzeFile("schema.graphql", content);
+
+    // Assert — the scalar is body-less: no stolen fields, single-line range.
+    const scalar = result.definitions!.find(d => d.name === "DateTime");
+    expect(scalar).toMatchObject({ kind: "scalar", lineRange: [1, 1] });
+    expect(scalar!.fields).toEqual([]);
+
+    // The following type keeps its own fields and range.
+    const user = result.definitions!.find(d => d.name === "User");
+    expect(user).toMatchObject({ kind: "type", lineRange: [3, 6] });
+    expect(user!.fields).toEqual(["id", "name"]);
+  });
+
+  it("does not let a union inherit a following type's fields or line range", () => {
+    // Arrange — a union declared above an object type. union has no brace body.
+    const content = `union SearchResult = User | Post
+
+type Post {
+  id: ID!
+  title: String!
+}`;
+
+    // Act
+    const result = parser.analyzeFile("schema.graphql", content);
+
+    // Assert — the union is body-less: no stolen fields, single-line range.
+    const union = result.definitions!.find(d => d.name === "SearchResult");
+    expect(union).toMatchObject({ kind: "union", lineRange: [1, 1] });
+    expect(union!.fields).toEqual([]);
+
+    // The following type is unaffected.
+    const post = result.definitions!.find(d => d.name === "Post");
+    expect(post).toMatchObject({ kind: "type", lineRange: [3, 6] });
+    expect(post!.fields).toEqual(["id", "title"]);
+  });
 });
 
 describe("ProtobufParser", () => {

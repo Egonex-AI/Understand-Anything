@@ -34,12 +34,18 @@ export class GraphQLParser implements AnalyzerPlugin {
       if (name === "Query" || name === "Mutation" || name === "Subscription") continue;
       const startLine = content.slice(0, match.index).split("\n").length;
 
+      // scalar and union have no brace-delimited body. Without this guard the
+      // logic below would scan forward and capture the fields and closing brace
+      // of a later braced definition — e.g. `scalar DateTime` declared above a
+      // `type` would inherit that type's fields and line range.
+      const hasBody = kind !== "scalar" && kind !== "union";
+
       // Extract fields (for type/input/interface/enum)
-      const fields = this.extractFields(content, match.index);
+      const fields = hasBody ? this.extractFields(content, match.index) : [];
 
       // Find closing brace
       const afterMatch = content.slice(match.index);
-      const closeBrace = afterMatch.indexOf("}");
+      const closeBrace = hasBody ? afterMatch.indexOf("}") : -1;
       const endLine = closeBrace !== -1
         ? content.slice(0, match.index + closeBrace + 1).split("\n").length
         : startLine;
