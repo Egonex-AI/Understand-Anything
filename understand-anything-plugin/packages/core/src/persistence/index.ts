@@ -68,8 +68,10 @@ function sanitiseFilePaths(
       return node;
     }
 
-    if (fp.startsWith(normalRoot) || fp.startsWith(projectRoot)) {
-      // Inside the project root — make it relative.
+    if (fp === projectRoot || fp.startsWith(normalRoot)) {
+      // Inside the project root — make it relative. Use normalRoot (trailing
+      // slash) for the boundary so a sibling like `<root>-backup/...` is not
+      // mistaken for being inside `<root>` and rewritten to a `../` path.
       return { ...node, filePath: relative(projectRoot, fp) };
     }
 
