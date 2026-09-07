@@ -13,7 +13,13 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
   if (!paramsNode) return [];
   const params: string[] = [];
 
-  const declarations = findChildren(paramsNode, "parameter_declaration");
+  // `parameter_declaration` covers normal params (`a int`, `a, b int`);
+  // `variadic_parameter_declaration` covers variadic params (`args ...int`),
+  // which tree-sitter-go emits as a distinct node type.
+  const declarations = [
+    ...findChildren(paramsNode, "parameter_declaration"),
+    ...findChildren(paramsNode, "variadic_parameter_declaration"),
+  ];
   for (const decl of declarations) {
     // A parameter_declaration can have multiple name identifiers sharing
     // a type, e.g. `a, b int`.  Collect all identifiers.
