@@ -79,10 +79,11 @@ export function detectLanguageConcepts(
 
   const patterns = buildConceptPatterns(langConfig);
   const detected: string[] = [];
+  const lowerText = text.toLowerCase();
 
   for (const [concept, keywords] of Object.entries(patterns)) {
     const found = keywords.some((keyword) =>
-      text.toLowerCase().includes(keyword.toLowerCase()),
+      matchesKeyword(lowerText, keyword.toLowerCase()),
     );
     if (found) {
       detected.push(concept);
@@ -90,6 +91,19 @@ export function detectLanguageConcepts(
   }
 
   return detected;
+}
+
+/**
+ * Match a keyword against text, requiring a word boundary on any alphanumeric
+ * edge of the keyword. This stops short tokens like `is` (type guards) or `di`
+ * (dependency injection) from matching inside unrelated words ("this", "list",
+ * "discriminated"), while leaving symbol keywords like `@` matching anywhere.
+ */
+function matchesKeyword(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const left = /^[a-z0-9]/.test(keyword) ? "(?:^|[^a-z0-9])" : "";
+  const right = /[a-z0-9]$/.test(keyword) ? "(?:$|[^a-z0-9])" : "";
+  return new RegExp(`${left}${escaped}${right}`).test(text);
 }
 
 /**

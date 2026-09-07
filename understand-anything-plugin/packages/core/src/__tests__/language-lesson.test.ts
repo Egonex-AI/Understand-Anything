@@ -153,5 +153,37 @@ describe("language-lesson", () => {
       const concepts = detectLanguageConcepts(plainNode, "typescript");
       expect(concepts).toEqual([]);
     });
+
+    it("does not match short keywords inside unrelated words", () => {
+      // Regression: keywords "is" (type guards) and "di" (dependency injection)
+      // were matched with naive .includes(), so "this"/"list"/"registered" and
+      // "audits" falsely attached those concepts to ordinary nodes.
+      const node: GraphNode = {
+        id: "function:users:register",
+        type: "function",
+        name: "registerUser",
+        filePath: "src/users/register.ts",
+        summary: "This handler audits and returns a list of registered users",
+        tags: ["users"],
+        complexity: "moderate",
+      };
+      const concepts = detectLanguageConcepts(node, "typescript");
+      expect(concepts).not.toContain("type guards");
+      expect(concepts).not.toContain("dependency injection");
+    });
+
+    it("still detects a concept when a short keyword appears as a whole word", () => {
+      const node: GraphNode = {
+        id: "function:guards:isString",
+        type: "function",
+        name: "isString",
+        filePath: "src/guards.ts",
+        summary: "Returns true when the value is a string",
+        tags: ["guard"],
+        complexity: "simple",
+      };
+      const concepts = detectLanguageConcepts(node, "typescript");
+      expect(concepts).toContain("type guards");
+    });
   });
 });
