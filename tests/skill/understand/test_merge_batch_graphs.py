@@ -123,6 +123,29 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("test/foo/X.test.ts"))
         self.assertTrue(mbg.is_test_path("spec/foo/X.spec.ts"))
 
+    def test_rust_integration_tests_by_directory(self) -> None:
+        """Cargo treats any `.rs` directly under `tests/` as an integration
+        test, whatever it is named, so there is no basename pattern to match."""
+        for path in [
+            "tests/smoke_risk.rs",
+            "src-tauri/tests/smoke_hooks.rs",
+            "src-tauri/tests/sonar_shellout.rs",
+            "crates/core/tests/integration.rs",
+        ]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
+    def test_rust_production_files_are_not_tests(self) -> None:
+        for path in [
+            "src/main.rs",
+            "src-tauri/src/ai.rs",
+            "src-tauri/src/metrics/risk.rs",
+            "src-tauri/build.rs",
+            "tests/helpers/util.rs",
+        ]:
+            with self.subTest(path=path):
+                self.assertFalse(mbg.is_test_path(path), f"{path} is production")
+
     def test_go_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("internal/bar_test.go"))
         self.assertTrue(mbg.is_test_path("bar_test.go"))
