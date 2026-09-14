@@ -36,7 +36,7 @@ openclaw|$HOME/.openclaw/skills|folder
 antigravity|$HOME/.gemini/antigravity/skills|folder
 vibe|$HOME/.vibe/skills|per-skill
 vscode|$HOME/.copilot/skills|per-skill
-hermes|$HOME/.hermes/skills|folder
+hermes|$HOME/AppData/Local/hermes/skills|folder
 cline|$HOME/.cline/skills|folder
 kimi|$HOME/.kimi-code/skills|folder
 trae|$HOME/.trae/skills|per-skill

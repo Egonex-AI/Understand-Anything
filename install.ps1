@@ -36,7 +36,7 @@ $Platforms = [ordered]@{
     antigravity = @{ Target = (Join-Path $HOME '.gemini\antigravity\skills'); Style = 'folder' }
     vibe        = @{ Target = (Join-Path $HOME '.vibe\skills');               Style = 'per-skill' }
     vscode      = @{ Target = (Join-Path $HOME '.copilot\skills');            Style = 'per-skill' }
-    hermes      = @{ Target = (Join-Path $HOME '.hermes\skills');             Style = 'folder' }
+    hermes      = @{ Target = (Join-Path $env:LOCALAPPDATA 'hermes\skills');   Style = 'folder' }
     cline       = @{ Target = (Join-Path $HOME '.cline\skills');              Style = 'folder' }
     kimi        = @{ Target = (Join-Path $HOME '.kimi-code\skills');          Style = 'folder' }
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
