@@ -100,17 +100,18 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    DASHBOARD_DIR="$PLUGIN_ROOT/packages/dashboard"
    ```
 
-4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball; run it pinned to the installed plugin version:
+4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball. Use the one pinned to the installed plugin version, or the latest release's when that version has no viewer asset (plugin versions can ship without a GitHub release):
    ```bash
    : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
    : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
    PLUGIN_VERSION=$(node -p "require('$PLUGIN_ROOT/package.json').version")
    VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
+   node -e "fetch(process.argv[1], { method: 'HEAD', signal: AbortSignal.timeout(10000) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))" "$VIEWER_URL" || VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz"
    npx --yes "$VIEWER_URL" "$PROJECT_DIR"
    ```
    Run this in the background. It prints the same `🔑  Dashboard URL` line as the dev server:
    - If the line appears, **skip steps 5-6** and continue at step 7.
-   - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
+   - If the process exits without printing it (no viewer asset in either release, or no network), fall back to steps 5-6.
 
 5. Fallback: install dependencies and build if needed:
    ```bash
@@ -149,7 +150,7 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Notes
 
-- The fast path (step 4) downloads a version-pinned, self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs
+- The fast path (step 4) downloads a self-contained viewer from the GitHub release matching the plugin version, or from the latest release when that version has none — nothing is installed into the plugin directory and no build runs
 - The dashboard auto-opens in the default browser (both the viewer and Vite's `--open`)
 - If port 5173 is already in use, the next available port is picked (both paths)
 - In the fallback, the `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph

@@ -64,8 +64,10 @@ describe('skill command hardening', () => {
     expect(content).toMatch(/: "\$\{DASHBOARD_DIR:\?Run step 5 first so DASHBOARD_DIR is set\}"/);
     expect(content).toMatch(/cd "\$PLUGIN_ROOT" && pnpm --filter @understand-anything\/core build/);
     expect(content).toMatch(/cd "\$DASHBOARD_DIR" && GRAPH_DIR="\$PROJECT_DIR" npx vite/);
-    // Fast path: the viewer URL is version-pinned and both npx arguments are quoted.
+    // Fast path: the viewer URL is version-pinned, falls back to the latest release
+    // when that version has no viewer asset, and both npx arguments are quoted.
     expect(content).toMatch(/VIEWER_URL="https:\/\/github\.com\/Egonex-AI\/Understand-Anything\/releases\/download\/v\$\{PLUGIN_VERSION\}\/understand-anything-viewer\.tgz"/);
+    expect(content).toMatch(/node -e "fetch\(process\.argv\[1\], \{ method: 'HEAD', signal: AbortSignal\.timeout\(10000\) \}\)\.then\(\(r\) => process\.exit\(r\.ok \? 0 : 1\), \(\) => process\.exit\(1\)\)" "\$VIEWER_URL" \|\| VIEWER_URL="https:\/\/github\.com\/Egonex-AI\/Understand-Anything\/releases\/latest\/download\/understand-anything-viewer\.tgz"\n\s*npx --yes "\$VIEWER_URL" "\$PROJECT_DIR"/);
     expect(content).toMatch(/npx --yes "\$VIEWER_URL" "\$PROJECT_DIR"/);
   });
 
