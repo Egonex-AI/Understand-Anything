@@ -1622,6 +1622,50 @@ describe('extract-import-map.mjs — Swift resolver', { timeout: 20_000 }, () =>
   });
 });
 
+describe('extract-import-map.mjs — Dart resolver', { timeout: 20_000 }, () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('resolves relative Dart imports against the importer directory', () => {
+    projectRoot = setupTree({
+      'lib/screens/home_screen.dart':
+        `import 'dart:async';\n` +
+        `import 'package:flutter/material.dart';\n` +
+        `import '../app_state.dart';\n` +
+        `import '../widgets/chip.dart';\n` +
+        `import 'detail_screen.dart';\n\n` +
+        `class HomeScreen {}\n`,
+      'lib/screens/detail_screen.dart': `class DetailScreen {}\n`,
+      'lib/widgets/chip.dart': `class Chip {}\n`,
+      'lib/app_state.dart': `class AppState {}\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'lib/screens/home_screen.dart', language: 'dart', fileCategory: 'code' },
+        { path: 'lib/screens/detail_screen.dart', language: 'dart', fileCategory: 'code' },
+        { path: 'lib/widgets/chip.dart', language: 'dart', fileCategory: 'code' },
+        { path: 'lib/app_state.dart', language: 'dart', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // `dart:` and `package:` URIs are external and stay unresolved.
+    expect(result.output.importMap['lib/screens/home_screen.dart']).toEqual([
+      'lib/app_state.dart',
+      'lib/screens/detail_screen.dart',
+      'lib/widgets/chip.dart',
+    ]);
+  });
+});
+
 describe('extract-import-map.mjs — per-file failure resilience', () => {
   let projectRoot;
 
