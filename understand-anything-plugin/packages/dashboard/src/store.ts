@@ -171,6 +171,10 @@ interface DashboardStore {
   filterPanelOpen: boolean;
   exportMenuOpen: boolean;
   pathFinderOpen: boolean;
+  /** Ask-AI dialog: null = closed; nodeId null = settings only (no node chosen). */
+  aiDialog: { nodeId: string | null; view: "chat" | "settings" } | null;
+  openAiDialog: (nodeId: string | null, view?: "chat" | "settings") => void;
+  closeAiDialog: () => void;
   reactFlowInstance: ReactFlowInstance | null;
 
   // Node type category filters
@@ -352,6 +356,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   filterPanelOpen: false,
   exportMenuOpen: false,
   pathFinderOpen: false,
+  aiDialog: null,
   reactFlowInstance: null,
 
   nodeTypeFilters: { code: true, config: true, docs: true, infra: true, data: true, domain: true, knowledge: true },
@@ -657,6 +662,9 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   togglePathFinder: () => set((state) => ({
     pathFinderOpen: !state.pathFinderOpen,
   })),
+
+  openAiDialog: (nodeId, view = "chat") => set({ aiDialog: { nodeId, view } }),
+  closeAiDialog: () => set({ aiDialog: null }),
 
   setReactFlowInstance: (instance) => set({ reactFlowInstance: instance }),
 
