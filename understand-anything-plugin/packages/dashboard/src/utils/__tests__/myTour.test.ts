@@ -26,10 +26,10 @@ describe("buildMyTourSteps", () => {
     expect(steps[0].description).toBe("_No note yet._\n\n`#helpers`");
   });
 
-  it("puts the containing file first for nodes outside any layer", () => {
+  it("highlights the containing file for functions and classes", () => {
     expect(steps[1].nodeIds).toEqual(["file:src/api.ts"]);
-    expect(steps[2].nodeIds).toEqual(["file:src/api.ts", "fn:src/api.ts:handler"]);
-    expect(steps[3].nodeIds).toEqual(["file:src/other.ts", "fn:src/other.ts:handler"]);
+    expect(steps[2].nodeIds).toEqual(["file:src/api.ts"]);
+    expect(steps[3].nodeIds).toEqual(["file:src/other.ts"]);
   });
 
   it("skips ids without a node or annotation and accepts labels", () => {

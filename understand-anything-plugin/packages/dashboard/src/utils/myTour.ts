@@ -15,8 +15,9 @@ const DEFAULT_LABELS: MyTourLabels = { lineNotes: "Line notes", line: "Line {lin
 /**
  * Turn annotated node ids (already ordered) into tour steps the existing tour
  * machinery can play: the user's note is the step description, followed by
- * their line notes and tags. Nodes outside any layer (functions, classes) put
- * their file first so the tour navigates to the right layer.
+ * their line notes and tags. Functions and classes highlight their file
+ * instead: the tour's fit-to-highlight waits for every highlighted node to
+ * render, and sub-file nodes are hidden at the default file detail level.
  */
 export function buildMyTourSteps(
   graph: KnowledgeGraph,
@@ -25,7 +26,6 @@ export function buildMyTourSteps(
   labels: MyTourLabels = DEFAULT_LABELS,
 ): TourStep[] {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  const inLayer = new Set(graph.layers.flatMap((l) => l.nodeIds));
   const steps: TourStep[] = [];
   for (const id of nodeIds) {
     const node = byId.get(id);
@@ -43,12 +43,12 @@ export function buildMyTourSteps(
     if (parts.length === 0) parts.push(`_${labels.noNote}_`);
     if (a.tags.length > 0) parts.push(a.tags.map((t) => `\`#${t}\``).join(" "));
 
-    const file = inLayer.has(id) ? undefined : containingFile(graph, node);
+    const file = containingFile(graph, node);
     steps.push({
       order: steps.length + 1,
       title: node.name,
       description: parts.join("\n\n"),
-      nodeIds: file ? [file.id, id] : [id],
+      nodeIds: [file?.id ?? id],
     });
   }
   return steps;
