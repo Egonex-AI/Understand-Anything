@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useDashboardStore } from "../store";
+import { useDashboardStore, type AiDialogView } from "../store";
 import { useAnnotationsStore } from "../annotationsStore";
 import { useI18n } from "../contexts/I18nContext";
 import { fmt } from "../locales";
@@ -75,7 +75,7 @@ export default function AskAiDialog({ accessToken }: { accessToken: string }) {
 
   // undefined = loading, null = no backend (demo / viewer)
   const [config, setConfig] = useState<PublicAiConfig | null | undefined>(undefined);
-  const [view, setView] = useState<"chat" | "settings">(dialog?.view ?? "chat");
+  const [view, setView] = useState<AiDialogView>(dialog?.view ?? "chat");
   const [turns, setTurns] = useState<Turn[]>([]);
   // The context sent with the first question, reused for follow-ups so a
   // mid-chat note edit (e.g. "save to notes") doesn't rewrite history.
@@ -108,7 +108,7 @@ export default function AskAiDialog({ accessToken }: { accessToken: string }) {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns]);
 
-  const showSettings = config !== undefined && config !== null && (view === "settings" || !config.configured || !node);
+  const showSettings = config !== undefined && config !== null && (view !== "chat" || !config.configured || !node);
 
   useEffect(() => {
     if (config && !showSettings) inputRef.current?.focus();
@@ -219,7 +219,7 @@ export default function AskAiDialog({ accessToken }: { accessToken: string }) {
           {config && node && (
             <button
               type="button"
-              onClick={() => setView(view === "settings" ? "chat" : "settings")}
+              onClick={() => setView(view === "chat" ? "settings" : "chat")}
               title={a.settings}
               aria-label={a.settings}
               data-testid="ai-settings-toggle"
@@ -276,6 +276,7 @@ export default function AskAiDialog({ accessToken }: { accessToken: string }) {
             <AiSettingsForm
               accessToken={accessToken}
               config={config}
+              expandEmbeddings={view === "embeddings"}
               onSaved={(saved) => {
                 setConfig(saved);
                 if (saved.configured && node) setView("chat");

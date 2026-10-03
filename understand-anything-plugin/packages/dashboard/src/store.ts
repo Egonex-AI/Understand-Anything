@@ -18,6 +18,8 @@ export type ViewMode = "structural" | "domain" | "knowledge";
 export type DetailLevel = "file" | "class";
 /** "content" = full-text search over source files (results arrive from the server). */
 export type SearchMode = "fuzzy" | "semantic" | "content";
+/** "embeddings" = settings with the embedding section expanded. */
+export type AiDialogView = "chat" | "settings" | "embeddings";
 
 export interface FilterState {
   nodeTypes: Set<NodeType>;
@@ -172,8 +174,8 @@ interface DashboardStore {
   exportMenuOpen: boolean;
   pathFinderOpen: boolean;
   /** Ask-AI dialog: null = closed; nodeId null = settings only (no node chosen). */
-  aiDialog: { nodeId: string | null; view: "chat" | "settings" } | null;
-  openAiDialog: (nodeId: string | null, view?: "chat" | "settings") => void;
+  aiDialog: { nodeId: string | null; view: AiDialogView } | null;
+  openAiDialog: (nodeId: string | null, view?: AiDialogView) => void;
   closeAiDialog: () => void;
   reactFlowInstance: ReactFlowInstance | null;
 
@@ -605,8 +607,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       set({ searchQuery: query, searchResults: [] });
       return;
     }
-    // Fuzzy and semantic currently use the same engine; when embeddings are
-    // available, "semantic" mode will use SemanticSearchEngine.
+    // Semantic mode shows fuzzy hits at once; useSemanticSearch replaces them
+    // with embedding hits when an embedding model is configured.
     const searchResults = engine.search(query);
     set({ searchQuery: query, searchResults });
   },

@@ -26,11 +26,13 @@ function presetFor(config: PublicAiConfig | null): string {
 export default function AiSettingsForm({
   accessToken,
   config,
+  expandEmbeddings = false,
   onSaved,
   onCancel,
 }: {
   accessToken: string;
   config: PublicAiConfig | null;
+  expandEmbeddings?: boolean;
   onSaved: (config: PublicAiConfig) => void;
   onCancel?: () => void;
 }) {
@@ -172,7 +174,7 @@ export default function AiSettingsForm({
         />
       </div>
 
-      <details className="rounded-md border border-border-subtle px-3 py-2" open={Boolean(config?.embeddingModel)}>
+      <details className="rounded-md border border-border-subtle px-3 py-2" open={expandEmbeddings || Boolean(config?.embeddingModel)}>
         <summary className="cursor-pointer text-xs text-text-secondary">{a.embeddings}</summary>
         <div className="mt-3 space-y-3">
           <div className="grid grid-cols-2 gap-3">
