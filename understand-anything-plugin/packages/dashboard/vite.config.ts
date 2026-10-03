@@ -16,6 +16,7 @@ import {
   parseContentSearchParams,
   searchProjectContent,
 } from "../core/src/content-search";
+import { handleAnnotationsRequest } from "../core/src/annotations";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -397,7 +398,8 @@ const config: DashboardViteConfig = {
             pathname === "/meta.json" ||
             pathname === "/config.json" ||
             pathname === "/file-content.json" ||
-            pathname === "/search-content.json";
+            pathname === "/search-content.json" ||
+            pathname === "/annotations.json";
 
           if (!isProtectedEndpoint) {
             next();
@@ -420,6 +422,19 @@ const config: DashboardViteConfig = {
           if (pathname === "/search-content.json") {
             const result = searchContent(url);
             sendJson(res, result.statusCode, result.payload);
+            return;
+          }
+
+          if (pathname === "/annotations.json") {
+            const graphFile = findGraphFile("knowledge-graph.json");
+            if (!graphFile) {
+              sendJson(res, 404, { error: "No knowledge graph found. Run /understand first." });
+              return;
+            }
+            res.setHeader("Cache-Control", "no-store");
+            void handleAnnotationsRequest(req, path.dirname(graphFile), { writable: true }).then(
+              (result) => sendJson(res, result.statusCode, result.payload),
+            );
             return;
           }
 

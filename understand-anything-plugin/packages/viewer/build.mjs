@@ -16,6 +16,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const dashboardDist = join(here, "..", "dashboard", "dist");
 const coreStaleness = join(here, "..", "core", "dist", "staleness.js");
 const coreContentSearch = join(here, "..", "core", "dist", "content-search.js");
+const coreAnnotations = join(here, "..", "core", "dist", "annotations.js");
 const viewerDist = join(here, "dist");
 const viewerServerDist = join(here, "bin", "dist");
 
@@ -33,4 +34,5 @@ rmSync(viewerServerDist, { recursive: true, force: true });
 mkdirSync(viewerServerDist, { recursive: true });
 cpSync(coreStaleness, join(viewerServerDist, "staleness.js"));
 cpSync(coreContentSearch, join(viewerServerDist, "content-search.js"));
+cpSync(coreAnnotations, join(viewerServerDist, "annotations.js"));
 console.log(`Embedded dashboard build into ${viewerDist}`);

@@ -17,6 +17,8 @@
  *   - /file-content.json only serves files listed in the graph, capped at
  *     1 MB, never binary
  *   - /search-content.json only searches those same files
+ *   - /annotations.json (dashboard tags + notes) is served read-only; edits
+ *     made in the viewer stay in the browser's local storage
  */
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -30,6 +32,7 @@ import {
   parseContentSearchParams,
   searchProjectContent,
 } from "./dist/content-search.js";
+import { handleAnnotationsRequest } from "./dist/annotations.js";
 
 const DIST_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
@@ -337,6 +340,7 @@ const PROTECTED = new Set([
   "/config.json",
   "/file-content.json",
   "/search-content.json",
+  "/annotations.json",
   "/staleness.json",
 ]);
 
@@ -367,6 +371,14 @@ const server = createServer((req, res) => {
   if (pathname === "/search-content.json") {
     const result = searchContent(url);
     sendJson(res, result.statusCode, result.payload);
+    return;
+  }
+
+  if (pathname === "/annotations.json") {
+    res.setHeader("Cache-Control", "no-store");
+    void handleAnnotationsRequest(req, graphDir, { writable: false }).then((result) =>
+      sendJson(res, result.statusCode, result.payload),
+    );
     return;
   }
 
