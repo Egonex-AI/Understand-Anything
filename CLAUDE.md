@@ -21,7 +21,9 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 ## Dashboard
 - Dark luxury theme: deep blacks (#0a0a0a), gold/amber accents (#d4a574), DM Serif Display typography
 - Graph-first layout: 75% graph + 360px right sidebar
-- No ChatPanel or Monaco Editor
+- No Monaco Editor; no persistent chat panel — AI chat is an on-demand "Ask AI" dialog per node (`AskAiDialog.tsx`)
+- Ask AI: the dev server proxies `/ai/config` and `/ai/chat` (`server/ai.ts`, token-gated) to any provider — `openai` protocol (any OpenAI-compatible `/chat/completions`: GPT, DeepSeek, GLM, Qwen, Ollama, OpenRouter, …) or `anthropic` (official SDK). Provider config incl. API key lives in `~/.understand-anything/ai.json` (mode 600, override with `UA_AI_CONFIG`), never in the project; the browser only sees a masked key hint. The viewer has no AI backend, so the dialog falls back to copying the prompt
+- URL hash mirrors navigation state (`utils/urlState.ts`, `hooks/useUrlStateSync.ts`); Ctrl/⌘+K command palette (`CommandPalette.tsx`; register feature commands in `hooks/usePaletteCommands.ts`)
 - Sidebar tabs: `Info` (ProjectOverview default → NodeInfo when node selected → LearnPanel in Learn persona, composing) and `Files` (FileExplorer tree built from the structural graph)
 - Code viewer: prism-react-renderer source viewer that slides up from the bottom on file node click; an expand button promotes it into a full-screen modal. Source content is fetched from the dev server's `/file-content.json` endpoint, gated by access token + a graph-derived path allowlist
 - Schema validation on graph load with error banner
