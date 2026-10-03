@@ -16,6 +16,8 @@ export type Complexity = "simple" | "moderate" | "complex";
 export type EdgeCategory = "structural" | "behavioral" | "data-flow" | "dependencies" | "semantic" | "infrastructure" | "domain" | "knowledge" | "design";
 export type ViewMode = "structural" | "domain" | "knowledge";
 export type DetailLevel = "file" | "class";
+/** "content" = full-text search over source files (results arrive from the server). */
+export type SearchMode = "fuzzy" | "semantic" | "content";
 
 export interface FilterState {
   nodeTypes: Set<NodeType>;
@@ -110,8 +112,10 @@ interface DashboardStore {
   searchQuery: string;
   searchResults: SearchResult[];
   searchEngine: SearchEngine | null;
-  searchMode: "fuzzy" | "semantic";
-  setSearchMode: (mode: "fuzzy" | "semantic") => void;
+  searchMode: SearchMode;
+  setSearchMode: (mode: SearchMode) => void;
+  /** Replace search results directly — used by content search, whose hits come from the server. */
+  setSearchResults: (results: SearchResult[]) => void;
 
   // Lens navigation
   navigationLevel: NavigationLevel;
@@ -368,8 +372,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   setGraph: (graph) => {
     const searchEngine = new SearchEngine(graph.nodes);
-    const query = get().searchQuery;
-    const searchResults = query.trim() ? searchEngine.search(query) : [];
+    const { searchQuery: query, searchMode } = get();
+    // Content-search hits are file-path based and refreshed by the search bar.
+    const searchResults =
+      searchMode === "content" ? get().searchResults
+      : query.trim() ? searchEngine.search(query) : [];
     const { viewMode, domainGraph, activeDomainId } = get();
     // Preserve domain view if a domain graph is already loaded
     const keepDomainView = viewMode === "domain" && domainGraph !== null;
@@ -532,17 +539,30 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       expandedContainers: new Set(),
       pendingFocusContainer: null,
     }),
-  setSearchMode: (mode) => set({ searchMode: mode }),
+  setSearchMode: (mode) => {
+    const { searchEngine, searchQuery } = get();
+    set({
+      searchMode: mode,
+      searchResults:
+        mode !== "content" && searchEngine && searchQuery.trim()
+          ? searchEngine.search(searchQuery)
+          : [],
+    });
+  },
+  setSearchResults: (results) => set({ searchResults: results }),
   setSearchQuery: (query) => {
     const engine = get().searchEngine;
     const mode = get().searchMode;
+    if (mode === "content") {
+      set({ searchQuery: query, ...(query.trim() ? {} : { searchResults: [] }) });
+      return;
+    }
     if (!engine || !query.trim()) {
       set({ searchQuery: query, searchResults: [] });
       return;
     }
-    // Currently both modes use the same fuzzy engine
-    // When embeddings are available, "semantic" mode will use SemanticSearchEngine
-    void mode;
+    // Fuzzy and semantic currently use the same engine; when embeddings are
+    // available, "semantic" mode will use SemanticSearchEngine.
     const searchResults = engine.search(query);
     set({ searchQuery: query, searchResults });
   },

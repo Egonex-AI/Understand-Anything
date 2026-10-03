@@ -674,7 +674,7 @@ function DashboardContent({
       </header>
 
       {/* Search */}
-      <SearchBar />
+      <SearchBar accessToken={accessToken} />
 
       {/* Graph freshness warning banner */}
       {!loadError && <StalenessBanner freshness={graphFreshness} />}

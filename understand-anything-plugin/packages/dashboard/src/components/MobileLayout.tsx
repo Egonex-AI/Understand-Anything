@@ -133,7 +133,7 @@ export default function MobileLayout({
       </header>
 
       {/* Search (collapsible) */}
-      {searchOpen && <SearchBar />}
+      {searchOpen && <SearchBar accessToken={accessToken} />}
 
       {/* Graph freshness warning */}
       {!loadError && <StalenessBanner freshness={graphFreshness} />}
