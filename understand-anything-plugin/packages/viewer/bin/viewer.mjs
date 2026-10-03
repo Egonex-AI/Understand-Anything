@@ -16,6 +16,7 @@
  *   - graph JSON is served with node filePaths relativised to the project
  *   - /file-content.json only serves files listed in the graph, capped at
  *     1 MB, never binary
+ *   - /search-content.json only searches those same files
  */
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -24,6 +25,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getGraphFreshnessBatch } from "./dist/staleness.js";
+import {
+  ContentSearchQueryError,
+  parseContentSearchParams,
+  searchProjectContent,
+} from "./dist/content-search.js";
 
 const DIST_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
@@ -198,6 +204,23 @@ function readSourceFile(url) {
   };
 }
 
+function searchContent(url) {
+  const { query, options } = parseContentSearchParams(url.searchParams);
+  if (!query.trim()) return { statusCode: 400, payload: { error: "Missing query" } };
+  try {
+    return {
+      statusCode: 200,
+      payload: searchProjectContent(projectRoot, graphFilePathSet(), query, {
+        ...options,
+        maxFileBytes: MAX_SOURCE_FILE_BYTES,
+      }),
+    };
+  } catch (err) {
+    if (err instanceof ContentSearchQueryError) return { statusCode: 400, payload: { error: err.message } };
+    throw err;
+  }
+}
+
 function serveGraphJson(res, fileName) {
   const candidate = path.join(graphDir, fileName);
   if (fs.existsSync(candidate)) {
@@ -313,6 +336,7 @@ const PROTECTED = new Set([
   "/meta.json",
   "/config.json",
   "/file-content.json",
+  "/search-content.json",
   "/staleness.json",
 ]);
 
@@ -336,6 +360,12 @@ const server = createServer((req, res) => {
 
   if (pathname === "/file-content.json") {
     const result = readSourceFile(url);
+    sendJson(res, result.statusCode, result.payload);
+    return;
+  }
+
+  if (pathname === "/search-content.json") {
+    const result = searchContent(url);
     sendJson(res, result.statusCode, result.payload);
     return;
   }

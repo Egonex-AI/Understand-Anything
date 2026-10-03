@@ -11,6 +11,11 @@ import {
   type GraphFreshnessInput,
   type GraphFreshnessResult,
 } from "../core/src/staleness";
+import {
+  ContentSearchQueryError,
+  parseContentSearchParams,
+  searchProjectContent,
+} from "../core/src/content-search";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -185,6 +190,29 @@ function readSourceFile(url: URL) {
       lineCount: content.length === 0 ? 0 : content.split(/\r\n|\n|\r/).length,
     },
   };
+}
+
+function searchContent(url: URL) {
+  const { query, options } = parseContentSearchParams(url.searchParams);
+  if (!query.trim()) return rejectFileRequest("Missing query");
+
+  const graphFile = findGraphFile("knowledge-graph.json");
+  if (!graphFile) {
+    return rejectFileRequest("No knowledge graph found. Run /understand first.", 404);
+  }
+  const projectRoot = projectRootFromGraphFile(graphFile);
+  try {
+    return {
+      statusCode: 200,
+      payload: searchProjectContent(projectRoot, graphFilePathSet(graphFile, projectRoot), query, {
+        ...options,
+        maxFileBytes: MAX_SOURCE_FILE_BYTES,
+      }),
+    };
+  } catch (err) {
+    if (err instanceof ContentSearchQueryError) return rejectFileRequest(err.message);
+    throw err;
+  }
 }
 
 export interface DashboardFreshnessReport {
@@ -368,7 +396,8 @@ const config: DashboardViteConfig = {
             pathname === "/diff-overlay.json" ||
             pathname === "/meta.json" ||
             pathname === "/config.json" ||
-            pathname === "/file-content.json";
+            pathname === "/file-content.json" ||
+            pathname === "/search-content.json";
 
           if (!isProtectedEndpoint) {
             next();
@@ -384,6 +413,12 @@ const config: DashboardViteConfig = {
 
           if (pathname === "/file-content.json") {
             const result = readSourceFile(url);
+            sendJson(res, result.statusCode, result.payload);
+            return;
+          }
+
+          if (pathname === "/search-content.json") {
+            const result = searchContent(url);
             sendJson(res, result.statusCode, result.payload);
             return;
           }
