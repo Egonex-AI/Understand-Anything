@@ -307,6 +307,7 @@ const config: DashboardViteConfig = {
     alias: {
       "@understand-anything/core/schema": path.resolve(__dirname, "../core/dist/schema.js"),
       "@understand-anything/core/search": path.resolve(__dirname, "../core/dist/search.js"),
+      "@understand-anything/core/embedding-search": path.resolve(__dirname, "../core/dist/embedding-search.js"),
       "@understand-anything/core/types": path.resolve(__dirname, "../core/dist/types.js"),
     },
   },
