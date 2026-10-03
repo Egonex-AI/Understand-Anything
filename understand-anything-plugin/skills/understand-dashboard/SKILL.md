@@ -100,37 +100,32 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    DASHBOARD_DIR="$PLUGIN_ROOT/packages/dashboard"
    ```
 
-4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball; run it pinned to the installed plugin version:
+4. **Start the full dashboard (dev server).** Only the dev server has the read-write features — Ask AI, saving tags/notes/line notes to `annotations.json`, semantic search and editing architecture rules — so it is the default. Install dependencies (fast when already installed) and build core:
+   ```bash
+   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
+   DASHBOARD_DIR="${DASHBOARD_DIR:-$PLUGIN_ROOT/packages/dashboard}"
+   PNPM="pnpm"; command -v pnpm >/dev/null 2>&1 || PNPM="npx --yes pnpm@10"
+   cd "$PLUGIN_ROOT" && ($PNPM install --frozen-lockfile 2>/dev/null || $PNPM install) && $PNPM --filter @understand-anything/core build
+   ```
+   If this fails (no Node/pnpm toolchain, or no network for the first install), skip to step 6.
+
+5. Start the Vite dev server pointing at the project's knowledge graph:
+   ```bash
+   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
+   : "${DASHBOARD_DIR:?Run step 4 first so DASHBOARD_DIR is set}"
+   cd "$DASHBOARD_DIR" && GRAPH_DIR="$PROJECT_DIR" npx vite --host 127.0.0.1
+   ```
+   Run this in the background so the user can continue working. When the `🔑  Dashboard URL` line appears, **skip step 6** and continue at step 7.
+
+6. **Fallback — prebuilt read-only viewer.** Only when steps 4-5 failed: run the self-contained viewer tarball pinned to the installed plugin version. It shows the same dashboard, but annotations and rules are read-only (edits stay in the browser) and Ask AI / semantic search are unavailable:
    ```bash
    : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
    : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
    PLUGIN_VERSION=$(node -p "require('$PLUGIN_ROOT/package.json').version")
-   VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
+   VIEWER_URL="https://github.com/WhoAlwaysZzz/Understand-Anything-Revise/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
    npx --yes "$VIEWER_URL" "$PROJECT_DIR"
    ```
-   Run this in the background. It prints the same `🔑  Dashboard URL` line as the dev server:
-   - If the line appears, **skip steps 5-6** and continue at step 7.
-   - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
-
-5. Fallback: install dependencies and build if needed:
-   ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   DASHBOARD_DIR="${DASHBOARD_DIR:-$PLUGIN_ROOT/packages/dashboard}"
-   cd "$DASHBOARD_DIR" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
-   ```
-   Then ensure the core package is built (the dashboard depends on it):
-   ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
-   ```
-
-6. Fallback: start the Vite dev server pointing at the project's knowledge graph:
-   ```bash
-   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
-   : "${DASHBOARD_DIR:?Run step 5 first so DASHBOARD_DIR is set}"
-   cd "$DASHBOARD_DIR" && GRAPH_DIR="$PROJECT_DIR" npx vite --host 127.0.0.1
-   ```
-   Run this in the background so the user can continue working.
+   Run this in the background. If it exits without printing the `🔑  Dashboard URL` line (no release asset for this version, or no network), tell the user the dashboard could not be started and show the errors from step 4.
 
 7. **Capture the access token URL from the server output.** The server (viewer or Vite) prints a line like:
    ```
@@ -149,7 +144,8 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Notes
 
-- The fast path (step 4) downloads a version-pinned, self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs
+- The dev server (steps 4-5) is the default because only it can write annotations, call the AI provider configured in `~/.understand-anything/ai.json`, and save architecture rules; the first run installs dependencies into the plugin directory
+- The fallback (step 6) downloads a version-pinned, self-contained read-only viewer from this fork's GitHub release — nothing is installed and no build runs
 - The dashboard auto-opens in the default browser (both the viewer and Vite's `--open`)
 - If port 5173 is already in use, the next available port is picked (both paths)
-- In the fallback, the `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph
+- The `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph
