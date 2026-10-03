@@ -1,6 +1,6 @@
 {
   "name": "understand-anything-viewer",
-  "version": "2.11.1",
+  "version": "2.11.2",
   "description": "Standalone read-only viewer for Understand-Anything knowledge graphs — no Claude Code or LLM required.",
   "type": "module",
   "license": "MIT",
