@@ -17,7 +17,7 @@ function subsequenceScore(q: string, text: string): number {
     if (found === prev + 1) score += 3;
     const before = found === 0 ? "/" : text[found - 1];
     const camel = /[a-z0-9]/.test(before) && /[A-Z]/.test(text[found]);
-    if (camel || /[\s/._:\-]/.test(before)) score += 4;
+    if (camel || /[\s/._:-]/.test(before)) score += 4;
     prev = found;
     from = found + 1;
   }
