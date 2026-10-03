@@ -90,6 +90,18 @@ export function buildCodeNavIndex(graph: KnowledgeGraph | null): CodeNavIndex {
   return { byName, childrenByFile, importsByFile };
 }
 
+const indexCache = new WeakMap<KnowledgeGraph, CodeNavIndex>();
+
+/** buildCodeNavIndex, memoised per graph object (the code viewer remounts often). */
+export function getCodeNavIndex(graph: KnowledgeGraph): CodeNavIndex {
+  let index = indexCache.get(graph);
+  if (!index) {
+    index = buildCodeNavIndex(graph);
+    indexCache.set(graph, index);
+  }
+  return index;
+}
+
 /**
  * The node an identifier in `filePath` most likely refers to: a definition in
  * the same file, then one in a file this file imports (or that imported file

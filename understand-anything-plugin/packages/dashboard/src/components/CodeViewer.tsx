@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
+import type { GraphNode } from "@understand-anything/core/types";
 import MarkdownContent from "./MarkdownContent";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { useTheme } from "../themes/index.ts";
 import { ensurePrismLanguage, isPrismLanguageLoaded, languageForPath } from "../utils/prismLanguages";
+import { getCodeNavIndex, isIdentifierToken, resolveIdentifier } from "../utils/codeNav";
+import { fmt } from "../locales";
 
 interface CodeViewerProps {
   accessToken: string;
@@ -30,6 +33,16 @@ function fileContentUrl(filePath: string, token: string): string {
   const params = new URLSearchParams({ token, path: filePath });
   return `/file-content.json?${params.toString()}`;
 }
+
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(
+    (navigator as Navigator & { userAgentData?: { platform: string } }).userAgentData?.platform ?? navigator.platform,
+  );
+const MOD_KEY_LABEL = IS_MAC ? "⌘" : "Ctrl";
+/** Class set on the code scroller while Ctrl/⌘ is held, so identifier links look clickable. */
+const MOD_HELD_CLASS = "ua-mod-held";
+const IDENTIFIER_SPLIT_RE = /([A-Za-z_$][\w$]*)/;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -88,6 +101,7 @@ export default function CodeViewer({
   const viewMode = useDashboardStore((s) => s.viewMode);
   const codeViewerNodeId = useDashboardStore((s) => s.codeViewerNodeId);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
+  const nodesById = useDashboardStore((s) => s.nodesById);
   const targetLine = useDashboardStore((s) => s.codeViewerLine);
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
@@ -163,6 +177,60 @@ export default function CodeViewer({
 
     return () => controller.abort();
   }, [accessToken, node?.filePath]);
+
+  // Identifier → graph node, cached per file so each name resolves once.
+  const navIndex = useMemo(() => (graph ? getCodeNavIndex(graph) : null), [graph]);
+  const filePath = node?.filePath ?? null;
+  const resolveName = useMemo(() => {
+    const cache = new Map<string, GraphNode | null>();
+    return (name: string): GraphNode | null => {
+      if (!navIndex || !filePath) return null;
+      let hit = cache.get(name);
+      if (hit === undefined) {
+        hit = resolveIdentifier(navIndex, name, filePath);
+        cache.set(name, hit);
+      }
+      return hit;
+    };
+  }, [navIndex, filePath]);
+
+  // Jump to another node from the source: select it in the graph and show its
+  // code, staying in the expanded modal if that's where the click came from.
+  const goToNode = useCallback((nodeId: string) => {
+    const store = useDashboardStore.getState();
+    const target = nodesById.get(nodeId);
+    if (!target) return;
+    const wasExpanded = store.codeViewerExpanded;
+    store.navigateToNode(nodeId);
+    store.openCodeViewer(nodeId, target.lineRange?.[0]);
+    if (wasExpanded) store.expandCodeViewer();
+  }, [nodesById]);
+
+  const handleCodeClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (!(event.metaKey || event.ctrlKey)) return;
+    const link = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-id]");
+    if (!link?.dataset.navId) return;
+    event.preventDefault();
+    goToNode(link.dataset.navId);
+  };
+
+  // Ctrl/⌘ held → identifier links show as clickable (toggled on the DOM, not
+  // in React state, so holding the key doesn't re-render the whole file).
+  useEffect(() => {
+    const update = (event: KeyboardEvent | MouseEvent) =>
+      scrollRef.current?.classList.toggle(MOD_HELD_CLASS, event.metaKey || event.ctrlKey);
+    const clear = () => scrollRef.current?.classList.remove(MOD_HELD_CLASS);
+    window.addEventListener("keydown", update);
+    window.addEventListener("keyup", update);
+    window.addEventListener("mousemove", update, { passive: true });
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", update);
+      window.removeEventListener("keyup", update);
+      window.removeEventListener("mousemove", update);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
 
   const highlightedRange = useMemo(() => {
     if (!node?.lineRange) return null;
@@ -318,6 +386,7 @@ export default function CodeViewer({
                     isModal ? "text-xs leading-5" : "text-[11px] leading-5"
                   } font-mono`}
                   style={{ ...style, backgroundColor: "transparent" }}
+                  onClick={handleCodeClick}
                 >
                   {tokens.map((line, index) => {
                     const lineNumber = index + 1;
@@ -344,9 +413,35 @@ export default function CodeViewer({
                           {lineNumber}
                         </span>
                         <span className="pl-3 pr-6 whitespace-pre">
-                          {line.map((token, key) => (
-                            <span key={key} {...getTokenProps({ token })} />
-                          ))}
+                          {line.map((token, key) => {
+                            const tokenProps = getTokenProps({ token });
+                            if (!navIndex || !isIdentifierToken(token.types)) {
+                              return <span key={key} {...tokenProps} />;
+                            }
+                            // Odd indices are identifiers; wrap the ones that name a graph node.
+                            const parts = token.content.split(IDENTIFIER_SPLIT_RE);
+                            if (!parts.some((part, i) => i % 2 === 1 && resolveName(part))) {
+                              return <span key={key} {...tokenProps} />;
+                            }
+                            return (
+                              <span key={key} {...tokenProps}>
+                                {parts.map((part, i) => {
+                                  const target = i % 2 === 1 ? resolveName(part) : null;
+                                  if (!target) return part;
+                                  return (
+                                    <span
+                                      key={i}
+                                      data-nav-id={target.id}
+                                      title={fmt(t.codeNav.goTo, { mod: MOD_KEY_LABEL, name: target.name })}
+                                      className="underline decoration-dotted decoration-transparent underline-offset-2 hover:decoration-current [.ua-mod-held_&]:cursor-pointer [.ua-mod-held_&:hover]:decoration-solid [.ua-mod-held_&:hover]:text-accent"
+                                    >
+                                      {part}
+                                    </span>
+                                  );
+                                })}
+                              </span>
+                            );
+                          })}
                         </span>
                       </div>
                     );
