@@ -64,6 +64,17 @@ function extractReturnType(node: TreeSitterNode): string | undefined {
 }
 
 /**
+ * Synthetic caller name used for call-graph entries whose call site is
+ * not inside any function or method (procedural / page-style PHP).
+ *
+ * Procedural PHP frequently calls helpers at file scope (top-level), and
+ * dropping those would yield ~0% call-graph coverage on such codebases.
+ * We attribute them to this stable identifier so downstream consumers can
+ * still link the file-as-caller to its callees.
+ */
+const FILE_SCOPE_CALLER = "<file>";
+
+/**
  * Reconstruct a fully-qualified name from a `namespace_use_clause`.
  *
  * For a simple clause like `use App\Models\User;`, the clause contains
@@ -97,6 +108,85 @@ function lastSegment(fqn: string): string {
 }
 
 /**
+ * PHP include/require expression node types (statically dispatchable in tree-sitter-php).
+ */
+const INCLUDE_NODE_TYPES = new Set([
+  "include_expression",
+  "include_once_expression",
+  "require_expression",
+  "require_once_expression",
+]);
+
+/**
+ * Extract the string contents of a `string` or `encapsed_string` node.
+ *
+ * tree-sitter-php represents PHP strings as a `string` (single-quoted) or
+ * `encapsed_string` (double-quoted) node wrapping a `string_content` /
+ * `string_value` child. Returns null if the node is not a string-typed node.
+ */
+function extractStringLiteral(node: TreeSitterNode): string | null {
+  if (node.type !== "string" && node.type !== "encapsed_string") return null;
+  // Walk children to gather contiguous string_content / string_value pieces.
+  let value = "";
+  let sawContent = false;
+  for (let i = 0; i < node.childCount; i++) {
+    const child = node.child(i);
+    if (!child) continue;
+    if (child.type === "string_content" || child.type === "string_value") {
+      value += child.text;
+      sawContent = true;
+    }
+  }
+  if (sawContent) return value;
+  // Fallback: strip surrounding quotes from the raw text.
+  return node.text.replace(/^['"]|['"]$/g, "");
+}
+
+/**
+ * Attempt to statically resolve the path argument of an include/require expression.
+ *
+ * Handles:
+ * - Plain string literal:    `include 'config.php';`
+ * - `__DIR__` / `__FILE__` concatenation: `require_once __DIR__ . '/helpers.php';`
+ *   (the magic constant is preserved as `__DIR__` in the resolved string so the
+ *    consumer can resolve it relative to the current file)
+ *
+ * Returns the resolved path string when statically determinable, otherwise the
+ * raw text of the argument expression (so the edge is still emitted, but with
+ * a non-resolvable source). Returns null if the expression has no usable form.
+ */
+function resolveIncludePath(argNode: TreeSitterNode): string | null {
+  // Direct string literal: `include 'config.php';`
+  const direct = extractStringLiteral(argNode);
+  if (direct !== null) return direct;
+
+  // Binary concatenation: `__DIR__ . '/helpers.php'` (possibly nested for
+  // multi-piece concatenations: `__DIR__ . '/sub' . '/helpers.php'`).
+  if (argNode.type === "binary_expression") {
+    const left = argNode.childForFieldName("left");
+    const right = argNode.childForFieldName("right");
+    const op = argNode.childForFieldName("operator");
+    if (left && right && op && op.text === ".") {
+      const leftStr = resolveIncludePath(left);
+      const rightStr = resolveIncludePath(right);
+      if (leftStr !== null && rightStr !== null) {
+        return leftStr + rightStr;
+      }
+    }
+  }
+
+  // Magic constants like __DIR__ / __FILE__ surface as bare `name` nodes.
+  // Preserve them verbatim so callers can resolve relative to the current file.
+  if (argNode.type === "name") {
+    return argNode.text;
+  }
+
+  // Unresolvable (variable, function call, etc.) — return raw text so the
+  // edge is still recorded but flagged as non-resolvable downstream.
+  return argNode.text;
+}
+
+/**
  * PHP extractor for tree-sitter structural analysis and call graph extraction.
  *
  * Handles functions, classes, interfaces, use imports, and call graphs
@@ -107,10 +197,15 @@ function lastSegment(fqn: string): string {
  * - `class_declaration` and `interface_declaration` map to the `classes` array.
  * - `property_declaration` nodes within classes map to class properties.
  * - `namespace_use_declaration` nodes (PHP `use` statements) map to imports.
+ * - `include` / `include_once` / `require` / `require_once` expressions also
+ *   map to imports, with the path string captured as the source (procedural
+ *   PHP relies on these for file→file dependencies).
  * - PHP has no formal export syntax, so public classes, interfaces, and
  *   top-level functions are treated as exports.
  * - Call graph covers `function_call_expression`, `member_call_expression`,
- *   and `scoped_call_expression`.
+ *   and `scoped_call_expression`. Calls at file scope (outside any function
+ *   or method) are attributed to a synthetic `<file>` caller so procedural
+ *   PHP pages still produce call-graph coverage.
  */
 export class PhpExtractor implements LanguageExtractor {
   readonly languageIds = ["php"];
@@ -174,6 +269,17 @@ export class PhpExtractor implements LanguageExtractor {
           this.extractUseDeclaration(node, imports);
           break;
 
+        case "expression_statement": {
+          // `include 'foo.php';` and friends parse as an expression_statement
+          // wrapping an include_expression / include_once_expression /
+          // require_expression / require_once_expression node.
+          const inner = node.child(0);
+          if (inner && INCLUDE_NODE_TYPES.has(inner.type)) {
+            this.extractIncludeRequire(inner, imports);
+          }
+          break;
+        }
+
         case "namespace_definition": {
           // Block-scoped namespaces (`namespace Foo { ... }`) nest declarations
           // inside a compound_statement body. Declarative namespaces (`namespace Foo;`)
@@ -204,50 +310,53 @@ export class PhpExtractor implements LanguageExtractor {
         }
       }
 
-      // Extract call expressions
-      if (functionStack.length > 0) {
-        const caller = functionStack[functionStack.length - 1];
+      // Extract call expressions. Calls inside functions/methods are attributed
+      // to the enclosing function; calls at file scope (procedural PHP pages)
+      // are attributed to the synthetic <file> caller so they aren't dropped.
+      const caller =
+        functionStack.length > 0
+          ? functionStack[functionStack.length - 1]
+          : FILE_SCOPE_CALLER;
 
-        if (node.type === "function_call_expression") {
-          // Standalone function call: baz($x), strtoupper($x), error_log($msg)
-          const nameNode = findChild(node, "name");
-          if (nameNode) {
-            entries.push({
-              caller,
-              callee: nameNode.text,
-              lineNumber: node.startPosition.row + 1,
-            });
-          }
-        } else if (node.type === "member_call_expression") {
-          // Instance method call: $this->fetchFromDb($id)
-          const nameNode = findChild(node, "name");
-          if (nameNode) {
-            // Determine the receiver for more descriptive callee
-            const firstChild = node.child(0);
-            const receiver = firstChild ? firstChild.text : "";
-            const callee = receiver
-              ? receiver + "->" + nameNode.text
-              : nameNode.text;
-            entries.push({
-              caller,
-              callee,
-              lineNumber: node.startPosition.row + 1,
-            });
-          }
-        } else if (node.type === "scoped_call_expression") {
-          // Static method call: Bar::staticMethod()
-          // Children: [name("Bar"), ::, name("staticMethod"), arguments]
-          // Both scope and method are `name` nodes, so we pick child[0] for scope
-          // and child[2] (after `::`) for the method name.
-          const scopeNode = node.child(0);
-          const methodNode = node.child(2);
-          if (scopeNode && methodNode && methodNode.type === "name") {
-            entries.push({
-              caller,
-              callee: scopeNode.text + "::" + methodNode.text,
-              lineNumber: node.startPosition.row + 1,
-            });
-          }
+      if (node.type === "function_call_expression") {
+        // Standalone function call: baz($x), strtoupper($x), error_log($msg)
+        const nameNode = findChild(node, "name");
+        if (nameNode) {
+          entries.push({
+            caller,
+            callee: nameNode.text,
+            lineNumber: node.startPosition.row + 1,
+          });
+        }
+      } else if (node.type === "member_call_expression") {
+        // Instance method call: $this->fetchFromDb($id)
+        const nameNode = findChild(node, "name");
+        if (nameNode) {
+          // Determine the receiver for more descriptive callee
+          const firstChild = node.child(0);
+          const receiver = firstChild ? firstChild.text : "";
+          const callee = receiver
+            ? receiver + "->" + nameNode.text
+            : nameNode.text;
+          entries.push({
+            caller,
+            callee,
+            lineNumber: node.startPosition.row + 1,
+          });
+        }
+      } else if (node.type === "scoped_call_expression") {
+        // Static method call: Bar::staticMethod()
+        // Children: [name("Bar"), ::, name("staticMethod"), arguments]
+        // Both scope and method are `name` nodes, so we pick child[0] for scope
+        // and child[2] (after `::`) for the method name.
+        const scopeNode = node.child(0);
+        const methodNode = node.child(2);
+        if (scopeNode && methodNode && methodNode.type === "name") {
+          entries.push({
+            caller,
+            callee: scopeNode.text + "::" + methodNode.text,
+            lineNumber: node.startPosition.row + 1,
+          });
         }
       }
 
@@ -457,5 +566,41 @@ export class PhpExtractor implements LanguageExtractor {
         lineNumber: node.startPosition.row + 1,
       });
     }
+  }
+
+  /**
+   * Extract an import entry from an include/require expression.
+   *
+   * Tree-sitter-php exposes these as `include_expression`, `include_once_expression`,
+   * `require_expression`, and `require_once_expression`. Each has a single child
+   * holding the path argument (string literal, magic-constant concatenation, etc.).
+   *
+   * When the path is statically resolvable (string literal or `__DIR__` / `__FILE__`
+   * concatenation) we capture the resolved string. Otherwise we capture the raw
+   * argument text so the dependency edge is still emitted, just non-resolvable.
+   */
+  private extractIncludeRequire(
+    node: TreeSitterNode,
+    imports: StructuralAnalysis["imports"],
+  ): void {
+    // The argument is the first named child of the include/require expression.
+    let arg: TreeSitterNode | null = null;
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      if (child && child.isNamed) {
+        arg = child;
+        break;
+      }
+    }
+    if (!arg) return;
+
+    const source = resolveIncludePath(arg);
+    if (source === null) return;
+
+    imports.push({
+      source,
+      specifiers: [],
+      lineNumber: node.startPosition.row + 1,
+    });
   }
 }
