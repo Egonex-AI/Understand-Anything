@@ -369,7 +369,7 @@ export default function CodeViewer({
                   className={`${className} min-w-max p-0 m-0 ${
                     isModal ? "text-xs leading-5" : "text-[11px] leading-5"
                   } font-mono`}
-                  style={{ ...style, background: "transparent" }}
+                  style={{ ...style, backgroundColor: "transparent" }}
                 >
                   {tokens.map((line, index) => {
                     const lineNumber = index + 1;
