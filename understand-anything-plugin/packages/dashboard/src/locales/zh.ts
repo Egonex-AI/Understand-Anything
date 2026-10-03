@@ -172,6 +172,7 @@ export const zh = {
     mono: "等宽",
   },
   codeViewer: {
+    resize: "拖动调整高度 · 双击恢复默认",
     fullFile: "完整文件",
     lines: "行",
     linesLabel: "行",

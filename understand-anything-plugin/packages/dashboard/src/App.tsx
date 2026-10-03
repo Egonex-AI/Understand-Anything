@@ -18,6 +18,7 @@ import FileExplorer from "./components/FileExplorer";
 import WarningBanner from "./components/WarningBanner";
 import StalenessBanner from "./components/StalenessBanner";
 import TokenGate from "./components/TokenGate";
+import ResizableBottomPanel from "./components/ResizableBottomPanel";
 import MobileLayout from "./components/MobileLayout";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
@@ -732,11 +733,11 @@ function DashboardContent({
 
         {/* Code viewer slide-up overlay (collapsed state) */}
         {codeViewerOpen && !codeViewerExpanded && (
-          <div className="absolute bottom-0 left-0 right-0 h-[40vh] bg-surface border-t border-border-subtle animate-slide-up z-20 overflow-hidden">
+          <ResizableBottomPanel label={t.codeViewer.resize}>
             <Suspense fallback={null}>
               <CodeViewer accessToken={accessToken} onExpand={expandCodeViewer} />
             </Suspense>
-          </div>
+          </ResizableBottomPanel>
         )}
       </div>
 

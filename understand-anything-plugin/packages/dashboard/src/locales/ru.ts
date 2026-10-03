@@ -172,6 +172,7 @@ export const ru = {
     mono: "Моноширинный",
   },
   codeViewer: {
+    resize: "Потяните для изменения размера · двойной щелчок — сброс",
     fullFile: "Весь файл",
     lines: "Строки",
     linesLabel: "строк",

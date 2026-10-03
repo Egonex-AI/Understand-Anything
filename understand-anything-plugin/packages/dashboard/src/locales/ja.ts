@@ -172,6 +172,7 @@ export const ja = {
     mono: "モノ",
   },
   codeViewer: {
+    resize: "ドラッグでサイズ変更 · ダブルクリックでリセット",
     fullFile: "ファイル全体",
     lines: "行",
     linesLabel: "行",

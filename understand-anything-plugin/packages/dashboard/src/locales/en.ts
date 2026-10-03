@@ -172,6 +172,7 @@ export const en = {
     mono: "Mono",
   },
   codeViewer: {
+    resize: "Drag to resize · double-click to reset",
     fullFile: "Full file",
     lines: "Lines",
     linesLabel: "lines",

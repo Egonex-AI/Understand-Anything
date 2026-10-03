@@ -172,6 +172,7 @@ export const ko = {
     mono: "모노",
   },
   codeViewer: {
+    resize: "드래그하여 크기 조절 · 더블클릭으로 초기화",
     fullFile: "전체 파일",
     lines: "행",
     linesLabel: "행",
