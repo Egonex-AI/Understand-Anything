@@ -1,7 +1,11 @@
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
-import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
+import { complexityLabel, edgeDirectionalLabel, nodeTypeLabel } from "../locales/displayLabels";
+import { explanationForPersona } from "../utils/explanationSections";
+import type { NodeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 // Badge color classes keyed by NodeType — must be kept in sync with core NodeType union.
 const typeBadgeColors: Record<NodeType, string> = {
@@ -40,18 +44,6 @@ const complexityBadgeColors: Record<string, string> = {
   complex: "text-[#c97070] border border-[#c97070]/30 bg-[#c97070]/10",
 };
 
-function getDirectionalLabel(edgeType: string, isSource: boolean, t: ReturnType<typeof useI18n>["t"]): string {
-  // edgeLabels only defines the labels that have explicit translations; the new
-  // design edge types (instance_of/variant_of/uses_token) intentionally fall back
-  // to the generated label below, so index it as a partial map over EdgeType.
-  const labels = (t.edgeLabels as Partial<Record<EdgeType, { forward: string; backward: string }>>)[edgeType as EdgeType];
-  if (!labels) {
-    const formatted = edgeType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    return isSource ? formatted : `${formatted} (reverse)`;
-  }
-  return isSource ? labels.forward : labels.backward;
-}
-
 function FigmaThumbnail({ node }: { node: GraphNode }) {
   const url = node.figmaMeta?.thumbnailUrl;
   if (!url) return null;
@@ -59,6 +51,79 @@ function FigmaThumbnail({ node }: { node: GraphNode }) {
     <div className="mb-3 rounded-lg overflow-hidden border border-border-subtle bg-elevated">
       <img src={url} alt={node.name} className="w-full h-auto block" loading="lazy" />
     </div>
+  );
+}
+
+function FileExplanation({ node, graph }: { node: GraphNode; graph: KnowledgeGraph }) {
+  const { t } = useI18n();
+  const navigateToNode = useDashboardStore((s) => s.navigateToNode);
+  const persona = useDashboardStore((s) => s.persona);
+  const expanded = useDashboardStore((s) => s.explanationExpandedNodeIds.has(node.id));
+  const toggleExplanation = useDashboardStore((s) => s.toggleExplanation);
+
+  if (node.type !== "file") return null;
+
+  const relatedFiles = graph.edges
+    .filter((edge) => edge.source === node.id || edge.target === node.id)
+    .map((edge) => graph.nodes.find((candidate) => candidate.id === (edge.source === node.id ? edge.target : edge.source)))
+    .filter((candidate): candidate is GraphNode => candidate?.type === "file")
+    .filter((candidate, index, candidates) => candidates.findIndex((item) => item.id === candidate.id) === index);
+
+  const status = node.explanationStatus ?? (node.explanation ? "ready" : "unavailable");
+  const personaExplanation = status === "ready" && node.explanation
+    ? explanationForPersona(node.explanation, persona)
+    : null;
+  const message = status === "generating"
+    ? t.nodeInfo.explanationGenerating
+    : status === "failed"
+      ? node.explanationError ?? t.nodeInfo.explanationFailed
+      : status === "ready"
+        ? t.nodeInfo.personaExplanationUnavailable
+        : t.nodeInfo.noExplanation;
+
+  return (
+    <section className="mb-4 rounded-lg border border-accent/25 bg-accent/5 p-3">
+      <button
+        type="button"
+        onClick={() => toggleExplanation(node.id)}
+        className="flex w-full items-center justify-between gap-2 text-left text-xs font-semibold uppercase tracking-wider text-accent hover:text-accent-bright"
+        aria-expanded={expanded}
+      >
+        <span>{t.nodeInfo.explanation}</span>
+        <span className="text-[10px]">{expanded ? t.nodeInfo.hideExplanation : t.nodeInfo.showExplanation}</span>
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          {personaExplanation ? (
+            <div className="prose prose-invert prose-sm max-w-none text-text-secondary prose-headings:text-text-primary prose-headings:font-heading prose-h2:text-sm prose-h3:text-xs prose-p:leading-relaxed prose-li:my-1">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{personaExplanation}</ReactMarkdown>
+            </div>
+          ) : (
+            <p className="text-sm text-text-secondary" role="status">{message}</p>
+          )}
+          {relatedFiles.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gold">
+                {t.nodeInfo.relatedFiles} ({relatedFiles.length})
+              </h3>
+              <div className="space-y-1">
+                {relatedFiles.map((related) => (
+                  <button
+                    key={related.id}
+                    type="button"
+                    onClick={() => navigateToNode(related.id)}
+                    className="block w-full truncate rounded bg-elevated px-2 py-1.5 text-left text-[11px] text-text-secondary transition-colors hover:bg-gold/10 hover:text-gold"
+                    title={related.filePath ?? related.name}
+                  >
+                    {related.filePath ?? related.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -281,7 +346,7 @@ export default function NodeInfo() {
   const nodeHistory = useDashboardStore((s) => s.nodeHistory);
   const goBackNode = useDashboardStore((s) => s.goBackNode);
   const [languageExpanded, setLanguageExpanded] = useState(true);
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   const navigateToNode = useDashboardStore((s) => s.navigateToNode);
   const navigateToHistoryIndex = useDashboardStore((s) => s.navigateToHistoryIndex);
@@ -376,12 +441,12 @@ export default function NodeInfo() {
         <span
           className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded ${typeBadge}`}
         >
-          {node.type}
+          {nodeTypeLabel(localeKey, node.type)}
         </span>
         <span
           className={`text-[10px] font-semibold px-2 py-0.5 rounded ${complexityBadge}`}
         >
-          {node.complexity}
+          {complexityLabel(localeKey, node.complexity)}
         </span>
       </div>
 
@@ -456,6 +521,8 @@ export default function NodeInfo() {
         </div>
       )}
 
+      {activeGraph && <FileExplanation node={node} graph={activeGraph} />}
+
       {node.tags.length > 0 && (
         <div className="mb-4">
           <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
@@ -503,11 +570,11 @@ export default function NodeInfo() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${childTypeBadge}`}>
-                      {child.type}
+                      {nodeTypeLabel(localeKey, child.type)}
                     </span>
                     <span className="text-text-primary truncate">{child.name}</span>
                     <span className={`text-[9px] ml-auto ${childComplexity} px-1 py-0.5 rounded`}>
-                      {child.complexity}
+                      {complexityLabel(localeKey, child.complexity)}
                     </span>
                   </div>
                   {child.summary && (
@@ -533,7 +600,7 @@ export default function NodeInfo() {
               const isSource = edge.source === node.id;
               const otherId = isSource ? edge.target : edge.source;
               const otherNode = activeGraph?.nodes.find((n) => n.id === otherId);
-              const dirLabel = getDirectionalLabel(edge.type, isSource, t);
+              const dirLabel = edgeDirectionalLabel(t.edgeLabels, edge.type, isSource);
               const arrow = isSource ? "\u2192" : "\u2190";
 
               return (

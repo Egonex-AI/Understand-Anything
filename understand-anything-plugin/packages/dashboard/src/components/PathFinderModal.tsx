@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDashboardStore } from "../store";
+import { useI18n } from "../contexts/I18nContext";
+import { nodeTypeLabel } from "../locales/displayLabels";
 
 interface PathFinderModalProps {
   isOpen: boolean;
@@ -7,6 +9,7 @@ interface PathFinderModalProps {
 }
 
 export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProps) {
+  const { localeKey } = useI18n();
   const graph = useDashboardStore((s) => s.graph);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const [fromNodeId, setFromNodeId] = useState("");
@@ -158,7 +161,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
               <option value="">Select a node...</option>
               {nodes.map((node) => (
                 <option key={node.id} value={node.id}>
-                  {node.name} ({node.type})
+                  {node.name} ({nodeTypeLabel(localeKey, node.type)})
                 </option>
               ))}
             </select>
@@ -180,7 +183,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
               <option value="">Select a node...</option>
               {nodes.map((node) => (
                 <option key={node.id} value={node.id}>
-                  {node.name} ({node.type})
+                  {node.name} ({nodeTypeLabel(localeKey, node.type)})
                 </option>
               ))}
             </select>
@@ -253,7 +256,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-sm text-text-primary truncate">{node.name}</div>
-                              <div className="text-xs text-text-muted capitalize">{node.type}</div>
+                              <div className="text-xs text-text-muted">{nodeTypeLabel(localeKey, node.type)}</div>
                             </div>
                             <svg
                               className="w-4 h-4 text-text-muted"

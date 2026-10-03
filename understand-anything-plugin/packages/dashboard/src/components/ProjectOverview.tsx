@@ -1,10 +1,11 @@
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { beginnerGuideCopy, complexityLabel, deriveBeginnerGuide, nodeTypeLabel } from "../locales/displayLabels";
 
 export default function ProjectOverview() {
   const graph = useDashboardStore((s) => s.graph);
   const startTour = useDashboardStore((s) => s.startTour);
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   if (!graph) {
     return (
@@ -16,6 +17,8 @@ export default function ProjectOverview() {
 
   const { project, nodes, edges, layers } = graph;
   const hasTour = graph.tour.length > 0;
+  const guide = deriveBeginnerGuide(graph, localeKey);
+  const guideCopy = beginnerGuideCopy[localeKey];
 
   const typeCounts: Record<string, number> = {};
   for (const node of nodes) {
@@ -59,6 +62,24 @@ export default function ProjectOverview() {
       {/* Project name */}
       <h2 className="font-heading text-2xl text-text-primary mb-1">{project.name}</h2>
       <p className="text-sm text-text-secondary leading-relaxed mb-6">{project.description}</p>
+
+      <section className="mb-6 rounded-lg border border-accent/25 bg-accent/5 p-3">
+        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-accent">{guideCopy.title}</h3>
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="font-medium text-text-primary">{guideCopy.projectPurpose}</dt>
+            <dd className="mt-1 text-text-secondary">{guide.purpose}</dd>
+          </div>
+          <div>
+            <dt className="font-medium text-text-primary">{guideCopy.majorScreens}</dt>
+            <dd className="mt-1 text-text-secondary">{guide.screens}</dd>
+          </div>
+          <div>
+            <dt className="font-medium text-text-primary">{guideCopy.dataStorage}</dt>
+            <dd className="mt-1 text-text-secondary">{guide.storage}</dd>
+          </div>
+        </dl>
+      </section>
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
@@ -138,7 +159,7 @@ export default function ProjectOverview() {
               return (
                 <div key={type}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-text-secondary capitalize">{type}</span>
+                    <span className="text-text-secondary">{nodeTypeLabel(localeKey, type)}</span>
                     <span className="text-text-muted font-mono">{count} ({percentage}%)</span>
                   </div>
                   <div className="w-full h-1.5 bg-elevated rounded-full overflow-hidden">
@@ -160,15 +181,15 @@ export default function ProjectOverview() {
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-elevated rounded-lg p-2 border border-border-subtle text-center">
               <div className="text-lg font-mono font-medium text-green-400">{complexityCounts.simple}</div>
-              <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{t.projectOverview.simple}</div>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{complexityLabel(localeKey, "simple")}</div>
             </div>
             <div className="bg-elevated rounded-lg p-2 border border-border-subtle text-center">
               <div className="text-lg font-mono font-medium text-yellow-400">{complexityCounts.moderate}</div>
-              <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{t.projectOverview.moderate}</div>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{complexityLabel(localeKey, "moderate")}</div>
             </div>
             <div className="bg-elevated rounded-lg p-2 border border-border-subtle text-center">
               <div className="text-lg font-mono font-medium text-red-400">{complexityCounts.complex}</div>
-              <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{t.projectOverview.complex}</div>
+              <div className="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">{complexityLabel(localeKey, "complex")}</div>
             </div>
           </div>
         </div>

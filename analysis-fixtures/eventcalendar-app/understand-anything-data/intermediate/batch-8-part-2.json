@@ -1,0 +1,954 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/app/setup-nickname/nickname-form.tsx",
+      "type": "file",
+      "name": "nickname-form.tsx",
+      "filePath": "src/app/setup-nickname/nickname-form.tsx",
+      "summary": "src/app/setup-nickname/nickname-form.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/setup-nickname/nickname-form.tsx:NicknameForm",
+      "type": "function",
+      "name": "NicknameForm",
+      "filePath": "src/app/setup-nickname/nickname-form.tsx",
+      "lineRange": [
+        10,
+        67
+      ],
+      "summary": "NicknameFormはnickname-form.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/setup-nickname/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/setup-nickname/page.tsx",
+      "summary": "src/app/setup-nickname/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/setup-nickname/page.tsx:SetupNicknamePage",
+      "type": "function",
+      "name": "SetupNicknamePage",
+      "filePath": "src/app/setup-nickname/page.tsx",
+      "lineRange": [
+        3,
+        17
+      ],
+      "summary": "SetupNicknamePageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/app-header.tsx",
+      "type": "file",
+      "name": "app-header.tsx",
+      "filePath": "src/components/app-header.tsx",
+      "summary": "src/components/app-header.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/app-header.tsx:AppHeader",
+      "type": "function",
+      "name": "AppHeader",
+      "filePath": "src/components/app-header.tsx",
+      "lineRange": [
+        14,
+        50
+      ],
+      "summary": "AppHeaderはapp-header.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/night-beach-scene.tsx",
+      "type": "file",
+      "name": "night-beach-scene.tsx",
+      "filePath": "src/components/night-beach-scene.tsx",
+      "summary": "src/components/night-beach-scene.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/night-beach-scene.tsx:NightScene",
+      "type": "function",
+      "name": "NightScene",
+      "filePath": "src/components/night-beach-scene.tsx",
+      "lineRange": [
+        1,
+        46
+      ],
+      "summary": "NightSceneはnight-beach-scene.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/sign-out-button.tsx",
+      "type": "file",
+      "name": "sign-out-button.tsx",
+      "filePath": "src/components/sign-out-button.tsx",
+      "summary": "src/components/sign-out-button.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/sign-out-button.tsx:SignOutButton",
+      "type": "function",
+      "name": "SignOutButton",
+      "filePath": "src/components/sign-out-button.tsx",
+      "lineRange": [
+        8,
+        27
+      ],
+      "summary": "SignOutButtonはsign-out-button.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/badge.tsx",
+      "type": "file",
+      "name": "badge.tsx",
+      "filePath": "src/components/ui/badge.tsx",
+      "summary": "src/components/ui/badge.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/badge.tsx:Badge",
+      "type": "function",
+      "name": "Badge",
+      "filePath": "src/components/ui/badge.tsx",
+      "lineRange": [
+        30,
+        50
+      ],
+      "summary": "Badgeはbadge.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/button.tsx",
+      "type": "file",
+      "name": "button.tsx",
+      "filePath": "src/components/ui/button.tsx",
+      "summary": "src/components/ui/button.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/button.tsx:Button",
+      "type": "function",
+      "name": "Button",
+      "filePath": "src/components/ui/button.tsx",
+      "lineRange": [
+        43,
+        56
+      ],
+      "summary": "Buttonはbutton.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/checkbox.tsx",
+      "type": "file",
+      "name": "checkbox.tsx",
+      "filePath": "src/components/ui/checkbox.tsx",
+      "summary": "src/components/ui/checkbox.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/checkbox.tsx:Checkbox",
+      "type": "function",
+      "name": "Checkbox",
+      "filePath": "src/components/ui/checkbox.tsx",
+      "lineRange": [
+        8,
+        27
+      ],
+      "summary": "Checkboxはcheckbox.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/dialog.tsx",
+      "type": "file",
+      "name": "dialog.tsx",
+      "filePath": "src/components/ui/dialog.tsx",
+      "summary": "src/components/ui/dialog.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:Dialog",
+      "type": "function",
+      "name": "Dialog",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        10,
+        12
+      ],
+      "summary": "Dialogはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogTrigger",
+      "type": "function",
+      "name": "DialogTrigger",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        14,
+        16
+      ],
+      "summary": "DialogTriggerはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogPortal",
+      "type": "function",
+      "name": "DialogPortal",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        18,
+        20
+      ],
+      "summary": "DialogPortalはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogClose",
+      "type": "function",
+      "name": "DialogClose",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        22,
+        24
+      ],
+      "summary": "DialogCloseはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogOverlay",
+      "type": "function",
+      "name": "DialogOverlay",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        26,
+        40
+      ],
+      "summary": "DialogOverlayはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogContent",
+      "type": "function",
+      "name": "DialogContent",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        42,
+        81
+      ],
+      "summary": "DialogContentはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogHeader",
+      "type": "function",
+      "name": "DialogHeader",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        83,
+        91
+      ],
+      "summary": "DialogHeaderはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogFooter",
+      "type": "function",
+      "name": "DialogFooter",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        93,
+        118
+      ],
+      "summary": "DialogFooterはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogTitle",
+      "type": "function",
+      "name": "DialogTitle",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        120,
+        131
+      ],
+      "summary": "DialogTitleはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/dialog.tsx:DialogDescription",
+      "type": "function",
+      "name": "DialogDescription",
+      "filePath": "src/components/ui/dialog.tsx",
+      "lineRange": [
+        133,
+        147
+      ],
+      "summary": "DialogDescriptionはdialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/input.tsx",
+      "type": "file",
+      "name": "input.tsx",
+      "filePath": "src/components/ui/input.tsx",
+      "summary": "src/components/ui/input.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/input.tsx:Input",
+      "type": "function",
+      "name": "Input",
+      "filePath": "src/components/ui/input.tsx",
+      "lineRange": [
+        6,
+        18
+      ],
+      "summary": "Inputはinput.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/label.tsx",
+      "type": "file",
+      "name": "label.tsx",
+      "filePath": "src/components/ui/label.tsx",
+      "summary": "src/components/ui/label.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/label.tsx:Label",
+      "type": "function",
+      "name": "Label",
+      "filePath": "src/components/ui/label.tsx",
+      "lineRange": [
+        7,
+        18
+      ],
+      "summary": "Labelはlabel.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/components/ui/popover.tsx",
+      "type": "file",
+      "name": "popover.tsx",
+      "filePath": "src/components/ui/popover.tsx",
+      "summary": "src/components/ui/popover.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/components/ui/popover.tsx:Popover",
+      "type": "function",
+      "name": "Popover",
+      "filePath": "src/components/ui/popover.tsx",
+      "lineRange": [
+        8,
+        10
+      ],
+      "summary": "Popoverはpopover.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/popover.tsx:PopoverTrigger",
+      "type": "function",
+      "name": "PopoverTrigger",
+      "filePath": "src/components/ui/popover.tsx",
+      "lineRange": [
+        12,
+        14
+      ],
+      "summary": "PopoverTriggerはpopover.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/popover.tsx:PopoverContent",
+      "type": "function",
+      "name": "PopoverContent",
+      "filePath": "src/components/ui/popover.tsx",
+      "lineRange": [
+        16,
+        48
+      ],
+      "summary": "PopoverContentはpopover.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/popover.tsx:PopoverHeader",
+      "type": "function",
+      "name": "PopoverHeader",
+      "filePath": "src/components/ui/popover.tsx",
+      "lineRange": [
+        50,
+        58
+      ],
+      "summary": "PopoverHeaderはpopover.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/popover.tsx:PopoverTitle",
+      "type": "function",
+      "name": "PopoverTitle",
+      "filePath": "src/components/ui/popover.tsx",
+      "lineRange": [
+        60,
+        68
+      ],
+      "summary": "PopoverTitleはpopover.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/components/ui/popover.tsx:PopoverDescription",
+      "type": "function",
+      "name": "PopoverDescription",
+      "filePath": "src/components/ui/popover.tsx",
+      "lineRange": [
+        70,
+        81
+      ],
+      "summary": "PopoverDescriptionはpopover.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src/app/setup-nickname/nickname-form.tsx",
+      "target": "function:src/app/setup-nickname/nickname-form.tsx:NicknameForm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/setup-nickname/nickname-form.tsx",
+      "target": "function:src/app/setup-nickname/nickname-form.tsx:NicknameForm",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/setup-nickname/page.tsx",
+      "target": "function:src/app/setup-nickname/page.tsx:SetupNicknamePage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/setup-nickname/page.tsx",
+      "target": "function:src/app/setup-nickname/page.tsx:SetupNicknamePage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/app-header.tsx",
+      "target": "function:src/components/app-header.tsx:AppHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/app-header.tsx",
+      "target": "function:src/components/app-header.tsx:AppHeader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/night-beach-scene.tsx",
+      "target": "function:src/components/night-beach-scene.tsx:NightScene",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/night-beach-scene.tsx",
+      "target": "function:src/components/night-beach-scene.tsx:NightScene",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/sign-out-button.tsx",
+      "target": "function:src/components/sign-out-button.tsx:SignOutButton",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/sign-out-button.tsx",
+      "target": "function:src/components/sign-out-button.tsx:SignOutButton",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/badge.tsx",
+      "target": "function:src/components/ui/badge.tsx:Badge",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/badge.tsx",
+      "target": "function:src/components/ui/badge.tsx:Badge",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/button.tsx",
+      "target": "function:src/components/ui/button.tsx:Button",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/button.tsx",
+      "target": "function:src/components/ui/button.tsx:Button",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/checkbox.tsx",
+      "target": "function:src/components/ui/checkbox.tsx:Checkbox",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/checkbox.tsx",
+      "target": "function:src/components/ui/checkbox.tsx:Checkbox",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:Dialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:Dialog",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogTrigger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogTrigger",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogPortal",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogPortal",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogClose",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogClose",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogOverlay",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogOverlay",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogContent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogContent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogHeader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogFooter",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogFooter",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogTitle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogDescription",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/dialog.tsx",
+      "target": "function:src/components/ui/dialog.tsx:DialogDescription",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/input.tsx",
+      "target": "function:src/components/ui/input.tsx:Input",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/input.tsx",
+      "target": "function:src/components/ui/input.tsx:Input",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/label.tsx",
+      "target": "function:src/components/ui/label.tsx:Label",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/label.tsx",
+      "target": "function:src/components/ui/label.tsx:Label",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:Popover",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:Popover",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverTrigger",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverTrigger",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverContent",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverContent",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverHeader",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverHeader",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverTitle",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverTitle",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverDescription",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/components/ui/popover.tsx",
+      "target": "function:src/components/ui/popover.tsx:PopoverDescription",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "nodes": [
+    {"id":"config:.env.local.example","type":"config","name":".env.local.example","filePath":".env.local.example","summary":"Supabase、Google Calendar、Cloudflare Accessなど、ローカル実行に必要な環境変数の記入例を定義します。","tags":["configuration","environment","supabase","authentication"],"complexity":"simple"},
+    {"id":"document:AGENTS.md","type":"document","name":"AGENTS.md","filePath":"AGENTS.md","summary":"このリポジトリで作業するエージェント向けの基本ルールと、Mem0を使う際の運用方針を説明します。","tags":["documentation","development","workflow"],"complexity":"simple"},
+    {"id":"document:CLAUDE.md","type":"document","name":"CLAUDE.md","filePath":"CLAUDE.md","summary":"EventCalendar_Appの実装状況、主要画面、認証や管理画面などのプロジェクト概要をまとめた開発メモです。","tags":["documentation","architecture","project-overview"],"complexity":"simple"},
+    {"id":"document:PROGRESS.md","type":"document","name":"PROGRESS.md","filePath":"PROGRESS.md","summary":"認証、空き時間、イベント、企画、管理画面などの開発フェーズと進捗を記録します。","tags":["documentation","project-management","progress"],"complexity":"complex"},
+    {"id":"document:README.md","type":"document","name":"README.md","filePath":"README.md","summary":"EventCalendar_Appの目的、セットアップ方法、環境変数、開発・デプロイ手順を案内する入口ドキュメントです。","tags":["documentation","entry-point","setup","deployment"],"complexity":"moderate"},
+    {"id":"document:REQUIREMENTS.md","type":"document","name":"REQUIREMENTS.md","filePath":"REQUIREMENTS.md","summary":"イベント共有カレンダーの機能要件、画面導線、認証、権限、通知、外部カレンダー連携の仕様を定義します。","tags":["documentation","requirements","domain","event-calendar"],"complexity":"moderate"},
+    {"id":"config:components.json","type":"config","name":"components.json","filePath":"components.json","summary":"shadcn/uiコンポーネントのスタイル、Tailwind、エイリアスなどの導入設定を指定します。","tags":["configuration","ui","tailwind","components"],"complexity":"simple"},
+    {"id":"config:package.json","type":"config","name":"package.json","filePath":"package.json","summary":"Next.jsアプリの依存パッケージ、開発・テスト・ビルド用スクリプト、Node.js要件を管理します。","tags":["configuration","dependencies","build-system","nextjs"],"complexity":"moderate"},
+    {"id":"config:skills-lock.json","type":"config","name":"skills-lock.json","filePath":"skills-lock.json","summary":"プロジェクトで利用するスキルの固定バージョンや取得元を記録します。","tags":["configuration","tooling","dependencies"],"complexity":"simple"},
+    {"id":"config:tsconfig.json","type":"config","name":"tsconfig.json","filePath":"tsconfig.json","summary":"TypeScriptのコンパイル設定、厳格な型チェック、パスエイリアスを定義します。","tags":["configuration","typescript","build-system","type-safety"],"complexity":"simple"},
+    {"id":"config:wrangler.jsonc","type":"config","name":"wrangler.jsonc","filePath":"wrangler.jsonc","summary":"Cloudflare Workers/OpenNextへのデプロイ先、静的アセット、互換性設定を定義します。","tags":["configuration","deployment","cloudflare","edge-runtime"],"complexity":"simple"}
+  ],
+  "edges": [
+    {"source":"document:README.md","target":"config:package.json","type":"documents","direction":"forward","weight":0.5},
+    {"source":"document:README.md","target":"config:.env.local.example","type":"documents","direction":"forward","weight":0.5},
+    {"source":"document:REQUIREMENTS.md","target":"document:CLAUDE.md","type":"related","direction":"forward","weight":0.5},
+    {"source":"config:package.json","target":"config:tsconfig.json","type":"configures","direction":"forward","weight":0.6},
+    {"source":"config:components.json","target":"config:package.json","type":"configures","direction":"forward","weight":0.6},
+    {"source":"config:wrangler.jsonc","target":"config:package.json","type":"configures","direction":"forward","weight":0.6},
+    {"source":"document:PROGRESS.md","target":"document:REQUIREMENTS.md","type":"documents","direction":"forward","weight":0.5},
+    {"source":"document:CLAUDE.md","target":"document:REQUIREMENTS.md","type":"documents","direction":"forward","weight":0.5}
+  ]
+}

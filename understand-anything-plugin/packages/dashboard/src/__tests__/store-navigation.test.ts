@@ -34,6 +34,41 @@ function graph(): KnowledgeGraph {
   };
 }
 
+function viewerGraph(): KnowledgeGraph {
+  const base = graph();
+  return {
+    ...base,
+    nodes: [
+      ...base.nodes,
+      {
+        id: "c1",
+        type: "file",
+        name: "c1",
+        summary: "",
+        tags: [],
+        complexity: "simple",
+      },
+      {
+        id: "function:helper",
+        type: "function",
+        name: "helper",
+        summary: "",
+        tags: [],
+        complexity: "simple",
+      },
+      {
+        id: "function:other",
+        type: "function",
+        name: "other",
+        summary: "",
+        tags: [],
+        complexity: "simple",
+      },
+    ],
+    layers: [...base.layers, { id: "layer:c", name: "C", description: "", nodeIds: ["c1"] }],
+  } as KnowledgeGraph;
+}
+
 function seedContainerState(): void {
   useDashboardStore.getState().expandContainer("container:cluster-0");
   useDashboardStore.getState().setPendingFocusContainer("container:cluster-0");
@@ -57,6 +92,19 @@ beforeEach(() => {
 });
 
 describe("store layer navigation container cache resets", () => {
+  it("navigates to a code destination with history, viewer, and explanation expanded", () => {
+    useDashboardStore.getState().setGraph(graph());
+    useDashboardStore.getState().navigateToNode("a1");
+    useDashboardStore.getState().expandCodeViewer();
+    useDashboardStore.getState().navigateToCodeFile("b1");
+    const state = useDashboardStore.getState();
+    expect(state.selectedNodeId).toBe("b1");
+    expect(state.nodeHistory).toEqual(["a1"]);
+    expect(state.codeViewerOpen).toBe(true);
+    expect(state.codeViewerNodeId).toBe("b1");
+    expect(state.codeViewerExpanded).toBe(true);
+    expect(state.explanationExpandedNodeIds.has("b1")).toBe(true);
+  });
   it("clears container state when navigateToNodeInLayer crosses layers", () => {
     useDashboardStore.getState().setGraph(graph());
     useDashboardStore.getState().navigateToNodeInLayer("a1");
@@ -105,5 +153,60 @@ describe("store layer navigation container cache resets", () => {
 
     expect(useDashboardStore.getState().activeLayerId).toBe("layer:b");
     expectContainerStateCleared();
+  });
+
+  it("keeps an open code viewer synchronized through back and history navigation", () => {
+    useDashboardStore.getState().setGraph(viewerGraph());
+    useDashboardStore.getState().navigateToNode("a1");
+    useDashboardStore.getState().navigateToCodeFile("b1");
+    useDashboardStore.getState().navigateToCodeFile("c1");
+
+    useDashboardStore.getState().goBackNode();
+    expect(useDashboardStore.getState().selectedNodeId).toBe("b1");
+    expect(useDashboardStore.getState().codeViewerNodeId).toBe("b1");
+
+    useDashboardStore.getState().navigateToCodeFile("c1");
+    useDashboardStore.getState().navigateToHistoryIndex(0);
+    expect(useDashboardStore.getState().selectedNodeId).toBe("a1");
+    expect(useDashboardStore.getState().codeViewerNodeId).toBe("a1");
+  });
+
+  it("does not add duplicate history entries for same-file destinations", () => {
+    useDashboardStore.getState().setGraph(viewerGraph());
+    useDashboardStore.getState().navigateToNode("a1");
+    useDashboardStore.getState().navigateToCodeFile("b1");
+    useDashboardStore.getState().navigateToCodeFile("b1");
+
+    expect(useDashboardStore.getState().nodeHistory).toEqual(["a1"]);
+    expect(useDashboardStore.getState().selectedNodeId).toBe("b1");
+  });
+
+  it("leaves the closed viewer and non-file destination unchanged", () => {
+    useDashboardStore.getState().setGraph(viewerGraph());
+    useDashboardStore.getState().navigateToNode("a1");
+    useDashboardStore.getState().navigateToCodeFile("b1");
+    useDashboardStore.getState().closeCodeViewer();
+    useDashboardStore.getState().navigateToNode("a2");
+    useDashboardStore.getState().navigateToHistoryIndex(0);
+    expect(useDashboardStore.getState().codeViewerOpen).toBe(false);
+    expect(useDashboardStore.getState().codeViewerNodeId).toBeNull();
+
+    useDashboardStore.getState().navigateToNode("function:helper");
+    useDashboardStore.getState().navigateToNode("function:other");
+    useDashboardStore.getState().openCodeViewer("b1");
+    useDashboardStore.getState().goBackNode();
+    expect(useDashboardStore.getState().selectedNodeId).toBe("function:helper");
+    expect(useDashboardStore.getState().codeViewerOpen).toBe(true);
+    expect(useDashboardStore.getState().codeViewerNodeId).toBe("b1");
+  });
+
+  it("rejects non-file code destinations", () => {
+    useDashboardStore.getState().setGraph(viewerGraph());
+    useDashboardStore.getState().navigateToNode("a1");
+    useDashboardStore.getState().openCodeViewer("a1");
+    useDashboardStore.getState().navigateToCodeFile("function:helper");
+
+    expect(useDashboardStore.getState().codeViewerNodeId).toBe("a1");
+    expect(useDashboardStore.getState().selectedNodeId).toBe("a1");
   });
 });

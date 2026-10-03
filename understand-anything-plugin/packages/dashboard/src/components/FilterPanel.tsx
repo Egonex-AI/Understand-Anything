@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useDashboardStore, ALL_NODE_TYPES, ALL_COMPLEXITIES, ALL_EDGE_CATEGORIES } from "../store";
 import type { NodeType, Complexity, EdgeCategory } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel, edgeCategoryLabel, nodeTypeLabel } from "../locales/displayLabels";
 
 export default function FilterPanel() {
   const graph = useDashboardStore((s) => s.graph);
@@ -11,7 +12,7 @@ export default function FilterPanel() {
   const hasActiveFilters = useDashboardStore((s) => s.hasActiveFilters);
   const filterPanelOpen = useDashboardStore((s) => s.filterPanelOpen);
   const toggleFilterPanel = useDashboardStore((s) => s.toggleFilterPanel);
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +123,7 @@ export default function FilterPanel() {
                       onChange={() => toggleNodeType(type)}
                       className="w-3.5 h-3.5 rounded border-border-subtle bg-elevated checked:bg-gold checked:border-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
-                    <span className="text-sm text-text-primary capitalize">{type}</span>
+                    <span className="text-sm text-text-primary">{nodeTypeLabel(localeKey, type)}</span>
                   </label>
                 ))}
               </div>
@@ -145,7 +146,7 @@ export default function FilterPanel() {
                       onChange={() => toggleComplexity(complexity)}
                       className="w-3.5 h-3.5 rounded border-border-subtle bg-elevated checked:bg-gold checked:border-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
-                    <span className="text-sm text-text-primary capitalize">{complexity}</span>
+                    <span className="text-sm text-text-primary">{complexityLabel(localeKey, complexity)}</span>
                   </label>
                 ))}
               </div>
@@ -195,7 +196,7 @@ export default function FilterPanel() {
                       className="w-3.5 h-3.5 rounded border-border-subtle bg-elevated checked:bg-gold checked:border-gold focus:ring-0 focus:ring-offset-0 cursor-pointer"
                     />
                     <span className="text-sm text-text-primary capitalize">
-                      {category.replace(/-/g, " ")}
+                      {edgeCategoryLabel(localeKey, category)}
                     </span>
                   </label>
                 ))}

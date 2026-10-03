@@ -1,0 +1,914 @@
+{
+  "nodes": [
+    {
+      "id": "document:.agents/skills/find-skills/SKILL.md",
+      "type": "document",
+      "name": "SKILL.md",
+      "filePath": ".agents/skills/find-skills/SKILL.md",
+      "summary": ".agents/skills/find-skills/SKILL.mdは設計・利用方法を説明します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "documentation",
+        "project"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "config:.codex/config.toml",
+      "type": "config",
+      "name": "config.toml",
+      "filePath": ".codex/config.toml",
+      "summary": ".codex/config.tomlは設定を管理します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "configuration",
+        "project"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:eslint.config.mjs",
+      "type": "file",
+      "name": "eslint.config.mjs",
+      "filePath": "eslint.config.mjs",
+      "summary": "eslint.config.mjsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:next.config.ts",
+      "type": "file",
+      "name": "next.config.ts",
+      "filePath": "next.config.ts",
+      "summary": "next.config.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:open-next.config.ts",
+      "type": "file",
+      "name": "open-next.config.ts",
+      "filePath": "open-next.config.ts",
+      "summary": "open-next.config.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:postcss.config.mjs",
+      "type": "file",
+      "name": "postcss.config.mjs",
+      "filePath": "postcss.config.mjs",
+      "summary": "postcss.config.mjsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:scripts/supabase-env.mjs",
+      "type": "file",
+      "name": "supabase-env.mjs",
+      "filePath": "scripts/supabase-env.mjs",
+      "summary": "scripts/supabase-env.mjsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:scripts/supabase-env.mjs:parseEnv",
+      "type": "function",
+      "name": "parseEnv",
+      "filePath": "scripts/supabase-env.mjs",
+      "lineRange": [
+        27,
+        39
+      ],
+      "summary": "parseEnvはsupabase-env.mjsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:scripts/supabase-env.mjs:isExpectedUrl",
+      "type": "function",
+      "name": "isExpectedUrl",
+      "filePath": "scripts/supabase-env.mjs",
+      "lineRange": [
+        48,
+        61
+      ],
+      "summary": "isExpectedUrlはsupabase-env.mjsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/access-denied/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/access-denied/page.tsx",
+      "summary": "src/app/access-denied/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/access-denied/page.tsx:AccessDeniedPage",
+      "type": "function",
+      "name": "AccessDeniedPage",
+      "filePath": "src/app/access-denied/page.tsx",
+      "lineRange": [
+        3,
+        18
+      ],
+      "summary": "AccessDeniedPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/admin/admin-panel.tsx",
+      "type": "file",
+      "name": "admin-panel.tsx",
+      "filePath": "src/app/admin/admin-panel.tsx",
+      "summary": "src/app/admin/admin-panel.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/admin/admin-panel.tsx:AdminPanel",
+      "type": "function",
+      "name": "AdminPanel",
+      "filePath": "src/app/admin/admin-panel.tsx",
+      "lineRange": [
+        12,
+        73
+      ],
+      "summary": "AdminPanelはadmin-panel.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/admin/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/admin/page.tsx",
+      "summary": "src/app/admin/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/admin/page.tsx:AdminPage",
+      "type": "function",
+      "name": "AdminPage",
+      "filePath": "src/app/admin/page.tsx",
+      "lineRange": [
+        7,
+        20
+      ],
+      "summary": "AdminPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/api/events/cancel/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/events/cancel/route.ts",
+      "summary": "src/app/api/events/cancel/route.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "api-handler",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/api/events/cancel/route.ts:POST",
+      "type": "function",
+      "name": "POST",
+      "filePath": "src/app/api/events/cancel/route.ts",
+      "lineRange": [
+        10,
+        68
+      ],
+      "summary": "POSTはroute.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/api/events/sync/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/api/events/sync/route.ts",
+      "summary": "src/app/api/events/sync/route.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "api-handler",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/api/events/sync/route.ts:POST",
+      "type": "function",
+      "name": "POST",
+      "filePath": "src/app/api/events/sync/route.ts",
+      "lineRange": [
+        10,
+        89
+      ],
+      "summary": "POSTはroute.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/auth/callback/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/auth/callback/route.ts",
+      "summary": "src/app/auth/callback/route.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "authentication",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/auth/callback/route.ts:safeNextPath",
+      "type": "function",
+      "name": "safeNextPath",
+      "filePath": "src/app/auth/callback/route.ts",
+      "lineRange": [
+        5,
+        23
+      ],
+      "summary": "safeNextPathはroute.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/auth/callback/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/auth/callback/route.ts",
+      "lineRange": [
+        25,
+        39
+      ],
+      "summary": "GETはroute.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/auth/cloudflare/logout/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/auth/cloudflare/logout/route.ts",
+      "summary": "src/app/auth/cloudflare/logout/route.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "authentication",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/auth/cloudflare/logout/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/auth/cloudflare/logout/route.ts",
+      "lineRange": [
+        4,
+        12
+      ],
+      "summary": "GETはroute.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/auth/cloudflare/route.ts",
+      "type": "file",
+      "name": "route.ts",
+      "filePath": "src/app/auth/cloudflare/route.ts",
+      "summary": "src/app/auth/cloudflare/route.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "authentication",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/auth/cloudflare/route.ts:GET",
+      "type": "function",
+      "name": "GET",
+      "filePath": "src/app/auth/cloudflare/route.ts",
+      "lineRange": [
+        8,
+        53
+      ],
+      "summary": "GETはroute.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/availability/_components/availability-board.tsx",
+      "type": "file",
+      "name": "availability-board.tsx",
+      "filePath": "src/app/availability/_components/availability-board.tsx",
+      "summary": "src/app/availability/_components/availability-board.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/app/availability/_components/availability-board.tsx:AvailabilityBoard",
+      "type": "function",
+      "name": "AvailabilityBoard",
+      "filePath": "src/app/availability/_components/availability-board.tsx",
+      "lineRange": [
+        35,
+        335
+      ],
+      "summary": "AvailabilityBoardはavailability-board.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/app/availability/_components/member-list.tsx",
+      "type": "file",
+      "name": "member-list.tsx",
+      "filePath": "src/app/availability/_components/member-list.tsx",
+      "summary": "src/app/availability/_components/member-list.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/availability/_components/member-list.tsx:MemberList",
+      "type": "function",
+      "name": "MemberList",
+      "filePath": "src/app/availability/_components/member-list.tsx",
+      "lineRange": [
+        7,
+        63
+      ],
+      "summary": "MemberListはmember-list.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/availability/_components/month-calendar.tsx",
+      "type": "file",
+      "name": "month-calendar.tsx",
+      "filePath": "src/app/availability/_components/month-calendar.tsx",
+      "summary": "src/app/availability/_components/month-calendar.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/availability/_components/month-calendar.tsx:MonthCalendar",
+      "type": "function",
+      "name": "MonthCalendar",
+      "filePath": "src/app/availability/_components/month-calendar.tsx",
+      "lineRange": [
+        14,
+        167
+      ],
+      "summary": "MonthCalendarはmonth-calendar.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/availability/_components/preset-dialog.tsx",
+      "type": "file",
+      "name": "preset-dialog.tsx",
+      "filePath": "src/app/availability/_components/preset-dialog.tsx",
+      "summary": "src/app/availability/_components/preset-dialog.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/app/availability/_components/preset-dialog.tsx:PresetDialog",
+      "type": "function",
+      "name": "PresetDialog",
+      "filePath": "src/app/availability/_components/preset-dialog.tsx",
+      "lineRange": [
+        31,
+        76
+      ],
+      "summary": "PresetDialogはpreset-dialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/availability/_components/preset-dialog.tsx:PresetForm",
+      "type": "function",
+      "name": "PresetForm",
+      "filePath": "src/app/availability/_components/preset-dialog.tsx",
+      "lineRange": [
+        78,
+        271
+      ],
+      "summary": "PresetFormはpreset-dialog.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/availability/_components/preset-panel.tsx",
+      "type": "file",
+      "name": "preset-panel.tsx",
+      "filePath": "src/app/availability/_components/preset-panel.tsx",
+      "summary": "src/app/availability/_components/preset-panel.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:src/app/availability/_components/preset-panel.tsx:PresetPanel",
+      "type": "function",
+      "name": "PresetPanel",
+      "filePath": "src/app/availability/_components/preset-panel.tsx",
+      "lineRange": [
+        18,
+        329
+      ],
+      "summary": "PresetPanelはpreset-panel.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:src/app/availability/_components/use-drag-paint.ts",
+      "type": "file",
+      "name": "use-drag-paint.ts",
+      "filePath": "src/app/availability/_components/use-drag-paint.ts",
+      "summary": "src/app/availability/_components/use-drag-paint.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/availability/_components/use-drag-paint.ts:useDragPaint",
+      "type": "function",
+      "name": "useDragPaint",
+      "filePath": "src/app/availability/_components/use-drag-paint.ts",
+      "lineRange": [
+        6,
+        62
+      ],
+      "summary": "useDragPaintはuse-drag-paint.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/availability/_components/week-calendar.tsx",
+      "type": "file",
+      "name": "week-calendar.tsx",
+      "filePath": "src/app/availability/_components/week-calendar.tsx",
+      "summary": "src/app/availability/_components/week-calendar.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "component",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/app/availability/_components/week-calendar.tsx:WeekCalendar",
+      "type": "function",
+      "name": "WeekCalendar",
+      "filePath": "src/app/availability/_components/week-calendar.tsx",
+      "lineRange": [
+        24,
+        161
+      ],
+      "summary": "WeekCalendarはweek-calendar.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/app/availability/loading.tsx",
+      "type": "file",
+      "name": "loading.tsx",
+      "filePath": "src/app/availability/loading.tsx",
+      "summary": "src/app/availability/loading.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/availability/loading.tsx:Loading",
+      "type": "function",
+      "name": "Loading",
+      "filePath": "src/app/availability/loading.tsx",
+      "lineRange": [
+        5,
+        17
+      ],
+      "summary": "Loadingはloading.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/app/availability/page.tsx",
+      "type": "file",
+      "name": "page.tsx",
+      "filePath": "src/app/availability/page.tsx",
+      "summary": "src/app/availability/page.tsxはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/app/availability/page.tsx:AvailabilityPage",
+      "type": "function",
+      "name": "AvailabilityPage",
+      "filePath": "src/app/availability/page.tsx",
+      "lineRange": [
+        7,
+        45
+      ],
+      "summary": "AvailabilityPageはpage.tsxで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:scripts/supabase-env.mjs",
+      "target": "function:scripts/supabase-env.mjs:parseEnv",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:scripts/supabase-env.mjs",
+      "target": "function:scripts/supabase-env.mjs:isExpectedUrl",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/access-denied/page.tsx",
+      "target": "function:src/app/access-denied/page.tsx:AccessDeniedPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/access-denied/page.tsx",
+      "target": "function:src/app/access-denied/page.tsx:AccessDeniedPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/admin/admin-panel.tsx",
+      "target": "function:src/app/admin/admin-panel.tsx:AdminPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/admin/admin-panel.tsx",
+      "target": "function:src/app/admin/admin-panel.tsx:AdminPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/admin/page.tsx",
+      "target": "function:src/app/admin/page.tsx:AdminPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/admin/page.tsx",
+      "target": "function:src/app/admin/page.tsx:AdminPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/events/cancel/route.ts",
+      "target": "function:src/app/api/events/cancel/route.ts:POST",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/api/events/cancel/route.ts",
+      "target": "function:src/app/api/events/cancel/route.ts:POST",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/api/events/sync/route.ts",
+      "target": "function:src/app/api/events/sync/route.ts:POST",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/api/events/sync/route.ts",
+      "target": "function:src/app/api/events/sync/route.ts:POST",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/auth/callback/route.ts",
+      "target": "function:src/app/auth/callback/route.ts:safeNextPath",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/auth/callback/route.ts",
+      "target": "function:src/app/auth/callback/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/auth/callback/route.ts",
+      "target": "function:src/app/auth/callback/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/auth/cloudflare/logout/route.ts",
+      "target": "function:src/app/auth/cloudflare/logout/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/auth/cloudflare/logout/route.ts",
+      "target": "function:src/app/auth/cloudflare/logout/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/auth/cloudflare/route.ts",
+      "target": "function:src/app/auth/cloudflare/route.ts:GET",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/auth/cloudflare/route.ts",
+      "target": "function:src/app/auth/cloudflare/route.ts:GET",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/availability-board.tsx",
+      "target": "function:src/app/availability/_components/availability-board.tsx:AvailabilityBoard",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/availability-board.tsx",
+      "target": "function:src/app/availability/_components/availability-board.tsx:AvailabilityBoard",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/member-list.tsx",
+      "target": "function:src/app/availability/_components/member-list.tsx:MemberList",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/member-list.tsx",
+      "target": "function:src/app/availability/_components/member-list.tsx:MemberList",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/month-calendar.tsx",
+      "target": "function:src/app/availability/_components/month-calendar.tsx:MonthCalendar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/month-calendar.tsx",
+      "target": "function:src/app/availability/_components/month-calendar.tsx:MonthCalendar",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/preset-dialog.tsx",
+      "target": "function:src/app/availability/_components/preset-dialog.tsx:PresetDialog",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/preset-dialog.tsx",
+      "target": "function:src/app/availability/_components/preset-dialog.tsx:PresetDialog",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/preset-dialog.tsx",
+      "target": "function:src/app/availability/_components/preset-dialog.tsx:PresetForm",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/preset-panel.tsx",
+      "target": "function:src/app/availability/_components/preset-panel.tsx:PresetPanel",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/preset-panel.tsx",
+      "target": "function:src/app/availability/_components/preset-panel.tsx:PresetPanel",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/use-drag-paint.ts",
+      "target": "function:src/app/availability/_components/use-drag-paint.ts:useDragPaint",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/use-drag-paint.ts",
+      "target": "function:src/app/availability/_components/use-drag-paint.ts:useDragPaint",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/_components/week-calendar.tsx",
+      "target": "function:src/app/availability/_components/week-calendar.tsx:WeekCalendar",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/_components/week-calendar.tsx",
+      "target": "function:src/app/availability/_components/week-calendar.tsx:WeekCalendar",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/loading.tsx",
+      "target": "function:src/app/availability/loading.tsx:Loading",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/loading.tsx",
+      "target": "function:src/app/availability/loading.tsx:Loading",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/app/availability/page.tsx",
+      "target": "function:src/app/availability/page.tsx:AvailabilityPage",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/app/availability/page.tsx",
+      "target": "function:src/app/availability/page.tsx:AvailabilityPage",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "function:src/app/auth/callback/route.ts:GET",
+      "target": "function:src/app/auth/callback/route.ts:safeNextPath",
+      "type": "calls",
+      "direction": "forward",
+      "weight": 0.8
+    }
+  ]
+}

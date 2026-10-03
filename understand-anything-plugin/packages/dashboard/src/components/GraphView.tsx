@@ -31,6 +31,8 @@ import type {
   NodeType,
 } from "@understand-anything/core/types";
 import { useTheme } from "../themes/index.ts";
+import { useI18n } from "../contexts/I18nContext";
+import { edgeDirectionalLabel } from "../locales/displayLabels";
 import {
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -53,6 +55,7 @@ import {
 import { deriveContainers } from "../utils/containers";
 import type { DerivedContainer } from "../utils/containers";
 import { computeLayerStats } from "../utils/layerStats";
+import { filterEdges, filterNodes } from "../utils/filters";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -240,6 +243,8 @@ function useOverviewGraph() {
   const graph = useDashboardStore((s) => s.graph);
   const nodesById = useDashboardStore((s) => s.nodesById);
   const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
+  const nodeIdToLayerIds = useDashboardStore((s) => s.nodeIdToLayerIds);
+  const filters = useDashboardStore((s) => s.filters);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
 
@@ -250,7 +255,15 @@ function useOverviewGraph() {
     if (!graph) {
       return null;
     }
-    const layers = graph.layers ?? [];
+    const graphNodes = filterNodes(graph.nodes, nodeIdToLayerIds, filters);
+    const visibleNodeIds = new Set(graphNodes.map((node) => node.id));
+    const graphEdges = filterEdges(graph.edges, visibleNodeIds, filters);
+    const layers = (graph.layers ?? [])
+      .map((layer) => ({
+        ...layer,
+        nodeIds: layer.nodeIds.filter((nodeId) => visibleNodeIds.has(nodeId)),
+      }))
+      .filter((layer) => layer.nodeIds.length > 0);
     if (layers.length === 0) {
       return null;
     }
@@ -293,7 +306,12 @@ function useOverviewGraph() {
     });
 
     // Aggregate edges between layers
-    const aggregated = aggregateLayerEdges(graph);
+    const aggregated = aggregateLayerEdges({
+      ...graph,
+      nodes: graphNodes,
+      edges: graphEdges,
+      layers,
+    });
     const flowEdges: Edge[] = aggregated.map((agg, i) => ({
       id: `le-${i}`,
       source: agg.sourceLayerId,
@@ -312,7 +330,7 @@ function useOverviewGraph() {
     }
 
     return { clusterNodes, flowEdges, dims };
-  }, [graph, nodesById, nodeIdToLayerId, searchResults, drillIntoLayer]);
+  }, [graph, nodesById, nodeIdToLayerId, nodeIdToLayerIds, filters, searchResults, drillIntoLayer]);
 
   const [overview, setOverview] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],
@@ -403,6 +421,8 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
+  const nodeIdToLayerIds = useDashboardStore((s) => s.nodeIdToLayerIds);
+  const filters = useDashboardStore((s) => s.filters);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
   const detailLevel = useDashboardStore((s) => s.detailLevel);
   const showFunctionsInClassView = useDashboardStore((s) => s.showFunctionsInClassView);
@@ -473,11 +493,20 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       return nodeTypeFilters[effectiveCategory] !== false;
     });
 
+    // FilterPanel uses the shared fine-grained filter model. Sub-file nodes
+    // inherit the active layer for filtering because layers list file-level
+    // nodes while the class view expands their contained children.
+    const effectiveLayerIds = new Map(nodeIdToLayerIds);
+    for (const nodeId of expandedLayerNodeIds) {
+      if (!effectiveLayerIds.has(nodeId)) {
+        effectiveLayerIds.set(nodeId, new Set([activeLayerId]));
+      }
+    }
+    filteredGraphNodes = filterNodes(filteredGraphNodes, effectiveLayerIds, filters);
+
     let filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
 
-    let filteredGraphEdges = graph.edges.filter(
-      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
-    );
+    let filteredGraphEdges = filterEdges(graph.edges, filteredNodeIds, filters);
 
     // Focus mode: 1-hop neighborhood within the layer
     if (focusNodeId && filteredNodeIds.has(focusNodeId)) {
@@ -569,6 +598,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
           summary: node.summary,
           complexity: node.complexity,
           tags: node.tags,
+          filePath: node.filePath,
           isHighlighted: false,
           searchScore: undefined,
           isSelected: false,
@@ -669,6 +699,8 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     affectedNodeIds,
     focusNodeId,
     nodeTypeFilters,
+    nodeIdToLayerIds,
+    filters,
     drillIntoLayer,
     detailLevel,
     showFunctionsInClassView,
@@ -948,6 +980,7 @@ function buildCustomFlowNode(
       summary: node.summary,
       complexity: node.complexity,
       tags: node.tags,
+      filePath: node.filePath,
       isHighlighted: false,
       searchScore: undefined,
       isSelected: false,
@@ -979,7 +1012,7 @@ function buildCustomFlowNode(
  *   - Aggregated edges incident to an expanded container are replaced with
  *     the underlying file→file edges from `topo.filteredEdges`.
  */
-function useLayerDetailGraph() {
+function useLayerDetailGraph(edgeLabels: Parameters<typeof edgeDirectionalLabel>[0]) {
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
@@ -1248,7 +1281,7 @@ function useLayerDetailGraph() {
           id: `inflated-${key}`,
           source: realSrc,
           target: realTgt,
-          label: m.type,
+          label: edgeDirectionalLabel(edgeLabels, m.type, true),
           style: { stroke: "rgba(212,165,116,0.5)", strokeWidth: 1.5 },
           labelStyle: { fill: "#a39787", fontSize: 10 },
         });
@@ -1266,7 +1299,7 @@ function useLayerDetailGraph() {
         id: key,
         source: e.source,
         target: e.target,
-        label: e.type,
+        label: edgeDirectionalLabel(edgeLabels, e.type, true),
         style: { stroke: "rgba(212,165,116,0.5)", strokeWidth: 1.5 },
         labelStyle: { fill: "#a39787", fontSize: 10 },
       });
@@ -1278,6 +1311,7 @@ function useLayerDetailGraph() {
     topo.intraContainer,
     topo.nodeToContainer,
     expandedContainers,
+    edgeLabels,
   ]);
 
   const edges = useMemo(() => {
@@ -1319,13 +1353,17 @@ function useLayerDetailGraph() {
 // ── Main inner component (must be inside ReactFlowProvider) ────────────
 
 function GraphViewInner() {
+  const { t } = useI18n();
   const graph = useDashboardStore((s) => s.graph);
   const navigationLevel = useDashboardStore((s) => s.navigationLevel);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
+  const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
+  const uiResetGraphView = useDashboardStore((s) => s.uiResetGraphView);
+  const nodesById = useDashboardStore((s) => s.nodesById);
   const setReactFlowInstance = useDashboardStore((s) => s.setReactFlowInstance);
   const tourHighlightedNodeIds = useDashboardStore((s) => s.tourHighlightedNodeIds);
   const expandContainer = useDashboardStore((s) => s.expandContainer);
@@ -1336,7 +1374,7 @@ function GraphViewInner() {
   const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
-  const detailGraph = useLayerDetailGraph();
+  const detailGraph = useLayerDetailGraph(t.edgeLabels);
 
   const {
     nodes: initialNodes,
@@ -1519,10 +1557,19 @@ function GraphViewInner() {
     selectNode(null);
   }, [selectNode]);
 
+  const handleResetView = useCallback(() => {
+    uiResetGraphView();
+    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+  }, [uiResetGraphView, fitView]);
+
+  const handleIsolate = useCallback(() => {
+    if (selectedNodeId) setFocusNode(selectedNodeId);
+  }, [selectedNodeId, setFocusNode]);
+
   if (!graph) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-root rounded-lg">
-        <p className="text-text-muted text-sm">No knowledge graph loaded</p>
+        <p className="text-text-muted text-sm">{t.common.noGraphLoaded}</p>
       </div>
     );
   }
@@ -1530,15 +1577,40 @@ function GraphViewInner() {
   return (
     <div className="h-full w-full relative">
       <Breadcrumb />
-      {focusNodeId && navigationLevel === "layer-detail" && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
-          <button
-            onClick={() => setFocusNode(null)}
-            className="px-4 py-2 rounded-full bg-elevated border border-gold/30 text-gold text-xs font-semibold tracking-wider uppercase hover:bg-gold/10 transition-colors flex items-center gap-2 shadow-lg"
-          >
-            <span>Showing neighborhood</span>
-            <span className="text-text-muted">&times;</span>
-          </button>
+      {/* Floating toolbar: focus dismiss + selection actions */}
+      {navigationLevel === "layer-detail" && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
+          {focusNodeId && (
+            <button
+              onClick={handleResetView}
+              className="px-4 py-2 rounded-full bg-elevated border border-gold/30 text-gold text-xs font-semibold tracking-wider uppercase hover:bg-gold/10 transition-colors flex items-center gap-2 shadow-lg"
+            >
+              <span>
+                {nodesById.get(focusNodeId)?.name
+                  ? `${t.graphView.focused}: ${nodesById.get(focusNodeId)!.name.slice(0, 20)}`
+                  : t.graphView.showingNeighborhood}
+              </span>
+              <span className="text-text-muted">&times;</span>
+            </button>
+          )}
+          {selectedNodeId && !focusNodeId && (
+            <button
+              onClick={handleIsolate}
+              className="px-3 py-1.5 rounded-full bg-elevated border border-accent/30 text-accent text-xs font-semibold tracking-wider uppercase hover:bg-accent/10 transition-colors shadow-lg"
+              title={t.graphView.isolateTitle}
+            >
+              {t.graphView.isolate}
+            </button>
+          )}
+          {(selectedNodeId || focusNodeId) && (
+            <button
+              onClick={handleResetView}
+              className="px-3 py-1.5 rounded-full bg-elevated border border-border-subtle text-text-secondary text-xs font-semibold tracking-wider uppercase hover:bg-surface transition-colors shadow-lg"
+              title={t.graphView.resetViewTitle}
+            >
+              {t.graphView.resetView}
+            </button>
+          )}
         </div>
       )}
       <ReactFlow

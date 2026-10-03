@@ -1,0 +1,327 @@
+{
+  "nodes": [
+    {
+      "id": "file:src/lib/supabase/client.ts",
+      "type": "file",
+      "name": "client.ts",
+      "filePath": "src/lib/supabase/client.ts",
+      "summary": "src/lib/supabase/client.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/supabase/client.ts:createClient",
+      "type": "function",
+      "name": "createClient",
+      "filePath": "src/lib/supabase/client.ts",
+      "lineRange": [
+        4,
+        9
+      ],
+      "summary": "createClientはclient.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/supabase/proxy.ts",
+      "type": "file",
+      "name": "proxy.ts",
+      "filePath": "src/lib/supabase/proxy.ts",
+      "summary": "src/lib/supabase/proxy.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "function:src/lib/supabase/proxy.ts:updateSession",
+      "type": "function",
+      "name": "updateSession",
+      "filePath": "src/lib/supabase/proxy.ts",
+      "lineRange": [
+        18,
+        146
+      ],
+      "summary": "updateSessionはproxy.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:src/lib/supabase/server.ts",
+      "type": "file",
+      "name": "server.ts",
+      "filePath": "src/lib/supabase/server.ts",
+      "summary": "src/lib/supabase/server.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/supabase/server.ts:createClient",
+      "type": "function",
+      "name": "createClient",
+      "filePath": "src/lib/supabase/server.ts",
+      "lineRange": [
+        6,
+        30
+      ],
+      "summary": "createClientはserver.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/types.ts",
+      "type": "file",
+      "name": "types.ts",
+      "filePath": "src/lib/types.ts",
+      "summary": "src/lib/types.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/lib/utils.ts",
+      "type": "file",
+      "name": "utils.ts",
+      "filePath": "src/lib/utils.ts",
+      "summary": "src/lib/utils.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "utility",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/lib/utils.ts:cn",
+      "type": "function",
+      "name": "cn",
+      "filePath": "src/lib/utils.ts",
+      "lineRange": [
+        4,
+        6
+      ],
+      "summary": "cnはutils.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:src/middleware.ts",
+      "type": "file",
+      "name": "middleware.ts",
+      "filePath": "src/middleware.ts",
+      "summary": "src/middleware.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "function:src/middleware.ts:middleware",
+      "type": "function",
+      "name": "middleware",
+      "filePath": "src/middleware.ts",
+      "lineRange": [
+        7,
+        9
+      ],
+      "summary": "middlewareはmiddleware.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "config:supabase/config.toml",
+      "type": "config",
+      "name": "config.toml",
+      "filePath": "supabase/config.toml",
+      "summary": "supabase/config.tomlは設定を管理します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "configuration",
+        "project"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "table:supabase/seed.sql",
+      "type": "table",
+      "name": "seed.sql",
+      "filePath": "supabase/seed.sql",
+      "summary": "supabase/seed.sqlはデータ構造を定義します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "project"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/cancel-event-schema.test.ts",
+      "type": "file",
+      "name": "cancel-event-schema.test.ts",
+      "filePath": "tests/cancel-event-schema.test.ts",
+      "summary": "tests/cancel-event-schema.test.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "test",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/cancellation-email.test.ts",
+      "type": "file",
+      "name": "cancellation-email.test.ts",
+      "filePath": "tests/cancellation-email.test.ts",
+      "summary": "tests/cancellation-email.test.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "test",
+        "application"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/cloudflare-access.test.ts",
+      "type": "file",
+      "name": "cloudflare-access.test.ts",
+      "filePath": "tests/cloudflare-access.test.ts",
+      "summary": "tests/cloudflare-access.test.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "test",
+        "application"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "function:tests/cloudflare-access.test.ts:token",
+      "type": "function",
+      "name": "token",
+      "filePath": "tests/cloudflare-access.test.ts",
+      "lineRange": [
+        29,
+        39
+      ],
+      "summary": "tokenはcloudflare-access.test.tsで処理を実行する関数です。",
+      "tags": [
+        "function",
+        "application",
+        "logic"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:tests/day-summary.test.ts",
+      "type": "file",
+      "name": "day-summary.test.ts",
+      "filePath": "tests/day-summary.test.ts",
+      "summary": "tests/day-summary.test.tsはアプリケーションの機能を実装します。プロジェクト内の関連処理を構成するファイルです。",
+      "tags": [
+        "test",
+        "application"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:src/lib/supabase/client.ts",
+      "target": "function:src/lib/supabase/client.ts:createClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/supabase/client.ts",
+      "target": "function:src/lib/supabase/client.ts:createClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/supabase/proxy.ts",
+      "target": "function:src/lib/supabase/proxy.ts:updateSession",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/supabase/proxy.ts",
+      "target": "function:src/lib/supabase/proxy.ts:updateSession",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/supabase/server.ts",
+      "target": "function:src/lib/supabase/server.ts:createClient",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/supabase/server.ts",
+      "target": "function:src/lib/supabase/server.ts:createClient",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/lib/utils.ts",
+      "target": "function:src/lib/utils.ts:cn",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/lib/utils.ts",
+      "target": "function:src/lib/utils.ts:cn",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:src/middleware.ts",
+      "target": "function:src/middleware.ts:middleware",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    },
+    {
+      "source": "file:src/middleware.ts",
+      "target": "function:src/middleware.ts:middleware",
+      "type": "exports",
+      "direction": "forward",
+      "weight": 0.8
+    },
+    {
+      "source": "file:tests/cloudflare-access.test.ts",
+      "target": "function:tests/cloudflare-access.test.ts:token",
+      "type": "contains",
+      "direction": "forward",
+      "weight": 1
+    }
+  ]
+}

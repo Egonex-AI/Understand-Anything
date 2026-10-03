@@ -1,0 +1,46 @@
+{
+  "nodes": [
+    {
+      "id": "pipeline:.github/workflows/backup-supabase-to-r2.yml",
+      "type": "pipeline",
+      "name": "backup-supabase-to-r2.yml",
+      "filePath": ".github/workflows/backup-supabase-to-r2.yml",
+      "summary": "Supabase のデータベースを定期的にダンプし、R2 へバックアップする GitHub Actions ワークフローです。",
+      "tags": [
+        "ci-cd",
+        "deployment",
+        "backup"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "pipeline:.github/workflows/keep-supabase-alive.yml",
+      "type": "pipeline",
+      "name": "keep-supabase-alive.yml",
+      "filePath": ".github/workflows/keep-supabase-alive.yml",
+      "summary": "定期的に Supabase にリクエストを送り、無料環境の停止を防ぐ GitHub Actions ワークフローです。",
+      "tags": [
+        "ci-cd",
+        "monitoring",
+        "supabase"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "pipeline:.github/workflows/backup-supabase-to-r2.yml",
+      "target": "file:supabase/migrations/0001_init.sql",
+      "type": "triggers",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/keep-supabase-alive.yml",
+      "target": "file:supabase/migrations/0001_init.sql",
+      "type": "triggers",
+      "direction": "forward",
+      "weight": 0.6
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CustomNodeData } from "./CustomNode";
+import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel, nodeTypeLabel } from "../locales/displayLabels";
 
 interface NodeTooltipProps {
   data: CustomNodeData;
@@ -16,6 +18,7 @@ export default function NodeTooltip({
   outgoingCount,
   tags = [],
 }: NodeTooltipProps) {
+  const { localeKey } = useI18n();
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
 
@@ -59,11 +62,11 @@ export default function NodeTooltip({
         {/* Header */}
         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border-subtle">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-gold">
-            {data.nodeType}
+            {nodeTypeLabel(localeKey, data.nodeType)}
           </span>
           {data.complexity && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-elevated text-text-muted font-mono">
-              {data.complexity}
+              {complexityLabel(localeKey, data.complexity)}
             </span>
           )}
         </div>

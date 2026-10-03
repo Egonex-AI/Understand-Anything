@@ -120,6 +120,13 @@ interface DashboardStore {
   codeViewerOpen: boolean;
   codeViewerNodeId: string | null;
   codeViewerExpanded: boolean;
+  codeViewerMode: "code" | "split";
+  setCodeViewerMode: (mode: "code" | "split") => void;
+
+  // File explanations are pre-generated and persisted in the graph. This
+  // state only remembers whether the reader has opened one in this dashboard.
+  explanationExpandedNodeIds: Set<string>;
+  toggleExplanation: (nodeId: string) => void;
 
   tourActive: boolean;
   currentTourStep: number;
@@ -167,6 +174,7 @@ interface DashboardStore {
   setSearchQuery: (query: string) => void;
   setPersona: (persona: Persona) => void;
   openCodeViewer: (nodeId: string) => void;
+  navigateToCodeFile: (nodeId: string) => void;
   closeCodeViewer: () => void;
   expandCodeViewer: () => void;
   collapseCodeViewer: () => void;
@@ -238,6 +246,9 @@ interface DashboardStore {
   layoutIssues: GraphIssue[];
   appendLayoutIssues: (issues: GraphIssue[]) => void;
   clearLayoutIssues: () => void;
+
+  // Track 3 — Graph UI/UX actions (ui prefix per convention)
+  uiResetGraphView: () => void;
 }
 
 function getSortedTour(graph: KnowledgeGraph): TourStep[] {
@@ -303,6 +314,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
+  codeViewerMode: "code",
+  explanationExpandedNodeIds: new Set<string>(),
 
   tourActive: false,
   currentTourStep: 0,
@@ -443,7 +456,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   navigateToHistoryIndex: (index) => {
-    const { nodeHistory, graph, nodeIdToLayerId, activeLayerId } = get();
+    const { nodeHistory, graph, nodeIdToLayerId, activeLayerId, codeViewerOpen } = get();
     if (!graph || index < 0 || index >= nodeHistory.length) return;
     const targetId = nodeHistory[index];
     const newHistory = nodeHistory.slice(0, index);
@@ -451,20 +464,27 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     const layerNav = layerId
       ? { navigationLevel: "layer-detail" as const, activeLayerId: layerId }
       : {};
+    const viewerSync = codeViewerOpen && graph.nodes.find((node) => node.id === targetId)?.type === "file"
+      ? { codeViewerNodeId: targetId }
+      : {};
     set({
       selectedNodeId: targetId,
       nodeHistory: newHistory,
       ...layerNav,
       ...layerResetIfChanged(layerNav, activeLayerId),
+      ...viewerSync,
     });
   },
 
   goBackNode: () => {
-    const { nodeHistory, graph, nodeIdToLayerId, activeLayerId } = get();
+    const { nodeHistory, graph, nodeIdToLayerId, activeLayerId, codeViewerOpen } = get();
     if (nodeHistory.length === 0 || !graph) return;
     const prevNodeId = nodeHistory[nodeHistory.length - 1];
     const newHistory = nodeHistory.slice(0, -1);
     const layerId = nodeIdToLayerId.get(prevNodeId) ?? null;
+    const viewerSync = codeViewerOpen && graph.nodes.find((node) => node.id === prevNodeId)?.type === "file"
+      ? { codeViewerNodeId: prevNodeId }
+      : {};
     if (layerId) {
       const layerNav = {
         navigationLevel: "layer-detail" as const,
@@ -475,11 +495,13 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
         selectedNodeId: prevNodeId,
         nodeHistory: newHistory,
         ...layerResetIfChanged(layerNav, activeLayerId),
+        ...viewerSync,
       });
     } else {
       set({
         selectedNodeId: prevNodeId,
         nodeHistory: newHistory,
+        ...viewerSync,
       });
     }
   },
@@ -493,6 +515,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       codeViewerOpen: false,
       codeViewerNodeId: null,
       codeViewerExpanded: false,
+      explanationExpandedNodeIds: new Set<string>(),
       // Container ids derive from folder names and collide across layers
       // (e.g. `container:auth` exists in many layers). Drop the cache so
       // we don't render stale positions for the new layer's children.
@@ -556,10 +579,31 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   openCodeViewer: (nodeId) =>
     set({ codeViewerOpen: true, codeViewerNodeId: nodeId, codeViewerExpanded: false }),
+  navigateToCodeFile: (nodeId) => {
+    const destination = get().graph?.nodes.find((node) => node.id === nodeId);
+    if (destination?.type !== "file") return;
+    const wasExpanded = get().codeViewerExpanded;
+    get().navigateToNode(nodeId);
+    set((state) => ({
+      codeViewerOpen: true,
+      codeViewerNodeId: nodeId,
+      codeViewerExpanded: wasExpanded,
+      explanationExpandedNodeIds: new Set(state.explanationExpandedNodeIds).add(nodeId),
+    }));
+  },
   closeCodeViewer: () =>
     set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false }),
   expandCodeViewer: () => set({ codeViewerExpanded: true }),
   collapseCodeViewer: () => set({ codeViewerExpanded: false }),
+  setCodeViewerMode: (codeViewerMode) => set({ codeViewerMode }),
+
+  toggleExplanation: (nodeId) =>
+    set((state) => {
+      const next = new Set(state.explanationExpandedNodeIds);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return { explanationExpandedNodeIds: next };
+    }),
 
   setDiffOverlay: (changed, affected) =>
     set({
@@ -793,5 +837,17 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       return { layoutIssues: [...state.layoutIssues, ...fresh] };
     }),
   clearLayoutIssues: () => set({ layoutIssues: [] }),
-}));
 
+  uiResetGraphView: () => {
+    set({
+      selectedNodeId: null,
+      focusNodeId: null,
+      searchQuery: "",
+      searchResults: [],
+      containerLayoutCache: new Map(),
+      containerSizeMemory: new Map(),
+      expandedContainers: new Set(),
+      pendingFocusContainer: null,
+    });
+  },
+}));

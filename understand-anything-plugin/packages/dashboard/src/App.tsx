@@ -258,7 +258,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   }, [setDomainGraph]);
 
   return (
-    <I18nProvider language={outputLanguage ?? "en"}>
+    <I18nProvider language={outputLanguage}>
       <ThemeProvider metaTheme={metaTheme}>
         <DashboardContent
           accessToken={accessToken}

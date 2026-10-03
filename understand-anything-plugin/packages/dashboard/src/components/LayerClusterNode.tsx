@@ -2,6 +2,8 @@ import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getLayerColor } from "./LayerLegend";
+import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel } from "../locales/displayLabels";
 
 const complexityColors: Record<string, string> = {
   simple: "text-node-function",
@@ -25,6 +27,7 @@ export type LayerClusterFlowNode = Node<LayerClusterData, "layer-cluster">;
 function LayerClusterNode({
   data,
 }: NodeProps<LayerClusterFlowNode>) {
+  const { localeKey } = useI18n();
   const color = getLayerColor(data.layerColorIndex);
   const complexityColor =
     complexityColors[data.aggregateComplexity] ?? complexityColors.simple;
@@ -66,7 +69,7 @@ function LayerClusterNode({
               </span>
             )}
             <span className={`text-[10px] font-mono ${complexityColor}`}>
-              {data.aggregateComplexity}
+              {complexityLabel(localeKey, data.aggregateComplexity)}
             </span>
           </div>
         </div>

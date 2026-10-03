@@ -25,6 +25,7 @@ import type {
   ForceLayoutPosition,
 } from "../utils/force-layout";
 import { useI18n } from "../contexts/I18nContext";
+import { edgeDirectionalLabel } from "../locales/displayLabels";
 import type { KnowledgeGraph } from "@understand-anything/core/types";
 
 const nodeTypes = {
@@ -331,7 +332,7 @@ function KnowledgeGraphViewInner() {
         style,
         animated: e.type === "contradicts" && (!activeId || !!isConnected),
         label: isConnected && e.type !== "related" && e.type !== "categorized_under"
-          ? e.type.replace(/_/g, " ")
+          ? edgeDirectionalLabel(t.edgeLabels, e.type, true)
           : undefined,
         labelStyle: { fill: "var(--color-text-muted)", fontSize: 9, opacity: 0.7 },
         labelBgStyle: { fill: "var(--color-surface)", fillOpacity: 0.9 },
@@ -341,7 +342,7 @@ function KnowledgeGraphViewInner() {
     });
 
     return { nodes: rfNodes, edges: rfEdges };
-  }, [filteredGraph, layoutIsReady, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts]);
+  }, [filteredGraph, layoutIsReady, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts, t.edgeLabels]);
 
   if (!graph) {
     return (

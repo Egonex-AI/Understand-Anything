@@ -61,6 +61,16 @@ export interface GraphNode {
   tags: string[];
   complexity: "simple" | "moderate" | "complex";
   languageNotes?: string;
+  /**
+   * Detailed, evidence-based explanation for a file node. Generated during
+   * analysis and persisted in the knowledge graph so the dashboard never has
+   * to request the same explanation again.
+   */
+  explanation?: string;
+  /** State of the persisted explanation when an analysis result is partial. */
+  explanationStatus?: "ready" | "generating" | "failed";
+  /** Safe, human-readable reason when explanationStatus is "failed". */
+  explanationError?: string;
   domainMeta?: DomainMeta;
   knowledgeMeta?: KnowledgeMeta;
   figmaMeta?: FigmaMeta;

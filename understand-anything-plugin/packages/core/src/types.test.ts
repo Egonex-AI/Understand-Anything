@@ -38,6 +38,8 @@ describe("KnowledgeGraph types", () => {
       tags: ["entry", "typescript"],
       complexity: "simple",
       languageNotes: "Uses ES module syntax",
+      explanation: "## Role\n\nBootstraps the application.",
+      explanationStatus: "ready",
     };
 
     expect(fileNode.id).toBe("node-1");
@@ -46,6 +48,7 @@ describe("KnowledgeGraph types", () => {
     expect(fileNode.lineRange).toEqual([1, 50]);
     expect(fileNode.tags).toContain("entry");
     expect(fileNode.complexity).toBe("simple");
+    expect(fileNode.explanationStatus).toBe("ready");
 
     const functionNode: GraphNode = {
       id: "node-2",

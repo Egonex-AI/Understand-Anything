@@ -58,6 +58,18 @@ const validGraph: KnowledgeGraph = {
 };
 
 describe("schema validation", () => {
+  it("accepts an optional persisted file explanation", () => {
+    const graph = structuredClone(validGraph);
+    graph.nodes[0].explanation = "## 役割\n\nアプリケーションを開始します。";
+    graph.nodes[0].explanationStatus = "ready";
+
+    const result = validateGraph(graph);
+
+    expect(result.success).toBe(true);
+    expect(result.data?.nodes[0].explanation).toContain("役割");
+    expect(result.data?.nodes[0].explanationStatus).toBe("ready");
+  });
+
   it("validates a correct knowledge graph", () => {
     const result = validateGraph(validGraph);
     expect(result.success).toBe(true);
@@ -282,12 +294,18 @@ describe("sanitizeGraph", () => {
     (graph.nodes[0] as any).filePath = null;
     (graph.nodes[0] as any).lineRange = null;
     (graph.nodes[0] as any).languageNotes = null;
+    (graph.nodes[0] as any).explanation = null;
+    (graph.nodes[0] as any).explanationStatus = null;
+    (graph.nodes[0] as any).explanationError = null;
 
     const result = sanitizeGraph(graph as any);
     const node = (result as any).nodes[0];
     expect(node.filePath).toBeUndefined();
     expect(node.lineRange).toBeUndefined();
     expect(node.languageNotes).toBeUndefined();
+    expect(node.explanation).toBeUndefined();
+    expect(node.explanationStatus).toBeUndefined();
+    expect(node.explanationError).toBeUndefined();
   });
 
   it("converts null optional edge fields to undefined", () => {

@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {"id":"document:supabase/local/README.md","type":"document","name":"README.md","filePath":"supabase/local/README.md","summary":"ローカルSupabase環境を起動し、テスト用fixtureを投入・削除する手順を説明します。","tags":["documentation","supabase","local-development","testing"],"complexity":"simple"},
+    {"id":"table:supabase/local/cleanup.sql","type":"table","name":"cleanup.sql","filePath":"supabase/local/cleanup.sql","summary":"ローカルSupabaseのテストデータを安全に削除し、fixture実行前の状態へ戻すSQLです。","tags":["database","testing","cleanup","supabase"],"complexity":"simple"},
+    {"id":"table:supabase/local/fixture.sql","type":"table","name":"fixture.sql","filePath":"supabase/local/fixture.sql","summary":"ローカル確認用のユーザー、プロフィール、空き時間、イベント関連データを投入するSQL fixtureです。","tags":["database","testing","fixture","supabase"],"complexity":"moderate"}
+  ],
+  "edges": [
+    {"source":"document:supabase/local/README.md","target":"table:supabase/local/fixture.sql","type":"documents","direction":"forward","weight":0.5},
+    {"source":"document:supabase/local/README.md","target":"table:supabase/local/cleanup.sql","type":"documents","direction":"forward","weight":0.5},
+    {"source":"table:supabase/local/cleanup.sql","target":"table:supabase/local/fixture.sql","type":"depends_on","direction":"forward","weight":0.6}
+  ]
+}

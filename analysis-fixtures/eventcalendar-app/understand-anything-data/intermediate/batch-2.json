@@ -1,0 +1,400 @@
+{
+  "nodes": [
+    {
+      "id": "file:supabase/migrations/0001_init.sql",
+      "type": "file",
+      "name": "0001_init.sql",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "初期データベース構造、RLS、認可関数を定義し、許可メール、プロフィール、空き時間、共有イベント、参加者を作成します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "complex"
+    },
+    {
+      "id": "file:supabase/migrations/0002_secure_profile_and_availability_writes.sql",
+      "type": "file",
+      "name": "0002_secure_profile_and_availability_writes.sql",
+      "filePath": "supabase/migrations/0002_secure_profile_and_availability_writes.sql",
+      "summary": "プロフィール作成と空き時間変更を検証付き RPC に限定し、直接テーブル書き込みを閉じます。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0003_harden_authorization_and_availability.sql",
+      "type": "file",
+      "name": "0003_harden_authorization_and_availability.sql",
+      "filePath": "supabase/migrations/0003_harden_authorization_and_availability.sql",
+      "summary": "許可リストの公開を抑止し、ユーザーと日付単位のロックで空き時間更新の競合を防ぎます。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0004_admin_roles.sql",
+      "type": "file",
+      "name": "0004_admin_roles.sql",
+      "filePath": "supabase/migrations/0004_admin_roles.sql",
+      "summary": "許可メールに member/admin/super_user ロールを追加し、初期 super user を登録します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0005_admin_access_controls.sql",
+      "type": "file",
+      "name": "0005_admin_access_controls.sql",
+      "filePath": "supabase/migrations/0005_admin_access_controls.sql",
+      "summary": "許可メール管理 RPC を統一し、管理者権限と最後の super user 保護を実装します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0006_batch_availability.sql",
+      "type": "file",
+      "name": "0006_batch_availability.sql",
+      "filePath": "supabase/migrations/0006_batch_availability.sql",
+      "summary": "複数の空き時間操作を一つのトランザクションで適用する RPC を追加します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0007_super_user_delete_event.sql",
+      "type": "file",
+      "name": "0007_super_user_delete_event.sql",
+      "filePath": "supabase/migrations/0007_super_user_delete_event.sql",
+      "summary": "キャンセル済みイベントを super user が物理削除できる RPC を追加します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:supabase/migrations/0008_google_calendar_sync.sql",
+      "type": "file",
+      "name": "0008_google_calendar_sync.sql",
+      "filePath": "supabase/migrations/0008_google_calendar_sync.sql",
+      "summary": "イベントに Google Calendar 同期状態・エラー・同期日時を追加します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "file:supabase/migrations/0009_active_members_and_admin_nicknames.sql",
+      "type": "file",
+      "name": "0009_active_members_and_admin_nicknames.sql",
+      "filePath": "supabase/migrations/0009_active_members_and_admin_nicknames.sql",
+      "summary": "有効かつニックネーム設定済みのメンバーだけを返す安全な一覧 RPC を追加します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0010_admin_self_access_protection.sql",
+      "type": "file",
+      "name": "0010_admin_self_access_protection.sql",
+      "filePath": "supabase/migrations/0010_admin_self_access_protection.sql",
+      "summary": "管理者が自分自身の許可リスト項目を変更できないよう検査を強化します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0011_cancel_event_notifications.sql",
+      "type": "file",
+      "name": "0011_cancel_event_notifications.sql",
+      "filePath": "supabase/migrations/0011_cancel_event_notifications.sql",
+      "summary": "イベントキャンセルの通知アウトボックスと、状態・参加者変更を保護するトリガー/RPC を追加します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "file:supabase/migrations/0012_personal_events.sql",
+      "type": "file",
+      "name": "0012_personal_events.sql",
+      "filePath": "supabase/migrations/0012_personal_events.sql",
+      "summary": "共有参加・通知・Google 同期から分離した所有者限定の個人イベントを追加します。",
+      "tags": [
+        "database",
+        "migration",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0001_init.sql:allowed_emails",
+      "type": "table",
+      "name": "allowed_emails",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "ログイン許可メールと有効状態・ロールを保持します。",
+      "tags": [
+        "database",
+        "schema",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0001_init.sql:profiles",
+      "type": "table",
+      "name": "profiles",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "アプリ内表示用のニックネームと色を保持します。",
+      "tags": [
+        "database",
+        "schema",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0001_init.sql:availability_presets",
+      "type": "table",
+      "name": "availability_presets",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "再利用可能な空き時間プリセットを保持します。",
+      "tags": [
+        "database",
+        "schema",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0001_init.sql:availability_slots",
+      "type": "table",
+      "name": "availability_slots",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "ユーザーごとの日付別空き時間スロットを保持します。",
+      "tags": [
+        "database",
+        "schema",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0001_init.sql:events",
+      "type": "table",
+      "name": "events",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "共有/個人イベントの日時、状態、作成者を保持します。",
+      "tags": [
+        "database",
+        "schema",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0001_init.sql:event_participants",
+      "type": "table",
+      "name": "event_participants",
+      "filePath": "supabase/migrations/0001_init.sql",
+      "summary": "イベント参加者の出欠状態とコメントを保持します。",
+      "tags": [
+        "database",
+        "schema",
+        "supabase"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:supabase/migrations/0011_cancel_event_notifications.sql:event_notifications",
+      "type": "table",
+      "name": "event_notifications",
+      "filePath": "supabase/migrations/0011_cancel_event_notifications.sql",
+      "summary": "キャンセル通知の送信待ち・送信済み・失敗状態と再試行情報を保持します。",
+      "tags": [
+        "database",
+        "notification",
+        "outbox"
+      ],
+      "complexity": "moderate"
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:supabase/migrations/0001_init.sql",
+      "target": "table:supabase/migrations/0001_init.sql:allowed_emails",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0001_init.sql",
+      "target": "table:supabase/migrations/0001_init.sql:profiles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0001_init.sql",
+      "target": "table:supabase/migrations/0001_init.sql:availability_presets",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0001_init.sql",
+      "target": "table:supabase/migrations/0001_init.sql:availability_slots",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0001_init.sql",
+      "target": "table:supabase/migrations/0001_init.sql:events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0001_init.sql",
+      "target": "table:supabase/migrations/0001_init.sql:event_participants",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0002_secure_profile_and_availability_writes.sql",
+      "target": "table:supabase/migrations/0001_init.sql:profiles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0002_secure_profile_and_availability_writes.sql",
+      "target": "table:supabase/migrations/0001_init.sql:availability_slots",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0003_harden_authorization_and_availability.sql",
+      "target": "table:supabase/migrations/0001_init.sql:allowed_emails",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0003_harden_authorization_and_availability.sql",
+      "target": "table:supabase/migrations/0001_init.sql:availability_slots",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0004_admin_roles.sql",
+      "target": "table:supabase/migrations/0001_init.sql:allowed_emails",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0005_admin_access_controls.sql",
+      "target": "table:supabase/migrations/0001_init.sql:allowed_emails",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0006_batch_availability.sql",
+      "target": "table:supabase/migrations/0001_init.sql:availability_slots",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0007_super_user_delete_event.sql",
+      "target": "table:supabase/migrations/0001_init.sql:events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0008_google_calendar_sync.sql",
+      "target": "table:supabase/migrations/0001_init.sql:events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0009_active_members_and_admin_nicknames.sql",
+      "target": "table:supabase/migrations/0001_init.sql:profiles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0010_admin_self_access_protection.sql",
+      "target": "table:supabase/migrations/0001_init.sql:allowed_emails",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0011_cancel_event_notifications.sql",
+      "target": "table:supabase/migrations/0011_cancel_event_notifications.sql:event_notifications",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0011_cancel_event_notifications.sql",
+      "target": "table:supabase/migrations/0001_init.sql:events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0011_cancel_event_notifications.sql",
+      "target": "table:supabase/migrations/0001_init.sql:event_participants",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "file:supabase/migrations/0012_personal_events.sql",
+      "target": "table:supabase/migrations/0001_init.sql:events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ]
+}
