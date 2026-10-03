@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * User tags + notes per graph node.
+ * User tags + notes (and per-line notes) per graph node.
  *
  * Persisted to the project's data directory (`.ua/annotations.json`) via the
  * dashboard server's `/annotations.json` endpoint. When the server can't
@@ -14,6 +14,8 @@ import { create } from "zustand";
 export interface NodeAnnotation {
   tags: string[];
   note: string;
+  /** Per-line notes for the node's file: 1-based line number (as a string) → note. */
+  lines?: Record<string, string>;
   updatedAt: string;
 }
 
@@ -26,6 +28,8 @@ interface AnnotationsState {
   load: (accessToken: string, projectKey: string) => Promise<void>;
   setTags: (nodeId: string, tags: string[]) => void;
   setNote: (nodeId: string, note: string) => void;
+  /** Attach a note to one line of the node's file; an empty note deletes it. */
+  setLineNote: (nodeId: string, line: number, note: string) => void;
 }
 
 const DEMO_TOKEN = "__demo__";
@@ -88,11 +92,12 @@ export const useAnnotationsStore = create<AnnotationsState>()((set, get) => {
     }, SAVE_DEBOUNCE_MS);
   }
 
-  function update(nodeId: string, patch: Partial<Pick<NodeAnnotation, "tags" | "note">>) {
+  function update(nodeId: string, patch: Partial<Pick<NodeAnnotation, "tags" | "note" | "lines">>) {
     const current = get().annotations[nodeId] ?? { tags: [], note: "", updatedAt: "" };
-    const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    const next: NodeAnnotation = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    if (next.lines && Object.keys(next.lines).length === 0) delete next.lines;
     const annotations = { ...get().annotations };
-    if (next.tags.length === 0 && !next.note.trim()) delete annotations[nodeId];
+    if (next.tags.length === 0 && !next.note.trim() && !next.lines) delete annotations[nodeId];
     else annotations[nodeId] = next;
     set({ annotations });
     scheduleSave();
@@ -138,5 +143,15 @@ export const useAnnotationsStore = create<AnnotationsState>()((set, get) => {
     },
 
     setNote: (nodeId, note) => update(nodeId, { note }),
+
+    setLineNote: (nodeId, line, note) => {
+      if (!Number.isInteger(line) || line < 1) return;
+      const lines = { ...(get().annotations[nodeId]?.lines ?? {}) };
+      const key = String(line);
+      if (note.trim()) lines[key] = note;
+      else if (key in lines) delete lines[key];
+      else return;
+      update(nodeId, { lines });
+    },
   };
 });
