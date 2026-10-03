@@ -39,6 +39,36 @@ describe("normalizeAnnotations", () => {
     });
   });
 
+  it("keeps sanitized per-line notes and omits `lines` when there are none", () => {
+    const doc = normalizeAnnotations({
+      nodes: {
+        a: {
+          tags: [],
+          note: "",
+          lines: { "3": "why this?", "012": "x", "0": "x", "-1": "x", "1.5": "x", abc: "x", "7": "  ", "9": 42, "12": "y".repeat(6000) },
+          updatedAt: "2026-01-01T00:00:00Z",
+        },
+        b: { tags: ["t"], note: "", lines: ["not", "an", "object"] },
+        c: { tags: [], note: "", lines: { "0": "invalid only" } },
+      },
+    });
+    expect(Object.keys(doc.nodes).sort()).toEqual(["a", "b"]);
+    expect(doc.nodes.a.lines).toEqual({ "3": "why this?", "12": "y".repeat(5000) });
+    expect(doc.nodes.b).not.toHaveProperty("lines");
+  });
+
+  it("caps the number of line notes per node", () => {
+    const lines: Record<string, string> = {};
+    for (let i = 1; i <= 600; i += 1) lines[String(i)] = `note ${i}`;
+    const doc = normalizeAnnotations({ nodes: { a: { lines } } });
+    expect(Object.keys(doc.nodes.a.lines ?? {})).toHaveLength(500);
+  });
+
+  it("still loads version-1 documents written before line notes existed", () => {
+    const doc = normalizeAnnotations({ version: 1, nodes: { a: { tags: ["x"], note: "n", updatedAt: "t" } } });
+    expect(doc).toEqual({ version: 1, nodes: { a: { tags: ["x"], note: "n", updatedAt: "t" } } });
+  });
+
   it("rejects a wrong top-level shape", () => {
     expect(() => normalizeAnnotations([])).toThrow(AnnotationsError);
     expect(() => normalizeAnnotations({ nodes: [] })).toThrow(AnnotationsError);
@@ -57,6 +87,15 @@ describe("handleAnnotationsRequest", () => {
     expect(put.statusCode).toBe(200);
     expect(readAnnotations(dir).nodes["file:a.ts"]).toMatchObject({ tags: ["core"], note: "entry point" });
     expect(fs.readdirSync(dir)).toEqual(["annotations.json"]);
+  });
+
+  it("round-trips line notes through PUT and GET", async () => {
+    const body = { version: 1, nodes: { "file:a.ts": { tags: [], note: "", lines: { "10": "hot path" } } } };
+    await handleAnnotationsRequest(request("PUT", body), dir, { writable: true });
+    const res = await handleAnnotationsRequest(request("GET"), dir, { writable: true });
+    expect((res.payload as { nodes: Record<string, { lines?: Record<string, string> }> }).nodes["file:a.ts"].lines).toEqual({
+      "10": "hot path",
+    });
   });
 
   it("refuses writes on read-only servers and non-JSON bodies", async () => {

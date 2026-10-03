@@ -1,5 +1,6 @@
 /**
- * User annotations (tags + notes) attached to graph nodes from the dashboard.
+ * User annotations (tags, notes and per-line notes) attached to graph nodes
+ * from the dashboard.
  *
  * Stored next to the knowledge graph as `annotations.json` in the project's
  * data directory (`.ua/` or legacy `.understand-anything/`), deliberately
@@ -20,10 +21,15 @@ export const MAX_ANNOTATIONS_BYTES = 2 * 1024 * 1024;
 const MAX_TAGS_PER_NODE = 50;
 const MAX_TAG_LENGTH = 64;
 const MAX_NOTE_LENGTH = 50_000;
+const MAX_LINE_NOTES_PER_NODE = 500;
+const MAX_LINE_NOTE_LENGTH = 5_000;
+const MAX_LINE_NUMBER = 10_000_000;
 
 export interface NodeAnnotation {
   tags: string[];
   note: string;
+  /** Per-line notes for the node's file: 1-based line number (as a string) → note. */
+  lines?: Record<string, string>;
   updatedAt: string;
 }
 
@@ -54,6 +60,23 @@ function normalizeTags(raw: unknown): string[] {
 }
 
 /**
+ * Keep only entries keyed by a canonical positive integer ("12", not "012"
+ * or "1.5") with a non-blank string note; cap note length and entry count.
+ */
+function normalizeLines(raw: unknown): Record<string, string> {
+  const lines: Record<string, string> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return lines;
+  let count = 0;
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^[1-9]\d*$/.test(key) || Number(key) > MAX_LINE_NUMBER) continue;
+    if (typeof value !== "string" || !value.trim()) continue;
+    lines[key] = value.slice(0, MAX_LINE_NOTE_LENGTH);
+    if (++count >= MAX_LINE_NOTES_PER_NODE) break;
+  }
+  return lines;
+}
+
+/**
  * Validate and clean an annotations payload. Throws AnnotationsError when
  * the top-level shape is wrong; silently drops malformed or empty entries.
  */
@@ -71,10 +94,13 @@ export function normalizeAnnotations(raw: unknown): AnnotationsDocument {
     const e = entry as Record<string, unknown>;
     const tags = normalizeTags(e.tags);
     const note = typeof e.note === "string" ? e.note.slice(0, MAX_NOTE_LENGTH) : "";
-    if (tags.length === 0 && !note.trim()) continue;
+    const lines = normalizeLines(e.lines);
+    const hasLines = Object.keys(lines).length > 0;
+    if (tags.length === 0 && !note.trim() && !hasLines) continue;
     doc.nodes[nodeId] = {
       tags,
       note,
+      ...(hasLines ? { lines } : {}),
       updatedAt: typeof e.updatedAt === "string" ? e.updatedAt : new Date().toISOString(),
     };
   }
