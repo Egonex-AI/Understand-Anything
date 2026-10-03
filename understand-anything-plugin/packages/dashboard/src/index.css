@@ -263,3 +263,10 @@ body {
 [data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* Prism token classes (e.g. "token table" for TOML headers / Markdown tables)
+   collide with Tailwind utilities like `.table { display: table }`, which
+   breaks a single source line across several rows. Keep tokens inline. */
+.prism-code .token {
+  display: inline;
+}
