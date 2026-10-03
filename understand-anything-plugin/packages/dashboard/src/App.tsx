@@ -3,6 +3,7 @@ import { validateGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
 import { useAnnotationsStore } from "./annotationsStore";
+import { useMyTourStore } from "./myTourStore";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
 import KnowledgeGraphView from "./components/KnowledgeGraphView";
@@ -46,6 +47,7 @@ const KeyboardShortcutsHelp = lazy(
 const OnboardingOverlay = lazy(() => import("./components/OnboardingOverlay"));
 const CommandPalette = lazy(() => import("./components/CommandPalette"));
 const AskAiDialog = lazy(() => import("./components/AskAiDialog"));
+const MyTourDialog = lazy(() => import("./components/MyTourDialog"));
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const SESSION_TOKEN_KEY = "understand-anything-token";
@@ -316,6 +318,7 @@ function DashboardContent({
   const collapseCodeViewer = useDashboardStore((s) => s.collapseCodeViewer);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
   const aiDialogOpen = useDashboardStore((s) => s.aiDialog !== null);
+  const myTourBuilderOpen = useMyTourStore((s) => s.builder !== null);
   const togglePathFinder = useDashboardStore((s) => s.togglePathFinder);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
   const toggleNodeTypeFilter = useDashboardStore((s) => s.toggleNodeTypeFilter);
@@ -803,6 +806,12 @@ function DashboardContent({
       {aiDialogOpen && (
         <Suspense fallback={null}>
           <AskAiDialog accessToken={accessToken} />
+        </Suspense>
+      )}
+
+      {myTourBuilderOpen && (
+        <Suspense fallback={null}>
+          <MyTourDialog />
         </Suspense>
       )}
 
