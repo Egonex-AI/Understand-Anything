@@ -222,8 +222,15 @@ export function buildNotesMarkdown(graph: KnowledgeGraph, annotations: Annotatio
   return parts.join("\n\n") + "\n";
 }
 
+/**
+ * `[[name]]`, or `[[name|display]]`. Names with a dot (`api.ts`, `README.md`)
+ * link with an explicit `.md`, otherwise Obsidian reads the suffix as the
+ * target's extension (`[[README.md]]` → a file called README.md).
+ */
 function wikilink(name: string, display?: string): string {
-  return display && display !== name ? `[[${name}|${display.replace(/[[\]|]/g, "")}]]` : `[[${name}]]`;
+  const target = name.includes(".") ? `${name}.md` : name;
+  const label = (display ?? name).replace(/[[\]|]/g, "");
+  return target === label ? `[[${target}]]` : `[[${target}|${label}]]`;
 }
 
 /**

@@ -96,15 +96,19 @@ describe("buildObsidianVault", () => {
       "# handler",
     ].join("\n"))).toBe(true);
     expect(note).toContain("## Line notes\n\n- `src/api.ts:12` — auth check");
-    expect(note).toContain("- ← contains [[api.ts]]");
+    expect(note).toContain("- ← contains [[api.ts.md|api.ts]]");
     expect(note.trimEnd().endsWith("Back to [[Index]]")).toBe(true);
     expect(byPath.get("Demo notes/notes/db.ts.md")).toContain("tags: []");
   });
 
-  it("links related annotated nodes with wikilinks", () => {
+  it("links related annotated nodes with wikilinks (explicit .md for dotted names)", () => {
     const api = byPath.get("Demo notes/notes/api.ts.md")!;
-    expect(api).toContain("- imports → [[db.ts]]");
-    expect(api).toContain("- contains → [[handler (api.ts)|handler]]");
+    expect(api).toContain("- imports → [[db.ts.md|db.ts]]");
+    expect(api).toContain("- contains → [[handler (api.ts).md|handler]]");
+    const g = notesGraph();
+    g.nodes[1].name = "Utilities";
+    const util = buildObsidianVault(g, notesAnnotations(), { date }).find((f) => f.path.endsWith("/api.ts.md"))!;
+    expect(util.data).toContain("- imports → [[Utilities]]");
   });
 
   it("groups the index by layer and by tag", () => {
@@ -112,10 +116,10 @@ describe("buildObsidianVault", () => {
     expect(index).toContain('type: "index"');
     expect(index).toContain("# Demo — notes");
     expect(index).toContain("A demo project.");
-    expect(index).toContain("### API\n\n- [[util.ts]] — util.ts summary.");
-    expect(index).toContain("### Data\n\n- [[db.ts]] — db.ts summary.");
-    expect(index).toContain("- #entry-point: [[api.ts]], [[handler (api.ts)|handler]]");
-    expect(index).toContain("- #helpers: [[util.ts]]");
+    expect(index).toContain("### API\n\n- [[util.ts.md|util.ts]] — util.ts summary.");
+    expect(index).toContain("### Data\n\n- [[db.ts.md|db.ts]] — db.ts summary.");
+    expect(index).toContain("- #entry-point: [[api.ts.md|api.ts]], [[handler (api.ts).md|handler]]");
+    expect(index).toContain("- #helpers: [[util.ts.md|util.ts]]");
     expect(index).not.toContain("stale");
   });
 
