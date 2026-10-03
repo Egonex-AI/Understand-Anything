@@ -260,6 +260,18 @@ body {
   color: #92600a;
 }
 
+/* The staleness banner's amber-100 text is tuned for dark backgrounds and is
+   unreadable on the light preset. */
+[data-theme="light"] .staleness-banner {
+  background: rgba(180, 130, 30, 0.1);
+  border-color: rgba(180, 130, 30, 0.3);
+  color: #7a4f06;
+}
+
+[data-theme="light"] .staleness-banner [class*="text-amber-"] {
+  color: inherit;
+}
+
 [data-theme="dark"] {
   color-scheme: dark;
 }

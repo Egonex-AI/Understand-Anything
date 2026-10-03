@@ -172,7 +172,7 @@ export default function StalenessBanner({ freshness }: StalenessBannerProps) {
   const hiddenFileCount = content.changedFiles.length - visibleFiles.length;
 
   return (
-    <div className="bg-amber-950/30 border-b border-amber-700 text-amber-100 text-sm">
+    <div className="staleness-banner bg-amber-950/30 border-b border-amber-700 text-amber-100 text-sm">
       <button
         type="button"
         aria-expanded={expanded}
