@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -109,6 +109,8 @@ export default function CodeViewer({
   const viewMode = useDashboardStore((s) => s.viewMode);
   const codeViewerNodeId = useDashboardStore((s) => s.codeViewerNodeId);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
+  const targetLine = useDashboardStore((s) => s.codeViewerLine);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
   // Files tab always builds its tree from the structural graph, so a node ID opened from
   // there may not exist in the active (domain) graph — fall back to the structural graph.
@@ -188,6 +190,27 @@ export default function CodeViewer({
     return { start: node.lineRange[0], end: node.lineRange[1] };
   }, [node?.lineRange]);
 
+  // A specific target line (content-search hit) needs line numbers, so show
+  // markdown as source.
+  useEffect(() => {
+    if (targetLine !== null) setMdView("source");
+  }, [targetLine]);
+
+  // Bring the target line — or the start of the node's line range — into view
+  // once the source has rendered, instead of always opening at line 1.
+  const focusLine = targetLine ?? highlightedRange?.start ?? null;
+  const isSourceRendered =
+    state.status === "loaded" && !(language === "markdown" && mdView === "rendered");
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || focusLine === null || !isSourceRendered) return;
+    const lineEl = container.querySelector<HTMLElement>(`[data-line="${focusLine}"]`);
+    if (!lineEl) return;
+    const offset =
+      lineEl.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+    container.scrollTop = Math.max(0, offset - container.clientHeight / 3);
+  }, [focusLine, isSourceRendered, state.source]);
+
   if (!node) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-surface">
@@ -259,7 +282,7 @@ export default function CodeViewer({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto bg-root">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto bg-root">
         {state.status === "loading" && (
           <div className="p-5 text-sm text-text-muted">{t.codeViewer.loading}</div>
         )}
@@ -316,6 +339,7 @@ export default function CodeViewer({
                 >
                   {tokens.map((line, index) => {
                     const lineNumber = index + 1;
+                    const isTarget = lineNumber === targetLine;
                     const isHighlighted =
                       highlightedRange !== null &&
                       lineNumber >= highlightedRange.start &&
@@ -325,8 +349,13 @@ export default function CodeViewer({
                       <div
                         key={lineNumber}
                         {...lineProps}
+                        data-line={lineNumber}
                         className={`${lineProps.className} flex ${
-                          isHighlighted ? "bg-accent/15" : "hover:bg-elevated/40"
+                          isTarget
+                            ? "bg-accent/30"
+                            : isHighlighted
+                            ? "bg-accent/15"
+                            : "hover:bg-elevated/40"
                         }`}
                       >
                         <span className="w-12 shrink-0 select-none border-r border-border-subtle pr-3 text-right text-text-muted bg-surface/60">

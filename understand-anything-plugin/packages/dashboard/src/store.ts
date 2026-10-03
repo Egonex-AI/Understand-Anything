@@ -120,6 +120,8 @@ interface DashboardStore {
   codeViewerOpen: boolean;
   codeViewerNodeId: string | null;
   codeViewerExpanded: boolean;
+  /** 1-based line to scroll to and mark (e.g. a content-search hit); null = node's lineRange. */
+  codeViewerLine: number | null;
 
   tourActive: boolean;
   currentTourStep: number;
@@ -166,7 +168,7 @@ interface DashboardStore {
   setFocusNode: (nodeId: string | null) => void;
   setSearchQuery: (query: string) => void;
   setPersona: (persona: Persona) => void;
-  openCodeViewer: (nodeId: string) => void;
+  openCodeViewer: (nodeId: string, line?: number) => void;
   closeCodeViewer: () => void;
   expandCodeViewer: () => void;
   collapseCodeViewer: () => void;
@@ -303,6 +305,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   codeViewerOpen: false,
   codeViewerNodeId: null,
   codeViewerExpanded: false,
+  codeViewerLine: null,
 
   tourActive: false,
   currentTourStep: 0,
@@ -554,10 +557,15 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       pendingFocusContainer: null,
     }),
 
-  openCodeViewer: (nodeId) =>
-    set({ codeViewerOpen: true, codeViewerNodeId: nodeId, codeViewerExpanded: false }),
+  openCodeViewer: (nodeId, line) =>
+    set({
+      codeViewerOpen: true,
+      codeViewerNodeId: nodeId,
+      codeViewerExpanded: false,
+      codeViewerLine: line ?? null,
+    }),
   closeCodeViewer: () =>
-    set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false }),
+    set({ codeViewerOpen: false, codeViewerNodeId: null, codeViewerExpanded: false, codeViewerLine: null }),
   expandCodeViewer: () => set({ codeViewerExpanded: true }),
   collapseCodeViewer: () => set({ codeViewerExpanded: false }),
 
