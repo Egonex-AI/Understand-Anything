@@ -17,8 +17,11 @@
  *   - /file-content.json only serves files listed in the graph, capped at
  *     1 MB, never binary
  *   - /search-content.json only searches those same files
- *   - /annotations.json (dashboard tags + notes) is served read-only; edits
- *     made in the viewer stay in the browser's local storage
+ *   - /annotations.json (dashboard tags + notes) and /arch-rules.json
+ *     (architecture rules) are served read-only; edits made in the viewer
+ *     stay in the browser's local storage
+ *   - /git-hotspots.json runs a read-only `git log` in the project root and
+ *     only reports files listed in the graph
  */
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
@@ -33,6 +36,8 @@ import {
   searchProjectContent,
 } from "./dist/content-search.js";
 import { handleAnnotationsRequest } from "./dist/annotations.js";
+import { handleArchRulesRequest } from "./dist/arch-rules.js";
+import { handleGitHotspotsRequest } from "./dist/git-hotspots.js";
 
 const DIST_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
@@ -341,6 +346,8 @@ const PROTECTED = new Set([
   "/file-content.json",
   "/search-content.json",
   "/annotations.json",
+  "/arch-rules.json",
+  "/git-hotspots.json",
   "/staleness.json",
 ]);
 
@@ -377,6 +384,22 @@ const server = createServer((req, res) => {
   if (pathname === "/annotations.json") {
     res.setHeader("Cache-Control", "no-store");
     void handleAnnotationsRequest(req, graphDir, { writable: false }).then((result) =>
+      sendJson(res, result.statusCode, result.payload),
+    );
+    return;
+  }
+
+  if (pathname === "/arch-rules.json") {
+    res.setHeader("Cache-Control", "no-store");
+    void handleArchRulesRequest(req, graphDir, { writable: false }).then((result) =>
+      sendJson(res, result.statusCode, result.payload),
+    );
+    return;
+  }
+
+  if (pathname === "/git-hotspots.json") {
+    res.setHeader("Cache-Control", "no-store");
+    void handleGitHotspotsRequest(url, projectRoot, graphFilePathSet()).then((result) =>
       sendJson(res, result.statusCode, result.payload),
     );
     return;

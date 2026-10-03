@@ -17,6 +17,8 @@ const dashboardDist = join(here, "..", "dashboard", "dist");
 const coreStaleness = join(here, "..", "core", "dist", "staleness.js");
 const coreContentSearch = join(here, "..", "core", "dist", "content-search.js");
 const coreAnnotations = join(here, "..", "core", "dist", "annotations.js");
+const coreArchRules = join(here, "..", "core", "dist", "arch-rules.js");
+const coreGitHotspots = join(here, "..", "core", "dist", "git-hotspots.js");
 const viewerDist = join(here, "dist");
 const viewerServerDist = join(here, "bin", "dist");
 
@@ -35,4 +37,6 @@ mkdirSync(viewerServerDist, { recursive: true });
 cpSync(coreStaleness, join(viewerServerDist, "staleness.js"));
 cpSync(coreContentSearch, join(viewerServerDist, "content-search.js"));
 cpSync(coreAnnotations, join(viewerServerDist, "annotations.js"));
+cpSync(coreArchRules, join(viewerServerDist, "arch-rules.js"));
+cpSync(coreGitHotspots, join(viewerServerDist, "git-hotspots.js"));
 console.log(`Embedded dashboard build into ${viewerDist}`);
