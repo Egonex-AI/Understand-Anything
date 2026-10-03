@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { NodeNotesSection, NodeTagsSection } from "./NodeAnnotations";
 import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 // Badge color classes keyed by NodeType — must be kept in sync with core NodeType union.
@@ -456,23 +457,8 @@ export default function NodeInfo() {
         </div>
       )}
 
-      {node.tags.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
-            {t.common.tags}
-          </h3>
-          <div className="flex flex-wrap gap-1.5">
-            {node.tags.map((tag) => (
-              <span
-                key={tag}
-                className="text-[11px] glass text-text-secondary px-2.5 py-1 rounded-full"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      <NodeTagsSection nodeId={node.id} graphTags={node.tags} />
+      <NodeNotesSection nodeId={node.id} />
 
       {/* Knowledge-specific details */}
       {activeGraph && node && (node.type === "article" || node.type === "entity" || node.type === "topic" || node.type === "claim" || node.type === "source") && (

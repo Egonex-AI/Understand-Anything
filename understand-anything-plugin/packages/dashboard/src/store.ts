@@ -97,6 +97,26 @@ function buildGraphIndexes(graph: KnowledgeGraph): {
   return { nodesById, nodeIdToLayerId, nodeIdToLayerIds };
 }
 
+/** User tags/notes per node id, folded into the fuzzy search index. */
+export type SearchAnnotations = Record<string, { tags: string[]; note: string }>;
+
+/**
+ * Nodes as the search engine should see them: user tags join the analyzer's
+ * tags and the user's note is searchable alongside languageNotes.
+ */
+function searchableNodes(nodes: GraphNode[], annotations: SearchAnnotations): GraphNode[] {
+  if (Object.keys(annotations).length === 0) return nodes;
+  return nodes.map((node) => {
+    const a = annotations[node.id];
+    if (!a) return node;
+    return {
+      ...node,
+      tags: [...node.tags, ...a.tags],
+      languageNotes: [node.languageNotes, a.note].filter(Boolean).join("\n"),
+    };
+  });
+}
+
 /** Maximum number of entries in the sidebar navigation history. */
 const MAX_HISTORY = 50;
 
@@ -112,6 +132,9 @@ interface DashboardStore {
   searchQuery: string;
   searchResults: SearchResult[];
   searchEngine: SearchEngine | null;
+  searchAnnotations: SearchAnnotations;
+  /** Rebuild the search index with the user's latest tags/notes. */
+  setSearchAnnotations: (annotations: SearchAnnotations) => void;
   searchMode: SearchMode;
   setSearchMode: (mode: SearchMode) => void;
   /** Replace search results directly — used by content search, whose hits come from the server. */
@@ -302,6 +325,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   searchQuery: "",
   searchResults: [],
   searchEngine: null,
+  searchAnnotations: {},
   searchMode: "fuzzy",
 
   navigationLevel: "overview",
@@ -371,7 +395,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     })),
 
   setGraph: (graph) => {
-    const searchEngine = new SearchEngine(graph.nodes);
+    const searchEngine = new SearchEngine(searchableNodes(graph.nodes, get().searchAnnotations));
     const { searchQuery: query, searchMode } = get();
     // Content-search hits are file-path based and refreshed by the search bar.
     const searchResults =
@@ -550,6 +574,21 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     });
   },
   setSearchResults: (results) => set({ searchResults: results }),
+  setSearchAnnotations: (annotations) => {
+    const { graph, searchQuery, searchMode } = get();
+    if (!graph) {
+      set({ searchAnnotations: annotations });
+      return;
+    }
+    const searchEngine = new SearchEngine(searchableNodes(graph.nodes, annotations));
+    set({
+      searchAnnotations: annotations,
+      searchEngine,
+      ...(searchMode !== "content" && searchQuery.trim()
+        ? { searchResults: searchEngine.search(searchQuery) }
+        : {}),
+    });
+  },
   setSearchQuery: (query) => {
     const engine = get().searchEngine;
     const mode = get().searchMode;

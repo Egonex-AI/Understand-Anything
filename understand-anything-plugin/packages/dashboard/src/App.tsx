@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react
 import { validateGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
+import { useAnnotationsStore } from "./annotationsStore";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
 import KnowledgeGraphView from "./components/KnowledgeGraphView";
@@ -192,6 +193,23 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         setLoadError(`Failed to load knowledge graph: ${err instanceof Error ? err.message : String(err)}`);
       });
   }, [setGraph]);
+
+  // Load the user's tags/notes once the graph (and so the project) is known,
+  // and keep the search index in sync with them.
+  const projectName = useDashboardStore((s) => s.graph?.project.name);
+  useEffect(() => {
+    if (projectName === undefined) return;
+    void useAnnotationsStore.getState().load(accessToken, projectName);
+  }, [accessToken, projectName]);
+  useEffect(
+    () =>
+      useAnnotationsStore.subscribe((state, prev) => {
+        if (state.annotations !== prev.annotations) {
+          useDashboardStore.getState().setSearchAnnotations(state.annotations);
+        }
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (
