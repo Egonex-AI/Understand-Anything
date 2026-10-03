@@ -45,6 +45,7 @@ const KeyboardShortcutsHelp = lazy(
 );
 const OnboardingOverlay = lazy(() => import("./components/OnboardingOverlay"));
 const CommandPalette = lazy(() => import("./components/CommandPalette"));
+const AskAiDialog = lazy(() => import("./components/AskAiDialog"));
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const SESSION_TOKEN_KEY = "understand-anything-token";
@@ -314,6 +315,7 @@ function DashboardContent({
   const expandCodeViewer = useDashboardStore((s) => s.expandCodeViewer);
   const collapseCodeViewer = useDashboardStore((s) => s.collapseCodeViewer);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
+  const aiDialogOpen = useDashboardStore((s) => s.aiDialog !== null);
   const togglePathFinder = useDashboardStore((s) => s.togglePathFinder);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
   const toggleNodeTypeFilter = useDashboardStore((s) => s.toggleNodeTypeFilter);
@@ -388,7 +390,9 @@ function DashboardContent({
         action: () => {
           // Read from store at invocation time to avoid stale closures
           const state = useDashboardStore.getState();
-          if (state.pathFinderOpen) {
+          if (state.aiDialog) {
+            state.closeAiDialog();
+          } else if (state.pathFinderOpen) {
             state.togglePathFinder();
           } else if (state.filterPanelOpen) {
             state.toggleFilterPanel();
@@ -793,6 +797,12 @@ function DashboardContent({
       {paletteOpen && (
         <Suspense fallback={null}>
           <CommandPalette onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
+        </Suspense>
+      )}
+
+      {aiDialogOpen && (
+        <Suspense fallback={null}>
+          <AskAiDialog accessToken={accessToken} />
         </Suspense>
       )}
 

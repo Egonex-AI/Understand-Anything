@@ -19,6 +19,7 @@ import MobileDrawer from "./MobileDrawer";
 const CodeViewer = lazy(() => import("./CodeViewer"));
 const LearnPanel = lazy(() => import("./LearnPanel"));
 const PathFinderModal = lazy(() => import("./PathFinderModal"));
+const AskAiDialog = lazy(() => import("./AskAiDialog"));
 const KeyboardShortcutsHelp = lazy(() => import("./KeyboardShortcutsHelp"));
 
 interface Props {
@@ -49,6 +50,7 @@ export default function MobileLayout({
   const codeViewerOpen = useDashboardStore((s) => s.codeViewerOpen);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
+  const aiDialogOpen = useDashboardStore((s) => s.aiDialog !== null);
   const togglePathFinder = useDashboardStore((s) => s.togglePathFinder);
   const { t } = useI18n();
 
@@ -233,6 +235,12 @@ export default function MobileLayout({
       {pathFinderOpen && (
         <Suspense fallback={null}>
           <PathFinderModal isOpen={pathFinderOpen} onClose={togglePathFinder} />
+        </Suspense>
+      )}
+
+      {aiDialogOpen && (
+        <Suspense fallback={null}>
+          <AskAiDialog accessToken={accessToken} />
         </Suspense>
       )}
     </div>
