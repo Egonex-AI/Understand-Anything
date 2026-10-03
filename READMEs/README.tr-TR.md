@@ -109,6 +109,7 @@ Alan görünümüne geçin ve kodunuzun gerçek iş süreçleriyle nasıl eşle�
 ```bash
 /plugin marketplace add Egonex-AI/Understand-Anything
 /plugin install understand-anything
+/reload-plugins
 ```
 
 > **Yerel model mi kullanıyorsunuz?** Gizlilik veya kurumsal kurulumlar için platformunuzu [Ollama](https://docs.ollama.com/integrations) gibi yerel bir model sağlayıcısına yönlendirin — model sağlayıcısını değiştirmek için entegrasyon kılavuzunu izleyin.
