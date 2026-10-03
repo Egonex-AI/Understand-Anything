@@ -570,6 +570,48 @@ describe("permissive validation", () => {
     expect(result.issues.some((i) => i.level === "dropped")).toBe(true);
   });
 
+  it("drops duplicate node IDs and keeps the first valid node", () => {
+    const graph = structuredClone(validGraph);
+    graph.nodes.push({
+      ...structuredClone(graph.nodes[0]),
+      name: "duplicate.ts",
+      summary: "Duplicate node that must not reach the dashboard",
+    });
+
+    const result = validateGraph(graph);
+
+    expect(result.success).toBe(true);
+    expect(result.data!.nodes).toHaveLength(1);
+    expect(result.data!.nodes[0].name).toBe("index.ts");
+    expect(result.issues).toContainEqual({
+      level: "dropped",
+      category: "duplicate-node-id",
+      message: 'nodes[1]: duplicate id "node-1" — removed',
+      path: "nodes[1].id",
+    });
+  });
+
+  it("keeps a later valid node when an earlier matching ID is invalid", () => {
+    const graph = structuredClone(validGraph);
+    (graph.nodes[0] as any).type = "invalid_type";
+    graph.nodes.push({
+      ...structuredClone(validGraph.nodes[0]),
+      name: "valid.ts",
+    });
+
+    const result = validateGraph(graph);
+
+    expect(result.success).toBe(true);
+    expect(result.data!.nodes).toHaveLength(1);
+    expect(result.data!.nodes[0].name).toBe("valid.ts");
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ level: "dropped", category: "invalid-node" })
+    );
+    expect(result.issues).not.toContainEqual(
+      expect.objectContaining({ category: "duplicate-node-id" })
+    );
+  });
+
   it("filters dangling nodeIds from layers", () => {
     const graph = structuredClone(validGraph);
     graph.layers[0].nodeIds.push("non-existent-node");
