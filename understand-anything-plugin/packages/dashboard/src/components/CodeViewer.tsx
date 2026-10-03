@@ -6,7 +6,14 @@ import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { useTheme } from "../themes/index.ts";
 import { ensurePrismLanguage, isPrismLanguageLoaded, languageForPath } from "../utils/prismLanguages";
-import { getCodeNavIndex, isIdentifierToken, resolveIdentifier } from "../utils/codeNav";
+import {
+  buildOutline,
+  buildRangeLanes,
+  getCodeNavIndex,
+  isIdentifierToken,
+  resolveIdentifier,
+} from "../utils/codeNav";
+import { normalizeNodePath } from "../utils/fileNodes";
 import { fmt } from "../locales";
 
 interface CodeViewerProps {
@@ -43,6 +50,32 @@ const MOD_KEY_LABEL = IS_MAC ? "⌘" : "Ctrl";
 /** Class set on the code scroller while Ctrl/⌘ is held, so identifier links look clickable. */
 const MOD_HELD_CLASS = "ua-mod-held";
 const IDENTIFIER_SPLIT_RE = /([A-Za-z_$][\w$]*)/;
+
+const OUTLINE_OPEN_KEY = "ua-code-outline-open";
+/** Width of one gutter range-bar lane, in px. */
+const LANE_WIDTH = 5;
+
+function readOutlineOpen(): boolean {
+  try {
+    const stored = window.localStorage.getItem(OUTLINE_OPEN_KEY);
+    if (stored !== null) return stored === "1";
+    return window.innerWidth >= 768;
+  } catch {
+    return true;
+  }
+}
+
+function writeOutlineOpen(open: boolean): void {
+  try {
+    window.localStorage.setItem(OUTLINE_OPEN_KEY, open ? "1" : "0");
+  } catch {
+    // Storage blocked — the choice just won't stick.
+  }
+}
+
+function nodeColor(type: string): string {
+  return `var(--color-node-${type}, var(--color-text-muted))`;
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -206,6 +239,51 @@ export default function CodeViewer({
     if (wasExpanded) store.expandCodeViewer();
   }, [nodesById]);
 
+  // Outline + gutter range bars: the graph's ranged nodes inside this file.
+  const outlineChildren = useMemo(
+    () => (navIndex && filePath ? navIndex.childrenByFile.get(normalizeNodePath(filePath)) ?? [] : []),
+    [navIndex, filePath],
+  );
+  const outline = useMemo(() => buildOutline(outlineChildren), [outlineChildren]);
+  const sourceLineCount = state.source?.lineCount ?? 0;
+  const rangeLanes = useMemo(
+    () => buildRangeLanes(outlineChildren, sourceLineCount),
+    [outlineChildren, sourceLineCount],
+  );
+  const [outlineOpen, setOutlineOpen] = useState(readOutlineOpen);
+  const toggleOutline = () => {
+    setOutlineOpen((open) => {
+      writeOutlineOpen(!open);
+      return !open;
+    });
+  };
+  const [flashLine, setFlashLine] = useState<number | null>(null);
+  useEffect(() => {
+    if (flashLine === null) return;
+    const timer = window.setTimeout(() => setFlashLine(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [flashLine]);
+
+  const scrollToLine = useCallback((line: number) => {
+    const container = scrollRef.current;
+    const lineEl = container?.querySelector<HTMLElement>(`[data-line="${line}"]`);
+    if (!container || !lineEl) return;
+    const offset =
+      lineEl.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+    container.scrollTop = Math.max(0, offset - container.clientHeight / 3);
+  }, []);
+
+  const jumpToNodeLine = (target: GraphNode) => {
+    if (!target.lineRange) return;
+    scrollToLine(target.lineRange[0]);
+    setFlashLine(target.lineRange[0]);
+  };
+
+  const rangeTitle = (target: GraphNode) =>
+    target.lineRange
+      ? fmt(t.codeNav.rangeTitle, { name: target.name, start: target.lineRange[0], end: target.lineRange[1] })
+      : target.name;
+
   const handleCodeClick = (event: React.MouseEvent<HTMLElement>) => {
     if (!(event.metaKey || event.ctrlKey)) return;
     const link = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-id]");
@@ -249,14 +327,9 @@ export default function CodeViewer({
   const isSourceRendered =
     state.status === "loaded" && !(language === "markdown" && mdView === "rendered");
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || focusLine === null || !isSourceRendered) return;
-    const lineEl = container.querySelector<HTMLElement>(`[data-line="${focusLine}"]`);
-    if (!lineEl) return;
-    const offset =
-      lineEl.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
-    container.scrollTop = Math.max(0, offset - container.clientHeight / 3);
-  }, [focusLine, isSourceRendered, state.source]);
+    if (focusLine === null || !isSourceRendered) return;
+    scrollToLine(focusLine);
+  }, [focusLine, isSourceRendered, state.source, scrollToLine]);
 
   if (!node) {
     return (
@@ -332,7 +405,38 @@ export default function CodeViewer({
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto bg-root">
+      <div className="flex-1 min-h-0 flex">
+      {outlineOpen && outline.length > 0 && isSourceRendered && (
+        <nav
+          className="w-44 shrink-0 overflow-auto border-r border-border-subtle bg-surface py-1"
+          aria-label={t.codeNav.outline}
+        >
+          <div className="px-2.5 pt-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-accent">
+            {t.codeNav.outline}
+          </div>
+          {outline.map(({ node: child, depth }) => {
+            const active = child.id === codeViewerNodeId;
+            return (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => jumpToNodeLine(child)}
+                className={`w-full flex items-center gap-1.5 py-1 pr-2 text-left text-[11px] transition-colors ${
+                  active ? "bg-accent/10 text-accent" : "text-text-secondary hover:text-text-primary hover:bg-elevated"
+                }`}
+                style={{ paddingLeft: 10 + depth * 10 }}
+                title={rangeTitle(child)}
+                aria-current={active ? "location" : undefined}
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: nodeColor(child.type) }} />
+                <span className="flex-1 truncate font-mono">{child.name}</span>
+                <span className="shrink-0 font-mono text-[10px] text-text-muted">{child.lineRange![0]}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+      <div ref={scrollRef} className="flex-1 min-w-0 overflow-auto bg-root">
         {state.status === "loading" && (
           <div className="p-5 text-sm text-text-muted">{t.codeViewer.loading}</div>
         )}
@@ -349,7 +453,29 @@ export default function CodeViewer({
         {source && (
           <>
             <div className="px-4 py-2 border-b border-border-subtle bg-surface text-[11px] text-text-muted flex items-center justify-between">
-              <span>{source.lineCount} {t.codeViewer.linesLabel}</span>
+              <div className="flex items-center gap-3">
+                <span>{source.lineCount} {t.codeViewer.linesLabel}</span>
+                {outline.length > 0 && !showRendered && (
+                  <button
+                    type="button"
+                    onClick={toggleOutline}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors ${
+                      outlineOpen
+                        ? "border-accent/40 bg-accent/10 text-accent"
+                        : "border-border-subtle text-text-muted hover:text-text-primary"
+                    }`}
+                    aria-pressed={outlineOpen}
+                    title={outlineOpen ? t.codeNav.hideOutline : t.codeNav.showOutline}
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M8 12h12M8 18h12" />
+                    </svg>
+                    <span className="text-[10px] uppercase tracking-wider">
+                      {t.codeNav.outline} · {outline.length}
+                    </span>
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 {isMarkdown && (
                   <div className="flex items-center rounded border border-border-subtle overflow-hidden" role="group">
@@ -401,8 +527,8 @@ export default function CodeViewer({
                         key={lineNumber}
                         {...lineProps}
                         data-line={lineNumber}
-                        className={`${lineProps.className} flex ${
-                          isTarget
+                        className={`${lineProps.className} flex transition-colors ${
+                          isTarget || lineNumber === flashLine
                             ? "bg-accent/30"
                             : isHighlighted
                             ? "bg-accent/15"
@@ -412,6 +538,38 @@ export default function CodeViewer({
                         <span className="w-12 shrink-0 select-none border-r border-border-subtle pr-3 text-right text-text-muted bg-surface/60">
                           {lineNumber}
                         </span>
+                        {rangeLanes.laneCount > 0 && (
+                          <span
+                            className="relative shrink-0 select-none bg-surface/60"
+                            style={{ width: rangeLanes.laneCount * LANE_WIDTH + 4 }}
+                          >
+                            {rangeLanes.lanes[index]?.map((owner, lane) => {
+                              if (!owner) return null;
+                              const [start, end] = owner.lineRange!;
+                              const selected = owner.id === codeViewerNodeId;
+                              return (
+                                <span
+                                  key={lane}
+                                  className="absolute inset-y-0 cursor-pointer"
+                                  style={{ left: 2 + lane * LANE_WIDTH, width: LANE_WIDTH }}
+                                  title={rangeTitle(owner)}
+                                  onClick={() => jumpToNodeLine(owner)}
+                                >
+                                  <span
+                                    className={`absolute left-px right-px ${
+                                      lineNumber === start ? "top-1 rounded-t-full" : "top-0"
+                                    } ${lineNumber === end ? "bottom-1 rounded-b-full" : "bottom-0"}`}
+                                    style={{
+                                      backgroundColor: selected
+                                        ? "var(--color-accent)"
+                                        : `color-mix(in srgb, ${nodeColor(owner.type)} 55%, transparent)`,
+                                    }}
+                                  />
+                                </span>
+                              );
+                            })}
+                          </span>
+                        )}
                         <span className="pl-3 pr-6 whitespace-pre">
                           {line.map((token, key) => {
                             const tokenProps = getTokenProps({ token });
@@ -452,6 +610,7 @@ export default function CodeViewer({
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   );
