@@ -412,6 +412,24 @@ export const zhTW = {
     saved: "已儲存",
     backToChat: "返回對話",
   },
+  codeNav: {
+    goTo: "{mod}+點擊：跳至 {name}",
+    outline: "大綱",
+    showOutline: "顯示大綱",
+    hideOutline: "隱藏大綱",
+    rangeTitle: "{name} · 第 {start}–{end} 行",
+    addLineNote: "為第 {line} 行新增筆記",
+    editLineNote: "編輯第 {line} 行的筆記",
+    lineNotePlaceholder: "第 {line} 行的筆記…",
+    lineNoteHint: "{mod}+Enter 儲存 · Esc 取消",
+    save: "儲存",
+    cancel: "取消",
+    deleteNote: "刪除",
+    read: "已讀",
+    readingProgress: "閱讀進度",
+    filesRead: "已讀 {read} / {total} 個檔案",
+    resetReadingProgress: "重設閱讀進度",
+  },
 };
 
 export default zhTW;

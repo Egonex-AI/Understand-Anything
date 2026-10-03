@@ -412,6 +412,24 @@ export const zh = {
     saved: "已保存",
     backToChat: "返回对话",
   },
+  codeNav: {
+    goTo: "{mod}+点击：跳转到 {name}",
+    outline: "大纲",
+    showOutline: "显示大纲",
+    hideOutline: "隐藏大纲",
+    rangeTitle: "{name} · 第 {start}–{end} 行",
+    addLineNote: "为第 {line} 行添加笔记",
+    editLineNote: "编辑第 {line} 行的笔记",
+    lineNotePlaceholder: "第 {line} 行的笔记…",
+    lineNoteHint: "{mod}+Enter 保存 · Esc 取消",
+    save: "保存",
+    cancel: "取消",
+    deleteNote: "删除",
+    read: "已读",
+    readingProgress: "阅读进度",
+    filesRead: "已读 {read} / {total} 个文件",
+    resetReadingProgress: "重置阅读进度",
+  },
 };
 
 export default zh;

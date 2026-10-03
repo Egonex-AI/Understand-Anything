@@ -412,6 +412,24 @@ export const ru = {
     saved: "Сохранено",
     backToChat: "Назад к диалогу",
   },
+  codeNav: {
+    goTo: "{mod}+клик: перейти к {name}",
+    outline: "Структура",
+    showOutline: "Показать структуру",
+    hideOutline: "Скрыть структуру",
+    rangeTitle: "{name} · строки {start}–{end}",
+    addLineNote: "Добавить заметку к строке {line}",
+    editLineNote: "Изменить заметку к строке {line}",
+    lineNotePlaceholder: "Заметка к строке {line}…",
+    lineNoteHint: "{mod}+Enter — сохранить · Esc — отмена",
+    save: "Сохранить",
+    cancel: "Отмена",
+    deleteNote: "Удалить",
+    read: "Прочитано",
+    readingProgress: "Прогресс чтения",
+    filesRead: "Прочитано файлов: {read} из {total}",
+    resetReadingProgress: "Сбросить прогресс чтения",
+  },
 };
 
 export default ru;

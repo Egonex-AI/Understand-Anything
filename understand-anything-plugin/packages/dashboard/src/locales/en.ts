@@ -412,6 +412,24 @@ export const en = {
     saved: "Saved",
     backToChat: "Back to chat",
   },
+  codeNav: {
+    goTo: "{mod}+click: go to {name}",
+    outline: "Outline",
+    showOutline: "Show outline",
+    hideOutline: "Hide outline",
+    rangeTitle: "{name} · lines {start}–{end}",
+    addLineNote: "Add a note to line {line}",
+    editLineNote: "Edit the note on line {line}",
+    lineNotePlaceholder: "Note for line {line}…",
+    lineNoteHint: "{mod}+Enter to save · Esc to cancel",
+    save: "Save",
+    cancel: "Cancel",
+    deleteNote: "Delete",
+    read: "Read",
+    readingProgress: "Reading progress",
+    filesRead: "{read} / {total} files read",
+    resetReadingProgress: "Reset reading progress",
+  },
 };
 
 export default en;

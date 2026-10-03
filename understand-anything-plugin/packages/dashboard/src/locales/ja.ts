@@ -412,6 +412,24 @@ export const ja = {
     saved: "保存しました",
     backToChat: "会話に戻る",
   },
+  codeNav: {
+    goTo: "{mod}+クリック：{name} へ移動",
+    outline: "アウトライン",
+    showOutline: "アウトラインを表示",
+    hideOutline: "アウトラインを隠す",
+    rangeTitle: "{name} · {start}–{end} 行",
+    addLineNote: "{line} 行目にメモを追加",
+    editLineNote: "{line} 行目のメモを編集",
+    lineNotePlaceholder: "{line} 行目のメモ…",
+    lineNoteHint: "{mod}+Enter で保存 · Esc でキャンセル",
+    save: "保存",
+    cancel: "キャンセル",
+    deleteNote: "削除",
+    read: "既読",
+    readingProgress: "読了状況",
+    filesRead: "{total} ファイル中 {read} 件を既読",
+    resetReadingProgress: "読了状況をリセット",
+  },
 };
 
 export default ja;

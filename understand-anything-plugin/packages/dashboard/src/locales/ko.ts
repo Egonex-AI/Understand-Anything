@@ -412,6 +412,24 @@ edgeLabels: {
     saved: "저장됨",
     backToChat: "대화로 돌아가기",
   },
+  codeNav: {
+    goTo: "{mod}+클릭: {name}(으)로 이동",
+    outline: "개요",
+    showOutline: "개요 표시",
+    hideOutline: "개요 숨기기",
+    rangeTitle: "{name} · {start}–{end}행",
+    addLineNote: "{line}행에 메모 추가",
+    editLineNote: "{line}행 메모 편집",
+    lineNotePlaceholder: "{line}행 메모…",
+    lineNoteHint: "{mod}+Enter 저장 · Esc 취소",
+    save: "저장",
+    cancel: "취소",
+    deleteNote: "삭제",
+    read: "읽음",
+    readingProgress: "읽기 진행률",
+    filesRead: "{total}개 중 {read}개 파일 읽음",
+    resetReadingProgress: "읽기 진행률 초기화",
+  },
 };
 
 export default ko;
