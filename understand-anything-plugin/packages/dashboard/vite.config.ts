@@ -17,6 +17,7 @@ import {
   searchProjectContent,
 } from "../core/src/content-search";
 import { handleAnnotationsRequest } from "../core/src/annotations";
+import { handleAiRequest } from "./server/ai";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -321,7 +322,7 @@ type DashboardViteConfig = UserConfig & {
 const config: DashboardViteConfig = {
   test: {
     environment: "node",
-    include: ["src/**/__tests__/**/*.test.ts"],
+    include: ["src/**/__tests__/**/*.test.ts", "server/**/__tests__/**/*.test.ts"],
   },
 
   // FIX 1 — bind only to localhost, not 0.0.0.0
@@ -399,7 +400,8 @@ const config: DashboardViteConfig = {
             pathname === "/config.json" ||
             pathname === "/file-content.json" ||
             pathname === "/search-content.json" ||
-            pathname === "/annotations.json";
+            pathname === "/annotations.json" ||
+            pathname.startsWith("/ai/");
 
           if (!isProtectedEndpoint) {
             next();
@@ -422,6 +424,13 @@ const config: DashboardViteConfig = {
           if (pathname === "/search-content.json") {
             const result = searchContent(url);
             sendJson(res, result.statusCode, result.payload);
+            return;
+          }
+
+          if (pathname.startsWith("/ai/")) {
+            void handleAiRequest(req, res, pathname).then((handled) => {
+              if (!handled) sendJson(res, 404, { error: "Not found" });
+            });
             return;
           }
 

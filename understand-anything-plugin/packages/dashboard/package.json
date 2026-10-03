@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@dagrejs/dagre": "^2.0.4",
     "@understand-anything/core": "workspace:*",
     "@xyflow/react": "^12.0.0",
