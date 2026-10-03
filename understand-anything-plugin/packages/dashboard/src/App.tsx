@@ -23,6 +23,7 @@ import MobileLayout from "./components/MobileLayout";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { useUrlStateSync } from "./hooks/useUrlStateSync";
+import { usePaletteCommands } from "./hooks/usePaletteCommands";
 import type { KeyboardShortcut } from "./hooks/useKeyboardShortcuts";
 import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
@@ -43,6 +44,7 @@ const KeyboardShortcutsHelp = lazy(
   () => import("./components/KeyboardShortcutsHelp"),
 );
 const OnboardingOverlay = lazy(() => import("./components/OnboardingOverlay"));
+const CommandPalette = lazy(() => import("./components/CommandPalette"));
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const SESSION_TOKEN_KEY = "understand-anything-token";
@@ -320,6 +322,21 @@ function DashboardContent({
   const showFunctionsInClassView = useDashboardStore((s) => s.showFunctionsInClassView);
   const toggleShowFunctionsInClassView = useDashboardStore((s) => s.toggleShowFunctionsInClassView);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const openShortcutsHelp = useCallback(() => setShowKeyboardHelp(true), []);
+  const paletteCommands = usePaletteCommands({ openShortcutsHelp });
+
+  // Ctrl/⌘+K opens the command palette — from anywhere, including text fields.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("info");
   const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding);
   const dismissOnboarding = useCallback((remember: boolean) => {
@@ -353,6 +370,15 @@ function DashboardContent({
         shiftKey: true,
         description: t.keyboardShortcuts.showHelp,
         action: () => setShowKeyboardHelp((prev) => !prev),
+        category: "General",
+      },
+      {
+        key: "k",
+        ctrlKey: true,
+        description: t.palette.open,
+        // Handled by the dedicated listener above (it must also work inside
+        // text fields); listed here so the help overlay shows it.
+        action: () => {},
         category: "General",
       },
       // Navigation
@@ -762,6 +788,12 @@ function DashboardContent({
             </Suspense>
           </div>
         </div>
+      )}
+
+      {paletteOpen && (
+        <Suspense fallback={null}>
+          <CommandPalette onClose={() => setPaletteOpen(false)} commands={paletteCommands} />
+        </Suspense>
       )}
 
       {/* Keyboard shortcuts help modal */}
