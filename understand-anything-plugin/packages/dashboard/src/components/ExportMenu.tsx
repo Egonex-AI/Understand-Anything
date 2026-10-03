@@ -3,6 +3,8 @@ import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import type { KnowledgeGraph } from "@understand-anything/core/types";
 import { filterNodes, filterEdges } from "../utils/filters";
+import { useAnnotationsStore } from "../annotationsStore";
+import { exportNotesMarkdown, exportNotesVault } from "../notesExportActions";
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -27,6 +29,7 @@ export default function ExportMenu() {
   const toggleExportMenu = useDashboardStore((s) => s.toggleExportMenu);
   const reactFlowInstance = useDashboardStore((s) => s.reactFlowInstance);
   const persona = useDashboardStore((s) => s.persona);
+  const hasNotes = useAnnotationsStore((s) => Object.keys(s.annotations).length > 0);
   const { t } = useI18n();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -239,7 +242,7 @@ export default function ExportMenu() {
       </button>
 
       {exportMenuOpen && (
-        <div className="absolute right-0 top-full mt-2 w-52 glass rounded-lg shadow-xl overflow-hidden animate-fade-slide-in z-50">
+        <div className="absolute right-0 top-full mt-2 w-64 glass rounded-lg shadow-xl overflow-hidden animate-fade-slide-in z-50">
           <div className="p-2">
             <button
               onClick={exportPNG}
@@ -270,6 +273,31 @@ export default function ExportMenu() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
               <span>{t.export.asJSON}</span>
+            </button>
+            <div className="my-1 border-t border-border-subtle" />
+            <button
+              onClick={() => { if (exportNotesMarkdown(t)) toggleExportMenu(); }}
+              disabled={!graph || !hasNotes}
+              title={hasNotes ? undefined : t.notesTools.noNotesToExport}
+              data-testid="export-notes-md"
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-primary hover:bg-elevated transition-colors rounded-lg text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>{t.notesTools.exportMarkdown}</span>
+            </button>
+            <button
+              onClick={() => { if (exportNotesVault(t)) toggleExportMenu(); }}
+              disabled={!graph || !hasNotes}
+              title={hasNotes ? undefined : t.notesTools.noNotesToExport}
+              data-testid="export-notes-vault"
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm text-text-primary hover:bg-elevated transition-colors rounded-lg text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+              <span>{t.notesTools.exportObsidian}</span>
             </button>
           </div>
         </div>

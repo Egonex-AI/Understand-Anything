@@ -6,6 +6,7 @@ import type { PaletteCommand } from "../components/CommandPalette";
 import { useAnnotationsStore } from "../annotationsStore";
 import { myTourLabels, playMyTourFor, useMyTourStore } from "../myTourStore";
 import { collectTags } from "../utils/annotatedNodes";
+import { exportNotesMarkdown, exportNotesVault } from "../notesExportActions";
 import { fmt } from "../locales";
 
 /** Commands offered by the Ctrl/⌘+K palette. Features register more here. */
@@ -95,6 +96,10 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
           run: () => void playMyTourFor(tag, myTourLabels(t)),
         });
       }
+      cmds.push(
+        { id: "export-notes-md", label: nt.exportMarkdownCmd, keywords: "notes annotations markdown md download", run: () => void exportNotesMarkdown(t) },
+        { id: "export-notes-vault", label: nt.exportObsidianCmd, keywords: "notes annotations obsidian vault zip wikilinks download", run: () => void exportNotesVault(t) },
+      );
     }
     if (tourActive) cmds.push({ id: "exit-tour", label: nt.exitTour, keywords: "stop tour", run: () => st().stopTour() });
     return cmds;
