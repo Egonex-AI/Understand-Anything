@@ -3,6 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import type { NodeType } from "@understand-anything/core/types";
 import { useI18n } from "../contexts/I18nContext";
+import { useAnnotationsStore } from "../annotationsStore";
 
 // Color maps keyed by NodeType — must be kept in sync with core NodeType union.
 const typeColors: Record<NodeType, string> = {
@@ -102,6 +103,7 @@ function CustomNodeComponent({
   const textColor = typeTextColors[knownType] ?? typeTextColors.file;
   const complexityColor = complexityColors[data.complexity] ?? complexityColors.simple;
   const { t } = useI18n();
+  const isAnnotated = useAnnotationsStore((s) => id in s.annotations);
 
   if (import.meta.env.DEV && !(knownType in typeColors)) {
     console.warn(`[CustomNode] Unknown node type "${data.nodeType}" — using "file" colors`);
@@ -176,6 +178,19 @@ function CustomNodeComponent({
                 aria-label={t.customNode.tested}
                 title={t.customNode.hasTests}
               />
+            )}
+            {isAnnotated && (
+              <svg
+                className="w-2.5 h-2.5 text-accent"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                role="img"
+                aria-label={t.annotations.annotated}
+              >
+                <title>{t.annotations.annotated}</title>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.2 5.2l3.6 3.6M4 20l4.2-1 10.6-10.6a2.5 2.5 0 00-3.6-3.6L4.6 15.4 4 20z" />
+              </svg>
             )}
           </div>
         </div>
