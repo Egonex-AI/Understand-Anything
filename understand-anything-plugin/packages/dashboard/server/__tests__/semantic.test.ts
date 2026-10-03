@@ -49,7 +49,8 @@ describe("semantic search", () => {
     expect(embedded).toBe(3);
     expect(indexed).toBe(3);
     expect(hits[0].nodeId).toBe("b");
-    expect(hits[0].similarity).toBeGreaterThan(hits[1].similarity);
+    // Unrelated nodes fall below the cutoff relative to the best hit.
+    expect(hits.map((h) => h.nodeId)).toEqual(["b"]);
   });
 
   it("only re-embeds new or changed nodes and drops removed ones", async () => {

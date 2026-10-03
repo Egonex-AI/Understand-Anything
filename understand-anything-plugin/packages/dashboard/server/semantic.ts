@@ -14,6 +14,7 @@ export const EMBEDDINGS_FILE = "embeddings.json";
 const MAX_QUERY_CHARS = 1000;
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
+const RELATIVE_CUTOFF = 0.75;
 
 interface EmbeddableNode {
   id: string;
@@ -163,7 +164,11 @@ export async function semanticSearch(
     hits.push({ nodeId, similarity: cosine(queryVector, qNorm, decodeVector(entry.v)) });
   }
   hits.sort((a, b) => b.similarity - a.similarity);
-  return { hits: hits.slice(0, options.limit ?? DEFAULT_LIMIT), embedded, indexed: hits.length };
+  // Similarity scales differ per model, so cut relative to the best hit
+  // instead of returning `limit` rows however unrelated they are.
+  const floor = (hits[0]?.similarity ?? 0) * RELATIVE_CUTOFF;
+  const relevant = hits.filter((h) => h.similarity > 0 && h.similarity >= floor);
+  return { hits: relevant.slice(0, options.limit ?? DEFAULT_LIMIT), embedded, indexed: hits.length };
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
