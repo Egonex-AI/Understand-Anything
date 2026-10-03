@@ -3,6 +3,7 @@ import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { fmt } from "../locales";
 import { graphFilePaths, useReadingProgress } from "../readingProgress";
+import MyTourButton from "./MyTourButton";
 
 export default function ProjectOverview() {
   const graph = useDashboardStore((s) => s.graph);
@@ -244,6 +245,7 @@ export default function ProjectOverview() {
           {t.common.startGuidedTour}
         </button>
       )}
+      <MyTourButton className={hasTour ? "mt-2" : ""} />
     </div>
   );
 }

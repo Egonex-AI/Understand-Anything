@@ -4,6 +4,11 @@ import { useI18n } from "../contexts/I18nContext";
 import { useTheme, PRESETS } from "../themes/index.ts";
 import type { PaletteCommand } from "../components/CommandPalette";
 import { useReadingProgress } from "../readingProgress";
+import { useAnnotationsStore } from "../annotationsStore";
+import { myTourLabels, playMyTourFor, useMyTourStore } from "../myTourStore";
+import { collectTags } from "../utils/annotatedNodes";
+import { exportNotesMarkdown, exportNotesVault } from "../notesExportActions";
+import { fmt } from "../locales";
 
 /** Commands offered by the Ctrl/⌘+K palette. Features register more here. */
 export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: () => void }): PaletteCommand[] {
@@ -13,6 +18,10 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
   const hasDomainGraph = useDashboardStore((s) => s.domainGraph !== null);
   const isKnowledgeGraph = useDashboardStore((s) => s.isKnowledgeGraph);
   const codeViewerOpen = useDashboardStore((s) => s.codeViewerOpen);
+  const tourActive = useDashboardStore((s) => s.tourActive);
+  const hasAnnotations = useAnnotationsStore((s) => Object.keys(s.annotations).length > 0);
+  // Joined so the selector result compares by value and commands only rebuild when tags change.
+  const annotationTags = useAnnotationsStore((s) => collectTags(s.annotations).join("\n"));
 
   return useMemo(() => {
     const st = () => useDashboardStore.getState();
@@ -78,6 +87,28 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
       });
     }
     if (codeViewerOpen) cmds.push({ id: "close-code", label: p.closeCode, run: () => st().closeCodeViewer() });
+    const nt = t.notesTools;
+    if (hasAnnotations) {
+      cmds.push({
+        id: "my-tour",
+        label: nt.buildMyTour,
+        keywords: "tour notes annotations tags personal walkthrough",
+        run: () => useMyTourStore.getState().openBuilder(null),
+      });
+      for (const tag of annotationTags ? annotationTags.split("\n") : []) {
+        cmds.push({
+          id: `my-tour-tag-${tag}`,
+          label: fmt(nt.playMyTourTag, { tag }),
+          keywords: "tour notes annotations tag",
+          run: () => void playMyTourFor(tag, myTourLabels(t)),
+        });
+      }
+      cmds.push(
+        { id: "export-notes-md", label: nt.exportMarkdownCmd, keywords: "notes annotations markdown md download", run: () => void exportNotesMarkdown(t) },
+        { id: "export-notes-vault", label: nt.exportObsidianCmd, keywords: "notes annotations obsidian vault zip wikilinks download", run: () => void exportNotesVault(t) },
+      );
+    }
+    if (tourActive) cmds.push({ id: "exit-tour", label: nt.exitTour, keywords: "stop tour", run: () => st().stopTour() });
     return cmds;
-  }, [t, setPreset, selectedNodeId, hasDomainGraph, isKnowledgeGraph, codeViewerOpen, openShortcutsHelp]);
+  }, [t, setPreset, selectedNodeId, hasDomainGraph, isKnowledgeGraph, codeViewerOpen, openShortcutsHelp, tourActive, hasAnnotations, annotationTags]);
 }

@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import MyTourButton from "./MyTourButton";
 
 export default function LearnPanel() {
   const graph = useDashboardStore((s) => s.graph);
   const tourActive = useDashboardStore((s) => s.tourActive);
+  const customTour = useDashboardStore((s) => s.customTour);
   const currentTourStep = useDashboardStore((s) => s.currentTourStep);
   const startTour = useDashboardStore((s) => s.startTour);
   const stopTour = useDashboardStore((s) => s.stopTour);
@@ -15,9 +17,10 @@ export default function LearnPanel() {
   const selectNode = useDashboardStore((s) => s.selectNode);
   const { t } = useI18n();
 
+  // A user-built tour ("My tour" from notes) replaces the graph's tour while it plays.
   const tourSteps = useMemo(
-    () => graph?.tour ? [...graph.tour].sort((a, b) => a.order - b.order) : [],
-    [graph?.tour]
+    () => customTour ?? (graph?.tour ? [...graph.tour].sort((a, b) => a.order - b.order) : []),
+    [customTour, graph?.tour]
   );
   const hasTour = tourSteps.length > 0;
 
@@ -31,6 +34,7 @@ export default function LearnPanel() {
           <p className="text-text-muted text-xs mt-1">
             {t.learnPanel.noTourHint}
           </p>
+          <MyTourButton className="mt-4" />
         </div>
       </div>
     );
@@ -53,6 +57,7 @@ export default function LearnPanel() {
         >
           {t.learnPanel.startTour}
         </button>
+        <MyTourButton className="-mt-2 mb-4" />
 
         <div className="space-y-2">
           <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
@@ -89,7 +94,7 @@ export default function LearnPanel() {
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider">
-            {t.learnPanel.tour}
+            {customTour ? t.notesTools.myTour : t.learnPanel.tour}
           </h3>
           <span className="text-xs text-text-muted">
             {currentTourStep + 1} / {totalSteps}
