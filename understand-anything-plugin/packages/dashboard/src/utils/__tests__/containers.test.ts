@@ -107,10 +107,36 @@ describe("deriveContainers — community fallback", () => {
       }
     }
     const { containers } = deriveContainers(nodes, edges);
+    // A single folder covering the whole set is now kept as ONE folder
+    // container (named after the folder) instead of being split into
+    // anonymous Louvain communities.
+    expect(containers.length).toBe(1);
+    expect(containers[0].strategy).toBe("folder");
+    expect(containers[0].name).toBe("services");
+  });
+
+  it("names community clusters by member files when no folder signal exists", () => {
+    // Flat paths (no directories) force the community fallback.
+    const nodes = Array.from({ length: 10 }, (_, i) =>
+      node(`n${i}`, `n${i}.go`),
+    );
+    const edges: GraphEdge[] = [];
+    for (const i of [0, 1, 2, 3, 4]) {
+      for (const j of [0, 1, 2, 3, 4]) {
+        if (i !== j) edges.push({ source: `n${i}`, target: `n${j}`, type: "calls" } as GraphEdge);
+      }
+    }
+    for (const i of [5, 6, 7, 8, 9]) {
+      for (const j of [5, 6, 7, 8, 9]) {
+        if (i !== j) edges.push({ source: `n${i}`, target: `n${j}`, type: "calls" } as GraphEdge);
+      }
+    }
+    const { containers } = deriveContainers(nodes, edges);
     expect(containers.length).toBeGreaterThanOrEqual(2);
     for (const c of containers) {
       expect(c.strategy).toBe("community");
-      expect(c.name).toMatch(/^Cluster [A-Z]$/);
+      // Member-derived label, e.g. "n0 · n1 · n2 +2" — not "Cluster A".
+      expect(c.name).toMatch(/·|\+/);
     }
   });
 
