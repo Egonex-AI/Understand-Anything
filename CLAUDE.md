@@ -27,7 +27,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - Sidebar tabs: `Info` (ProjectOverview default → NodeInfo when node selected → LearnPanel in Learn persona, composing) and `Files` (FileExplorer tree built from the structural graph)
 - Code viewer: prism-react-renderer source viewer that slides up from the bottom on file node click; an expand button promotes it into a full-screen modal. Source content is fetched from the dev server's `/file-content.json` endpoint, gated by access token + a graph-derived path allowlist
 - Schema validation on graph load with error banner
-- Search modes: `Fuzzy`/`Semantic` (node names/tags/summaries + user annotations) and `Code` — full-text search over the graph's files via the dev server's `/search-content.json` (core `content-search.ts`; same graph-derived allowlist as `/file-content.json`)
+- Search modes: `Fuzzy`/`Semantic` (node names/tags/summaries + user annotations; `Semantic` upgrades to embedding search via `/ai/semantic-search` — `server/semantic.ts`, vectors cached in the data directory's `embeddings.json` — when an embedding model is configured) and `Code` — full-text search over the graph's files via the dev server's `/search-content.json` (core `content-search.ts`; same graph-derived allowlist as `/file-content.json`)
 - User annotations (personal tags + notes per node) persist to the data directory's `annotations.json` via `/annotations.json` (core `annotations.ts`), separate from `knowledge-graph.json` so `/understand` never overwrites them; the read-only viewer and demo build fall back to localStorage
 - Code viewer grammars beyond prism-react-renderer's bundled set load on demand from `prismjs/components` (`utils/prismLanguages.ts`)
 
