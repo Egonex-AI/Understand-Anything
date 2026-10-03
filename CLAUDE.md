@@ -1,5 +1,7 @@
 # Understand Anything
 
+Agent rules (commit hygiene, etc.): @AGENTS.md
+
 ## Project Overview
 An open-source tool combining LLM intelligence + static analysis to produce interactive dashboards for understanding codebases.
 
