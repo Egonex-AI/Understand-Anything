@@ -12,6 +12,14 @@ const NAVIGABLE_TYPES = new Set<GraphNode["type"]>(["function", "class", "module
 
 const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*$/;
 
+const IS_MAC =
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad/.test(
+    (navigator as Navigator & { userAgentData?: { platform: string } }).userAgentData?.platform ?? navigator.platform,
+  );
+/** How the Ctrl/⌘ modifier is spelled in hints on this platform. */
+export const MOD_KEY_LABEL = IS_MAC ? "⌘" : "Ctrl";
+
 export interface CodeNavIndex {
   /** identifier → candidate nodes (functions/classes by name, files by base name) */
   byName: Map<string, GraphNode[]>;

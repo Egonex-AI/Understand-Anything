@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import type { GraphNode } from "@understand-anything/core/types";
 import MarkdownContent from "./MarkdownContent";
@@ -11,9 +11,12 @@ import {
   buildRangeLanes,
   getCodeNavIndex,
   isIdentifierToken,
+  MOD_KEY_LABEL,
   resolveIdentifier,
 } from "../utils/codeNav";
-import { normalizeNodePath } from "../utils/fileNodes";
+import { buildFileNodeIndex, fileNodeForPath, normalizeNodePath } from "../utils/fileNodes";
+import { useAnnotationsStore } from "../annotationsStore";
+import { LineNoteEditor, LineNoteView } from "./LineNote";
 import { fmt } from "../locales";
 
 interface CodeViewerProps {
@@ -41,12 +44,6 @@ function fileContentUrl(filePath: string, token: string): string {
   return `/file-content.json?${params.toString()}`;
 }
 
-const IS_MAC =
-  typeof navigator !== "undefined" &&
-  /Mac|iPhone|iPad/.test(
-    (navigator as Navigator & { userAgentData?: { platform: string } }).userAgentData?.platform ?? navigator.platform,
-  );
-const MOD_KEY_LABEL = IS_MAC ? "⌘" : "Ctrl";
 /** Class set on the code scroller while Ctrl/⌘ is held, so identifier links look clickable. */
 const MOD_HELD_CLASS = "ua-mod-held";
 const IDENTIFIER_SPLIT_RE = /([A-Za-z_$][\w$]*)/;
@@ -284,6 +281,18 @@ export default function CodeViewer({
       ? fmt(t.codeNav.rangeTitle, { name: target.name, start: target.lineRange[0], end: target.lineRange[1] })
       : target.name;
 
+  // Line notes belong to the file's node, whichever of its nodes is open.
+  const fileIndex = useMemo(() => (graph ? buildFileNodeIndex(graph.nodes) : null), [graph]);
+  const noteNodeId = filePath && fileIndex ? fileNodeForPath(fileIndex, filePath)?.id ?? node?.id : node?.id;
+  const lineNotes = useAnnotationsStore((s) => (noteNodeId ? s.annotations[noteNodeId]?.lines : undefined));
+  const setLineNote = useAnnotationsStore((s) => s.setLineNote);
+  const [editingLine, setEditingLine] = useState<number | null>(null);
+  useEffect(() => setEditingLine(null), [filePath]);
+  const saveLineNote = (line: number, note: string) => {
+    if (noteNodeId) setLineNote(noteNodeId, line, note);
+    setEditingLine(null);
+  };
+
   const handleCodeClick = (event: React.MouseEvent<HTMLElement>) => {
     if (!(event.metaKey || event.ctrlKey)) return;
     const link = (event.target as HTMLElement).closest<HTMLElement>("[data-nav-id]");
@@ -346,6 +355,7 @@ export default function CodeViewer({
     ? `${t.codeViewer.lines} ${highlightedRange.start}-${highlightedRange.end}`
     : t.codeViewer.fullFile;
   const isModal = presentation === "modal";
+  const gutterWidth = 48 + (rangeLanes.laneCount > 0 ? rangeLanes.laneCount * LANE_WIDTH + 4 : 0);
   const handleClose = onClose ?? closeCodeViewer;
 
   return (
@@ -522,9 +532,10 @@ export default function CodeViewer({
                       lineNumber >= highlightedRange.start &&
                       lineNumber <= highlightedRange.end;
                     const lineProps = getLineProps({ line });
+                    const lineNote = lineNotes?.[String(lineNumber)];
                     return (
+                      <Fragment key={lineNumber}>
                       <div
-                        key={lineNumber}
                         {...lineProps}
                         data-line={lineNumber}
                         className={`${lineProps.className} flex transition-colors ${
@@ -535,8 +546,20 @@ export default function CodeViewer({
                             : "hover:bg-elevated/40"
                         }`}
                       >
-                        <span className="w-12 shrink-0 select-none border-r border-border-subtle pr-3 text-right text-text-muted bg-surface/60">
-                          {lineNumber}
+                        <span className="w-12 shrink-0 select-none border-r border-border-subtle text-right text-text-muted bg-surface/60">
+                          <button
+                            type="button"
+                            onClick={() => setEditingLine(lineNumber)}
+                            className={`relative w-full pr-3 text-right hover:text-accent transition-colors ${
+                              lineNote ? "text-accent" : ""
+                            }`}
+                            title={fmt(lineNote ? t.codeNav.editLineNote : t.codeNav.addLineNote, { line: lineNumber })}
+                          >
+                            {lineNote && (
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent" />
+                            )}
+                            {lineNumber}
+                          </button>
                         </span>
                         {rangeLanes.laneCount > 0 && (
                           <span
@@ -602,6 +625,25 @@ export default function CodeViewer({
                           })}
                         </span>
                       </div>
+                      {editingLine === lineNumber ? (
+                        <LineNoteEditor
+                          line={lineNumber}
+                          initial={lineNote ?? ""}
+                          gutterWidth={gutterWidth}
+                          onSave={(note) => saveLineNote(lineNumber, note)}
+                          onCancel={() => setEditingLine(null)}
+                        />
+                      ) : (
+                        lineNote && (
+                          <LineNoteView
+                            line={lineNumber}
+                            note={lineNote}
+                            gutterWidth={gutterWidth}
+                            onEdit={() => setEditingLine(lineNumber)}
+                          />
+                        )
+                      )}
+                      </Fragment>
                     );
                   })}
                 </pre>
