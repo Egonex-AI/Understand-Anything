@@ -18,6 +18,7 @@ import {
 } from "../core/src/content-search";
 import { handleAnnotationsRequest } from "../core/src/annotations";
 import { handleAiRequest } from "./server/ai";
+import { handleSemanticSearchRequest } from "./server/semantic";
 
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
@@ -424,6 +425,11 @@ const config: DashboardViteConfig = {
           if (pathname === "/search-content.json") {
             const result = searchContent(url);
             sendJson(res, result.statusCode, result.payload);
+            return;
+          }
+
+          if (pathname === "/ai/semantic-search") {
+            void handleSemanticSearchRequest(req, res, url, findGraphFile("knowledge-graph.json"));
             return;
           }
 
