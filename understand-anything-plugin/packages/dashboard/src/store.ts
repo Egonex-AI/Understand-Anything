@@ -155,6 +155,8 @@ interface DashboardStore {
   tourActive: boolean;
   currentTourStep: number;
   tourHighlightedNodeIds: string[];
+  /** Steps of a user-built tour (e.g. "My tour" from notes); null = the graph's own tour. */
+  customTour: TourStep[] | null;
 
   persona: Persona;
 
@@ -219,6 +221,8 @@ interface DashboardStore {
   hasActiveFilters: () => boolean;
 
   startTour: () => void;
+  /** Play `steps` with the regular tour machinery instead of graph.tour. */
+  startCustomTour: (steps: TourStep[]) => void;
   stopTour: () => void;
   setTourStep: (step: number) => void;
   nextTourStep: () => void;
@@ -275,8 +279,8 @@ interface DashboardStore {
   clearLayoutIssues: () => void;
 }
 
-function getSortedTour(graph: KnowledgeGraph): TourStep[] {
-  const tour = graph.tour ?? [];
+function getSortedTour(graph: KnowledgeGraph | null, customTour: TourStep[] | null = null): TourStep[] {
+  const tour = customTour ?? graph?.tour ?? [];
   return [...tour].sort((a, b) => a.order - b.order);
 }
 
@@ -344,6 +348,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   tourActive: false,
   currentTourStep: 0,
   tourHighlightedNodeIds: [],
+  customTour: null,
 
   persona: "junior",
 
@@ -698,6 +703,23 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[0].nodeIds);
     set({
       tourActive: true,
+      customTour: null,
+      currentTourStep: 0,
+      tourHighlightedNodeIds: sorted[0].nodeIds,
+      selectedNodeId: null,
+      ...layerNav,
+      ...layerResetIfChanged(layerNav, activeLayerId),
+    });
+  },
+
+  startCustomTour: (steps) => {
+    const { nodeIdToLayerId, activeLayerId } = get();
+    if (steps.length === 0) return;
+    const sorted = getSortedTour(null, steps);
+    const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[0].nodeIds);
+    set({
+      tourActive: true,
+      customTour: sorted,
       currentTourStep: 0,
       tourHighlightedNodeIds: sorted[0].nodeIds,
       selectedNodeId: null,
@@ -709,14 +731,15 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   stopTour: () =>
     set({
       tourActive: false,
+      customTour: null,
       currentTourStep: 0,
       tourHighlightedNodeIds: [],
     }),
 
   setTourStep: (step) => {
-    const { graph, nodeIdToLayerId, activeLayerId } = get();
-    if (!graph || !graph.tour || graph.tour.length === 0) return;
-    const sorted = getSortedTour(graph);
+    const { graph, customTour, nodeIdToLayerId, activeLayerId } = get();
+    const sorted = getSortedTour(graph, customTour);
+    if (sorted.length === 0) return;
     if (step < 0 || step >= sorted.length) return;
     const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[step].nodeIds);
     set({
@@ -728,9 +751,9 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   nextTourStep: () => {
-    const { graph, currentTourStep, nodeIdToLayerId, activeLayerId } = get();
-    if (!graph || !graph.tour || graph.tour.length === 0) return;
-    const sorted = getSortedTour(graph);
+    const { graph, customTour, currentTourStep, nodeIdToLayerId, activeLayerId } = get();
+    const sorted = getSortedTour(graph, customTour);
+    if (sorted.length === 0) return;
     if (currentTourStep < sorted.length - 1) {
       const next = currentTourStep + 1;
       const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[next].nodeIds);
@@ -744,10 +767,10 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   },
 
   prevTourStep: () => {
-    const { graph, currentTourStep, nodeIdToLayerId, activeLayerId } = get();
-    if (!graph || !graph.tour || graph.tour.length === 0) return;
+    const { graph, customTour, currentTourStep, nodeIdToLayerId, activeLayerId } = get();
+    const sorted = getSortedTour(graph, customTour);
+    if (sorted.length === 0) return;
     if (currentTourStep > 0) {
-      const sorted = getSortedTour(graph);
       const prev = currentTourStep - 1;
       const layerNav = navigateTourToLayer(nodeIdToLayerId, sorted[prev].nodeIds);
       set({
