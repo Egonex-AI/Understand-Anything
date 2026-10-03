@@ -448,7 +448,10 @@ function listen(attemptPort, attemptsLeft) {
     console.log(`  🔑  Dashboard URL: ${dashboardUrl}\n`);
     if (openBrowser) {
       const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-      spawn(opener, [dashboardUrl], { shell: process.platform === "win32", stdio: "ignore", detached: true }).unref();
+      const child = spawn(opener, [dashboardUrl], { shell: process.platform === "win32", stdio: "ignore", detached: true });
+      // No opener (headless Linux, minimal WSL): keep serving; the URL is printed above.
+      child.on("error", () => {});
+      child.unref();
     }
   });
 }
