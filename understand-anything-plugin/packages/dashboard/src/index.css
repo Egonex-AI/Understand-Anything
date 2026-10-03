@@ -211,6 +211,58 @@ body {
   transition: opacity 0.3s ease, filter 0.3s ease;
 }
 
+/* Analysis overlays (hotspots, impact, rule violations, review) */
+:root {
+  --color-heat-1: #e9d57c;
+  --color-heat-2: #e9b45a;
+  --color-heat-3: #e58a3f;
+  --color-heat-4: #dc5b3a;
+  --color-heat-5: #d0303f;
+  --color-impact: #5fb3d9;
+  --color-violation: #ef5b5b;
+}
+
+[data-theme="light"] {
+  --color-heat-1: #c9a321;
+  --color-heat-2: #d0861b;
+  --color-heat-3: #cc6219;
+  --color-heat-4: #bd3f1d;
+  --color-heat-5: #a3152b;
+  --color-impact: #1f7fae;
+  --color-violation: #c62828;
+}
+
+.overlay-heat {
+  border-color: var(--heat) !important;
+  background-color: color-mix(in srgb, var(--heat) 16%, var(--color-elevated)) !important;
+}
+.overlay-heat-1 { --heat: var(--color-heat-1); }
+.overlay-heat-2 { --heat: var(--color-heat-2); }
+.overlay-heat-3 { --heat: var(--color-heat-3); }
+.overlay-heat-4 { --heat: var(--color-heat-4); }
+.overlay-heat-5 { --heat: var(--color-heat-5); }
+
+.overlay-impact {
+  border-color: var(--color-impact) !important;
+  background-color: color-mix(in srgb, var(--color-impact) var(--impact-mix, 10%), var(--color-elevated)) !important;
+}
+.overlay-violation {
+  border-color: var(--color-violation) !important;
+  background-color: color-mix(in srgb, var(--color-violation) 12%, var(--color-elevated)) !important;
+}
+
+.overlay-dim {
+  opacity: 0.22;
+  filter: saturate(0.3);
+}
+.overlay-cold {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+[data-theme="light"] .overlay-dim {
+  opacity: 0.3;
+}
+
 /* Hide scrollbar but keep scroll functionality */
 .scrollbar-hide {
   -ms-overflow-style: none;

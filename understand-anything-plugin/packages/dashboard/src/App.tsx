@@ -11,6 +11,8 @@ import SearchBar from "./components/SearchBar";
 import NodeInfo from "./components/NodeInfo";
 import LayerLegend from "./components/LayerLegend";
 import DiffToggle from "./components/DiffToggle";
+import AnalysisToolbar from "./components/AnalysisToolbar";
+import AnalysisSidebar from "./components/AnalysisSidebar";
 import FilterPanel from "./components/FilterPanel";
 import ExportMenu from "./components/ExportMenu";
 import PersonaSelector from "./components/PersonaSelector";
@@ -501,6 +503,7 @@ function DashboardContent({
   const isLearnMode = tourActive || persona === "junior";
   const infoSidebarContent = (
     <>
+      <AnalysisSidebar />
       {selectedNodeId && <NodeInfo />}
       {isLearnMode && (
         <Suspense fallback={null}>
@@ -597,6 +600,7 @@ function DashboardContent({
         <div className="flex-1 min-w-0 overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-4 w-max">
             <DiffToggle />
+            <AnalysisToolbar accessToken={accessToken} />
             {/* Detail level: file view (architecture) / class view (code structure) */}
             {!isKnowledgeGraph && viewMode !== "domain" && (
               <>

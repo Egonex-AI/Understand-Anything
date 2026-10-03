@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { NodeNotesSection, NodeTagsSection } from "./NodeAnnotations";
+import { ImpactButton, NodeChurnStats } from "./NodeAnalysis";
 import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 // Badge color classes keyed by NodeType — must be kept in sync with core NodeType union.
@@ -387,7 +388,7 @@ export default function NodeInfo() {
         </span>
       </div>
 
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 mb-2">
         <h2 className="text-lg font-heading text-text-primary">{node.name}</h2>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
@@ -397,6 +398,7 @@ export default function NodeInfo() {
           >
             ✦ {t.ai.ask}
           </button>
+          <ImpactButton nodeId={node.id} />
           <button
             onClick={() => setFocusNode(focusNodeId === node.id ? null : node.id)}
             className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded transition-colors ${
@@ -440,6 +442,8 @@ export default function NodeInfo() {
           </div>
         </div>
       )}
+
+      <NodeChurnStats node={node} />
 
       {node.languageNotes && (
         <div className="mb-4">

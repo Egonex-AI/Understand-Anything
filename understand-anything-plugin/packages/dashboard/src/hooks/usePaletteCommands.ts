@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useDashboardStore } from "../store";
+import { useAnalysisStore } from "../analysisStore";
 import { useI18n } from "../contexts/I18nContext";
+import { fmt } from "../locales";
 import { useTheme, PRESETS } from "../themes/index.ts";
 import type { PaletteCommand } from "../components/CommandPalette";
 import { useReadingProgress } from "../readingProgress";
@@ -8,7 +10,6 @@ import { useAnnotationsStore } from "../annotationsStore";
 import { myTourLabels, playMyTourFor, useMyTourStore } from "../myTourStore";
 import { collectTags } from "../utils/annotatedNodes";
 import { exportNotesMarkdown, exportNotesVault } from "../notesExportActions";
-import { fmt } from "../locales";
 
 /** Commands offered by the Ctrl/⌘+K palette. Features register more here. */
 export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: () => void }): PaletteCommand[] {
@@ -22,6 +23,8 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
   const hasAnnotations = useAnnotationsStore((s) => Object.keys(s.annotations).length > 0);
   // Joined so the selector result compares by value and commands only rebuild when tags change.
   const annotationTags = useAnnotationsStore((s) => collectTags(s.annotations).join("\n"));
+  const hasDiff = useDashboardStore((s) => s.changedNodeIds.size > 0);
+  const overlayActive = useAnalysisStore((s) => s.overlay !== null);
 
   return useMemo(() => {
     const st = () => useDashboardStore.getState();
@@ -62,6 +65,25 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
       })),
     ];
     if (!isKnowledgeGraph) {
+      const an = () => useAnalysisStore.getState();
+      const a = t.analysis;
+      cmds.push(
+        { id: "hotspots", label: a.hotspotsCmd, keywords: "git churn heat hotspots commits", run: () => an().showHotspots() },
+        ...[30, 90, 365].map((days) => ({
+          id: `hotspots-${days}`,
+          label: `${a.hotspotsCmd}: ${fmt(a.lastDays, { n: days })}`,
+          keywords: "git churn heat hotspots",
+          run: () => an().showHotspots(days),
+        })),
+        { id: "arch-rules", label: a.rulesCmd, keywords: "architecture rules layers dependency lint", run: () => an().openRulesEditor() },
+        { id: "arch-violations", label: a.violationsCmd, keywords: "architecture rules violations", run: () => an().showViolations() },
+      );
+      if (hasDiff) {
+        cmds.push({ id: "review", label: a.reviewCmd, keywords: "pr pull request review diff walkthrough", run: () => an().startReview() });
+      }
+      if (overlayActive) {
+        cmds.push({ id: "clear-overlay", label: a.clearOverlayCmd, keywords: "overlay hotspots impact rules review", run: () => an().clearOverlay() });
+      }
       cmds.push(
         { id: "detail-files", label: `${p.detail}: ${t.detailLevel.files}`, run: () => st().setDetailLevel("file") },
         { id: "detail-classes", label: `${p.detail}: ${t.detailLevel.classes}`, run: () => st().setDetailLevel("class") },
@@ -79,6 +101,14 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
         cmds.push({ id: "open-code", label: p.openSelectedCode, run: () => st().openCodeViewer(selectedNodeId) });
       }
       cmds.push({ id: "focus", label: p.focusSelected, run: () => st().setFocusNode(selectedNodeId) });
+      if (!isKnowledgeGraph) {
+        cmds.push({
+          id: "impact",
+          label: t.analysis.impactCmd,
+          keywords: "impact blast radius dependents affected",
+          run: () => useAnalysisStore.getState().showImpact(selectedNodeId),
+        });
+      }
       cmds.push({
         id: "ask-ai",
         label: t.ai.askSelectedCmd,
@@ -110,5 +140,5 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
     }
     if (tourActive) cmds.push({ id: "exit-tour", label: nt.exitTour, keywords: "stop tour", run: () => st().stopTour() });
     return cmds;
-  }, [t, setPreset, selectedNodeId, hasDomainGraph, isKnowledgeGraph, codeViewerOpen, openShortcutsHelp, tourActive, hasAnnotations, annotationTags]);
+  }, [t, setPreset, selectedNodeId, hasDomainGraph, isKnowledgeGraph, codeViewerOpen, openShortcutsHelp, tourActive, hasAnnotations, annotationTags, hasDiff, overlayActive]);
 }

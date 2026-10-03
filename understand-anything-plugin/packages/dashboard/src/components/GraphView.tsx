@@ -24,6 +24,8 @@ import ContainerNode from "./ContainerNode";
 import type { ContainerFlowNode, ContainerNodeData } from "./ContainerNode";
 import Breadcrumb from "./Breadcrumb";
 import { useDashboardStore } from "../store";
+import { useAnalysisStore } from "../analysisStore";
+import { edgeKey } from "../utils/dependencies";
 import type {
   GraphEdge,
   GraphNode,
@@ -1280,7 +1282,7 @@ function useLayerDetailGraph() {
     expandedContainers,
   ]);
 
-  const edges = useMemo(() => {
+  const selectionEdges = useMemo(() => {
     // Compose: Stage 1 / inflated edges, plus portal edges (Stage 1 sources
     // them off container atoms — re-sourcing on expand is deferred).
     const base = [...expandedEdges, ...topo.portalEdges];
@@ -1299,6 +1301,33 @@ function useLayerDetailGraph() {
       return { ...edge, animated: false, style: { stroke: "rgba(212,165,116,0.08)", strokeWidth: 1 }, labelStyle: { fill: "rgba(163,151,135,0.2)", fontSize: 10 } };
     });
   }, [expandedEdges, topo.portalEdges, selectedNodeId]);
+
+  // Analysis overlay (impact paths, rule violations): marked edges win over
+  // selection styling. Marks are node-level pairs; map them onto container
+  // atoms too so aggregated edges between collapsed containers light up.
+  const overlay = useAnalysisStore((s) => s.overlay);
+  const markedEdges = useAnalysisStore((s) => s.markedEdges);
+  const edges = useMemo(() => {
+    if (markedEdges.length === 0) return selectionEdges;
+    const keys = new Set<string>();
+    for (const { source, target } of markedEdges) {
+      keys.add(edgeKey(source, target));
+      const sa = topo.nodeToContainer.get(source) ?? source;
+      const ta = topo.nodeToContainer.get(target) ?? target;
+      if (sa !== ta) keys.add(edgeKey(sa, ta));
+    }
+    const color = overlay === "rules" ? "var(--color-violation)" : "var(--color-impact)";
+    return selectionEdges.map((edge) => {
+      if (!keys.has(edgeKey(String(edge.source), String(edge.target)))) return edge;
+      return {
+        ...edge,
+        animated: true,
+        zIndex: 1,
+        style: { stroke: color, strokeWidth: 2.5 },
+        labelStyle: { fill: color, fontSize: 11, fontWeight: 600 },
+      };
+    });
+  }, [selectionEdges, markedEdges, overlay, topo.nodeToContainer]);
 
   // Expose container topology so the parent component can wire auto-expand
   // triggers (focus, tour, zoom) without having to re-derive containers.

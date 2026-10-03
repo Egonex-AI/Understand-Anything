@@ -4,6 +4,7 @@ import type { NodeProps, Node } from "@xyflow/react";
 import type { NodeType } from "@understand-anything/core/types";
 import { useI18n } from "../contexts/I18nContext";
 import { useAnnotationsStore } from "../annotationsStore";
+import { useAnalysisStore, type NodeMark } from "../analysisStore";
 
 // Color maps keyed by NodeType — must be kept in sync with core NodeType union.
 const typeColors: Record<NodeType, string> = {
@@ -94,6 +95,28 @@ export interface CustomNodeData extends Record<string, unknown> {
 
 export type CustomFlowNode = Node<CustomNodeData, "custom">;
 
+/** Classes for an analysis-overlay mark (hotspots, impact, rule violations, review). */
+function markClass(mark: NodeMark): string {
+  switch (mark.tone) {
+    case "heat":
+      return ` overlay-heat overlay-heat-${mark.level}`;
+    case "impact-root":
+      return " ring-2 ring-[var(--color-impact)] overlay-impact [--impact-mix:22%]";
+    case "impact":
+      return mark.level <= 1
+        ? " ring-2 ring-[var(--color-impact)]/80 overlay-impact [--impact-mix:16%]"
+        : mark.level === 2
+          ? " ring-1 ring-[var(--color-impact)]/70 overlay-impact"
+          : " ring-1 ring-[var(--color-impact)]/40 overlay-impact [--impact-mix:5%]";
+    case "violation":
+      return " ring-2 ring-[var(--color-violation)] overlay-violation";
+    case "review-current":
+      return " ring-2 ring-accent animate-accent-pulse";
+    case "review-done":
+      return " ring-1 ring-node-function/70";
+  }
+}
+
 function CustomNodeComponent({
   id,
   data,
@@ -104,6 +127,10 @@ function CustomNodeComponent({
   const complexityColor = complexityColors[data.complexity] ?? complexityColors.simple;
   const { t } = useI18n();
   const isAnnotated = useAnnotationsStore((s) => id in s.annotations);
+  const mark = useAnalysisStore((s) => s.nodeMarks.get(id));
+  const overlayDim = useAnalysisStore(
+    (s) => s.overlay !== null && !s.nodeMarks.has(id) && (s.fadeUnmarked ? "dim" : s.overlay === "hotspots" ? "cold" : null),
+  );
 
   if (import.meta.env.DEV && !(knownType in typeColors)) {
     console.warn(`[CustomNode] Unknown node type "${data.nodeType}" — using "file" colors`);
@@ -130,12 +157,17 @@ function CustomNodeComponent({
     extraClass += " ring-2 ring-[var(--color-diff-changed)] diff-changed-glow";
   } else if (data.isDiffAffected) {
     extraClass += " ring-1 ring-[var(--color-diff-affected)] diff-affected-glow";
-  } else if (data.isDiffFaded) {
+  } else if (data.isDiffFaded && !mark) {
     extraClass += " diff-faded";
   }
 
+  // Analysis overlay: marked nodes stay visible even when selection would fade them.
+  if (mark) extraClass += markClass(mark);
+  else if (overlayDim === "dim") extraClass += " overlay-dim";
+  else if (overlayDim === "cold") extraClass += " overlay-cold";
+
   // Selection-based dimming (when another node is selected, fade unrelated nodes)
-  if (data.isSelectionFaded) {
+  if (data.isSelectionFaded && !mark && !overlayDim) {
     extraClass += " opacity-20 pointer-events-auto";
   } else if (data.isNeighbor) {
     extraClass += " ring-1 ring-gold-dim/50";
@@ -168,6 +200,22 @@ function CustomNodeComponent({
             {data.nodeType}
           </span>
           <div className="flex items-center gap-1.5">
+            {mark?.badge && (
+              <span
+                className={`text-[9px] font-mono font-semibold px-1 rounded leading-tight ${
+                  mark.tone === "heat"
+                    ? "text-[var(--heat)] bg-[color-mix(in_srgb,var(--heat)_18%,transparent)]"
+                    : mark.tone === "impact"
+                      ? "text-[var(--color-impact)] bg-[color-mix(in_srgb,var(--color-impact)_15%,transparent)]"
+                      : mark.tone === "review-done"
+                        ? "text-node-function bg-node-function/15"
+                        : "text-accent bg-accent/15"
+                }`}
+                title={mark.tone === "heat" ? t.analysis.commitsTitle : mark.tone === "impact" ? t.analysis.depthTitle : undefined}
+              >
+                {mark.tone === "impact" ? `↑${mark.badge}` : mark.badge}
+              </span>
+            )}
             <span className={`text-[9px] font-mono ${complexityColor}`}>
               {data.complexity}
             </span>
