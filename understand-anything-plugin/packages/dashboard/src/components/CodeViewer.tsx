@@ -16,6 +16,7 @@ import {
 } from "../utils/codeNav";
 import { buildFileNodeIndex, fileNodeForPath, normalizeNodePath } from "../utils/fileNodes";
 import { useAnnotationsStore } from "../annotationsStore";
+import { useReadingProgress } from "../readingProgress";
 import { LineNoteEditor, LineNoteView } from "./LineNote";
 import { fmt } from "../locales";
 
@@ -318,6 +319,11 @@ export default function CodeViewer({
       window.removeEventListener("blur", clear);
     };
   }, []);
+
+  // Reading progress: a file counts as read once its source has been shown.
+  useEffect(() => {
+    if (state.status === "loaded" && filePath) useReadingProgress.getState().markRead(filePath);
+  }, [state.status, filePath]);
 
   const highlightedRange = useMemo(() => {
     if (!node?.lineRange) return null;

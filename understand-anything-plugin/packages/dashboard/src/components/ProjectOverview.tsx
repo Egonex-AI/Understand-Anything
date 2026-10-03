@@ -1,10 +1,16 @@
+import { useMemo } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { fmt } from "../locales";
+import { graphFilePaths, useReadingProgress } from "../readingProgress";
 
 export default function ProjectOverview() {
   const graph = useDashboardStore((s) => s.graph);
   const startTour = useDashboardStore((s) => s.startTour);
   const { t } = useI18n();
+  const read = useReadingProgress((s) => s.read);
+  const filePaths = useMemo(() => graphFilePaths(graph), [graph]);
+  const readCount = useMemo(() => [...filePaths].filter((p) => read.has(p)).length, [filePaths, read]);
 
   if (!graph) {
     return (
@@ -79,6 +85,27 @@ export default function ProjectOverview() {
           <div className="text-[11px] text-text-muted uppercase tracking-wider mt-1">{t.projectOverview.types}</div>
         </div>
       </div>
+
+      {/* Reading progress */}
+      {filePaths.size > 0 && (
+        <div className="mb-5 bg-elevated rounded-lg p-3 border border-border-subtle">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider">{t.codeNav.readingProgress}</h3>
+            <span className="text-xs font-mono text-text-muted">
+              {Math.round((readCount / filePaths.size) * 100)}%
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
+            <div
+              className="h-full bg-accent/60 rounded-full transition-all duration-500"
+              style={{ width: `${(readCount / filePaths.size) * 100}%` }}
+            />
+          </div>
+          <div className="text-[11px] text-text-muted mt-1.5">
+            {fmt(t.codeNav.filesRead, { read: readCount, total: filePaths.size })}
+          </div>
+        </div>
+      )}
 
       {/* File Types breakdown */}
       {hasNonCodeNodes && (

@@ -3,6 +3,7 @@ import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { useTheme, PRESETS } from "../themes/index.ts";
 import type { PaletteCommand } from "../components/CommandPalette";
+import { useReadingProgress } from "../readingProgress";
 
 /** Commands offered by the Ctrl/⌘+K palette. Features register more here. */
 export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: () => void }): PaletteCommand[] {
@@ -38,6 +39,12 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
       { id: "persona-overview", label: `${p.mode}: ${t.personaSelector.overview}`, run: () => st().setPersona("non-technical") },
       { id: "persona-learn", label: `${p.mode}: ${t.personaSelector.learn}`, run: () => st().setPersona("junior") },
       { id: "persona-deep", label: `${p.mode}: ${t.personaSelector.deepDive}`, run: () => st().setPersona("experienced") },
+      {
+        id: "reset-reading-progress",
+        label: t.codeNav.resetReadingProgress,
+        keywords: "read files clear progress",
+        run: () => useReadingProgress.getState().reset(),
+      },
       ...PRESETS.map((preset) => ({
         id: `theme-${preset.id}`,
         label: `${p.theme}: ${preset.name}`,

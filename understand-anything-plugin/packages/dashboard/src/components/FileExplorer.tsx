@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { GraphNode } from "@understand-anything/core/types";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { useReadingProgress } from "../readingProgress";
 
 interface FileEntry {
   name: string;
@@ -94,6 +95,8 @@ function FileTreeRow({
   toggleFolder: (path: string) => void;
   openFile: (nodeId: string) => void;
 }) {
+  const isRead = useReadingProgress((s) => entry.type === "file" && s.read.has(entry.path));
+  const { t } = useI18n();
   const isExpanded = expanded.has(entry.path);
   const paddingLeft = 12 + depth * 14;
 
@@ -134,7 +137,20 @@ function FileTreeRow({
       title={`${entry.path} - double-click to open`}
     >
       <span className="w-3 text-text-muted">-</span>
-      <span className="truncate font-mono">{entry.name}</span>
+      <span className="truncate font-mono flex-1">{entry.name}</span>
+      {isRead && (
+        <svg
+          className="w-3 h-3 shrink-0 text-accent/70"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          role="img"
+          aria-label={t.codeNav.read}
+        >
+          <title>{t.codeNav.read}</title>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+      )}
     </button>
   );
 }
