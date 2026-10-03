@@ -287,6 +287,7 @@ export default function NodeInfo() {
   const navigateToNode = useDashboardStore((s) => s.navigateToNode);
   const navigateToHistoryIndex = useDashboardStore((s) => s.navigateToHistoryIndex);
   const setFocusNode = useDashboardStore((s) => s.setFocusNode);
+  const openAiDialog = useDashboardStore((s) => s.openAiDialog);
   const openCodeViewer = useDashboardStore((s) => s.openCodeViewer);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const viewMode = useDashboardStore((s) => s.viewMode);
@@ -388,16 +389,25 @@ export default function NodeInfo() {
 
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-heading text-text-primary">{node.name}</h2>
-        <button
-          onClick={() => setFocusNode(focusNodeId === node.id ? null : node.id)}
-          className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded transition-colors ${
-            focusNodeId === node.id
-              ? "bg-gold/20 text-gold border border-gold/40"
-              : "text-text-muted border border-border-subtle hover:text-gold hover:border-gold/30"
-          }`}
-        >
-          {focusNodeId === node.id ? t.common.unfocus : t.common.focus}
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={() => openAiDialog(node.id)}
+            data-testid="ask-ai-button"
+            className="text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded transition-colors text-text-muted border border-border-subtle hover:text-gold hover:border-gold/30"
+          >
+            ✦ {t.ai.ask}
+          </button>
+          <button
+            onClick={() => setFocusNode(focusNodeId === node.id ? null : node.id)}
+            className={`text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded transition-colors ${
+              focusNodeId === node.id
+                ? "bg-gold/20 text-gold border border-gold/40"
+                : "text-text-muted border border-border-subtle hover:text-gold hover:border-gold/30"
+            }`}
+          >
+            {focusNodeId === node.id ? t.common.unfocus : t.common.focus}
+          </button>
+        </div>
       </div>
 
       <FigmaThumbnail node={node} />

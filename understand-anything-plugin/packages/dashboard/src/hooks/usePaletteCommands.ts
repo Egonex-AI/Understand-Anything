@@ -29,6 +29,12 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
       { id: "export", label: t.keyboardShortcuts.toggleExport, hint: "E", run: () => st().toggleExportMenu() },
       { id: "path", label: t.keyboardShortcuts.openPathFinder, hint: "P", run: () => st().togglePathFinder() },
       { id: "help", label: t.keyboardShortcuts.showHelp, hint: "?", run: openShortcutsHelp },
+      {
+        id: "ai-settings",
+        label: t.ai.settings,
+        keywords: "ai llm model provider api key base url openai anthropic deepseek glm",
+        run: () => st().openAiDialog(st().selectedNodeId, "settings"),
+      },
       { id: "persona-overview", label: `${p.mode}: ${t.personaSelector.overview}`, run: () => st().setPersona("non-technical") },
       { id: "persona-learn", label: `${p.mode}: ${t.personaSelector.learn}`, run: () => st().setPersona("junior") },
       { id: "persona-deep", label: `${p.mode}: ${t.personaSelector.deepDive}`, run: () => st().setPersona("experienced") },
@@ -57,6 +63,12 @@ export function usePaletteCommands({ openShortcutsHelp }: { openShortcutsHelp: (
         cmds.push({ id: "open-code", label: p.openSelectedCode, run: () => st().openCodeViewer(selectedNodeId) });
       }
       cmds.push({ id: "focus", label: p.focusSelected, run: () => st().setFocusNode(selectedNodeId) });
+      cmds.push({
+        id: "ask-ai",
+        label: t.ai.askSelectedCmd,
+        keywords: "ai llm chat claude gpt explain",
+        run: () => st().openAiDialog(selectedNodeId),
+      });
     }
     if (codeViewerOpen) cmds.push({ id: "close-code", label: p.closeCode, run: () => st().closeCodeViewer() });
     return cmds;
