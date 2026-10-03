@@ -26,7 +26,9 @@ export class MarkdownParser implements AnalyzerPlugin {
     let match;
     while ((match = linkRegex.exec(content)) !== null) {
       const target = match[2];
-      if (target.startsWith("http")) continue; // Skip external URLs
+      // Skip external URLs (scheme://... or protocol-relative //...), but keep
+      // local files whose name merely begins with "http" (e.g. http-client.md).
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(target) || target.startsWith("//")) continue;
       const line = content.slice(0, match.index).split("\n").length;
       refs.push({
         source: filePath,
