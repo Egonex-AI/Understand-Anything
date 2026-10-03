@@ -19,3 +19,6 @@ venv/
 *.pyo
 Thumbs.db
 *.tgz
+
+# Node.js module compile cache (NODE_COMPILE_CACHE)
+node-compile-cache/
