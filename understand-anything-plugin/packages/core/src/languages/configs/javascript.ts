@@ -23,7 +23,7 @@ export const javascriptConfig = {
   filePatterns: {
     entryPoints: ["index.js", "src/index.js", "main.js"],
     barrels: ["index.js"],
-    tests: ["*.test.js", "*.spec.js"],
+    tests: ["*.test.js", "*.spec.js", "*.test.jsx", "*.spec.jsx"],
     config: ["package.json", "jsconfig.json"],
   },
 } satisfies LanguageConfig;
