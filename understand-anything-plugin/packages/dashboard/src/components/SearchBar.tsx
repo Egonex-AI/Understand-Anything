@@ -9,6 +9,7 @@ import {
   type ContentSearchMatch,
   type ContentSearchOptions,
 } from "../hooks/useContentSearch";
+import { useSemanticSearch } from "../hooks/useSemanticSearch";
 import { buildFileNodeIndex, fileNodeForPath, nodeForFileLine } from "../utils/fileNodes";
 
 const typeBadgeColors: Record<string, string> = {
@@ -101,6 +102,7 @@ export default function SearchBar({ accessToken }: { accessToken: string }) {
 
   const isContent = searchMode === "content";
   const contentSearch = useContentSearch(searchQuery, contentOptions, accessToken, isContent);
+  const semanticSearch = useSemanticSearch(searchQuery, accessToken, searchMode === "semantic");
 
   // Build a lookup map for node details
   const nodeMap = useMemo(
@@ -234,14 +236,19 @@ export default function SearchBar({ accessToken }: { accessToken: string }) {
 
   const modes: { mode: SearchMode; label: string; title?: string }[] = [
     { mode: "fuzzy", label: t.search.fuzzy },
-    { mode: "semantic", label: t.search.semantic },
+    { mode: "semantic", label: t.search.semantic, title: t.search.semanticTitle },
     { mode: "content", label: t.search.code, title: t.search.codePlaceholder },
   ];
 
   let statusText: string | null = null;
   if (hasQuery) {
-    if (!isContent) {
+    if (searchMode === "semantic" && semanticSearch.status === "loading") {
+      statusText = t.search.semanticSearching;
+    } else if (!isContent) {
       statusText = `${searchResults.length} ${searchResults.length === 1 ? t.search.result : t.search.results} (${searchMode})`;
+      if (semanticSearch.status === "done" && semanticSearch.embedded > 0) {
+        statusText += ` · ${fmt(t.search.semanticIndexed, { n: semanticSearch.embedded })}`;
+      }
     } else if (contentSearch.status === "loading" && !contentSearch.result) {
       statusText = t.search.searching;
     } else if (contentSearch.result) {
@@ -330,6 +337,25 @@ export default function SearchBar({ accessToken }: { accessToken: string }) {
           <span className="hidden sm:inline text-xs text-text-muted shrink-0">{statusText}</span>
         )}
       </div>
+      {semanticSearch.status === "unavailable" && hasQuery && (
+        <div className="flex items-center gap-2 px-4 py-1 bg-surface border-b border-border-subtle text-[11px] text-text-muted">
+          <span className="truncate">{t.search.semanticUnavailable}</span>
+          {semanticSearch.canConfigure && (
+            <button
+              type="button"
+              onClick={() => useDashboardStore.getState().openAiDialog(null, "embeddings")}
+              className="text-accent hover:underline shrink-0"
+            >
+              {t.search.semanticSetup}
+            </button>
+          )}
+        </div>
+      )}
+      {semanticSearch.status === "error" && hasQuery && (
+        <div className="px-4 py-1 bg-surface border-b border-border-subtle text-[11px] text-amber-400 truncate">
+          {fmt(t.search.semanticError, { error: semanticSearch.error })}
+        </div>
+      )}
 
       {/* Dropdown results */}
       {showDropdown && (
