@@ -1,4 +1,5 @@
 import type { AnalyzerPlugin, StructuralAnalysis, DefinitionInfo, EndpointInfo } from "../../types.js";
+import { findClosingBrace, GRAPHQL_SYNTAX } from "./brace-matcher.js";
 
 /**
  * Parses GraphQL schema files to extract type, input, enum, interface, union, and scalar definitions.
@@ -37,9 +38,15 @@ export class GraphQLParser implements AnalyzerPlugin {
       // Extract fields (for type/input/interface/enum)
       const fields = this.extractFields(content, match.index);
 
-      // Find closing brace
+      // Find closing brace. Bodyless definitions (scalar, union) have no brace
+      // on their header line, so only scan when the header actually opens one —
+      // otherwise the scan would run on into the next definition's block.
       const afterMatch = content.slice(match.index);
-      const closeBrace = afterMatch.indexOf("}");
+      const headerEnd = afterMatch.indexOf("\n");
+      const header = headerEnd === -1 ? afterMatch : afterMatch.slice(0, headerEnd);
+      const closeBrace = header.includes("{")
+        ? findClosingBrace(afterMatch, GRAPHQL_SYNTAX, "graphql-parser")
+        : -1;
       const endLine = closeBrace !== -1
         ? content.slice(0, match.index + closeBrace + 1).split("\n").length
         : startLine;
@@ -66,15 +73,10 @@ export class GraphQLParser implements AnalyzerPlugin {
       const startIdx = match.index + match[0].length;
 
       // Find closing brace
-      let depth = 1;
-      let i = startIdx;
-      while (i < content.length && depth > 0) {
-        if (content[i] === "{") depth++;
-        if (content[i] === "}") depth--;
-        i++;
-      }
+      const braceIdx = match.index + match[0].lastIndexOf("{");
+      const closeBrace = braceIdx + findClosingBrace(content.slice(braceIdx), GRAPHQL_SYNTAX);
 
-      const blockContent = content.slice(startIdx, i - 1);
+      const blockContent = content.slice(startIdx, closeBrace);
       const blockLines = blockContent.split("\n");
       const blockStartLine = content.slice(0, startIdx).split("\n").length;
 
@@ -100,15 +102,8 @@ export class GraphQLParser implements AnalyzerPlugin {
     const openBrace = afterType.indexOf("{");
     if (openBrace === -1) return fields;
 
-    let depth = 1;
-    let i = openBrace + 1;
-    while (i < afterType.length && depth > 0) {
-      if (afterType[i] === "{") depth++;
-      if (afterType[i] === "}") depth--;
-      i++;
-    }
-
-    const body = afterType.slice(openBrace + 1, i - 1);
+    const closeBrace = findClosingBrace(afterType, GRAPHQL_SYNTAX);
+    const body = afterType.slice(openBrace + 1, closeBrace);
     const lines = body.split("\n");
     for (const line of lines) {
       const fieldMatch = line.trim().match(/^(\w+)/);
