@@ -8,6 +8,8 @@
   "homepage": "https://github.com/Egonex-AI/Understand-Anything",
   "repository": "https://github.com/Egonex-AI/Understand-Anything",
   "license": "MIT",
+  "skills": "./skills",
+  "agents": "./agents",
   "keywords": [
     "codebase-analysis",
     "knowledge-graph",
