@@ -23,6 +23,7 @@
     "graphology-types": "^0.24.8",
     "hast-util-to-jsx-runtime": "^2.3.6",
     "prism-react-renderer": "^2.4.1",
+    "prismjs": "^1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

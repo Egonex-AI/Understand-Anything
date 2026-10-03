@@ -4,6 +4,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { useTheme } from "../themes/index.ts";
+import { ensurePrismLanguage, isPrismLanguageLoaded, languageForPath } from "../utils/prismLanguages";
 
 interface CodeViewerProps {
   accessToken: string;
@@ -28,28 +30,6 @@ type SourceState =
 function fileContentUrl(filePath: string, token: string): string {
   const params = new URLSearchParams({ token, path: filePath });
   return `/file-content.json?${params.toString()}`;
-}
-
-function fallbackLanguage(filePath: string | undefined): string {
-  const ext = filePath?.split(".").pop()?.toLowerCase();
-  const byExt: Record<string, string> = {
-    css: "css",
-    go: "go",
-    html: "markup",
-    js: "javascript",
-    jsx: "jsx",
-    json: "json",
-    md: "markdown",
-    py: "python",
-    rb: "ruby",
-    rs: "rust",
-    sh: "bash",
-    ts: "typescript",
-    tsx: "tsx",
-    yaml: "yaml",
-    yml: "yaml",
-  };
-  return ext ? byExt[ext] ?? "text" : "text";
 }
 
 function formatBytes(bytes: number): string {
@@ -145,6 +125,25 @@ export default function CodeViewer({
   // source for line numbers / lineRange highlighting.
   const [mdView, setMdView] = useState<"rendered" | "source">("rendered");
   const { t } = useI18n();
+  const { preset } = useTheme();
+
+  // Prefer the client-side mapping (it knows which grammars exist); fall back
+  // to the server's guess for extensions the client doesn't recognise.
+  const pathLanguage = languageForPath(node?.filePath);
+  const language =
+    pathLanguage !== "text" ? pathLanguage : state.source?.language ?? "text";
+  const [loadedLanguage, setLoadedLanguage] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void ensurePrismLanguage(language).then((ok) => {
+      if (!cancelled && ok) setLoadedLanguage(language);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [language]);
+  const highlightLanguage =
+    loadedLanguage === language || isPrismLanguageLoaded(language) ? language : "text";
 
   useEffect(() => {
     if (!node?.filePath) {
@@ -198,7 +197,6 @@ export default function CodeViewer({
   }
 
   const source = state.source;
-  const language = source?.language ?? fallbackLanguage(node.filePath);
   const isMarkdown = language === "markdown";
   const showRendered = isMarkdown && mdView === "rendered";
   const lineInfo = highlightedRange
@@ -304,7 +302,11 @@ export default function CodeViewer({
             </div>
             {showRendered && <MarkdownView content={source.content} />}
             {!showRendered && (
-            <Highlight code={source.content} language={language} theme={themes.vsDark}>
+            <Highlight
+              code={source.content}
+              language={highlightLanguage}
+              theme={preset.isDark ? themes.oneDark : themes.oneLight}
+            >
               {({ className, style, tokens, getLineProps, getTokenProps }) => (
                 <pre
                   className={`${className} min-w-max p-0 m-0 ${
