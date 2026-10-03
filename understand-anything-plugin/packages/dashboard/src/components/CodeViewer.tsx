@@ -98,6 +98,37 @@ function MarkdownView({ content }: { content: string }) {
   );
 }
 
+function CopyButton({ text, label, doneLabel }: { text: string; label: string; doneLabel: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(() => setCopied(true), () => {});
+      }}
+      className={`shrink-0 transition-colors ${copied ? "text-accent" : "text-text-muted hover:text-text-primary"}`}
+      title={copied ? doneLabel : label}
+      aria-label={copied ? doneLabel : label}
+    >
+      {copied ? (
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="11" height="11" rx="2" strokeWidth={2} />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15V5a2 2 0 012-2h10" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export default function CodeViewer({
   accessToken,
   presentation = "sidebar",
@@ -249,8 +280,11 @@ export default function CodeViewer({
             {node.name}
           </div>
           {node.filePath && (
-            <div className="text-[11px] font-mono text-text-muted truncate mt-0.5" title={node.filePath}>
-              {node.filePath}
+            <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+              <div className="text-[11px] font-mono text-text-muted truncate" title={node.filePath}>
+                {node.filePath}
+              </div>
+              <CopyButton text={node.filePath} label={t.codeViewer.copyPath} doneLabel={t.codeViewer.copied} />
             </div>
           )}
         </div>

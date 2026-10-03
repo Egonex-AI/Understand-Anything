@@ -173,6 +173,8 @@ export const ru = {
   },
   codeViewer: {
     resize: "Потяните для изменения размера · двойной щелчок — сброс",
+    copyPath: "Копировать путь",
+    copied: "Скопировано",
     fullFile: "Весь файл",
     lines: "Строки",
     linesLabel: "строк",

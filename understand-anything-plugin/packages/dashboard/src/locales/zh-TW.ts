@@ -173,6 +173,8 @@ export const zhTW = {
   },
   codeViewer: {
     resize: "拖曳調整高度 · 雙擊恢復預設",
+    copyPath: "複製路徑",
+    copied: "已複製",
     fullFile: "完整檔案",
     lines: "行",
     linesLabel: "行",

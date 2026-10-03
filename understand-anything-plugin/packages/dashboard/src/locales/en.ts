@@ -173,6 +173,8 @@ export const en = {
   },
   codeViewer: {
     resize: "Drag to resize · double-click to reset",
+    copyPath: "Copy path",
+    copied: "Copied",
     fullFile: "Full file",
     lines: "Lines",
     linesLabel: "lines",

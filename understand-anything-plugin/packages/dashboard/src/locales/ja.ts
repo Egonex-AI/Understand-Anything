@@ -173,6 +173,8 @@ export const ja = {
   },
   codeViewer: {
     resize: "ドラッグでサイズ変更 · ダブルクリックでリセット",
+    copyPath: "パスをコピー",
+    copied: "コピーしました",
     fullFile: "ファイル全体",
     lines: "行",
     linesLabel: "行",

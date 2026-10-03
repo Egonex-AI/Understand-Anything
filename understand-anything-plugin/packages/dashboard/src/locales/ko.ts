@@ -173,6 +173,8 @@ export const ko = {
   },
   codeViewer: {
     resize: "드래그하여 크기 조절 · 더블클릭으로 초기화",
+    copyPath: "경로 복사",
+    copied: "복사됨",
     fullFile: "전체 파일",
     lines: "행",
     linesLabel: "행",

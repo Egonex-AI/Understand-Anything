@@ -173,6 +173,8 @@ export const zh = {
   },
   codeViewer: {
     resize: "拖动调整高度 · 双击恢复默认",
+    copyPath: "复制路径",
+    copied: "已复制",
     fullFile: "完整文件",
     lines: "行",
     linesLabel: "行",
