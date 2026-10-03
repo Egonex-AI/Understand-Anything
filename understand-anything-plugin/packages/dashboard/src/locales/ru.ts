@@ -185,6 +185,7 @@ export const ru = {
     source: "Исходник",
   },
   customNode: {
+    clickToExpand: "Нажмите, чтобы раскрыть",
     tested: "Покрыт тестами",
     hasTests: "Есть тесты",
   },

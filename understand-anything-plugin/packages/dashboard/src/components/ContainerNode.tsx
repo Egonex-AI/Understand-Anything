@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getLayerColor } from "./LayerLegend";
+import { useI18n } from "../contexts/I18nContext";
 
 export interface ContainerNodeData extends Record<string, unknown> {
   containerId: string;
@@ -20,6 +21,7 @@ export type ContainerFlowNode = Node<ContainerNodeData, "container">;
 
 function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlowNode>) {
   const color = getLayerColor(data.colorIndex);
+  const { t } = useI18n();
 
   const borderColor = data.isDiffAffected
     ? "var(--color-diff-changed)"
@@ -71,7 +73,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
           className={labelDimmed ? "opacity-50" : ""}
           style={{ display: "flex", alignItems: "center", gap: 6 }}
         >
-          {data.isExpanded && <span style={{ fontSize: 10 }}>▾</span>}
+          <span style={{ fontSize: 10 }}>{data.isExpanded ? "▾" : "▸"}</span>
           {labelText}
           {data.searchHitCount != null && data.searchHitCount > 0 && (
             <span
@@ -91,6 +93,15 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
         </span>
         <span style={{ color: "#a39787", fontSize: 11 }}>{data.childCount}</span>
       </div>
+      {/* A collapsed container is otherwise an empty box with no hint that it opens. */}
+      {!data.isExpanded && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+          style={{ color: "#a39787", fontSize: 11, opacity: 0.7 }}
+        >
+          {t.customNode.clickToExpand}
+        </div>
+      )}
     </div>
   );
 }

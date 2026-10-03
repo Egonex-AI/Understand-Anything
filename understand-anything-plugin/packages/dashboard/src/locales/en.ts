@@ -185,6 +185,7 @@ export const en = {
     source: "Source",
   },
   customNode: {
+    clickToExpand: "Click to expand",
     tested: "Tested",
     hasTests: "Has tests",
   },

@@ -185,6 +185,7 @@ export const ja = {
     source: "ソース",
   },
   customNode: {
+    clickToExpand: "クリックで展開",
     tested: "テスト済み",
     hasTests: "テストあり",
   },

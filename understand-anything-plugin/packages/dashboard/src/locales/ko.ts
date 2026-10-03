@@ -185,6 +185,7 @@ export const ko = {
     source: "소스",
   },
   customNode: {
+    clickToExpand: "클릭하여 펼치기",
     tested: "테스트됨",
     hasTests: "테스트 있음",
   },

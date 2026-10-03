@@ -185,6 +185,7 @@ export const zhTW = {
     source: "原始碼",
   },
   customNode: {
+    clickToExpand: "點擊展開",
     tested: "已測試",
     hasTests: "有測試",
   },

@@ -185,6 +185,7 @@ export const zh = {
     source: "源码",
   },
   customNode: {
+    clickToExpand: "点击展开",
     tested: "已测试",
     hasTests: "有测试",
   },
