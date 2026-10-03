@@ -22,6 +22,7 @@ import ResizableBottomPanel from "./components/ResizableBottomPanel";
 import MobileLayout from "./components/MobileLayout";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { useUrlStateSync } from "./hooks/useUrlStateSync";
 import type { KeyboardShortcut } from "./hooks/useKeyboardShortcuts";
 import { ThemeProvider } from "./themes/index.ts";
 import { ThemePicker } from "./components/ThemePicker.tsx";
@@ -127,6 +128,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
     useState<DashboardFreshnessReport | null>(null);
   const [metaTheme, setMetaTheme] = useState<ThemeConfig | null>(null);
   const [outputLanguage, setOutputLanguage] = useState<string | undefined>();
+  useUrlStateSync();
 
   useEffect(() => {
     fetch(dataUrl("meta.json", accessToken))
