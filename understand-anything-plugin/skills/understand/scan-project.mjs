@@ -649,7 +649,7 @@ function hasUserIgnoreFile(projectRoot) {
  * Per-file failure: emits a Warning: and returns null. Caller decides
  * whether to drop the file or keep it with sizeLines=0.
  */
-function readAndCountLines(absPath, posixPath) {
+function readAndCountLines(absPath, posixPath, failures) {
   try {
     const buf = readFileSync(absPath);
     // Manual newline count beats split('\n').length on large files — no
@@ -660,6 +660,7 @@ function readAndCountLines(absPath, posixPath) {
     }
     return { bytes: buf, sizeLines: count };
   } catch (err) {
+    failures.push({ path: posixPath, stage: 'file-read', message: err.message });
     process.stderr.write(
       `Warning: scan-project: ${posixPath} — line count failed ` +
       `(${err.message}) — file skipped from output\n`,
@@ -757,6 +758,8 @@ async function main() {
     process.exit(1);
   }
 
+  const failures = [];
+
   // 1. Enumerate. Either git ls-files or recursive walk.
   const candidates = enumerateFiles(projectRoot).filter(
     rel =>
@@ -814,13 +817,14 @@ async function main() {
         continue;
       }
     } catch (err) {
+      failures.push({ path: rel, stage: 'file-lstat', message: err.message });
       process.stderr.write(
         `Warning: scan-project: ${rel} — lstat failed (${err.message}) ` +
         `— file skipped from output\n`,
       );
       continue;
     }
-    const scanned = readAndCountLines(absPath, rel);
+    const scanned = readAndCountLines(absPath, rel, failures);
     if (scanned === null) {
       // readAndCountLines already emitted the Warning: line.
       continue;
@@ -855,6 +859,7 @@ async function main() {
     totalFiles: fileEntries.length,
     filteredByIgnore,
     estimatedComplexity,
+    failures,
     stats: {
       filesScanned: fileEntries.length,
       byCategory,

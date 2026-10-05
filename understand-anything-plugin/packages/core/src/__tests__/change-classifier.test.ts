@@ -95,6 +95,70 @@ describe("classifyUpdate", () => {
     expect(decision.rerunArchitecture).toBe(true);
   });
 
+  it("compares explicit before and after inventories for removed directories", () => {
+    const analysis = makeAnalysis({
+      deletedFiles: ["legacy/removed.ts"],
+    });
+
+    const decision = classifyUpdate(
+      analysis,
+      20,
+      ["src/index.ts", "legacy/removed.ts"],
+      ["src/index.ts"],
+    );
+
+    expect(decision.action).toBe("ARCHITECTURE_UPDATE");
+    expect(decision.filesToReanalyze).toEqual([]);
+  });
+
+  it("keeps deletion-only changes partial when the top-level directory remains", () => {
+    const analysis = makeAnalysis({
+      deletedFiles: ["src/removed.ts"],
+    });
+
+    const decision = classifyUpdate(
+      analysis,
+      20,
+      ["src/index.ts", "src/removed.ts"],
+      ["src/index.ts"],
+    );
+
+    expect(decision.action).toBe("PARTIAL_UPDATE");
+    expect(decision.filesToReanalyze).toEqual([]);
+    expect(decision.rerunArchitecture).toBe(false);
+  });
+
+  it("normalizes Windows separators when comparing top-level directories", () => {
+    const analysis = makeAnalysis({
+      newFiles: ["src\\new.ts"],
+    });
+
+    const decision = classifyUpdate(
+      analysis,
+      20,
+      ["src\\existing.ts"],
+      ["src\\existing.ts", "src\\new.ts"],
+    );
+
+    expect(decision.action).toBe("PARTIAL_UPDATE");
+  });
+
+  it.skipIf(process.platform === "win32")(
+    "does not treat a literal POSIX backslash as a directory separator",
+    () => {
+      const analysis = makeAnalysis({ newFiles: ["foo\\bar.js"] });
+
+      const decision = classifyUpdate(
+        analysis,
+        20,
+        ["index.js"],
+        ["index.js", "foo\\bar.js"],
+      );
+
+      expect(decision.action).toBe("PARTIAL_UPDATE");
+    },
+  );
+
   it("does NOT trigger ARCHITECTURE_UPDATE for new file in existing directory", () => {
     const analysis = makeAnalysis({
       newFiles: ["src/newfile.ts"],

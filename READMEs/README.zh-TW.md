@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>AI 應該幫助人，而不是取代人。</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -22,18 +28,15 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/專案首頁-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/線上展示-00c853" alt="Live Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
   <img src="../assets/hero.png" alt="Understand Anything — 將任何程式碼庫轉換為互動式知識圖譜" width="800" />
-</p>
-
-<p align="center">
-  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
-  <br />
-  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
 </p>
 
 ---
@@ -185,7 +188,7 @@ Understand-Anything 可在多個 AI 編碼平台上執行。
 /plugin install understand-anything
 ```
 
-### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro）
+### 一行指令安裝（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro）
 
 **macOS / Linux：**
 ```bash
@@ -203,7 +206,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **關於技能呼叫方式：** 不同平台的呼叫前綴不同。大多數平台使用斜線指令（`/understand`），但 **Codex 使用 `$`** —— 請輸入 `$understand`，而不是 `/understand`。如果兩種前綴都無法辨識，直接用自然語言請求即可：*「使用 understand 技能分析這個專案」*。
 
-- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`nanobot`、`kiro`
+- 支援的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`
 - 後續更新：`./install.sh --update`
 - 解除安裝：`./install.sh --uninstall <platform>`
 
@@ -255,6 +258,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Hermes | ✅ 支援 | `install.sh hermes` |
 | Cline | ✅ 支援 | `install.sh cline` |
 | KIMI CLI | ✅ 支援 | `install.sh kimi` |
+| Trae | ✅ 支援 | `install.sh trae` |
 | Nanobot | ✅ 支援 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 支援 | `install.sh kiro` |
 
@@ -310,7 +314,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 
 ### 多智能體架構
 
-`/understand` 指令呼叫 5 個 agent，`/understand-domain` 額外增加第 6 個：
+`/understand` 指令呼叫 5 個 agent，`/understand-domain` 額外增加第 6 個，`/understand-knowledge` 再增加第 7 個：
 
 | Agent | 職責 |
 |-------|------|
@@ -318,11 +322,11 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 | `file-analyzer` | 提取程式碼結構（函式、類別和匯入），產生圖節點和邊 |
 | `architecture-analyzer` | 識別架構層 |
 | `tour-builder` | 產生引導式學習路徑 |
-| `graph-reviewer` | 驗證圖的完整性和參考完整性 |
+| `graph-reviewer` | 驗證圖的完整性和參考完整性（預設以內聯方式執行；使用 `--review` 進行完整的 LLM 審查） |
 | `domain-analyzer` | 提取業務領域、流程和處理步驟（由 `/understand-domain` 使用） |
 | `article-analyzer` | 從 wiki 文章中提取實體、論斷和隱式關係（由 `/understand-knowledge` 使用） |
 
-檔案分析器並行執行（最多 3 個並發）。支援增量更新 — 僅重新分析自上次執行以來發生變更的檔案。
+檔案分析器並行執行（最多 5 個並發，每批 20–30 個檔案）。支援增量更新 — 僅重新分析自上次執行以來發生變更的檔案。
 
 ---
 

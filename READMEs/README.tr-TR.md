@@ -7,6 +7,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>Yapay zekâ insanların yerini almamalı, onlara yardım etmeli.</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -23,18 +29,15 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Ana_Sayfa-d4a574" alt="Ana Sayfa" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Canlı_Demo-00c853" alt="Canlı Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
   <img src="../assets/hero.png" alt="Understand Anything — Herhangi bir kod tabanını interaktif bir bilgi grafiğine dönüştür" width="800" />
-</p>
-
-<p align="center">
-  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
-  <br />
-  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
 </p>
 
 ---
@@ -186,7 +189,7 @@ Understand-Anything birden fazla AI kodlama platformunda çalışır.
 /plugin install understand-anything
 ```
 
-### Tek satırlık kurulum (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### Tek satırlık kurulum (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
 
 **macOS / Linux:**
 ```bash
@@ -204,7 +207,7 @@ Kurulum betiği depoyu `~/.understand-anything/repo` dizinine klonlar ve seçile
 
 > **Skill çağırma hakkında not:** Çağırma öneki platforma göre değişir. Çoğu platform eğik çizgi komutları (`/understand`) kullanır, ancak **Codex `$` kullanır** — `/understand` değil, `$understand` yaz. İki önek de tanınmıyorsa doğal dille iste: *"understand skill'ini kullanarak bu projeyi analiz et."*
 
-- Desteklenen `<platform>` değerleri: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- Desteklenen `<platform>` değerleri: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
 - Daha sonra güncelle: `./install.sh --update`
 - Kaldır: `./install.sh --uninstall <platform>`
 
@@ -256,6 +259,7 @@ Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıda
 | Hermes | ✅ Destekleniyor | `install.sh hermes` |
 | Cline | ✅ Destekleniyor | `install.sh cline` |
 | KIMI CLI | ✅ Destekleniyor | `install.sh kimi` |
+| Trae | ✅ Destekleniyor | `install.sh trae` |
 | Nanobot | ✅ Destekleniyor | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Destekleniyor | `install.sh kiro` |
 
@@ -311,7 +315,7 @@ Bu ayrım sayesinde graf yapısal tarafta yeniden üretilebilir kalırken (aynı
 
 ### Çok-Ajan Hattı
 
-`/understand` komutu 5 özel ajan düzenler ve `/understand-domain` 6. ajanı ekler:
+`/understand` komutu 5 özel ajan düzenler, `/understand-domain` 6. ajanı, `/understand-knowledge` ise 7. ajanı ekler:
 
 | Ajan | Rol |
 |-------|------|
@@ -319,11 +323,11 @@ Bu ayrım sayesinde graf yapısal tarafta yeniden üretilebilir kalırken (aynı
 | `file-analyzer` | Fonksiyonları, sınıfları, içe aktarmaları çıkar; grafik düğümleri ve kenarları üret |
 | `architecture-analyzer` | Mimari katmanları tanımla |
 | `tour-builder` | Rehberli öğrenme turları oluştur |
-| `graph-reviewer` | Grafik bütünlüğünü ve referans bütünlüğünü doğrula |
+| `graph-reviewer` | Grafik bütünlüğünü ve referans bütünlüğünü doğrula (varsayılan olarak satır içi çalışır; tam LLM incelemesi için `--review` kullan) |
 | `domain-analyzer` | İş alanları, akışlar ve işlem adımlarını çıkar (`/understand-domain` tarafından kullanılır) |
 | `article-analyzer` | Wiki makalelerinden varlıkları, iddiaları ve örtük ilişkileri çıkar (`/understand-knowledge` tarafından kullanılır) |
 
-Dosya analizörleri paralel çalışır (en fazla 3 eşzamanlı). Artımlı güncellemeleri destekler — yalnızca son çalıştırmadan bu yana değişen dosyaları yeniden analiz eder.
+Dosya analizörleri paralel çalışır (en fazla 5 eşzamanlı, parti başına 20–30 dosya). Artımlı güncellemeleri destekler — yalnızca son çalıştırmadan bu yana değişen dosyaları yeniden analiz eder.
 
 ---
 

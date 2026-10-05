@@ -31,6 +31,23 @@ function parse(code: string) {
 describe("GoExtractor", () => {
   const extractor = new GoExtractor();
 
+  it("preserves receiver ownership outside type declarations, including generic receivers", () => {
+    const { tree, parser, root } = parse(`package p
+type A[T any] struct{}
+func (a *A[T]) Run() {}
+func (b B) Run() {}
+func Run() {}
+`);
+    expect(root.hasError).toBe(false);
+    const result = extractor.extractStructure(root);
+    expect(result.functions.map(fn => [fn.name, fn.owner])).toEqual([
+      ["Run", "A"], ["Run", "B"], ["Run", ""],
+    ]);
+    expect(result.classes[0].methods).toEqual(["Run"]);
+    tree.delete();
+    parser.delete();
+  });
+
   it("has correct languageIds", () => {
     expect(extractor.languageIds).toEqual(["go"]);
   });

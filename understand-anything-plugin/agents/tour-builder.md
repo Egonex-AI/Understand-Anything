@@ -208,64 +208,17 @@ If the script exits with a non-zero code, read stderr, diagnose the issue, fix t
 
 After the script completes, read `$UA_DIR/tmp/ua-tour-results.json`. Use the structural analysis as your primary guide for designing the tour. Do NOT re-read source files or re-analyze the graph -- trust the script's results entirely.
 
-### Step 1 -- Choose the Starting Point
+### Tour Design Goals
 
-Consider two options for Step 1:
+Choose a sequence of 5-15 steps that helps a newcomer understand the project's purpose, architecture, and key concepts:
 
-**Option A: README.md first** — If `document:README.md` appears in `entryPointCandidates` or `nonCodeFiles.documentation`, start with it. A README gives newcomers the project's purpose and context before diving into code.
+- Start with a project overview, using an informative README when available or a code entry point otherwise.
+- Introduce the concepts needed to understand later steps before those steps. Use layer names and descriptions to identify these prerequisites.
+- Use `bfsTraversal`, `fanInRanking`, `fanOutRanking`, and `entryPointCandidates` as structural signals. Choose step order and emphasis according to the project's learning needs; BFS depth does not prescribe step numbers.
+- Select the most important and illustrative nodes. Group related nodes when explaining them together helps the reader, using `clusters` as a guide.
+- Integrate meaningful documentation, infrastructure, data, and configuration from `nonCodeFiles` alongside the concepts they explain.
 
-**Option B: Code entry point first** — If there is no README or it is trivial, use the top code entry point from `entryPointCandidates[0]`.
-
-For most projects with a README, **Option A is preferred** — the tour starts with "What is this project?" (README) then moves to "How does it start?" (code entry point in Step 2).
-
-### Step 2 -- Map the BFS Traversal to Tour Steps
-
-The `bfsTraversal.byDepth` structure gives you the natural reading order of the codebase. Use this as the backbone of your tour:
-
-| BFS Depth | Tour Mapping | Purpose |
-|---|---|---|
-| Depth 0 | Step 1-2 | Project overview (README) + code entry point |
-| Depth 1 | Steps 3-4 | Direct dependencies: core types, config, main modules |
-| Depth 2 | Steps 5-7 | Feature modules, services, primary functionality |
-| Depth 3+ | Steps 8-10 | Supporting infrastructure, utilities |
-| (non-code) | Steps 11+ | Infrastructure, data, deployment |
-
-You do not need to include every node from the BFS. Select the most important and illustrative nodes at each depth level, using `fanInRanking` to prioritize.
-
-### Step 3 -- Integrate Non-Code Tour Stops
-
-Use `nonCodeFiles` to add non-code stops at appropriate points in the tour:
-
-**Documentation stops:**
-- README.md → Step 1 (project overview, if available)
-- API docs → After the API layer code
-- Architecture docs → After explaining the code structure
-
-**Infrastructure stops:**
-- Dockerfile → "How the app gets containerized" — place after the code's entry point and main modules are explained
-- docker-compose.yml → "How services are orchestrated" — place after Dockerfile
-- K8s manifests → "How the app gets deployed to production"
-
-**Data stops:**
-- SQL schema/migrations → "The database schema" — place near the data model code
-- GraphQL schema → "The API contract" — place near the API handlers
-- Protobuf definitions → "The message protocol" — place near the service handlers
-
-**CI/CD stops:**
-- GitHub Actions / GitLab CI → "How code gets tested and deployed" — place near the end as a capstone
-
-**Configuration stops:**
-- Key config files → Weave into relevant code steps rather than grouping all configs together
-
-### Step 4 -- Use Clusters for Grouped Steps
-
-When a `cluster` from the script output appears at the same BFS depth, group those nodes into a single tour step. Clusters represent tightly coupled code that should be explained together.
-
-### Step 5 -- Use Layers for Narrative Arc
-
-The `layers` list gives you the project's architectural groupings. Use layer names and descriptions to understand which areas are foundational vs. top-level, and structure the tour to explain foundational layers before the layers that depend on them.
-
-### Step 6 -- Write Step Descriptions
+### Step Descriptions
 
 For each step, use the `nodeSummaryIndex` to access node summaries and names without re-reading files. Each description must:
 
@@ -274,16 +227,17 @@ For each step, use the `nodeSummaryIndex` to access node summaries and names wit
 - Highlight key design decisions or patterns
 - Be written for someone who has never seen this codebase before
 - Be 2-4 sentences long
+- Ground project-specific claims in node summaries or other provided project context
 
-**For non-code stops, adapt the description style:**
+**Illustrative non-code descriptions:** Adapt the wording to the project and include only details supported by the provided data.
 
 Bad description: "This is the Dockerfile."
-Good description: "The Dockerfile defines how the application gets packaged into a container image. It uses a multi-stage build: the first stage installs dependencies and compiles TypeScript, while the second stage copies only the compiled output into a minimal Alpine image. This keeps the production image under 100MB while including everything needed to run the server from Step 2."
+Good description: "The Dockerfile defines how the application gets packaged into a container image. It uses a multi-stage build: the first stage installs dependencies and compiles TypeScript, while the second stage copies only the compiled output into a minimal Alpine image. This separates compilation dependencies from the files needed to run the server."
 
 Bad description: "These are the SQL migrations."
-Good description: "The database schema defines the core data model underpinning the entire application. The users table (Step 3's User model) maps directly to the columns defined here, while the orders table introduces the foreign key relationship that drives the business logic in Step 5's OrderService."
+Good description: "The users and orders tables store the records used by the models introduced earlier. The foreign key from orders to users links each purchase to its owner, connecting the data model to the ordering workflow."
 
-### Step 7 -- Add Language Lessons (Optional)
+### Language Lessons (Optional)
 
 If a step involves notable language-specific or format-specific patterns, include a brief `languageLesson` string. Only add these when genuinely educational:
 
@@ -309,6 +263,8 @@ If a step involves notable language-specific or format-specific patterns, includ
 
 Produce a single, valid JSON array.
 
+The following example is illustrative. Use node IDs and project facts from the provided graph when creating the actual tour.
+
 ```json
 [
   {
@@ -331,18 +287,18 @@ Produce a single, valid JSON array.
     "nodeIds": ["file:src/types.ts", "file:src/interfaces/user.ts"]
   },
   {
-    "order": 8,
+    "order": 4,
     "title": "Database Schema",
-    "description": "The SQL migrations define the database tables that back the User and Order models from Steps 3-4. Foreign keys enforce the relationships the code relies on.",
+    "description": "The SQL migrations define persistent storage for the data model introduced in Step 3. Foreign keys enforce the relationships the code relies on.",
     "nodeIds": ["table:migrations/001.sql:users", "table:migrations/002.sql:orders"],
     "languageLesson": "SQL migrations should be idempotent and ordered. Each migration file applies incremental changes to the schema, allowing the database to evolve alongside the application code."
   },
   {
-    "order": 12,
+    "order": 5,
     "title": "Containerization & Deployment",
     "description": "The Dockerfile packages the application into a production-ready container image. The multi-stage build compiles TypeScript in a builder stage and copies only the runtime artifacts, keeping the final image small.",
     "nodeIds": ["service:Dockerfile", "service:docker-compose.yml"],
-    "languageLesson": "Multi-stage Docker builds use multiple FROM statements. The builder stage has dev dependencies for compilation, while the final stage only includes runtime dependencies, reducing image size by 50-80%."
+    "languageLesson": "Multi-stage Docker builds use multiple FROM statements. The builder stage has dev dependencies for compilation, while the final stage only includes runtime dependencies."
   }
 ]
 ```

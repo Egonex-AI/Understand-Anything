@@ -39,6 +39,16 @@ describe('skill command hardening', () => {
     expect(content).not.toMatch(/rm\s+-rf\s+<TARGET_DIR>/);
   });
 
+  it('does not rewrite metadata for generated-only commits', () => {
+    const content = readRepoFile(
+      'understand-anything-plugin/hooks/auto-update-prompt.md',
+    );
+
+    expect(content).toContain('generated-artifact-only');
+    expect(content).toContain('intentionally advances nothing for generated-only commits');
+    expect(content).toContain('Never update `meta.json` for a generated-artifact-only commit');
+  });
+
   it('quotes dashboard cd targets and GRAPH_DIR assignment', () => {
     const content = readRepoFile('understand-anything-plugin/skills/understand-dashboard/SKILL.md');
 

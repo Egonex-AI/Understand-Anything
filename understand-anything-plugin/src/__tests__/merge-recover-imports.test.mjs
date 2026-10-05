@@ -53,6 +53,14 @@ function fileNode(path) {
   };
 }
 
+function wholeFileNode(type, path) {
+  return {
+    ...fileNode(path),
+    id: `${type}:${path}`,
+    type,
+  };
+}
+
 function importsEdge(src, tgt) {
   return {
     source: `file:${src}`,
@@ -144,7 +152,7 @@ describe("merge-batch-graphs.py imports recovery", () => {
 
     const { assembled, stderr } = runMerge();
     expect(assembled.edges.filter((e) => e.type === "imports")).toHaveLength(0);
-    expect(stderr).toContain("Skipped 1 importMap source files with no `file:` node");
+    expect(stderr).toContain("Skipped 1 importMap source files with no whole-file node");
   });
 
   it("skips importMap targets that don't have a file: node", () => {
@@ -164,7 +172,7 @@ describe("merge-batch-graphs.py imports recovery", () => {
 
     const { assembled, stderr } = runMerge();
     expect(assembled.edges.filter((e) => e.type === "imports")).toHaveLength(0);
-    expect(stderr).toContain("Skipped 2 importMap target paths with no `file:` node");
+    expect(stderr).toContain("Skipped 2 importMap target paths with no whole-file node");
   });
 
   it("works when scan-result.json is missing (incremental update path)", () => {
@@ -200,6 +208,86 @@ describe("merge-batch-graphs.py imports recovery", () => {
 
     const { assembled } = runMerge();
     expect(assembled.edges.filter((e) => e.type === "imports")).toHaveLength(0);
+  });
+
+  it.each([
+    ['file', 'config'],
+    ['file', 'schema'],
+    ['config', 'file'],
+  ])('recovers %s to %s imports through whole-file nodes', (sourceType, targetType) => {
+    writeFileSync(
+      join(intermediateDir, 'batch-0.json'),
+      JSON.stringify({
+        nodes: [
+          wholeFileNode(sourceType, 'src/source.ts'),
+          wholeFileNode(targetType, 'config/target.json'),
+        ],
+        edges: [],
+      }),
+    );
+    writeFileSync(
+      join(intermediateDir, 'scan-result.json'),
+      JSON.stringify({
+        importMap: { 'src/source.ts': ['config/target.json'] },
+      }),
+    );
+
+    const { assembled } = runMerge();
+    expect(assembled.edges.filter((edge) => edge.type === 'imports')).toEqual([
+      expect.objectContaining({
+        source: `${sourceType}:src/source.ts`,
+        target: `${targetType}:config/target.json`,
+      }),
+    ]);
+  });
+
+  it('prefers file nodes over other whole-file nodes for the same path', () => {
+    writeFileSync(
+      join(intermediateDir, 'batch-0.json'),
+      JSON.stringify({
+        nodes: [
+          wholeFileNode('config', 'src/source.ts'),
+          wholeFileNode('file', 'src/source.ts'),
+          wholeFileNode('schema', 'src/target.ts'),
+          wholeFileNode('file', 'src/target.ts'),
+        ],
+        edges: [],
+      }),
+    );
+    writeFileSync(
+      join(intermediateDir, 'scan-result.json'),
+      JSON.stringify({ importMap: { 'src/source.ts': ['src/target.ts'] } }),
+    );
+
+    const { assembled, stderr } = runMerge();
+    expect(assembled.edges.filter((edge) => edge.type === 'imports')).toEqual([
+      expect.objectContaining({
+        source: 'file:src/source.ts',
+        target: 'file:src/target.ts',
+      }),
+    ]);
+    expect(stderr).toContain('multiple whole-file nodes for src/source.ts');
+    expect(stderr).toContain('selected file:src/source.ts');
+  });
+
+  it('does not use child constructs as whole-file import endpoints', () => {
+    const table = {
+      ...wholeFileNode('schema', 'db/schema.sql'),
+      id: 'table:db/schema.sql:users',
+      type: 'table',
+    };
+    writeFileSync(
+      join(intermediateDir, 'batch-0.json'),
+      JSON.stringify({ nodes: [fileNode('src/source.ts'), table], edges: [] }),
+    );
+    writeFileSync(
+      join(intermediateDir, 'scan-result.json'),
+      JSON.stringify({ importMap: { 'src/source.ts': ['db/schema.sql'] } }),
+    );
+
+    const { assembled, stderr } = runMerge();
+    expect(assembled.edges.filter((edge) => edge.type === 'imports')).toHaveLength(0);
+    expect(stderr).toContain('no whole-file node in graph');
   });
 });
 

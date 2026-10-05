@@ -7,6 +7,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>ИИ должен помогать людям, а не заменять их.</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -23,18 +29,15 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Сайт-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Демо-00c853" alt="Live Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
   <img src="../assets/hero.png" alt="Understand Anything — Превратите любую кодовую базу в интерактивный граф знаний" width="800" />
-</p>
-
-<p align="center">
-  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
-  <br />
-  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
 </p>
 
 ---
@@ -186,7 +189,7 @@ Understand-Anything работает с несколькими платформ�
 /plugin install understand-anything
 ```
 
-### Установка одной командой (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### Установка одной командой (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
 
 **macOS / Linux:**
 ```bash
@@ -204,7 +207,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **Как вызывать skills:** префикс вызова зависит от платформы. Большинство платформ используют слэш-команды (`/understand`), но **Codex использует `$`** — вводите `$understand`, а не `/understand`. Если ни один префикс не распознаётся, просто попросите обычным языком: *«Используй skill understand, чтобы проанализировать этот проект»*.
 
-- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
 - Обновление: `./install.sh --update`
 - Удаление: `./install.sh --uninstall <platform>`
 
@@ -256,6 +259,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Hermes | ✅ Поддерживается | `install.sh hermes` |
 | Cline | ✅ Поддерживается | `install.sh cline` |
 | KIMI CLI | ✅ Поддерживается | `install.sh kimi` |
+| Trae | ✅ Поддерживается | `install.sh trae` |
 | Nanobot | ✅ Поддерживается | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Поддерживается | `install.sh kiro` |
 
@@ -311,7 +315,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 
 ### Мультиагентный пайплайн
 
-Команда `/understand` оркестрирует 5 специализированных агентов, а `/understand-domain` добавляет шестого:
+Команда `/understand` оркестрирует 5 специализированных агентов, `/understand-domain` добавляет шестого, а `/understand-knowledge` — седьмого:
 
 | Агент | Роль |
 |-------|------|

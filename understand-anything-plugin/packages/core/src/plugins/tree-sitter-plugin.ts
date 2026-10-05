@@ -8,6 +8,7 @@ import type {
 } from "../types.js";
 import type { LanguageConfig } from "../languages/types.js";
 import type { LanguageExtractor } from "./extractors/types.js";
+import { collectSymbolEvidence, type SymbolEvidence } from "./symbol-evidence.js";
 import { builtinExtractors } from "./extractors/index.js";
 
 // web-tree-sitter uses CJS internally; we need createRequire for .wasm resolution
@@ -261,6 +262,48 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     tree.delete();
 
     return result;
+  }
+
+  /**
+   * Evidence for destructive structural comparisons. Unlike analyzeFile's
+   * best-effort contract, an unavailable grammar or a recovered syntax error
+   * must never look like a successfully parsed file with no symbols.
+   * Supplemental declarations retain their name and owner, so uncertainty
+   * cannot leak from an unrelated class or an ordinary source-code token.
+   */
+  analyzeFileStrict(
+    filePath: string,
+    content: string,
+  ): {
+    status: "succeeded" | "unsupported" | "failed";
+    structure: StructuralAnalysis | null;
+    symbolEvidence: SymbolEvidence | null;
+    language?: string;
+  } {
+    let tree: ReturnType<TreeSitterParser["parse"]> = null;
+    try {
+      const parser = this.getParser(filePath);
+      const langKey = this.languageKeyFromPath(filePath);
+      const extractor = langKey ? this.getExtractor(langKey) : null;
+      if (!parser || !extractor) {
+        return { status: "unsupported", structure: null, symbolEvidence: null };
+      }
+      tree = parser.parse(content);
+      if (!tree || tree.rootNode.hasError) {
+        return { status: "failed", structure: null, symbolEvidence: null };
+      }
+      const structure = extractor.extractStructure(tree.rootNode);
+      return {
+        status: "succeeded",
+        language: langKey!,
+        structure,
+        symbolEvidence: collectSymbolEvidence(tree.rootNode, structure, langKey!),
+      };
+    } catch {
+      return { status: "failed", structure: null, symbolEvidence: null };
+    } finally {
+      tree?.delete();
+    }
   }
 
   /**

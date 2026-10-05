@@ -256,11 +256,24 @@ function buildBatchOfMap(allBatches) {
 }
 
 function normalizeRelativePathForMatch(pathText) {
-  return pathText
-    .trim()
-    .replace(/\\/g, '/')
+  if (typeof pathText !== 'string') return '';
+  const platformPath = process.platform === 'win32' ? pathText.replace(/\\/g, '/') : pathText;
+  return platformPath
     .replace(/^\.\/+/, '')
     .replace(/\/+/g, '/');
+}
+
+function parseChangedFileList(content, filePath) {
+  if (filePath.toLowerCase().endsWith('.json') || content.trimStart().startsWith('[')) {
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed) || parsed.some(path => typeof path !== 'string')) {
+      throw new Error('JSON changed-file list must be an array of strings');
+    }
+    return parsed.map(normalizeRelativePathForMatch).filter(Boolean);
+  }
+  // Backwards compatibility for existing newline-delimited callers. New
+  // incremental handoffs use JSON so embedded newlines remain unambiguous.
+  return content.split(/\r?\n/).map(normalizeRelativePathForMatch).filter(Boolean);
 }
 
 // ECMAScript string comparison uses a stable UTF-16 code-unit order and does
@@ -417,11 +430,15 @@ async function main() {
       );
       process.exit(1);
     }
-    const lines = content
-      .split('\n')
-      .map(normalizeRelativePathForMatch)
-      .filter(Boolean);
-    changedFiles = new Set(lines);
+    try {
+      changedFiles = new Set(parseChangedFileList(content, changedFilesPath));
+    } catch (err) {
+      process.stderr.write(
+        `Error: compute-batches: --changed-files contents invalid: ${changedFilesPath} ` +
+        `(${err.message})\n`,
+      );
+      process.exit(1);
+    }
   }
 
   const scanResultValue = helperOptions.get('scan-result');

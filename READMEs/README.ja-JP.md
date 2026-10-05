@@ -40,12 +40,6 @@
   <img src="../assets/hero.png" alt="Understand Anything — あらゆるコードベースをインタラクティブなナレッジグラフに変換" width="800" />
 </p>
 
-<p align="center">
-  <strong><a href="https://github.com/Egonex-AI">Egonex</a> によるオープンソースプロジェクト</strong>
-  <br />
-  <em>原作者: <a href="https://github.com/Lum1104">Lum1104</a></em>
-</p>
-
 ---
 
 **新しいチームに参加したばかり。コードベースは20万行。どこから手をつければいいのか？**
@@ -323,7 +317,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 
 ### マルチエージェントパイプライン
 
-`/understand` コマンドは5つの専門エージェントをオーケストレーションし、`/understand-domain` は6つ目を追加します：
+`/understand` コマンドは5つの専門エージェントをオーケストレーションし、`/understand-domain` は6つ目、`/understand-knowledge` は7つ目を追加します：
 
 | エージェント | 役割 |
 |-------|------|

@@ -223,7 +223,7 @@ Produce the final validation report JSON:
 
 ## Critical Constraints
 
-- NEVER approve a graph that has critical issues. Be strict.
+- NEVER approve a graph that has critical issues.
 - ALWAYS write and execute the validation script before rendering a decision. Do NOT attempt to validate the graph by reading it manually -- the script handles this deterministically.
 - ALWAYS provide specific, actionable issue descriptions. "Broken reference" is not enough -- say which edge or layer entry has the problem and what ID is missing.
 - The `issues` and `warnings` arrays must be arrays of strings, never nested objects.

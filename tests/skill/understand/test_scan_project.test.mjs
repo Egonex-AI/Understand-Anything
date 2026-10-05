@@ -719,6 +719,7 @@ describe('scan-project.mjs — empty repo', () => {
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     expect(r.output.scriptCompleted).toBe(true);
+    expect(r.output.failures).toEqual([]);
     expect(r.output.totalFiles).toBe(0);
     expect(r.output.files).toEqual([]);
     expect(r.output.filteredByIgnore).toBe(0);
@@ -762,6 +763,9 @@ describe('scan-project.mjs — per-file failure resilience', () => {
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
     expect(r.output.scriptCompleted).toBe(true);
+    expect(r.output.failures).toEqual([
+      expect.objectContaining({ path: 'src/unreadable.ts', stage: 'file-read' }),
+    ]);
     // The good file is in the output.
     expect(byPath(r.output, 'src/good.ts')).toBeDefined();
     // The unreadable file is dropped.
@@ -907,6 +911,7 @@ describe('scan-project.mjs — output schema invariants', () => {
       out.estimatedComplexity,
     );
     expect(out.stats).toBeDefined();
+    expect(out.failures).toEqual([]);
     expect(out.stats.filesScanned).toBe(out.files.length);
     expect(typeof out.stats.byCategory).toBe('object');
     expect(typeof out.stats.byLanguage).toBe('object');

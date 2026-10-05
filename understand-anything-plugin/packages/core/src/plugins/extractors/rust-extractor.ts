@@ -238,6 +238,7 @@ export class RustExtractor implements LanguageExtractor {
 
     functions.push({
       name: nameNode.text,
+      owner: "",
       lineRange: [
         node.startPosition.row + 1,
         node.endPosition.row + 1,
@@ -400,6 +401,9 @@ export class RustExtractor implements LanguageExtractor {
 
       functions.push({
         name: nameNode.text,
+        // A trait impl needs trait identity as well as receiver identity.
+        // Until that is modeled, do not equate it with an inherent method.
+        owner: node.childForFieldName("trait") ? null : typeName,
         lineRange: [
           fn.startPosition.row + 1,
           fn.endPosition.row + 1,

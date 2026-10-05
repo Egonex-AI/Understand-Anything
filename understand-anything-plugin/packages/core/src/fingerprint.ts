@@ -8,6 +8,7 @@ import type { PluginRegistry } from "./plugins/registry.js";
 
 export interface FunctionFingerprint {
   name: string;
+  owner?: string | null;
   params: string[];
   returnType?: string;
   exported: boolean;
@@ -43,6 +44,15 @@ export interface FingerprintStore {
   gitCommitHash: string;
   generatedAt: string;
   files: Record<string, FileFingerprint>;
+}
+
+export interface FingerprintBuildOptions {
+  /**
+   * Languages whose StructuralAnalysis fields are fully represented by
+   * FileFingerprint. Other languages receive content-only fingerprints so a
+   * content change is classified conservatively instead of as cosmetic.
+   */
+  structuralFingerprintLanguages?: ReadonlySet<string>;
 }
 
 export type ChangeLevel = "NONE" | "COSMETIC" | "STRUCTURAL";
@@ -86,6 +96,7 @@ export function extractFileFingerprint(
 
   const functions: FunctionFingerprint[] = analysis.functions.map((fn) => ({
     name: fn.name,
+    ...(fn.owner !== undefined ? { owner: fn.owner } : {}),
     params: [...fn.params],
     returnType: fn.returnType,
     exported: exportedNames.has(fn.name),
@@ -149,7 +160,24 @@ export function compareFingerprints(
     };
   }
 
+  // A null receiver is incomplete evidence, not a stable identity. Any content
+  // change must reach the source validator even if other signatures match.
+  if ([...oldFp.functions, ...newFp.functions].some(fn => fn.owner === null)) {
+    return {
+      filePath: newFp.filePath,
+      changeLevel: "STRUCTURAL",
+      details: ["unresolved function ownership — conservative classification"],
+    };
+  }
+
   // Compare function signatures
+  // Receiver changes matter even when the type is declared in another file.
+  // Also conservatively reanalyze changed files with older ownerless evidence.
+  const ownership = (functions: FunctionFingerprint[]) => functions
+    .map(fn => JSON.stringify([fn.name, fn.owner])).sort();
+  if (JSON.stringify(ownership(oldFp.functions)) !== JSON.stringify(ownership(newFp.functions))) {
+    details.push("function ownership changed");
+  }
   const oldFuncNames = new Set(oldFp.functions.map((f) => f.name));
   const newFuncNames = new Set(newFp.functions.map((f) => f.name));
 
@@ -255,6 +283,7 @@ export function buildFingerprintStore(
   filePaths: string[],
   registry: PluginRegistry,
   gitCommitHash: string,
+  options: FingerprintBuildOptions = {},
 ): FingerprintStore {
   const files: Record<string, FileFingerprint> = {};
 
@@ -264,8 +293,14 @@ export function buildFingerprintStore(
 
     const content = readFileSync(absolutePath, "utf-8");
     const analysis = registry.analyzeFile(filePath, content);
+    let fingerprintCoversAnalysis = true;
+    if (options.structuralFingerprintLanguages !== undefined) {
+      const language = registry.getLanguageForFile(filePath);
+      fingerprintCoversAnalysis =
+        language !== null && options.structuralFingerprintLanguages.has(language);
+    }
 
-    if (analysis) {
+    if (analysis && fingerprintCoversAnalysis) {
       files[filePath] = extractFileFingerprint(filePath, content, analysis);
     } else {
       // No tree-sitter support: content hash only (conservative)

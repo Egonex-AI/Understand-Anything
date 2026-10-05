@@ -381,6 +381,7 @@ export class CppExtractor implements LanguageExtractor {
               const paramsNode = funcDecl.childForFieldName("parameters");
               functions.push({
                 name: info.name,
+                owner: className,
                 lineRange: [
                   member.startPosition.row + 1,
                   member.endPosition.row + 1,
@@ -446,6 +447,7 @@ export class CppExtractor implements LanguageExtractor {
 
     functions.push({
       name: info.name,
+      owner: info.qualifier ?? "",
       lineRange: [
         node.startPosition.row + 1,
         node.endPosition.row + 1,

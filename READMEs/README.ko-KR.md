@@ -6,6 +6,12 @@
 </p>
 
 <p align="center">
+  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
+  <br />
+  <em>AI는 사람을 대체하는 것이 아니라 사람을 도와야 합니다.</em>
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
@@ -22,18 +28,15 @@
   <a href="#copilot-cli"><img src="https://img.shields.io/badge/Copilot_CLI-24292e" alt="Copilot CLI" /></a>
   <a href="#gemini-cli"><img src="https://img.shields.io/badge/Gemini_CLI-4285F4" alt="Gemini CLI" /></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
+  <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
+  <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/홈페이지-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/라이브_데모-00c853" alt="Live Demo" /></a>
+  <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
 </p>
 
 <p align="center">
   <img src="../assets/hero.png" alt="Understand Anything — 모든 코드베이스를 인터랙티브 지식 그래프로 변환" width="800" />
-</p>
-
-<p align="center">
-  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
-  <br />
-  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
 </p>
 
 ---
@@ -185,7 +188,7 @@ Understand-Anything은 다양한 AI 코딩 플랫폼에서 사용할 수 있습�
 /plugin install understand-anything
 ```
 
-### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Nanobot / Kiro)
+### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
 
 **macOS / Linux:**
 ```bash
@@ -203,7 +206,7 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 > **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"* 처럼 자연어로 요청하면 됩니다.
 
-- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `nanobot`, `kiro`
+- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
 - 이후 업데이트: `./install.sh --update`
 - 제거: `./install.sh --uninstall <platform>`
 
@@ -255,6 +258,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 | Hermes | ✅ 지원 | `install.sh hermes` |
 | Cline | ✅ 지원 | `install.sh cline` |
 | KIMI CLI | ✅ 지원 | `install.sh kimi` |
+| Trae | ✅ 지원 | `install.sh trae` |
 | Nanobot | ✅ 지원 | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ 지원 | `install.sh kiro` |
 
@@ -310,7 +314,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 
 ### 멀티 에이전트 파이프라인
 
-`/understand` 명령은 5개의 전문 에이전트를 조율하며, `/understand-domain`은 6번째 에이전트를 추가합니다:
+`/understand` 명령은 5개의 전문 에이전트를 조율하며, `/understand-domain`은 6번째, `/understand-knowledge`는 7번째 에이전트를 추가합니다:
 
 | 에이전트 | 역할 |
 |-------|------|

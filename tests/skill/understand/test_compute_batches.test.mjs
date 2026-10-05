@@ -749,7 +749,8 @@ describe('compute-batches.mjs — --changed-files', () => {
     const changedPath = join(root, 'changed.txt');
     // Only two files in the auth clique are changed. Use CRLF plus one
     // backslash path to cover Windows git diff/path-list inputs.
-    writeFileSync(changedPath, ['src\\auth\\login.ts', 'src/auth/tokens.ts'].join('\r\n'));
+    const loginPath = process.platform === 'win32' ? 'src\\auth\\login.ts' : 'src/auth/login.ts';
+    writeFileSync(changedPath, [loginPath, 'src/auth/tokens.ts'].join('\r\n'));
 
     const result = runScript(root, [`--changed-files=${changedPath}`]);
     expect(result.status).toBe(0);
@@ -793,6 +794,38 @@ describe('compute-batches.mjs — --changed-files', () => {
       'src/auth/tokens.ts',
     ]);
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'preserves a newline-containing path from a JSON changed-file list',
+    () => {
+      root = mkdtempSync(join(tmpdir(), 'ua-cb-newline-'));
+      const intermediate = join(root, '.understand-anything', 'intermediate');
+      const sourcePath = 'src/line\nbreak.ts';
+      mkdirSync(intermediate, { recursive: true });
+      mkdirSync(join(root, 'src'), { recursive: true });
+      writeFileSync(join(root, sourcePath), 'export const value = 1;\n');
+      writeFileSync(
+        join(intermediate, 'scan-result.json'),
+        JSON.stringify({
+          files: [{
+            path: sourcePath,
+            language: 'typescript',
+            sizeLines: 1,
+            fileCategory: 'code',
+          }],
+          importMap: { [sourcePath]: [] },
+        }),
+      );
+      const changedPath = join(root, 'changed-files.json');
+      writeFileSync(changedPath, JSON.stringify([sourcePath]));
+
+      const result = runScript(root, [`--changed-files=${changedPath}`]);
+      expect(result.status, result.stderr).toBe(0);
+      expect(readBatches(root).batches.flatMap(batch => batch.files)).toEqual([
+        expect.objectContaining({ path: sourcePath }),
+      ]);
+    },
+  );
 
   it('emits only changed files inside retained batches while preserving unchanged neighbor context', () => {
     root = mkdtempSync(join(tmpdir(), 'ua-cb-changed-nbr-'));

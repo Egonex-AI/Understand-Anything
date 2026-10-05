@@ -40,12 +40,6 @@
   <img src="assets/hero.png" alt="Understand Anything — Turn any codebase into an interactive knowledge graph" width="800" />
 </p>
 
-<p align="center">
-  <strong>An open-source project from <a href="https://github.com/Egonex-AI">Egonex</a></strong>
-  <br />
-  <em>Originally created by <a href="https://github.com/Lum1104">Lum1104</a>.</em>
-</p>
-
 ---
 
 **You just joined a new team. The codebase is 200,000 lines of code. Where do you even start?**
@@ -218,8 +212,12 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 
 - Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
-- Update later: `./install.sh --update`
-- Uninstall: `./install.sh --uninstall <platform>`
+- Update later:
+  - macOS / Linux: `./install.sh --update`
+  - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Update`
+- Uninstall:
+  - macOS / Linux: `./install.sh --uninstall <platform>`
+  - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Uninstall <platform>`
 
 ### Cursor
 
@@ -326,19 +324,22 @@ This split is why the graph is reproducible on the structural side (the same cod
 
 ### Multi-Agent Pipeline
 
-The `/understand` command orchestrates 5 specialized agents, and `/understand-domain` adds a 6th:
+The `/understand` command orchestrates 5 specialized agents, `/understand-domain` adds a 6th, and `/understand-knowledge` adds a 7th:
 
-| Agent | Role |
-|-------|------|
-| `project-scanner` | Discover files, detect languages and frameworks |
-| `file-analyzer` | Extract functions, classes, imports; produce graph nodes and edges |
-| `architecture-analyzer` | Identify architectural layers |
-| `tour-builder` | Generate guided learning tours |
-| `graph-reviewer` | Validate graph completeness and referential integrity (runs inline by default; use `--review` for full LLM review) |
-| `domain-analyzer` | Extract business domains, flows, and process steps (used by `/understand-domain`) |
-| `article-analyzer` | Extract entities, claims, and implicit relationships from wiki articles (used by `/understand-knowledge`) |
+| Agent                   | Role                                                                                                               | Used By                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| `project-scanner`       | Discovers files, detects languages and frameworks                                                                  | `/understand`           |
+| `file-analyzer`         | Extracts functions, classes, imports; produces graph nodes and edges                                               | `/understand`           |
+| `architecture-analyzer` | Identifies architectural layers                                                                                    | `/understand`           |
+| `tour-builder`          | Generates guided learning tours                                                                                    | `/understand`           |
+| `graph-reviewer`        | Validates graph completeness and referential integrity. Runs inline by default; use `--review` for full LLM review | `/understand`           |
+| `domain-analyzer`       | Extracts business domains, flows, and process steps                                                                | `/understand-domain`    |
+| `article-analyzer`      | Extracts entities, claims, and implicit relationships from wiki articles                                           | `/understand-knowledge` |
 
-File analyzers run in parallel (up to 5 concurrent, 20-30 files per batch). Supports incremental updates — only re-analyzes files that changed since the last run.
+File analyzers run in parallel, up to 5 concurrent workers and 20–30 files per batch.
+
+The pipeline also supports incremental updates: only files changed since the last run are re-analyzed.
+
 
 ---
 

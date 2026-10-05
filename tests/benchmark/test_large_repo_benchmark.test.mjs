@@ -13,12 +13,18 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { rm } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { afterEach, describe, expect, it } from 'vitest';
-
 import * as benchmark from '../../scripts/lib/large-repo-benchmark.mjs';
+
+// Synchronous CLI probes can make this file exceed Vitest's RPC timeout on
+// Windows. Let the worker receive progress acknowledgements between cases.
+afterEach(async () => {
+  await new Promise(resolve => setImmediate(resolve));
+});
 
 const { CliUsageError, parseArgs } = benchmark;
 
@@ -1024,9 +1030,12 @@ describe('path redaction', () => {
 describe('Git metadata probes', () => {
   const cleanup = [];
 
-  afterEach(() => {
+  afterEach(async () => {
     for (const path of cleanup.splice(0)) {
-      rmSync(path, { recursive: true, force: true });
+      // Git-for-Windows can briefly retain its cwd after ENOBUFS termination.
+      // Async cleanup lets pending process/pipe events drain between retries;
+      // synchronous backoff can retain the lock throughout its retry window.
+      await rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
   });
 

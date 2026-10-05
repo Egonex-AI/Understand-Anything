@@ -1,9 +1,16 @@
 import { describe, it, expect, afterEach } from 'vitest';
+
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// This synchronous subprocess suite can exceed 60 seconds on Windows. Yield
+// between cases so Vitest can service onTaskUpdate replies while tests run.
+afterEach(async () => {
+  await new Promise(resolve => setImmediate(resolve));
+});
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(__dirname, '../../../understand-anything-plugin/skills/understand/extract-import-map.mjs');
@@ -95,6 +102,140 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.stats.filesScanned).toBe(4);
     expect(result.output.stats.filesWithImports).toBe(1);
     expect(result.output.stats.totalEdges).toBe(2);
+  });
+
+  it('uses the full inventory for resolution while emitting only analysisPaths', () => {
+    projectRoot = setupTree({
+      'src/changed.ts': `import { stable } from './stable';\nexport const changed = stable;\n`,
+      'src/stable.ts': `export const stable = 1;\n`,
+      'src/untouched.ts': `import './stable';\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/changed.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/stable.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/untouched.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+      analysisPaths: [process.platform === 'win32' ? 'src\\changed.ts' : 'src/changed.ts'],
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap).toEqual({
+      'src/changed.ts': ['src/stable.ts'],
+    });
+    expect(result.output.stats).toEqual({
+      filesScanned: 1,
+      filesWithImports: 1,
+      totalEdges: 1,
+    });
+  });
+
+  it('rejects analysisPaths that are absent from the current inventory', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const value = 1;\n',
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+      analysisPaths: ['src/missing.ts'],
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('analysisPaths entry is not present in files');
+  });
+
+  it('supports an empty analysisPaths list without emitting full-scan entries', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const value = 1;\n',
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+      analysisPaths: [],
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap).toEqual({});
+    expect(result.output.stats.filesScanned).toBe(0);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'preserves literal backslashes in POSIX filenames',
+    () => {
+      projectRoot = setupTree({
+        'src/foo\\bar.js': 'module.exports = 1;\n',
+      });
+
+      const result = runScript(projectRoot, {
+        projectRoot,
+        files: [
+          { path: 'src/foo\\bar.js', language: 'javascript', fileCategory: 'code' },
+        ],
+        analysisPaths: ['src/foo\\bar.js'],
+      });
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.output.importMap).toEqual({ 'src/foo\\bar.js': [] });
+    },
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'accepts Windows-looking paths as project-relative POSIX filenames',
+    () => {
+      projectRoot = setupTree({
+        'C:/drive-slash.js': 'module.exports = 1;\n',
+        'C:\\drive-backslash.js': 'module.exports = 2;\n',
+        '\\root-backslash.js': 'module.exports = 3;\n',
+      });
+
+      const paths = [
+        'C:/drive-slash.js',
+        'C:\\drive-backslash.js',
+        '\\root-backslash.js',
+      ];
+      const result = runScript(projectRoot, {
+        projectRoot,
+        files: paths.map(path => ({
+          path,
+          language: 'javascript',
+          fileCategory: 'code',
+        })),
+        analysisPaths: paths,
+      });
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.output.importMap).toEqual(Object.fromEntries(
+        paths.map(path => [path, []]),
+      ));
+    },
+  );
+
+  it('rejects host-absolute analysis paths', () => {
+    projectRoot = setupTree({
+      'src/index.ts': 'export const value = 1;\n',
+    });
+    const absolutePath = process.platform === 'win32'
+      ? 'C:\\outside\\index.ts'
+      : '/outside/index.ts';
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+      analysisPaths: [absolutePath],
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('analysisPaths entry must be project-relative');
   });
 
   it('orders Unicode import targets by locale-independent UTF-16 code units', () => {
@@ -1391,7 +1532,7 @@ describe('extract-import-map.mjs — C/C++ resolver', () => {
   });
 });
 
-describe('extract-import-map.mjs — Swift resolver', () => {
+describe('extract-import-map.mjs — Swift resolver', { timeout: 20_000 }, () => {
   let projectRoot;
 
   afterEach(() => {
@@ -1520,6 +1661,9 @@ describe('extract-import-map.mjs — per-file failure resilience', () => {
     expect(result.output.importMap['src/other.ts']).toEqual([]);
     // Missing file is in importMap with []
     expect(result.output.importMap['src/missing.ts']).toEqual([]);
+    expect(result.output.failures).toEqual([
+      expect.objectContaining({ path: 'src/missing.ts', stage: 'file-read' }),
+    ]);
     // A warning was emitted on stderr for the missing file
     expect(result.stderr).toMatch(/Warning: extract-import-map: import resolution failed for src\/missing\.ts/);
     expect(result.stderr).toMatch(/importMap\[src\/missing\.ts\]=\[\]/);
@@ -1575,6 +1719,7 @@ describe('extract-import-map.mjs — output schema invariants', () => {
     });
 
     expect(result.status).toBe(0);
+    expect(result.output.failures).toEqual([]);
     expect(Object.keys(result.output.importMap).sort()).toEqual([
       'Dockerfile', 'README.md', 'a.ts', 'package.json',
     ]);
@@ -1870,6 +2015,39 @@ describe('extract-import-map.mjs — tsconfig parse resilience', () => {
     expect(result.stderr).toMatch(/path aliases.*will not be applied/);
     // Aliased import unresolved; relative import still resolves.
     expect(result.output.importMap['src/index.ts']).toEqual(['src/sibling.ts']);
+    expect(result.output.failures).toEqual([
+      expect.objectContaining({ path: 'tsconfig.json', stage: 'resolver-config-parse' }),
+    ]);
+  });
+
+  it('accepts JSONC comments and trailing commas without reporting a failure', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': `{
+        // aliases may point at URL-like strings without losing // in quotes
+        "compilerOptions": {
+          "baseUrl": ".",
+          "paths": {
+            "@/*": ["src/*",],
+            "@url/*": ["https://example.test/*",],
+          },
+        },
+      }`,
+      'src/index.ts': `import { value } from '@/value';\n`,
+      'src/value.ts': 'export const value = 1;\n',
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/value.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.failures).toEqual([]);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/value.ts']);
   });
 
   it('falls back to raw-text parse when a paths value contains "//" that the stripper would damage', () => {
@@ -2020,6 +2198,9 @@ describe('extract-import-map.mjs — tree-sitter init graceful failure', () => {
     expect(result.output.stats.filesScanned).toBe(2);
     expect(result.output.stats.filesWithImports).toBe(0);
     expect(result.output.stats.totalEdges).toBe(0);
+    expect(result.output.failures).toEqual([
+      expect.objectContaining({ path: null, stage: 'tree-sitter-init' }),
+    ]);
   });
 });
 
