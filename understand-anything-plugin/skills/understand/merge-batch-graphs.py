@@ -108,13 +108,6 @@ _JS_TS_TEST_EXTS: frozenset[str] = frozenset(_JS_TS_EXTS)
 # mirroring `src/`, `app/`, `lib/`, or the project root.
 _MIRROR_PRODUCTION_ROOTS: tuple[str, ...] = ("src", "app", "lib", "")
 
-# Extensions whose test files carry no basename convention at all, so the
-# only available signal is directory position. Cargo compiles every `.rs`
-# file directly inside a crate's `tests/` directory as an integration-test
-# binary whatever it is named (`smoke_risk.rs`, `sonar_shellout.rs`); Rust
-# unit tests live inline behind `#[cfg(test)]` rather than in their own files.
-_DIR_CONVENTION_TEST_EXTS: frozenset[str] = frozenset({".rs"})
-
 # Per-extension test-name patterns: ext → (prefix_patterns, suffix_patterns).
 # A basename qualifies as a test if its stem starts with any prefix or ends
 # with any suffix listed for its extension. JS/TS family is handled separately
@@ -139,7 +132,7 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 # These language configs treat every source file below `tests/` as part of a
 # test target, even when the basename itself has no test marker.  JS/TS is
 # intentionally absent: files such as `__tests__/helpers.ts` remain helpers.
-_TEST_DIRECTORY_EXTENSIONS: frozenset[str] = frozenset({".swift", ".php"})
+_TEST_DIRECTORY_EXTENSIONS: frozenset[str] = frozenset({".swift", ".rs", ".php"})
 
 _EXACT_TEST_STEMS: dict[str, frozenset[str]] = {
     ".rb": frozenset({"spec_helper"}),
@@ -348,30 +341,15 @@ def _basename(path: str) -> str:
     return path.rsplit("/", 1)[-1] if "/" in path else path
 
 
-def _parent_dir(path: str) -> str:
-    """Name of the directory immediately containing `path` ("" at the root)."""
-    return path.rsplit("/", 2)[-2] if "/" in path else ""
-
-
 def is_test_path(path: str) -> bool:
-    """Return True if `path` looks like a test file.
+    """Return True if `path` looks like a test file by language convention.
 
-    Most languages are matched by basename convention. Extensions listed in
-    `_DIR_CONVENTION_TEST_EXTS` have no such convention and are matched by
-    directory position instead (immediate parent must be `tests`).
-
-    Swift and PHP additionally make any `tests/` ancestor a test-source
-    root; Rust does not (`tests/helpers/util.rs` is a helper). JS/TS files
-    still require `.test` or `.spec`, so `__tests__/helpers.ts` remains a
-    non-test helper.
+    Most languages use basename markers. Swift, Rust, and PHP additionally
+    make `tests/` a test-source root. JS/TS files still require `.test` or
+    `.spec`, so `__tests__/helpers.ts` remains a non-test helper.
     """
     stem, ext = os.path.splitext(_basename(path))
     ext = ext.lower()
-
-    # No basename convention for this extension: a file directly under
-    # `tests/` is a test. Anything else falls through to basename patterns.
-    if ext in _DIR_CONVENTION_TEST_EXTS and _parent_dir(path) == "tests":
-        return True
 
     # JS/TS family: the test marker is an infix on the stem (foo.test.ts has
     # stem "foo.test", ext ".ts"), not a prefix/suffix on the stem itself.
