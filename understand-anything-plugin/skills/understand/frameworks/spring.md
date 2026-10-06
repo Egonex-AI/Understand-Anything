@@ -32,7 +32,7 @@ When analyzing a Spring Boot project, apply these additional conventions on top 
 
 **Controller-Service-Repository chain** — The canonical call chain is `@RestController` -> `@Service` -> `@Repository`. Create `depends_on` edges along this chain to show the layered architecture.
 
-**@Entity relationships** — When entities define `@OneToMany`, `@ManyToOne`, `@OneToOne`, or `@ManyToMany` annotations, create `depends_on` edges between entity classes with descriptions indicating the relationship type and direction.
+**JPA relationships** — Apply the shared entity relationship rules in the appended `jpa.md` addendum. These rules also apply to persistence projects without Spring.
 
 **@Configuration bean definitions** — When a `@Configuration` class defines `@Bean` methods, create `configures` edges from the configuration class to the types it produces. These beans become available for injection throughout the application.
 
