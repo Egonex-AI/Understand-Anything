@@ -122,6 +122,42 @@ module.exports = { list, get: find, save() {}, 'read-all': readAll };`,
       expect(result.imports).toEqual([]);
     });
 
+    it.each([
+      "function require(name) { return {}; } const item = require('./not-a-dependency');",
+      "const require = (name) => ({}); const item = require('./not-a-dependency');",
+    ])(
+      "does not treat a locally defined require as a module loader",
+      (source) => {
+        expect(analyze(source, language).imports).toEqual([]);
+      },
+    );
+
+    it.each([
+      "const module = { exports: {} }; module.exports.Item = Item;",
+      "const exports = {}; exports.Item = Item;",
+    ])(
+      "does not treat locally declared objects as CommonJS exports",
+      (source) => {
+        expect(analyze(source, language).exports).toEqual([]);
+      },
+    );
+
+    it.each([
+      "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+      "import { createRequire as makeRequire } from 'module'; const require = makeRequire(import.meta.url);",
+      "import * as nodeModule from 'node:module'; const require = nodeModule.createRequire(import.meta.url);",
+    ])("recognizes a Node createRequire bridge", (bridge) => {
+      const result = analyze(
+        `${bridge} const item = require('./dependency');`,
+        language,
+      );
+      expect(result.imports).toContainEqual({
+        source: "./dependency",
+        specifiers: ["item"],
+        lineNumber: 1,
+      });
+    });
+
     it("ignores unrelated assignments and dynamic export keys", () => {
       expect(
         analyze(

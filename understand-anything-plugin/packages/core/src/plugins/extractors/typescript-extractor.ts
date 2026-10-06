@@ -2,6 +2,12 @@ import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { getStringValue } from "./base-extractor.js";
 
+interface CommonJsGlobals {
+  require: boolean;
+  module: boolean;
+  exports: boolean;
+}
+
 /**
  * Extract parameter names from a formal_parameters node.
  */
@@ -112,6 +118,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
     const imports: StructuralAnalysis["imports"] = [];
     const exports: StructuralAnalysis["exports"] = [];
     const exportedNames = new Set<string>();
+    const commonJs = this.commonJsGlobals(rootNode);
 
     for (let i = 0; i < rootNode.childCount; i++) {
       const node = rootNode.child(i);
@@ -123,6 +130,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
         imports,
         exports,
         exportedNames,
+        commonJs,
       );
     }
 
@@ -202,6 +210,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
     imports: StructuralAnalysis["imports"],
     exports: StructuralAnalysis["exports"],
     exportedNames: Set<string>,
+    commonJs: CommonJsGlobals,
   ): void {
     switch (node.type) {
       case "function_declaration":
@@ -218,9 +227,9 @@ export class TypeScriptExtractor implements LanguageExtractor {
         this.extractVariableDeclarations(node, functions);
         for (const declaration of node.namedChildren) {
           if (declaration.type !== "variable_declarator") continue;
-          const source = this.requireSource(
-            declaration.childForFieldName("value"),
-          );
+          const source = commonJs.require
+            ? this.requireSource(declaration.childForFieldName("value"))
+            : null;
           if (source === null) continue;
           imports.push({
             source,
@@ -231,7 +240,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
         break;
 
       case "expression_statement":
-        this.extractCommonJsStatement(node, imports, exports, exportedNames);
+        this.extractCommonJsStatement(node, imports, exports, exportedNames, commonJs);
         break;
 
       case "import_statement":
@@ -372,6 +381,118 @@ export class TypeScriptExtractor implements LanguageExtractor {
     }
   }
 
+  private commonJsGlobals(root: TreeSitterNode): CommonJsGlobals {
+    const bound = new Set<string>();
+    const factories = new Set<string>();
+    const nativeModules = new Set<string>();
+    const declarations = root.namedChildren.flatMap((node) =>
+      node.type === "export_statement" ? node.namedChildren : [node],
+    );
+
+    for (const node of declarations) {
+      if (
+        node.type === "lexical_declaration" ||
+        node.type === "variable_declaration"
+      ) {
+        for (const declaration of node.namedChildren) {
+          if (declaration.type !== "variable_declarator") continue;
+          for (const name of this.bindingNames(
+            declaration.childForFieldName("name"),
+          ))
+            bound.add(name);
+        }
+      } else if (
+        [
+          "function_declaration",
+          "generator_function_declaration",
+          "class_declaration",
+          "abstract_class_declaration",
+          "enum_declaration",
+          "internal_module",
+        ].includes(node.type)
+      ) {
+        const name = node.childForFieldName("name");
+        if (name) bound.add(name.text);
+      } else if (
+        node.type === "import_statement" &&
+        !node.children.some((child) => child.type === "type")
+      ) {
+        const source = node.childForFieldName("source");
+        const native =
+          source && ["module", "node:module"].includes(getStringValue(source));
+        const clause = node.namedChildren.find(
+          (child) => child.type === "import_clause",
+        );
+        for (const child of clause?.namedChildren ?? []) {
+          if (
+            child.type === "identifier" ||
+            child.type === "namespace_import"
+          ) {
+            const name =
+              child.type === "identifier"
+                ? child
+                : child.namedChildren.find(
+                    (part) => part.type === "identifier",
+                  );
+            if (!name) continue;
+            bound.add(name.text);
+            if (native) nativeModules.add(name.text);
+          } else if (child.type === "named_imports") {
+            for (const specifier of child.namedChildren) {
+              if (
+                specifier.type !== "import_specifier" ||
+                specifier.children.some((part) => part.type === "type")
+              )
+                continue;
+              const imported = specifier.childForFieldName("name");
+              const local = specifier.childForFieldName("alias") ?? imported;
+              if (!local) continue;
+              bound.add(local.text);
+              if (native && imported?.text === "createRequire")
+                factories.add(local.text);
+            }
+          }
+        }
+      }
+    }
+
+    const result = {
+      require: !bound.has("require"),
+      module: !bound.has("module"),
+      exports: !bound.has("exports"),
+    };
+    // An immutable createRequire bridge from Node's module API is a real
+    // require function even though it introduces a local binding.
+    for (const node of declarations) {
+      if (
+        node.type !== "lexical_declaration" ||
+        !node.children.some((child) => child.type === "const")
+      )
+        continue;
+      for (const declaration of node.namedChildren) {
+        const name = declaration.childForFieldName("name");
+        const value = declaration.childForFieldName("value");
+        if (
+          name?.type !== "identifier" ||
+          name.text !== "require" ||
+          value?.type !== "call_expression"
+        )
+          continue;
+        const callee = value.childForFieldName("function");
+        const member = this.staticMember(callee);
+        if (
+          (callee?.type === "identifier" && factories.has(callee.text)) ||
+          (member?.object.type === "identifier" &&
+            nativeModules.has(member.object.text) &&
+            member.name === "createRequire")
+        ) {
+          result.require = true;
+        }
+      }
+    }
+    return result;
+  }
+
   private requireSource(node: TreeSitterNode | null): string | null {
     if (node?.type !== "call_expression") return null;
     const callee = node.childForFieldName("function");
@@ -438,10 +559,11 @@ export class TypeScriptExtractor implements LanguageExtractor {
     imports: StructuralAnalysis["imports"],
     exports: StructuralAnalysis["exports"],
     exportedNames: Set<string>,
+    commonJs: CommonJsGlobals,
   ): void {
     const expression = node.namedChildren[0];
     if (!expression) return;
-    const source = this.requireSource(expression);
+    const source = commonJs.require ? this.requireSource(expression) : null;
     if (source !== null) {
       imports.push({
         source,
@@ -461,11 +583,11 @@ export class TypeScriptExtractor implements LanguageExtractor {
       exportedNames.add(name);
     };
     if (
-      (member.object.type === "identifier" && member.object.text === "exports") ||
-      this.isModuleExports(member.object)
+      (commonJs.exports && member.object.type === "identifier" && member.object.text === "exports") ||
+      (commonJs.module && this.isModuleExports(member.object))
     ) {
       add(member.name);
-    } else if (left && this.isModuleExports(left)) {
+    } else if (commonJs.module && left && this.isModuleExports(left)) {
       if (right.type === "object") {
         for (const property of right.namedChildren) {
           if (property.type === "shorthand_property_identifier") add(property.text);
