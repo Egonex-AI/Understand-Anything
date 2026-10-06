@@ -112,17 +112,22 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    - If the line appears, **skip steps 5-6** and continue at step 7.
    - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
 
-5. Fallback: install dependencies and build if needed:
+5. Fallback: install dependencies and build if needed. Prefer `pnpm` (the repository is pinned with `packageManager`), but fall back to `npm` where pnpm is unavailable:
    ```bash
    : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
    DASHBOARD_DIR="${DASHBOARD_DIR:-$PLUGIN_ROOT/packages/dashboard}"
-   cd "$DASHBOARD_DIR" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
+   if command -v pnpm >/dev/null 2>&1; then
+     cd "$DASHBOARD_DIR" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
+     cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
+   elif command -v npm >/dev/null 2>&1; then
+     cd "$PLUGIN_ROOT" && npm install --workspaces --include-workspace-root --ignore-scripts
+     cd "$PLUGIN_ROOT" && npm run --workspace @understand-anything/core build
+   else
+     echo "Error: Install Node.js ≥ 22 with either pnpm ≥ 10 or npm, then re-run /understand-dashboard."
+     exit 1
+   fi
    ```
-   Then ensure the core package is built (the dashboard depends on it):
-   ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
-   ```
+   This installs the dashboard's dependencies and builds the core package, which the dashboard depends on.
 
 6. Fallback: start the Vite dev server pointing at the project's knowledge graph:
    ```bash
