@@ -216,6 +216,22 @@ export class TypeScriptExtractor implements LanguageExtractor {
       case "lexical_declaration":
       case "variable_declaration":
         this.extractVariableDeclarations(node, functions);
+        for (const declaration of node.namedChildren) {
+          if (declaration.type !== "variable_declarator") continue;
+          const source = this.requireSource(
+            declaration.childForFieldName("value"),
+          );
+          if (source === null) continue;
+          imports.push({
+            source,
+            specifiers: this.bindingNames(declaration.childForFieldName("name")),
+            lineNumber: declaration.startPosition.row + 1,
+          });
+        }
+        break;
+
+      case "expression_statement":
+        this.extractCommonJsStatement(node, imports, exports, exportedNames);
         break;
 
       case "import_statement":
@@ -352,6 +368,124 @@ export class TypeScriptExtractor implements LanguageExtractor {
           params,
           returnType,
         });
+      }
+    }
+  }
+
+  private requireSource(node: TreeSitterNode | null): string | null {
+    if (node?.type !== "call_expression") return null;
+    const callee = node.childForFieldName("function");
+    if (callee?.type !== "identifier" || callee.text !== "require") return null;
+    const argument = node.childForFieldName("arguments")?.namedChildren[0];
+    if (!argument || !["string", "template_string"].includes(argument.type)) {
+      return null;
+    }
+    if (argument.namedChildren.some((child) => child.type === "template_substitution")) {
+      return null;
+    }
+    return getStringValue(argument);
+  }
+
+  private bindingNames(node: TreeSitterNode | null): string[] {
+    if (!node) return [];
+    switch (node.type) {
+      case "identifier":
+      case "shorthand_property_identifier_pattern":
+        return [node.text];
+      case "pair_pattern":
+        return this.bindingNames(node.childForFieldName("value"));
+      case "assignment_pattern":
+      case "object_assignment_pattern":
+        return this.bindingNames(node.childForFieldName("left"));
+      case "rest_pattern":
+        return this.bindingNames(node.namedChildren[0] ?? null);
+      case "object_pattern":
+      case "array_pattern":
+        return node.namedChildren.flatMap((child) => this.bindingNames(child));
+      default:
+        return [];
+    }
+  }
+
+  private staticMember(
+    node: TreeSitterNode | null,
+  ): { object: TreeSitterNode; name: string } | null {
+    if (!node) return null;
+    const object = node.childForFieldName("object");
+    if (!object) return null;
+    if (node.type === "member_expression") {
+      const property = node.childForFieldName("property");
+      return property ? { object, name: property.text } : null;
+    }
+    if (node.type === "subscript_expression") {
+      const index = node.childForFieldName("index");
+      if (index?.type === "string") return { object, name: getStringValue(index) };
+    }
+    return null;
+  }
+
+  private isModuleExports(node: TreeSitterNode): boolean {
+    const member = this.staticMember(node);
+    return (
+      member?.object.type === "identifier" &&
+      member.object.text === "module" &&
+      member.name === "exports"
+    );
+  }
+
+  private extractCommonJsStatement(
+    node: TreeSitterNode,
+    imports: StructuralAnalysis["imports"],
+    exports: StructuralAnalysis["exports"],
+    exportedNames: Set<string>,
+  ): void {
+    const expression = node.namedChildren[0];
+    if (!expression) return;
+    const source = this.requireSource(expression);
+    if (source !== null) {
+      imports.push({
+        source,
+        specifiers: [],
+        lineNumber: node.startPosition.row + 1,
+      });
+      return;
+    }
+    if (expression.type !== "assignment_expression") return;
+    const left = expression.childForFieldName("left");
+    const right = expression.childForFieldName("right");
+    const member = this.staticMember(left);
+    if (!member || !right) return;
+    const add = (name: string, isDefault = false) => {
+      if (exportedNames.has(name)) return;
+      exports.push({ name, isDefault, lineNumber: node.startPosition.row + 1 });
+      exportedNames.add(name);
+    };
+    if (
+      (member.object.type === "identifier" && member.object.text === "exports") ||
+      this.isModuleExports(member.object)
+    ) {
+      add(member.name);
+    } else if (left && this.isModuleExports(left)) {
+      if (right.type === "object") {
+        for (const property of right.namedChildren) {
+          if (property.type === "shorthand_property_identifier") add(property.text);
+          else if (property.type === "pair" || property.type === "method_definition") {
+            const key =
+              property.childForFieldName("key") ??
+              property.childForFieldName("name");
+            if (!key) continue;
+            if (key.type === "string") add(getStringValue(key));
+            else if (["property_identifier", "identifier", "number"].includes(key.type)) {
+              add(key.text);
+            }
+          }
+        }
+      } else {
+        add(
+          right.childForFieldName("name")?.text ??
+            (right.type === "identifier" ? right.text : "default"),
+          true,
+        );
       }
     }
   }

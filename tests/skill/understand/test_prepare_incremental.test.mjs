@@ -957,8 +957,10 @@ describe('prepare-incremental.mjs', { timeout: 30_000 }, () => {
   });
 
   it('refreshes supplemental require imports even when fingerprints classify the edit as cosmetic', () => {
+    // A function-body dependency remains an implementation-only fingerprint
+    // edit; the import-map supplement must still refresh its dependency edge.
     const { root, baseCommit } = setupRepository({
-      'src/index.js': "const value = require('./a');\nmodule.exports = value;\n",
+      'src/index.js': "function load() { return require('./a'); }\nmodule.exports = load;\n",
       'src/a.js': 'module.exports = 1;\n',
       'src/b.js': 'module.exports = 2;\n',
       'src/c.js': 'module.exports = 3;\n',
@@ -966,7 +968,7 @@ describe('prepare-incremental.mjs', { timeout: 30_000 }, () => {
     writeProjectFile(
       root,
       'src/index.js',
-      "const value = require('./b');\nmodule.exports = value;\n",
+      "function load() { return require('./b'); }\nmodule.exports = load;\n",
     );
     commit(root, 'change supplemental require');
 
