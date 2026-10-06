@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDashboardStore } from "../store";
 
 interface PathFinderModalProps {
@@ -14,6 +14,50 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
   const [path, setPath] = useState<string[] | null>(null);
   const [searching, setSearching] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Undirected adjacency, memoized per graph. Matches the bidirectional
+  // traversal used by findPath so reachability and path-finding agree.
+  const adjacency = useMemo(() => {
+    const adj = new Map<string, string[]>();
+    if (!graph) return adj;
+    for (const edge of graph.edges) {
+      if (!adj.has(edge.source)) adj.set(edge.source, []);
+      adj.get(edge.source)!.push(edge.target);
+      if (!adj.has(edge.target)) adj.set(edge.target, []);
+      adj.get(edge.target)!.push(edge.source);
+    }
+    return adj;
+  }, [graph]);
+
+  // Set of node ids reachable from the selected "From" node (excluding itself).
+  // null when no source is selected — caller treats null as "no filtering yet".
+  const reachableFromSource = useMemo(() => {
+    if (!fromNodeId) return null;
+    const reachable = new Set<string>();
+    const queue: string[] = [fromNodeId];
+    reachable.add(fromNodeId);
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!;
+      const neighbors = adjacency.get(nodeId) ?? [];
+      for (const n of neighbors) {
+        if (!reachable.has(n)) {
+          reachable.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    reachable.delete(fromNodeId);
+    return reachable;
+  }, [fromNodeId, adjacency]);
+
+  // If "From" changes and the previously chosen "To" is no longer reachable,
+  // clear "To" so the select doesn't display a stale, invalid value.
+  useEffect(() => {
+    if (toNodeId && reachableFromSource && !reachableFromSource.has(toNodeId)) {
+      setToNodeId("");
+      setPath(null);
+    }
+  }, [reachableFromSource, toNodeId]);
 
   // Close on outside click
   useEffect(() => {
@@ -46,7 +90,13 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
   if (!isOpen || !graph) return null;
 
   const nodes = graph.nodes;
-  const edges = graph.edges;
+
+  // Nodes shown in the "To" dropdown. Before a source is picked, show all
+  // nodes; once a source is picked, only show nodes reachable from it so
+  // the user can't select a destination with no path.
+  const toCandidates = reachableFromSource
+    ? nodes.filter((n) => reachableFromSource.has(n.id))
+    : nodes;
 
   // BFS to find shortest path
   const findPath = () => {
@@ -57,21 +107,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
 
     setSearching(true);
 
-    // Build adjacency list (bidirectional traversal for path finding)
-    const adjacency = new Map<string, string[]>();
-    for (const edge of edges) {
-      if (!adjacency.has(edge.source)) {
-        adjacency.set(edge.source, []);
-      }
-      adjacency.get(edge.source)!.push(edge.target);
-      // Also traverse in reverse so we can find paths through backward edges
-      if (!adjacency.has(edge.target)) {
-        adjacency.set(edge.target, []);
-      }
-      adjacency.get(edge.target)!.push(edge.source);
-    }
-
-    // BFS
+    // BFS using the memoized undirected adjacency
     const queue: Array<{ nodeId: string; path: string[] }> = [
       { nodeId: fromNodeId, path: [fromNodeId] },
     ];
@@ -166,19 +202,33 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
 
           {/* To Node */}
           <div>
-            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-              To Node
-            </label>
+            <div className="flex items-baseline justify-between mb-2">
+              <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                To Node
+              </label>
+              {fromNodeId && (
+                <span className="text-[10px] text-text-muted">
+                  {toCandidates.length} reachable
+                </span>
+              )}
+            </div>
             <select
               value={toNodeId}
               onChange={(e) => {
                 setToNodeId(e.target.value);
                 setPath(null);
               }}
-              className="w-full bg-elevated text-text-primary text-sm rounded-lg px-3 py-2 border border-border-subtle focus:outline-none focus:border-gold/50"
+              disabled={!fromNodeId || toCandidates.length === 0}
+              className="w-full bg-elevated text-text-primary text-sm rounded-lg px-3 py-2 border border-border-subtle focus:outline-none focus:border-gold/50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">Select a node...</option>
-              {nodes.map((node) => (
+              <option value="">
+                {!fromNodeId
+                  ? "Pick a From node first..."
+                  : toCandidates.length === 0
+                    ? "No reachable nodes from source"
+                    : "Select a node..."}
+              </option>
+              {toCandidates.map((node) => (
                 <option key={node.id} value={node.id}>
                   {node.name} ({node.type})
                 </option>
