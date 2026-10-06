@@ -245,6 +245,29 @@ describe("schema validation", () => {
     );
   });
 
+  it('drops "documented_by" instead of reversing its meaning', () => {
+    const graph = {
+      ...validGraph,
+      edges: [{ ...validGraph.edges[0], type: "documented_by" }],
+    };
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.edges).toHaveLength(0);
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ level: "dropped", category: "invalid-edge", path: "edges[0]" })
+    );
+  });
+
+  it('preserves the endpoints of canonical "documents" edges', () => {
+    const graph = structuredClone(validGraph);
+    graph.edges[0].type = "documents";
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.edges[0]).toEqual(graph.edges[0]);
+  });
+
   it("drops truly invalid edge types after normalization", () => {
     const graph = structuredClone(validGraph);
     (graph.edges[0] as any).type = "totally_bogus";
