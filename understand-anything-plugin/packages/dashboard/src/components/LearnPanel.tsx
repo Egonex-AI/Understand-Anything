@@ -158,7 +158,7 @@ export default function LearnPanel() {
         {step.languageLesson && (
           <div className="bg-accent/5 border border-accent/20 rounded p-3 mb-4">
             <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-1.5">
-              Language Lesson
+              {t.learnPanel.languageLesson}
             </h4>
             <p className="text-sm text-text-secondary leading-relaxed">
               {step.languageLesson}
@@ -170,7 +170,7 @@ export default function LearnPanel() {
         {step.nodeIds.length > 0 && (
           <div className="mb-4">
             <h4 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
-              Referenced Components
+              {t.learnPanel.referencedComponents}
             </h4>
             <div className="flex flex-wrap gap-1.5">
               {step.nodeIds.map((nodeId) => {
@@ -203,7 +203,7 @@ export default function LearnPanel() {
                   ? "bg-accent"
                   : "bg-elevated hover:bg-surface"
               }`}
-              aria-label={`Go to step ${i + 1}`}
+              aria-label={t.learnPanel.goToStep(i + 1)}
             />
           ))}
         </div>

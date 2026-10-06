@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { NodeProps, Node } from "@xyflow/react";
 import { getLayerColor } from "./LayerLegend";
+import { useI18n } from "../contexts/I18nContext";
 
 export interface ContainerNodeData extends Record<string, unknown> {
   containerId: string;
@@ -20,6 +21,7 @@ export type ContainerFlowNode = Node<ContainerNodeData, "container">;
 
 function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlowNode>) {
   const color = getLayerColor(data.colorIndex);
+  const { t } = useI18n();
 
   const borderColor = data.isDiffAffected
     ? "var(--color-diff-changed)"
@@ -29,7 +31,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
   const borderWidth = data.isExpanded || data.isFocusedViaChild ? 1.5 : 1;
 
   const labelDimmed = data.name === "~";
-  const labelText = labelDimmed ? "(root)" : data.name;
+  const labelText = labelDimmed ? t.graphNodes.root : data.name;
 
   const handleToggle = (e: React.SyntheticEvent) => {
     e.stopPropagation();
@@ -41,7 +43,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
       role="button"
       tabIndex={0}
       aria-expanded={data.isExpanded}
-      aria-label={`${labelText} container, ${data.childCount} item${data.childCount !== 1 ? "s" : ""}, ${data.isExpanded ? "expanded" : "collapsed"}`}
+      aria-label={t.graphNodes.containerAria(labelText, data.childCount, data.isExpanded)}
       className="rounded-xl cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-[rgba(212,165,116,0.6)]"
       style={{
         width,
@@ -85,7 +87,7 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
                 borderRadius: 8,
               }}
             >
-              {data.searchHitCount} hit{data.searchHitCount !== 1 ? "s" : ""}
+              {t.graphNodes.hits(data.searchHitCount)}
             </span>
           )}
         </span>

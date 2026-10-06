@@ -1,5 +1,20 @@
+
+type StalenessGraph = "knowledge" | "domain";
+
+const graphName = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "grafo de conhecimento" : "grafo de domínio";
+const plural = (count: number, singular: string, pluralForm = `${singular}s`) =>
+  `${count} ${count === 1 ? singular : pluralForm}`;
+const filesChanged = (count: number) =>
+  count === 1
+    ? "1 arquivo mudou desde a análise."
+    : `${count} arquivos mudaram desde a análise.`;
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
 export const ptBR = {
   common: {
+    unnamed: "sem nome",
+    close: "Fechar",
     loading: "Carregando projeto...",
     computingGraphLayout: "Calculando o layout do grafo...",
     forceLayoutFallback: "Layout de forças indisponível; exibindo uma grade alternativa.",
@@ -48,6 +63,7 @@ export const ptBR = {
     avgConnectionsPerNode: "Média de conexões por nó",
   },
   nodeInfo: {
+    reverse: "inverso",
     definedInThisFile: "Definido neste arquivo",
     languageConcepts: "Conceitos da linguagem",
     category: "Categoria",
@@ -67,6 +83,7 @@ export const ptBR = {
     noFilePathsFound: "Nenhum caminho de arquivo encontrado.",
   },
   filterPanel: {
+    title: "Filtrar grafo (F)",
     nodeTypes: "Tipos de nó",
     complexity: "Complexidade",
     layers: "Camadas",
@@ -125,10 +142,22 @@ export const ptBR = {
     knowledge: "Conhecimento",
   },
   tokenGate: {
+    title: "Token de acesso necessário",
+    instructionsBefore: "Cole o token de acesso exibido no seu terminal. Procure a linha com",
+    instructionsAfter: ".",
+    keyIcon: "chave",
+    placeholder: "Cole o token aqui...",
+    invalidToken: "Token inválido. Confira e tente novamente.",
+    unexpectedResponse: (status: number) =>
+      `Resposta inesperada (${status}). O servidor do dashboard está em execução?`,
+    unreachable: (detail: string) => `Não foi possível acessar o servidor: ${detail}`,
     validating: "Validando...",
     continue: "Continuar",
   },
   diffToggle: {
+    label: "Diff",
+    on: "LIGADO",
+    off: "DESLIGADO",
     hideOverlay: "Ocultar sobreposição de diff",
     showOverlay: "Mostrar sobreposição de diff",
     noData: "Nenhum dado de diff carregado",
@@ -136,6 +165,9 @@ export const ptBR = {
     affected: "Afetado",
   },
   learnPanel: {
+    languageLesson: "Lição da linguagem",
+    referencedComponents: "Componentes referenciados",
+    goToStep: (step: number) => `Ir para a etapa ${step}`,
     finish: "Concluir",
     next: "Próximo",
     prev: "Anterior",
@@ -159,6 +191,20 @@ export const ptBR = {
     escBack: "Esc para voltar",
   },
   warningBanner: {
+    autoCorrected: "Corrigidos automaticamente",
+    fatalErrors: (count: number) => plural(count, "erro fatal", "erros fatais"),
+    autoCorrections: (count: number) =>
+      plural(count, "correção automática", "correções automáticas"),
+    droppedItems: (count: number) => plural(count, "item descartado", "itens descartados"),
+    summaryFatal: (parts: string[]) => `O dashboard encontrou ${parts.join(", ")}`,
+    summaryLoaded: (parts: string[]) =>
+      `Grafo de conhecimento carregado com ${parts.join(" e ")}`,
+    clickToExpand: "clique para expandir",
+    clickToCollapse: "clique para recolher",
+    footerFatal: "Copie estes problemas e abra um relatório de bug no GitHub",
+    footerFix: "Copie estes problemas e peça ao seu agente para corrigi-los no knowledge-graph.json",
+    copied: "Copiado!",
+    copyIssues: "Copiar problemas",
     dropped: "Descartados",
     fatal: "Fatal",
   },
@@ -172,6 +218,9 @@ export const ptBR = {
     mono: "Mono",
   },
   codeViewer: {
+    noFilePath: "Este nó não tem um caminho de arquivo.",
+    demoUnavailable:
+      "A prévia do código-fonte só fica disponível quando o servidor local do dashboard está em execução.",
     fullFile: "Arquivo inteiro",
     lines: "Linhas",
     linesLabel: "linhas",
@@ -222,9 +271,17 @@ export const ptBR = {
     placeholder: "Buscar nós por nome, resumo ou tags...",
     fuzzy: "Aproximada",
     semantic: "Semântica",
-    result: "resultado",
+    resultCount: (count: number) => plural(count, "resultado"),
   },
   export: {
+    notReady: "O grafo ainda não está pronto para exportação",
+    noNodes: "Nenhum nó para exportar",
+    pngRenderFailed: "Falha ao exportar PNG: não foi possível renderizar o grafo como imagem.",
+    canvasFailed: "Falha ao criar o contexto do canvas",
+    pngEncodingFailed: "Falha ao exportar PNG: erro na codificação da imagem.",
+    pngFailed: (detail: string) => `Falha ao exportar PNG: ${detail}`,
+    svgFailed: (detail: string) => `Falha ao exportar SVG: ${detail}`,
+    jsonFailed: (detail: string) => `Falha ao exportar JSON: ${detail}`,
     label: "Exportar",
     title: "Exportar grafo (E)",
     asPNG: "Exportar como PNG",
@@ -269,7 +326,123 @@ export const ptBR = {
     authored_by: { forward: "escrito por", backward: "autor de" },
   },
   pathFinder: {
+    heading: "Localizador de caminhos de dependência",
+    description: "Encontre o caminho mais curto entre dois nós no grafo de dependências.",
+    fromNode: "Nó de origem",
+    toNode: "Nó de destino",
+    selectNode: "Selecione um nó...",
+    searching: "Buscando...",
+    findPath: "Encontrar caminho",
+    noPath: "Nenhum caminho encontrado entre esses nós.",
+    pathFound: (count: number) => `Caminho encontrado (${plural(count, "nó", "nós")})`,
     title: "Encontrar caminho entre nós (P)",
+  },
+  graphNodes: {
+    matches: (count: number) => plural(count, "correspondência", "correspondências"),
+    files: (count: number) => plural(count, "arquivo"),
+    flows: (count: number) => plural(count, "fluxo"),
+    steps: (count: number) => plural(count, "etapa"),
+    connections: (count: number) => plural(count, "conexão", "conexões"),
+    hits: (count: number) => plural(count, "ocorrência", "ocorrências"),
+    clickToExplore: "Clique para explorar →",
+    root: "(raiz)",
+    containerAria: (name: string, count: number, expanded: boolean) =>
+      `Contêiner ${name}, ${plural(count, "item", "itens")}, ${expanded ? "expandido" : "recolhido"}`,
+    incoming: (count: number) => `${count} de entrada`,
+    outgoing: (count: number) => `${count} de saída`,
+  },
+  graphView: {
+    showingNeighborhood: "Exibindo vizinhança",
+    locatingTourHighlight: "Localizando o destaque do tour…",
+    computingLayout: "Calculando o layout…",
+    noKnowledgeGraph:
+      "Nenhum grafo de conhecimento disponível. Execute /understand-knowledge para gerar um.",
+    noDomainGraph: "Nenhum grafo de domínio disponível. Execute /understand-domain para gerar um.",
+  },
+  loadErrors: {
+    invalidGraph: (detail: string) => `Grafo de conhecimento inválido: ${detail}`,
+    unknownValidation: "Grafo de conhecimento inválido: erro de validação desconhecido",
+    loadFailed: (detail: string) => `Falha ao carregar o grafo de conhecimento: ${detail}`,
+  },
+  staleness: {
+    subjectKnowledge: "O grafo de conhecimento",
+    subjectDomain: "O grafo de domínio",
+    subjectBoth: "Os grafos de conhecimento e de domínio",
+    titleStale: (subject: string, multiple: boolean) =>
+      `${subject} ${multiple ? "podem estar desatualizados" : "pode estar desatualizado"}`,
+    titleDirty: (subject: string, multiple: boolean) =>
+      `${subject} ${multiple ? "têm" : "tem"} alterações na árvore de trabalho`,
+    titleUnknown: (subject: string, multiple: boolean) =>
+      `Não foi possível verificar se ${lowerFirst(subject)} ${
+        multiple ? "estão atualizados" : "está atualizado"
+      }`,
+    staleBehind: (graph: StalenessGraph, commits: number, files: number) =>
+      `O ${graphName(graph)} está ${plural(commits, "commit")} atrás do HEAD do projeto; ${filesChanged(files)}`,
+    staleAhead: (graph: StalenessGraph, files: number) =>
+      `O ${graphName(graph)} vem de um histórico do projeto mais recente que o HEAD; ${filesChanged(files)}`,
+    staleDiverged: (graph: StalenessGraph, files: number) =>
+      `O ${graphName(graph)} e o HEAD vêm de históricos diferentes do projeto; ${filesChanged(files)}`,
+    dirty: (graph: StalenessGraph, files: number) =>
+      files === 1
+        ? `1 arquivo da árvore de trabalho mudou e não está refletido nos metadados de commit do ${graphName(graph)}.`
+        : `${files} arquivos da árvore de trabalho mudaram e não estão refletidos nos metadados de commit do ${graphName(graph)}.`,
+    unknownMissingGraphCommit: (graph: StalenessGraph) =>
+      `O ${graphName(graph)} não inclui um hash de commit do Git para comparar com o HEAD.`,
+    unknownGitHeadUnavailable: (graph: StalenessGraph) =>
+      `Não foi possível comparar o ${graphName(graph)} porque o dashboard não conseguiu ler o HEAD do Git.`,
+    unknownGraphCommitUnavailable: (graph: StalenessGraph) =>
+      `O ${graphName(graph)} referencia um commit que não está disponível neste checkout.`,
+    unknownGitCommandTimeout: (graph: StalenessGraph) =>
+      `Não foi possível verificar o ${graphName(graph)} porque os comandos do Git excederam o tempo limite.`,
+    unknownRequestFailed: "O dashboard não conseguiu verificar se o grafo está atualizado.",
+    refresh: (commands: string[], multiple: boolean) =>
+      `Execute ${commands.join(" e ")} para ${
+        multiple ? "atualizá-los" : "atualizá-lo"
+      } antes de confiar em respostas sobre impacto ou onboarding.`,
+    retry: "Volte o foco para a janela para tentar a verificação de novo.",
+    showFiles: "mostrar arquivos",
+    hideFiles: "ocultar arquivos",
+    moreFiles: (count: number) => `+${count} a mais`,
+  },
+  nodeTypeNames: {
+    file: "arquivo",
+    function: "função",
+    class: "classe",
+    module: "módulo",
+    concept: "conceito",
+    config: "configuração",
+    document: "documento",
+    service: "serviço",
+    table: "tabela",
+    endpoint: "endpoint",
+    pipeline: "pipeline",
+    schema: "schema",
+    resource: "recurso",
+    domain: "domínio",
+    flow: "fluxo",
+    step: "etapa",
+    article: "artigo",
+    entity: "entidade",
+    topic: "tópico",
+    claim: "afirmação",
+    source: "fonte",
+    page: "página",
+    screen: "tela",
+    component: "componente",
+    componentSet: "conjunto de componentes",
+    instance: "instância",
+    token: "token",
+  },
+  edgeCategoryNames: {
+    structural: "estrutural",
+    behavioral: "comportamental",
+    "data-flow": "fluxo de dados",
+    dependencies: "dependências",
+    semantic: "semântica",
+    infrastructure: "infraestrutura",
+    domain: "domínio",
+    knowledge: "conhecimento",
+    design: "design",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · PRIMEIROS PASSOS",

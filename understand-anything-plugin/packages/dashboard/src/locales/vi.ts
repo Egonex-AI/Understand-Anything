@@ -1,5 +1,15 @@
+
+type StalenessGraph = "knowledge" | "domain";
+
+const graphName = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "đồ thị tri thức" : "đồ thị nghiệp vụ";
+const filesChanged = (count: number) => `${count} tệp đã thay đổi kể từ lần phân tích.`;
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 export const vi = {
   common: {
+    unnamed: "chưa đặt tên",
+    close: "Đóng",
     loading: "Đang tải dự án...",
     computingGraphLayout: "Đang tính bố cục đồ thị...",
     forceLayoutFallback: "Không thể dùng bố cục lực; đang hiển thị lưới dự phòng.",
@@ -48,6 +58,7 @@ export const vi = {
     avgConnectionsPerNode: "Số kết nối trung bình mỗi node",
   },
   nodeInfo: {
+    reverse: "chiều ngược",
     definedInThisFile: "Được định nghĩa trong tệp này",
     languageConcepts: "Khái niệm ngôn ngữ",
     category: "Danh mục",
@@ -67,6 +78,7 @@ export const vi = {
     noFilePathsFound: "Không tìm thấy đường dẫn tệp.",
   },
   filterPanel: {
+    title: "Lọc đồ thị (F)",
     nodeTypes: "Loại node",
     complexity: "Độ phức tạp",
     layers: "Tầng",
@@ -125,10 +137,22 @@ export const vi = {
     knowledge: "Tri thức",
   },
   tokenGate: {
+    title: "Cần mã truy cập",
+    instructionsBefore: "Dán mã truy cập từ terminal của bạn. Tìm dòng có biểu tượng",
+    instructionsAfter: ".",
+    keyIcon: "chìa khóa",
+    placeholder: "Dán mã vào đây...",
+    invalidToken: "Mã không hợp lệ. Vui lòng kiểm tra và thử lại.",
+    unexpectedResponse: (status: number) =>
+      `Phản hồi không mong đợi (${status}). Máy chủ bảng điều khiển có đang chạy không?`,
+    unreachable: (detail: string) => `Không thể kết nối tới máy chủ: ${detail}`,
     validating: "Đang xác thực...",
     continue: "Tiếp tục",
   },
   diffToggle: {
+    label: "Diff",
+    on: "BẬT",
+    off: "TẮT",
     hideOverlay: "Ẩn lớp phủ diff",
     showOverlay: "Hiện lớp phủ diff",
     noData: "Chưa có dữ liệu diff",
@@ -136,6 +160,9 @@ export const vi = {
     affected: "Bị ảnh hưởng",
   },
   learnPanel: {
+    languageLesson: "Bài học ngôn ngữ",
+    referencedComponents: "Thành phần liên quan",
+    goToStep: (step: number) => `Đi tới bước ${step}`,
     finish: "Hoàn tất",
     next: "Tiếp",
     prev: "Trước",
@@ -159,6 +186,18 @@ export const vi = {
     escBack: "Nhấn Esc để quay lại",
   },
   warningBanner: {
+    autoCorrected: "Đã tự sửa",
+    fatalErrors: (count: number) => `${count} lỗi nghiêm trọng`,
+    autoCorrections: (count: number) => `${count} lần tự sửa`,
+    droppedItems: (count: number) => `${count} mục bị loại bỏ`,
+    summaryFatal: (parts: string[]) => `Bảng điều khiển gặp ${parts.join(", ")}`,
+    summaryLoaded: (parts: string[]) => `Đã tải đồ thị tri thức với ${parts.join(" và ")}`,
+    clickToExpand: "nhấn để mở rộng",
+    clickToCollapse: "nhấn để thu gọn",
+    footerFatal: "Sao chép các vấn đề này và báo lỗi trên GitHub",
+    footerFix: "Sao chép các vấn đề này và nhờ agent của bạn sửa chúng trong knowledge-graph.json",
+    copied: "Đã sao chép!",
+    copyIssues: "Sao chép vấn đề",
     dropped: "Đã loại bỏ",
     fatal: "Nghiêm trọng",
   },
@@ -172,6 +211,8 @@ export const vi = {
     mono: "Mono",
   },
   codeViewer: {
+    noFilePath: "Node này không có đường dẫn tệp.",
+    demoUnavailable: "Chỉ có thể xem trước mã nguồn khi máy chủ bảng điều khiển cục bộ đang chạy.",
     fullFile: "Toàn bộ tệp",
     lines: "Dòng",
     linesLabel: "dòng",
@@ -222,9 +263,17 @@ export const vi = {
     placeholder: "Tìm node theo tên, tóm tắt hoặc thẻ...",
     fuzzy: "Fuzzy",
     semantic: "Ngữ nghĩa",
-    result: "kết quả",
+    resultCount: (count: number) => `${count} kết quả`,
   },
   export: {
+    notReady: "Đồ thị chưa sẵn sàng để xuất",
+    noNodes: "Không có node nào để xuất",
+    pngRenderFailed: "Xuất PNG thất bại: không thể kết xuất đồ thị thành ảnh.",
+    canvasFailed: "Không thể tạo ngữ cảnh canvas",
+    pngEncodingFailed: "Xuất PNG thất bại: mã hóa ảnh không thành công.",
+    pngFailed: (detail: string) => `Xuất PNG thất bại: ${detail}`,
+    svgFailed: (detail: string) => `Xuất SVG thất bại: ${detail}`,
+    jsonFailed: (detail: string) => `Xuất JSON thất bại: ${detail}`,
     label: "Xuất",
     title: "Xuất đồ thị (E)",
     asPNG: "Xuất dạng PNG",
@@ -269,7 +318,115 @@ export const vi = {
     authored_by: { forward: "được tạo bởi", backward: "tạo ra" },
   },
   pathFinder: {
+    heading: "Tìm đường phụ thuộc",
+    description: "Tìm đường ngắn nhất giữa hai node trong đồ thị phụ thuộc.",
+    fromNode: "Node bắt đầu",
+    toNode: "Node kết thúc",
+    selectNode: "Chọn một node...",
+    searching: "Đang tìm...",
+    findPath: "Tìm đường",
+    noPath: "Không tìm thấy đường đi giữa các node này.",
+    pathFound: (count: number) => `Đã tìm thấy đường đi (${count} node)`,
     title: "Tìm đường dẫn giữa các node (P)",
+  },
+  graphNodes: {
+    matches: (count: number) => `${count} kết quả khớp`,
+    files: (count: number) => `${count} tệp`,
+    flows: (count: number) => `${count} luồng`,
+    steps: (count: number) => `${count} bước`,
+    connections: (count: number) => `${count} kết nối`,
+    hits: (count: number) => `${count} kết quả`,
+    clickToExplore: "Nhấn để khám phá →",
+    root: "(gốc)",
+    containerAria: (name: string, count: number, expanded: boolean) =>
+      `Vùng chứa ${name}, ${count} mục, ${expanded ? "đang mở rộng" : "đang thu gọn"}`,
+    incoming: (count: number) => `${count} vào`,
+    outgoing: (count: number) => `${count} ra`,
+  },
+  graphView: {
+    showingNeighborhood: "Đang hiển thị vùng lân cận",
+    locatingTourHighlight: "Đang tìm điểm nhấn của tham quan…",
+    computingLayout: "Đang tính bố cục…",
+    noKnowledgeGraph: "Chưa có đồ thị tri thức. Chạy /understand-knowledge để tạo.",
+    noDomainGraph: "Chưa có đồ thị nghiệp vụ. Chạy /understand-domain để tạo.",
+  },
+  loadErrors: {
+    invalidGraph: (detail: string) => `Đồ thị tri thức không hợp lệ: ${detail}`,
+    unknownValidation: "Đồ thị tri thức không hợp lệ: lỗi xác thực không xác định",
+    loadFailed: (detail: string) => `Không thể tải đồ thị tri thức: ${detail}`,
+  },
+  staleness: {
+    subjectKnowledge: "Đồ thị tri thức",
+    subjectDomain: "Đồ thị nghiệp vụ",
+    subjectBoth: "Đồ thị tri thức và đồ thị nghiệp vụ",
+    titleStale: (subject: string, _multiple: boolean) => `${subject} có thể đã lỗi thời`,
+    titleDirty: (subject: string, _multiple: boolean) =>
+      `${subject} có thay đổi trong working tree`,
+    titleUnknown: (subject: string, _multiple: boolean) =>
+      `Không thể xác minh độ mới của ${subject.charAt(0).toLowerCase()}${subject.slice(1)}`,
+    staleBehind: (graph: StalenessGraph, commits: number, files: number) =>
+      `${capitalize(graphName(graph))} chậm hơn HEAD ${commits} commit của dự án; ${filesChanged(files)}`,
+    staleAhead: (graph: StalenessGraph, files: number) =>
+      `${capitalize(graphName(graph))} được tạo từ lịch sử dự án mới hơn HEAD; ${filesChanged(files)}`,
+    staleDiverged: (graph: StalenessGraph, files: number) =>
+      `${capitalize(graphName(graph))} và HEAD thuộc hai lịch sử dự án khác nhau; ${filesChanged(files)}`,
+    dirty: (graph: StalenessGraph, files: number) =>
+      `${files} tệp trong working tree đã thay đổi và chưa được phản ánh trong metadata commit của ${graphName(graph)}.`,
+    unknownMissingGraphCommit: (graph: StalenessGraph) =>
+      `${capitalize(graphName(graph))} không có mã băm commit Git để so sánh với HEAD.`,
+    unknownGitHeadUnavailable: (graph: StalenessGraph) =>
+      `Không thể so sánh ${graphName(graph)} vì bảng điều khiển không đọc được Git HEAD.`,
+    unknownGraphCommitUnavailable: (graph: StalenessGraph) =>
+      `${capitalize(graphName(graph))} tham chiếu tới một commit không có trong bản checkout này.`,
+    unknownGitCommandTimeout: (graph: StalenessGraph) =>
+      `Không thể kiểm tra ${graphName(graph)} vì các lệnh Git kiểm tra độ mới đã hết thời gian chờ.`,
+    unknownRequestFailed: "Bảng điều khiển không thể làm mới dữ liệu về độ mới của đồ thị.",
+    refresh: (commands: string[], _multiple: boolean) =>
+      `Chạy ${commands.join(" và ")} để làm mới trước khi dựa vào các câu trả lời về tác động hoặc onboarding.`,
+    retry: "Chuyển lại tiêu điểm vào cửa sổ để thử kiểm tra độ mới lần nữa.",
+    showFiles: "hiện tệp",
+    hideFiles: "ẩn tệp",
+    moreFiles: (count: number) => `+${count} tệp khác`,
+  },
+  nodeTypeNames: {
+    file: "tệp",
+    function: "hàm",
+    class: "lớp",
+    module: "module",
+    concept: "khái niệm",
+    config: "cấu hình",
+    document: "tài liệu",
+    service: "dịch vụ",
+    table: "bảng",
+    endpoint: "endpoint",
+    pipeline: "pipeline",
+    schema: "schema",
+    resource: "tài nguyên",
+    domain: "nghiệp vụ",
+    flow: "luồng",
+    step: "bước",
+    article: "bài viết",
+    entity: "thực thể",
+    topic: "chủ đề",
+    claim: "luận điểm",
+    source: "nguồn",
+    page: "trang",
+    screen: "màn hình",
+    component: "thành phần",
+    componentSet: "bộ thành phần",
+    instance: "thể hiện",
+    token: "token",
+  },
+  edgeCategoryNames: {
+    structural: "cấu trúc",
+    behavioral: "hành vi",
+    "data-flow": "luồng dữ liệu",
+    dependencies: "phụ thuộc",
+    semantic: "ngữ nghĩa",
+    infrastructure: "hạ tầng",
+    domain: "nghiệp vụ",
+    knowledge: "tri thức",
+    design: "thiết kế",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · BẮT ĐẦU",

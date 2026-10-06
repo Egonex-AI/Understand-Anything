@@ -1,5 +1,14 @@
+
+type StalenessGraph = "knowledge" | "domain";
+
+const graphName = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "知識グラフ" : "ドメイングラフ";
+const filesChanged = (count: number) => `分析後に ${count} 個のファイルが変更されています。`;
+
 export const ja = {
   common: {
+    unnamed: "名前なし",
+    close: "閉じる",
     loading: "プロジェクトを読み込み中...",
     computingGraphLayout: "グラフのレイアウトを計算しています...",
     forceLayoutFallback: "フォースレイアウトを使用できないため、代替グリッドを表示しています。",
@@ -48,6 +57,7 @@ export const ja = {
     avgConnectionsPerNode: "ノード平均接続数",
   },
   nodeInfo: {
+    reverse: "逆方向",
     definedInThisFile: "このファイルで定義",
     languageConcepts: "言語概念",
     category: "カテゴリ",
@@ -67,6 +77,7 @@ export const ja = {
     noFilePathsFound: "ファイルパスが見つかりません。",
   },
   filterPanel: {
+    title: "グラフを絞り込む (F)",
     nodeTypes: "ノードタイプ",
     complexity: "複雑度",
     layers: "レイヤー",
@@ -125,10 +136,22 @@ export const ja = {
     knowledge: "ナレッジ",
   },
   tokenGate: {
+    title: "アクセストークンが必要です",
+    instructionsBefore: "ターミナルに表示されたアクセストークンを貼り付けてください。",
+    instructionsAfter: " の行を探してください。",
+    keyIcon: "鍵",
+    placeholder: "ここにトークンを貼り付け...",
+    invalidToken: "トークンが無効です。確認してもう一度お試しください。",
+    unexpectedResponse: (status: number) =>
+      `予期しない応答です (${status})。ダッシュボードサーバーは起動していますか？`,
+    unreachable: (detail: string) => `サーバーに接続できませんでした: ${detail}`,
     validating: "検証中...",
     continue: "続行",
   },
   diffToggle: {
+    label: "差分",
+    on: "ON",
+    off: "OFF",
     hideOverlay: "差分オーバーレイを非表示",
     showOverlay: "差分オーバーレイを表示",
     noData: "差分データが読み込まれていません",
@@ -136,6 +159,9 @@ export const ja = {
     affected: "影響あり",
   },
   learnPanel: {
+    languageLesson: "言語のポイント",
+    referencedComponents: "関連コンポーネント",
+    goToStep: (step: number) => `ステップ ${step} へ移動`,
     finish: "完了",
     next: "次へ",
     prev: "前へ",
@@ -159,6 +185,19 @@ export const ja = {
     escBack: "Escで戻る",
   },
   warningBanner: {
+    autoCorrected: "自動修正済み",
+    fatalErrors: (count: number) => `${count} 件の致命的エラー`,
+    autoCorrections: (count: number) => `${count} 件の自動修正`,
+    droppedItems: (count: number) => `${count} 件の削除された項目`,
+    summaryFatal: (parts: string[]) => `ダッシュボードで ${parts.join("、")} が発生しました`,
+    summaryLoaded: (parts: string[]) =>
+      `知識グラフを読み込みました（${parts.join("、")}）`,
+    clickToExpand: "クリックして展開",
+    clickToCollapse: "クリックして折りたたむ",
+    footerFatal: "これらの問題をコピーして GitHub でバグを報告してください",
+    footerFix: "これらの問題をコピーし、knowledge-graph.json の修正をエージェントに依頼してください",
+    copied: "コピーしました！",
+    copyIssues: "問題をコピー",
     dropped: "削除済み",
     fatal: "致命的",
   },
@@ -172,6 +211,8 @@ export const ja = {
     mono: "モノ",
   },
   codeViewer: {
+    noFilePath: "このノードにはファイルパスがありません。",
+    demoUnavailable: "ソースのプレビューはローカルのダッシュボードサーバー起動時のみ利用できます。",
     fullFile: "ファイル全体",
     lines: "行",
     linesLabel: "行",
@@ -222,9 +263,17 @@ export const ja = {
     placeholder: "ノード名、概要、タグで検索...",
     fuzzy: "ファジー",
     semantic: "セマンティック",
-    result: "結果",
+    resultCount: (count: number) => `${count} 件の結果`,
   },
   export: {
+    notReady: "グラフのエクスポート準備ができていません",
+    noNodes: "エクスポートするノードがありません",
+    pngRenderFailed: "PNG のエクスポートに失敗しました: グラフを画像として描画できませんでした。",
+    canvasFailed: "キャンバスコンテキストの作成に失敗しました",
+    pngEncodingFailed: "PNG のエクスポートに失敗しました: 画像のエンコードに失敗しました。",
+    pngFailed: (detail: string) => `PNG のエクスポートに失敗しました: ${detail}`,
+    svgFailed: (detail: string) => `SVG のエクスポートに失敗しました: ${detail}`,
+    jsonFailed: (detail: string) => `JSON のエクスポートに失敗しました: ${detail}`,
     label: "エクスポート",
     title: "グラフをエクスポート (E)",
     asPNG: "PNGでエクスポート",
@@ -269,7 +318,115 @@ export const ja = {
     authored_by: { forward: "作成者", backward: "作成" },
   },
   pathFinder: {
+    heading: "依存パス検索",
+    description: "依存関係グラフ内の 2 つのノード間の最短パスを検索します。",
+    fromNode: "開始ノード",
+    toNode: "終了ノード",
+    selectNode: "ノードを選択...",
+    searching: "検索中...",
+    findPath: "パスを検索",
+    noPath: "これらのノード間にパスが見つかりませんでした。",
+    pathFound: (count: number) => `パスが見つかりました（${count} ノード）`,
     title: "ノード間のパスを検索 (P)",
+  },
+  graphNodes: {
+    matches: (count: number) => `${count} 件一致`,
+    files: (count: number) => `${count} ファイル`,
+    flows: (count: number) => `${count} フロー`,
+    steps: (count: number) => `${count} ステップ`,
+    connections: (count: number) => `${count} 件の接続`,
+    hits: (count: number) => `${count} 件ヒット`,
+    clickToExplore: "クリックして探索 →",
+    root: "（ルート）",
+    containerAria: (name: string, count: number, expanded: boolean) =>
+      `${name} コンテナー、${count} 項目、${expanded ? "展開済み" : "折りたたみ済み"}`,
+    incoming: (count: number) => `入力 ${count}`,
+    outgoing: (count: number) => `出力 ${count}`,
+  },
+  graphView: {
+    showingNeighborhood: "近傍を表示中",
+    locatingTourHighlight: "ツアーのハイライトを検索中…",
+    computingLayout: "レイアウトを計算中…",
+    noKnowledgeGraph: "知識グラフがありません。/understand-knowledge を実行して生成してください。",
+    noDomainGraph: "ドメイングラフがありません。/understand-domain を実行して生成してください。",
+  },
+  loadErrors: {
+    invalidGraph: (detail: string) => `無効な知識グラフです: ${detail}`,
+    unknownValidation: "無効な知識グラフです: 不明な検証エラー",
+    loadFailed: (detail: string) => `知識グラフの読み込みに失敗しました: ${detail}`,
+  },
+  staleness: {
+    subjectKnowledge: "知識グラフ",
+    subjectDomain: "ドメイングラフ",
+    subjectBoth: "知識グラフとドメイングラフ",
+    titleStale: (subject: string, _multiple: boolean) => `${subject}が古くなっている可能性があります`,
+    titleDirty: (subject: string, _multiple: boolean) =>
+      `${subject}に作業ツリーの変更があります`,
+    titleUnknown: (subject: string, _multiple: boolean) =>
+      `${subject}が最新かどうかを確認できませんでした`,
+    staleBehind: (graph: StalenessGraph, commits: number, files: number) =>
+      `${graphName(graph)}は HEAD より ${commits} コミット遅れています。${filesChanged(files)}`,
+    staleAhead: (graph: StalenessGraph, files: number) =>
+      `${graphName(graph)}は HEAD より新しいプロジェクト履歴に基づいています。${filesChanged(files)}`,
+    staleDiverged: (graph: StalenessGraph, files: number) =>
+      `${graphName(graph)}と HEAD は異なるプロジェクト履歴に基づいています。${filesChanged(files)}`,
+    dirty: (graph: StalenessGraph, files: number) =>
+      `作業ツリーの ${files} 個のファイルが変更されており、${graphName(graph)}のコミットメタデータに反映されていません。`,
+    unknownMissingGraphCommit: (graph: StalenessGraph) =>
+      `${graphName(graph)}には HEAD と比較するための Git コミットハッシュが含まれていません。`,
+    unknownGitHeadUnavailable: (graph: StalenessGraph) =>
+      `ダッシュボードが Git HEAD を読み取れなかったため、${graphName(graph)}を比較できませんでした。`,
+    unknownGraphCommitUnavailable: (graph: StalenessGraph) =>
+      `${graphName(graph)}が参照するコミットはこのチェックアウトに存在しません。`,
+    unknownGitCommandTimeout: (graph: StalenessGraph) =>
+      `Git の鮮度確認コマンドがタイムアウトしたため、${graphName(graph)}を確認できませんでした。`,
+    unknownRequestFailed: "ダッシュボードはグラフの鮮度データを更新できませんでした。",
+    refresh: (commands: string[], _multiple: boolean) =>
+      `影響分析やオンボーディングの回答に頼る前に、${commands.join(" と ")} を実行して更新してください。`,
+    retry: "ウィンドウに再度フォーカスすると鮮度チェックを再試行します。",
+    showFiles: "ファイルを表示",
+    hideFiles: "ファイルを隠す",
+    moreFiles: (count: number) => `他 ${count} 件`,
+  },
+  nodeTypeNames: {
+    file: "ファイル",
+    function: "関数",
+    class: "クラス",
+    module: "モジュール",
+    concept: "概念",
+    config: "設定",
+    document: "ドキュメント",
+    service: "サービス",
+    table: "テーブル",
+    endpoint: "エンドポイント",
+    pipeline: "パイプライン",
+    schema: "スキーマ",
+    resource: "リソース",
+    domain: "ドメイン",
+    flow: "フロー",
+    step: "ステップ",
+    article: "記事",
+    entity: "エンティティ",
+    topic: "トピック",
+    claim: "主張",
+    source: "出典",
+    page: "ページ",
+    screen: "画面",
+    component: "コンポーネント",
+    componentSet: "コンポーネントセット",
+    instance: "インスタンス",
+    token: "トークン",
+  },
+  edgeCategoryNames: {
+    structural: "構造",
+    behavioral: "振る舞い",
+    "data-flow": "データフロー",
+    dependencies: "依存関係",
+    semantic: "意味",
+    infrastructure: "インフラ",
+    domain: "ドメイン",
+    knowledge: "知識",
+    design: "デザイン",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · はじめに",
