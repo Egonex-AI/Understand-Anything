@@ -14,6 +14,12 @@ export function namedScope(name: string | null): SymbolScope {
 }
 export const CLASS_NODES = new Set(["class", "module", "class_declaration", "abstract_class_declaration", "class_definition", "class_specifier",
   "struct_specifier", "struct_declaration", "struct_item", "enum_item", "interface_declaration"]);
+// Java type declarations beyond the shared surface. Gated by language because
+// TypeScript's `enum_declaration` (and C#'s records) are not class scopes there.
+const JAVA_CLASS_NODES = new Set(["record_declaration", "enum_declaration", "annotation_type_declaration"]);
+export function isClassNode(type: string, language: string): boolean {
+  return CLASS_NODES.has(type) || language === "java" && JAVA_CLASS_NODES.has(type);
+}
 export const FUNCTION_NODES = new Set(["method", "singleton_method", "method_definition", "function_definition",
   "function_declaration", "generator_function_declaration", "generator_function", "function_item", "method_declaration", "constructor_declaration", "arrow_function", "function_expression", "lambda"]);
 const METHODS = new Set(["method", "singleton_method", "method_definition", "method_declaration", "constructor_declaration"]);
@@ -88,7 +94,7 @@ export function buildSymbolScopes(root: Node, language: string) {
   const scan = (node: Node, enclosing: Scope, region?: ValueRegion) => {
     let scope = enclosing;
     const declaration = declarationScope(enclosing);
-    const isClass = node !== root && CLASS_NODES.has(node.type);
+    const isClass = node !== root && isClassNode(node.type, language);
     const isFunction = FUNCTION_NODES.has(node.type);
     const expression = isJS && classExpression(node);
     const nameNode = node.childForFieldName("name");
@@ -112,6 +118,10 @@ export function buildSymbolScopes(root: Node, language: string) {
       scope = makeScope(node, enclosing, "function", receiver, true);
       if (["function_expression", "generator_function"].includes(node.type) && nameNode) bind(scope, name, node, unknownTarget);
       for (const parameter of targets(node.childForFieldName("parameters"))) bind(scope, parameter, node, unknownTarget);
+    } else if (language === "java" && node.type === "class_body" && !isClassNode(node.parent?.type ?? "", language)) {
+      // Anonymous class bodies (`new T() { ... }`, enum constant bodies) have no
+      // nameable declaring type; their members never belong to the enclosing class.
+      scope = makeScope(node, enclosing, "class", local(node), false);
     } else if (isJS && ["statement_block", "class_static_block", "for_statement", "for_in_statement", "catch_clause", "switch_statement", "with_statement"].includes(node.type)) {
       scope = makeScope(node, enclosing, "block", enclosing.receiver, true);
     } else if (["namespace_definition", "namespace_declaration"].includes(node.type)) {
