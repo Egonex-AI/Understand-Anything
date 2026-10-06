@@ -130,7 +130,7 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 # These language configs treat every source file below `tests/` as part of a
 # test target, even when the basename itself has no test marker.  JS/TS is
 # intentionally absent: files such as `__tests__/helpers.ts` remain helpers.
-_TEST_DIRECTORY_EXTENSIONS: frozenset[str] = frozenset({".swift", ".rs", ".php"})
+_TEST_DIRECTORY_EXTENSIONS: frozenset[str] = frozenset({".swift", ".rs", ".php", ".py"})
 
 _EXACT_TEST_STEMS: dict[str, frozenset[str]] = {
     ".rb": frozenset({"spec_helper"}),
@@ -342,9 +342,11 @@ def _basename(path: str) -> str:
 def is_test_path(path: str) -> bool:
     """Return True if `path` looks like a test file by language convention.
 
-    Most languages use basename markers. Swift, Rust, and PHP additionally
-    make `tests/` a test-source root. JS/TS files still require `.test` or
-    `.spec`, so `__tests__/helpers.ts` remains a non-test helper.
+    Most languages use basename markers. Swift, Rust, PHP, and Python
+    additionally make `tests/` a test-source root, so `tests/run_tests.py`
+    (no `test_` prefix, no `_test` suffix) is still recognized as a test.
+    JS/TS files still require `.test` or `.spec`, so `__tests__/helpers.ts`
+    remains a non-test helper.
     """
     stem, ext = os.path.splitext(_basename(path))
     ext = ext.lower()
