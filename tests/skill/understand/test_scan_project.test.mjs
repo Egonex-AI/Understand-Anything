@@ -169,6 +169,7 @@ describe('scan-project.mjs — language detection', () => {
       'd.h': 'void f();\n',
       'e.cpp': 'int main() {}\n',
       'f.hpp': 'class F {};\n',
+      'g.hh': 'class G {};\n',
     });
     const r = runScript(projectRoot);
     expect(r.status).toBe(0);
@@ -178,6 +179,7 @@ describe('scan-project.mjs — language detection', () => {
     expect(byPath(r.output, 'd.h').language).toBe('c');
     expect(byPath(r.output, 'e.cpp').language).toBe('cpp');
     expect(byPath(r.output, 'f.hpp').language).toBe('cpp');
+    expect(byPath(r.output, 'g.hh').language).toBe('cpp');
   });
 
   it('maps web markup (HTML, CSS) to their language ids', () => {
