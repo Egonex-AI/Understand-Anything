@@ -59,20 +59,31 @@ beforeEach(() => {
 
 describe("getChangedFiles", () => {
   it("returns changed file list from git diff", () => {
-    mockedExecFileSync.mockReturnValue("src/index.ts\nsrc/utils.ts\n");
+    mockedExecFileSync
+      .mockReturnValueOnce("abc123\n")
+      .mockReturnValueOnce("src/index.ts\nsrc/utils.ts\n");
 
     const result = getChangedFiles("/project", "abc123");
 
     expect(result).toEqual(["src/index.ts", "src/utils.ts"]);
-    expect(mockedExecFileSync).toHaveBeenCalledWith(
+    expect(mockedExecFileSync).toHaveBeenNthCalledWith(
+      1,
       "git",
-      ["diff", "abc123..HEAD", "--name-only"],
+      ["rev-parse", "--verify", "--end-of-options", "abc123^{commit}"],
+      { cwd: "/project", encoding: "utf-8" },
+    );
+    expect(mockedExecFileSync).toHaveBeenNthCalledWith(
+      2,
+      "git",
+      ["diff", "--end-of-options", "abc123..HEAD", "--name-only"],
       { cwd: "/project", encoding: "utf-8" },
     );
   });
 
   it("returns empty array when no changes", () => {
-    mockedExecFileSync.mockReturnValue("");
+    mockedExecFileSync
+      .mockReturnValueOnce("abc123\n")
+      .mockReturnValueOnce("");
 
     const result = getChangedFiles("/project", "abc123");
 
@@ -92,7 +103,9 @@ describe("getChangedFiles", () => {
 
 describe("isStale", () => {
   it("returns stale when files have changed", () => {
-    mockedExecFileSync.mockReturnValue("src/index.ts\n");
+    mockedExecFileSync
+      .mockReturnValueOnce("abc123\n")
+      .mockReturnValueOnce("src/index.ts\n");
 
     const result = isStale("/project", "abc123");
 
@@ -103,7 +116,9 @@ describe("isStale", () => {
   });
 
   it("returns not stale when no files changed", () => {
-    mockedExecFileSync.mockReturnValue("");
+    mockedExecFileSync
+      .mockReturnValueOnce("abc123\n")
+      .mockReturnValueOnce("");
 
     const result = isStale("/project", "abc123");
 
