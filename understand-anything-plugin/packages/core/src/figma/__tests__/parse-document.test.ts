@@ -57,4 +57,28 @@ describe("parseDocument", () => {
   it("emits validateGraph-ready nodes (summary/tags/complexity present)", () => {
     expect(nodes.every((n) => n.summary && n.tags.length > 0 && n.complexity)).toBe(true);
   });
+
+  it("finds screens and components inside nested page groups and sections", () => {
+    const grouped = structuredClone(doc);
+    for (const page of grouped.document.children ?? []) {
+      page.children = [{
+        id: `${page.id}:group`, name: "Designs", type: "GROUP", children: [{
+          id: `${page.id}:section`, name: "Version 1", type: "SECTION", children: [{
+            id: `${page.id}:nested`, name: "Nested group", type: "GROUP", children: page.children,
+          }],
+        }],
+      }];
+    }
+
+    // Container organization must not change the extracted design graph.
+    expect(parseDocument(grouped, "ABC123")).toEqual({ nodes, edges });
+  });
+
+  it("ignores empty page groups without adding placeholder nodes", () => {
+    const grouped = structuredClone(doc);
+    grouped.document.children![0].children!.push({
+      id: "empty", name: "Empty", type: "GROUP",
+    });
+    expect(parseDocument(grouped, "ABC123")).toEqual({ nodes, edges });
+  });
 });
