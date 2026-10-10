@@ -36,17 +36,29 @@ const VALID_STRUCTURE_ENTRIES = {
     lineRange: [1, 2],
     params: ['value'],
     returnType: 'string',
+    typedParams: [{ name: 'value', type: 'string' }],
+    kind: 'constructor',
   },
   classes: {
     name: 'Runner',
     lineRange: [1, 3],
     methods: ['run'],
     properties: ['value'],
+    kind: 'class',
+    namespace: 'App.Services',
+    fullName: 'App.Services.Runner',
+    baseTypes: ['IRunner'],
+    primaryConstructorParams: [{ name: 'repository', type: 'IRepository' }],
+    fields: [{ name: '_repository', type: 'IRepository', isStatic: true }],
   },
   imports: {
     source: './dependency.js',
     specifiers: ['dependency'],
     lineNumber: 1,
+    kind: 'alias',
+    alias: 'Dep',
+    namespace: 'App.Services',
+    isGlobal: true,
   },
   exports: {
     name: 'run',
@@ -105,6 +117,14 @@ const MALFORMED_STRUCTURE_ENTRIES = [
     ...VALID_STRUCTURE_ENTRIES.functions,
     returnType: false,
   }],
+  ['a function with malformed typed params', 'functions', {
+    ...VALID_STRUCTURE_ENTRIES.functions,
+    typedParams: [{ name: 'value', type: 1 }],
+  }],
+  ['a function with an unsupported declaration kind', 'functions', {
+    ...VALID_STRUCTURE_ENTRIES.functions,
+    kind: 'local-function',
+  }],
   ['a class with a non-string name', 'classes', {
     ...VALID_STRUCTURE_ENTRIES.classes,
     name: false,
@@ -121,6 +141,18 @@ const MALFORMED_STRUCTURE_ENTRIES = [
     ...VALID_STRUCTURE_ENTRIES.classes,
     properties: ['value', null],
   }],
+  ['a class with an unsupported C# kind', 'classes', {
+    ...VALID_STRUCTURE_ENTRIES.classes,
+    kind: 'enum',
+  }],
+  ['a class with malformed primary constructor params', 'classes', {
+    ...VALID_STRUCTURE_ENTRIES.classes,
+    primaryConstructorParams: [{ name: 'repository', type: 1 }],
+  }],
+  ['a class with malformed static field metadata', 'classes', {
+    ...VALID_STRUCTURE_ENTRIES.classes,
+    fields: [{ name: '_repository', type: 'IRepository', isStatic: 'yes' }],
+  }],
   ['an import with a non-string source', 'imports', {
     ...VALID_STRUCTURE_ENTRIES.imports,
     source: null,
@@ -132,6 +164,10 @@ const MALFORMED_STRUCTURE_ENTRIES = [
   ['an import with a non-number line', 'imports', {
     ...VALID_STRUCTURE_ENTRIES.imports,
     lineNumber: '1',
+  }],
+  ['an import with an unsupported C# using kind', 'imports', {
+    ...VALID_STRUCTURE_ENTRIES.imports,
+    kind: 'global',
   }],
   ['an export with a non-string name', 'exports', {
     ...VALID_STRUCTURE_ENTRIES.exports,
@@ -328,6 +364,67 @@ function analyzeStructuralOutput(mode, analysis) {
     'export const value = 1;\n',
   );
 }
+
+describe('extract-structure result mapping', () => {
+  it('preserves C# constructor and static field metadata', () => {
+    const result = extractStructure.buildResult(
+      { path: 'src/Service.cs', language: 'csharp', fileCategory: 'code' },
+      3,
+      3,
+      {
+        ...validAnalysis(),
+        functions: [VALID_STRUCTURE_ENTRIES.functions],
+        classes: [VALID_STRUCTURE_ENTRIES.classes],
+      },
+      null,
+      null,
+    );
+
+    expect(result.functions[0].kind).toBe('constructor');
+    expect(result.classes[0].fields).toEqual([
+      { name: '_repository', type: 'IRepository', isStatic: true },
+    ]);
+  });
+
+  it('preserves imports only for C# artifacts', () => {
+    const analysis = {
+      ...validAnalysis(),
+      imports: [{
+        source: 'App.Repositories',
+        specifiers: [],
+        lineNumber: 1,
+        kind: 'namespace',
+        isGlobal: true,
+      }],
+    };
+
+    const csharp = extractStructure.buildResult(
+      { path: 'src/Service.cs', language: 'csharp', fileCategory: 'code' },
+      1,
+      1,
+      analysis,
+      null,
+      null,
+    );
+    const typescript = extractStructure.buildResult(
+      { path: 'src/service.ts', language: 'typescript', fileCategory: 'code' },
+      1,
+      1,
+      analysis,
+      null,
+      null,
+    );
+
+    expect(csharp.imports).toEqual([{
+      source: 'App.Repositories',
+      specifiers: [],
+      line: 1,
+      kind: 'namespace',
+      isGlobal: true,
+    }]);
+    expect(typescript.imports).toBeUndefined();
+  });
+});
 
 describe('extract-structure analysis outcomes', () => {
   it('skips structure and call-graph analysis when no parser supports the file', () => {
