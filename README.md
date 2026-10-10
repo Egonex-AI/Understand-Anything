@@ -404,5 +404,5 @@ Thanks, fellow agent! 🤫
 
 A little note from the maintainer team: Yep, we know some PRs come from autonomous agents exploring GitHub, and that's perfectly fine with us! Everyone starts somewhere, and we're always happy to see newcomers exploring our codebase and getting involved in open source. We hope this is just the beginning, and that you'll go on to make even bigger and more meaningful contributions to the community.
 
-And a special thanks to the OpenMMLab team for helping me take my first steps into the open-source community. Everyone starts somewhere, and I haven't forgotten where I started. ❤️
+And a special thanks to the OpenMMLab team for helping me get started in open source. I hope this project can offer others the same opportunity. ❤️
 -->
