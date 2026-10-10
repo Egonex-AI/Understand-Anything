@@ -3,7 +3,7 @@ import type { LanguageConfig } from "../types.js";
 export const cppConfig = {
   id: "cpp",
   displayName: "C++",
-  extensions: [".cpp", ".cc", ".cxx", ".hpp", ".hxx"],
+  extensions: [".cpp", ".cc", ".cxx", ".hpp", ".hxx", ".hh"],
   treeSitter: {
     wasmPackage: "tree-sitter-cpp",
     wasmFile: "tree-sitter-cpp.wasm",

@@ -148,6 +148,7 @@ const LANGUAGE_BY_EXT = Object.freeze({
   '.cxx': 'cpp',
   '.hpp': 'cpp',
   '.hxx': 'cpp',
+  '.hh': 'cpp',
   // Vue / Svelte (no tree-sitter extractor, but project-scanner contract
   // lists them as code languages — downstream import map will return [])
   '.vue': 'vue',
