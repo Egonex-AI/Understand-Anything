@@ -129,7 +129,7 @@ Pipeline đa tác nhân quét dự án của bạn, trích xuất mọi tệp, h
 # Tạo nội dung tiếng Trung (知识图节点描述和 Dashboard UI)
 /understand --language zh
 
-# Các ngôn ngữ hỗ trợ: en (mặc định), zh, zh-TW, ja, ko, ru, vi
+# Các ngôn ngữ hỗ trợ: en (mặc định), zh, zh-TW, ja, ko, ru, vi, pt-BR
 ```
 
 Ở **lần chạy đầu tiên** trong một dự án — khi bạn không truyền `--language` và chưa có ngôn ngữ nào được lưu — `/understand` sẽ phát hiện ngôn ngữ bạn đang trò chuyện. Nếu không phải tiếng Anh, nó sẽ hỏi bạn xác nhận (hoặc ghi đè) trước khi tạo nội dung; các cuộc trò chuyện tiếng Anh không bị ảnh hưởng. Lựa chọn của bạn được lưu vào `.ua/config.json` và tái sử dụng trong mọi lần chạy sau.

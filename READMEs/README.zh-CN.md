@@ -128,7 +128,7 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 # 生成中文内容（知识图节点描述和 Dashboard UI）
 /understand --language zh
 
-# 支持的语言：en（默认）、zh、zh-TW、ja、ko、ru、vi
+# 支持的语言：en（默认）、zh、zh-TW、ja、ko、ru、vi、pt-BR
 ```
 
 `--language` 参数会影响：

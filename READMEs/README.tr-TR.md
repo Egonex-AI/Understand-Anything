@@ -129,7 +129,7 @@ Alan görünümüne geçin ve kodunuzun gerçek iş süreçleriyle nasıl eşle�
 # İstediğiniz dilde içerik oluştur (düğüm açıklamaları ve dashboard UI)
 /understand --language en
 
-# Desteklenen diller: en (varsayılan), zh, zh-TW, ja, ko, ru, vi
+# Desteklenen diller: en (varsayılan), zh, zh-TW, ja, ko, ru, vi, pt-BR
 ```
 
 `--language` parametresi şunları etkiler:

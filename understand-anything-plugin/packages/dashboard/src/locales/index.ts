@@ -5,8 +5,9 @@ import ja from "./ja";
 import ko from "./ko";
 import ru from "./ru";
 import vi from "./vi";
+import ptBR from "./pt-BR";
 
-export type LocaleKey = "en" | "zh" | "zh-TW" | "ja" | "ko" | "ru" | "vi";
+export type LocaleKey = "en" | "zh" | "zh-TW" | "ja" | "ko" | "ru" | "vi" | "pt-BR";
 export type Locale = typeof en;
 
 export const locales: Record<LocaleKey, Locale> = {
@@ -17,6 +18,7 @@ export const locales: Record<LocaleKey, Locale> = {
   ko,
   ru,
   vi,
+  "pt-BR": ptBR,
 };
 
 export function getLocale(key: LocaleKey): Locale {
@@ -32,7 +34,11 @@ export function resolveLocaleKey(lang: string | undefined): LocaleKey {
   if (normalized === "ko" || normalized === "korean") return "ko";
   if (normalized === "ru" || normalized === "russian" || normalized === "ru-ru") return "ru";
   if (normalized === "vi" || normalized === "vietnamese" || normalized === "vi-vn") return "vi";
+  if (normalized === "pt" || normalized === "pt-br" || normalized === "portuguese" || normalized === "brazilian-portuguese") return "pt-BR";
+  // Browser tags such as "ja-JP" or "ko-KR": retry with the base language.
+  const base = normalized.split("-")[0];
+  if (base && base !== normalized) return resolveLocaleKey(base);
   return "en";
 }
 
-export { en, zh, zhTW as "zh-TW", ja, ko, ru, vi };
+export { en, zh, zhTW as "zh-TW", ja, ko, ru, vi, ptBR as "pt-BR" };

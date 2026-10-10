@@ -1,5 +1,31 @@
+
+type StalenessGraph = "knowledge" | "domain";
+
+/** Russian plural form: one (1, 21), few (2-4, 22-24), many (0, 5-20, 25...). */
+const plural = (count: number, one: string, few: string, many: string) => {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const form =
+    mod10 === 1 && mod100 !== 11
+      ? one
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+        ? few
+        : many;
+  return `${count} ${form}`;
+};
+const graphNominative = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "Граф знаний" : "Доменный граф";
+const graphGenitive = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "графа знаний" : "доменного графа";
+const graphAccusative = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "граф знаний" : "доменный граф";
+const filesChanged = (count: number) =>
+  `с момента анализа ${count % 10 === 1 && count % 100 !== 11 ? "изменился" : "изменилось"} ${plural(count, "файл", "файла", "файлов")}.`;
+
 export const ru = {
   common: {
+    unnamed: "без имени",
+    close: "Закрыть",
     loading: "Загрузка проекта...",
     computingGraphLayout: "Вычисление расположения графа...",
     forceLayoutFallback: "Силовая раскладка недоступна; показана резервная сетка.",
@@ -48,6 +74,7 @@ export const ru = {
     avgConnectionsPerNode: "Среднее число связей на узел",
   },
   nodeInfo: {
+    reverse: "обратно",
     definedInThisFile: "Определено в этом файле",
     languageConcepts: "Концепции языка",
     category: "Категория",
@@ -67,6 +94,7 @@ export const ru = {
     noFilePathsFound: "Пути файлов не найдены.",
   },
   filterPanel: {
+    title: "Фильтр графа (F)",
     nodeTypes: "Типы узлов",
     complexity: "Сложность",
     layers: "Слои",
@@ -125,10 +153,22 @@ export const ru = {
     knowledge: "Знания",
   },
   tokenGate: {
+    title: "Требуется токен доступа",
+    instructionsBefore: "Вставьте токен доступа из терминала. Найдите строку со значком",
+    instructionsAfter: ".",
+    keyIcon: "ключ",
+    placeholder: "Вставьте токен сюда...",
+    invalidToken: "Недействительный токен. Проверьте и попробуйте снова.",
+    unexpectedResponse: (status: number) =>
+      `Неожиданный ответ (${status}). Сервер панели запущен?`,
+    unreachable: (detail: string) => `Не удалось подключиться к серверу: ${detail}`,
     validating: "Проверка...",
     continue: "Продолжить",
   },
   diffToggle: {
+    label: "Diff",
+    on: "ВКЛ",
+    off: "ВЫКЛ",
     hideOverlay: "Скрыть наложение изменений",
     showOverlay: "Показать наложение изменений",
     noData: "Данные об изменениях не загружены",
@@ -136,6 +176,9 @@ export const ru = {
     affected: "Затронуто",
   },
   learnPanel: {
+    languageLesson: "Урок по языку",
+    referencedComponents: "Связанные компоненты",
+    goToStep: (step: number) => `Перейти к шагу ${step}`,
     finish: "Завершить",
     next: "Далее",
     prev: "Назад",
@@ -159,6 +202,21 @@ export const ru = {
     escBack: "Esc — назад",
   },
   warningBanner: {
+    autoCorrected: "Исправлено автоматически",
+    fatalErrors: (count: number) =>
+      plural(count, "критическая ошибка", "критические ошибки", "критических ошибок"),
+    autoCorrections: (count: number) =>
+      plural(count, "автоисправление", "автоисправления", "автоисправлений"),
+    droppedItems: (count: number) =>
+      plural(count, "отброшенный элемент", "отброшенных элемента", "отброшенных элементов"),
+    summaryFatal: (parts: string[]) => `В панели возникли проблемы: ${parts.join(", ")}`,
+    summaryLoaded: (parts: string[]) => `Граф знаний загружен; ${parts.join(" и ")}`,
+    clickToExpand: "нажмите, чтобы развернуть",
+    clickToCollapse: "нажмите, чтобы свернуть",
+    footerFatal: "Скопируйте эти проблемы и создайте отчёт об ошибке на GitHub",
+    footerFix: "Скопируйте эти проблемы и попросите агента исправить их в knowledge-graph.json",
+    copied: "Скопировано!",
+    copyIssues: "Копировать проблемы",
     dropped: "Отброшено",
     fatal: "Критично",
   },
@@ -172,6 +230,8 @@ export const ru = {
     mono: "Моноширинный",
   },
   codeViewer: {
+    noFilePath: "У этого узла нет пути к файлу.",
+    demoUnavailable: "Просмотр исходного кода доступен только при запущенном локальном сервере панели.",
     fullFile: "Весь файл",
     lines: "Строки",
     linesLabel: "строк",
@@ -222,9 +282,17 @@ export const ru = {
     placeholder: "Поиск узлов по имени, описанию или тегам...",
     fuzzy: "Нечёткий",
     semantic: "Семантический",
-    result: "результат",
+    resultCount: (count: number) => plural(count, "результат", "результата", "результатов"),
   },
   export: {
+    notReady: "Граф ещё не готов к экспорту",
+    noNodes: "Нет узлов для экспорта",
+    pngRenderFailed: "Не удалось экспортировать PNG: не удалось отрисовать граф как изображение.",
+    canvasFailed: "Не удалось создать контекст canvas",
+    pngEncodingFailed: "Не удалось экспортировать PNG: ошибка кодирования изображения.",
+    pngFailed: (detail: string) => `Не удалось экспортировать PNG: ${detail}`,
+    svgFailed: (detail: string) => `Не удалось экспортировать SVG: ${detail}`,
+    jsonFailed: (detail: string) => `Не удалось экспортировать JSON: ${detail}`,
     label: "Экспорт",
     title: "Экспортировать граф (E)",
     asPNG: "Экспортировать как PNG",
@@ -269,7 +337,130 @@ export const ru = {
     authored_by: { forward: "автор", backward: "автор" },
   },
   pathFinder: {
+    heading: "Поиск пути зависимостей",
+    description: "Найдите кратчайший путь между двумя узлами в графе зависимостей.",
+    fromNode: "Начальный узел",
+    toNode: "Конечный узел",
+    selectNode: "Выберите узел...",
+    searching: "Поиск...",
+    findPath: "Найти путь",
+    noPath: "Путь между этими узлами не найден.",
+    pathFound: (count: number) => `Путь найден (${plural(count, "узел", "узла", "узлов")})`,
     title: "Найти путь между узлами (P)",
+  },
+  graphNodes: {
+    matches: (count: number) => plural(count, "совпадение", "совпадения", "совпадений"),
+    files: (count: number) => plural(count, "файл", "файла", "файлов"),
+    flows: (count: number) => plural(count, "поток", "потока", "потоков"),
+    steps: (count: number) => plural(count, "шаг", "шага", "шагов"),
+    connections: (count: number) => plural(count, "связь", "связи", "связей"),
+    hits: (count: number) => plural(count, "совпадение", "совпадения", "совпадений"),
+    clickToExplore: "Нажмите, чтобы открыть →",
+    root: "(корень)",
+    containerAria: (name: string, count: number, expanded: boolean) =>
+      `Контейнер ${name}, ${plural(count, "элемент", "элемента", "элементов")}, ${
+        expanded ? "развёрнут" : "свёрнут"
+      }`,
+    incoming: (count: number) => `входящие: ${count}`,
+    outgoing: (count: number) => `исходящие: ${count}`,
+  },
+  graphView: {
+    showingNeighborhood: "Показано окружение",
+    locatingTourHighlight: "Поиск выделенного шага обзора…",
+    computingLayout: "Расчёт раскладки…",
+    noKnowledgeGraph: "Граф знаний недоступен. Запустите /understand-knowledge, чтобы создать его.",
+    noDomainGraph: "Доменный граф недоступен. Запустите /understand-domain, чтобы создать его.",
+  },
+  loadErrors: {
+    invalidGraph: (detail: string) => `Некорректный граф знаний: ${detail}`,
+    unknownValidation: "Некорректный граф знаний: неизвестная ошибка проверки",
+    loadFailed: (detail: string) => `Не удалось загрузить граф знаний: ${detail}`,
+  },
+  staleness: {
+    subjectKnowledge: "Граф знаний",
+    subjectDomain: "Доменный граф",
+    subjectBoth: "Граф знаний и доменный граф",
+    titleStale: (subject: string, multiple: boolean) =>
+      `${subject} ${multiple ? "могут быть устаревшими" : "может быть устаревшим"}`,
+    titleDirty: (subject: string, _multiple: boolean) =>
+      `${subject}: есть изменения в рабочем дереве`,
+    titleUnknown: (subject: string, multiple: boolean) =>
+      `${subject}: не удалось проверить ${multiple ? "их" : "его"} актуальность`,
+    staleBehind: (graph: StalenessGraph, commits: number, files: number) =>
+      `${graphNominative(graph)} отстаёт от HEAD на ${plural(
+        commits,
+        "коммит",
+        "коммита",
+        "коммитов",
+      )} проекта; ${filesChanged(files)}`,
+    staleAhead: (graph: StalenessGraph, files: number) =>
+      `${graphNominative(graph)} построен по более новой истории проекта, чем HEAD; ${filesChanged(files)}`,
+    staleDiverged: (graph: StalenessGraph, files: number) =>
+      `${graphNominative(graph)} и HEAD относятся к разным историям проекта; ${filesChanged(files)}`,
+    dirty: (graph: StalenessGraph, files: number) =>
+      `В рабочем дереве ${files % 10 === 1 && files % 100 !== 11 ? "изменился" : "изменилось"} ${plural(
+        files,
+        "файл",
+        "файла",
+        "файлов",
+      )}; эти изменения не отражены в метаданных коммита ${graphGenitive(graph)}.`,
+    unknownMissingGraphCommit: (graph: StalenessGraph) =>
+      `${graphNominative(graph)} не содержит хеш коммита Git для сравнения с HEAD.`,
+    unknownGitHeadUnavailable: (graph: StalenessGraph) =>
+      `Не удалось сравнить ${graphAccusative(graph)}: панель не смогла прочитать Git HEAD.`,
+    unknownGraphCommitUnavailable: (graph: StalenessGraph) =>
+      `${graphNominative(graph)} ссылается на коммит, которого нет в этом checkout.`,
+    unknownGitCommandTimeout: (graph: StalenessGraph) =>
+      `Не удалось проверить ${graphAccusative(graph)}: истекло время ожидания команд Git.`,
+    unknownRequestFailed: "Панели не удалось обновить данные об актуальности графа.",
+    refresh: (commands: string[], multiple: boolean) =>
+      `Запустите ${commands.join(" и ")}, чтобы обновить ${
+        multiple ? "их" : "его"
+      }, прежде чем полагаться на ответы об impact-анализе или онбординге.`,
+    retry: "Переключитесь обратно на окно, чтобы повторить проверку актуальности.",
+    showFiles: "показать файлы",
+    hideFiles: "скрыть файлы",
+    moreFiles: (count: number) => `ещё ${count}`,
+  },
+  nodeTypeNames: {
+    file: "файл",
+    function: "функция",
+    class: "класс",
+    module: "модуль",
+    concept: "концепция",
+    config: "конфигурация",
+    document: "документ",
+    service: "сервис",
+    table: "таблица",
+    endpoint: "эндпоинт",
+    pipeline: "конвейер",
+    schema: "схема",
+    resource: "ресурс",
+    domain: "домен",
+    flow: "поток",
+    step: "шаг",
+    article: "статья",
+    entity: "сущность",
+    topic: "тема",
+    claim: "утверждение",
+    source: "источник",
+    page: "страница",
+    screen: "экран",
+    component: "компонент",
+    componentSet: "набор компонентов",
+    instance: "экземпляр",
+    token: "токен",
+  },
+  edgeCategoryNames: {
+    structural: "структурные",
+    behavioral: "поведенческие",
+    "data-flow": "потоки данных",
+    dependencies: "зависимости",
+    semantic: "семантические",
+    infrastructure: "инфраструктура",
+    domain: "домен",
+    knowledge: "знания",
+    design: "дизайн",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · НАЧАЛО РАБОТЫ",
