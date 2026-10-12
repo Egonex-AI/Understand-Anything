@@ -51,7 +51,7 @@ Read `filesToReanalyze` from the plan. It never contains deleted, ignored, cosme
     --changed-files="$UA_DIR/intermediate/changed-files.json"
   ```
 
-  Dispatch file-analyzer for those batches only, using `agents/file-analyzer.md` and the batch prompt contract from the `/understand` skill. Include `previousSymbols` for each batch's files from `incremental-symbol-baseline.json`: old symbol IDs, names, types, paths, line ranges, and class containment. Existing symbols that still exist must survive significance filtering. Preserve each original batch index in its output filename. Retry a failed dispatch once; if it still fails, **STOP** without running the finalizer or advancing the baseline.
+  Dispatch file-analyzer for those batches only, using `agents/file-analyzer.md` and the batch prompt contract from the `/understand` skill. Build framework context with `node "$PLUGIN_ROOT/skills/understand/framework-addendums.mjs" "$UA_DIR/intermediate/scan-result.json"` and append it to each dispatch, including standalone JPA provider rules. Include `previousSymbols` for each batch's files from `incremental-symbol-baseline.json`: old symbol IDs, names, types, paths, line ranges, and class containment. Existing symbols that still exist must survive significance filtering. Preserve each original batch index in its output filename. Retry a failed dispatch once; if it still fails, **STOP** without running the finalizer or advancing the baseline.
 
 ## Phase 2 — Merge
 
