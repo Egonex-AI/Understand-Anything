@@ -23,7 +23,10 @@ interface SourceFile {
 type SourceState =
   | { status: "idle" | "loading"; source: null; error: null }
   | { status: "loaded"; source: SourceFile; error: null }
-  | { status: "error"; source: null; error: string };
+  | { status: "error"; source: null; error: string | null; errorKind?: SourceErrorKind };
+
+/** Errors raised by the dashboard itself are localized at render time. */
+type SourceErrorKind = "no-file-path" | "demo" | "unavailable";
 
 function fileContentUrl(filePath: string, token: string): string {
   const params = new URLSearchParams({ token, path: filePath });
@@ -148,7 +151,7 @@ export default function CodeViewer({
 
   useEffect(() => {
     if (!node?.filePath) {
-      setState({ status: "error", source: null, error: "This node does not have a file path." });
+      setState({ status: "error", source: null, error: null, errorKind: "no-file-path" });
       return;
     }
 
@@ -156,7 +159,8 @@ export default function CodeViewer({
       setState({
         status: "error",
         source: null,
-        error: "Source preview is available only when the local dashboard server is running.",
+        error: null,
+        errorKind: "demo",
       });
       return;
     }
@@ -168,7 +172,7 @@ export default function CodeViewer({
       .then(async (res) => {
         const data = (await res.json()) as SourceFile | { error?: string };
         if (!res.ok) {
-          throw new Error("error" in data && data.error ? data.error : "Source unavailable");
+          throw new Error("error" in data && data.error ? data.error : "");
         }
         setState({ status: "loaded", source: data as SourceFile, error: null });
       })
@@ -177,7 +181,8 @@ export default function CodeViewer({
         setState({
           status: "error",
           source: null,
-          error: err instanceof Error ? err.message : String(err),
+          error: (err instanceof Error ? err.message : String(err)) || null,
+          errorKind: "unavailable",
         });
       });
 
@@ -270,7 +275,13 @@ export default function CodeViewer({
           <div className="p-5">
             <div className="rounded-lg border border-border-subtle bg-elevated p-4">
               <div className="text-sm font-medium text-text-primary mb-2">{t.codeViewer.sourceUnavailable}</div>
-              <p className="text-sm text-text-secondary leading-relaxed">{state.error}</p>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                {state.errorKind === "no-file-path"
+                  ? t.codeViewer.noFilePath
+                  : state.errorKind === "demo"
+                    ? t.codeViewer.demoUnavailable
+                    : state.error ?? t.codeViewer.sourceUnavailable}
+              </p>
             </div>
           </div>
         )}

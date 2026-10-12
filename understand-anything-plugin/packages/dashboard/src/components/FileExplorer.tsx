@@ -96,6 +96,7 @@ function FileTreeRow({
 }) {
   const isExpanded = expanded.has(entry.path);
   const paddingLeft = 12 + depth * 14;
+  const { t } = useI18n();
 
   if (entry.type === "folder") {
     return (
@@ -131,7 +132,7 @@ function FileTreeRow({
       onDoubleClick={() => entry.nodeId && openFile(entry.nodeId)}
       className="w-full flex items-center gap-1.5 py-1.5 pr-3 text-left text-xs text-text-secondary hover:text-accent hover:bg-accent/5 transition-colors"
       style={{ paddingLeft }}
-      title={`${entry.path} - double-click to open`}
+      title={`${entry.path} - ${t.common.doubleClickToOpen}`}
     >
       <span className="w-3 text-text-muted">-</span>
       <span className="truncate font-mono">{entry.name}</span>
