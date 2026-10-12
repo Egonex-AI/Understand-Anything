@@ -40,7 +40,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { dirname, resolve, join, posix, isAbsolute } from 'node:path';
+import { dirname, resolve, join, isAbsolute, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -196,17 +196,6 @@ function dirOf(p) {
 // same config 1000 times).
 // ---------------------------------------------------------------------------
 
-/**
- * Parse a single tsconfig.json file content and return
- * `{ baseUrl: string, paths: Map<string, string[]> }` or `null` if both the
- * comment-stripped and raw parses fail. Centralizes the "JSONC-then-raw"
- * fallback so callers can iterate many tsconfigs without duplicating the
- * try/catch ladder.
- *
- * Returning `null` (rather than throwing) lets the caller emit a Warning:
- * with the exact tsconfig path that failed; bubbling the error would
- * conceal which file was at fault when many tsconfigs are loaded.
- */
 function normalizeJsonc(raw) {
   let withoutComments = '';
   let inString = false;
@@ -270,36 +259,108 @@ function normalizeJsonc(raw) {
   return normalized.replace(/^\uFEFF/, '');
 }
 
-function parseTsConfigText(raw) {
+/**
+ * Parse a single tsconfig file's content (JSONC tolerated) and return the
+ * parsed object, or `null` if both the comment-stripped and raw parses fail.
+ * Centralizes the "JSONC-then-raw" fallback so callers can iterate many
+ * tsconfigs without duplicating the try/catch ladder.
+ *
+ * Returning `null` (rather than throwing) lets the caller emit a Warning:
+ * with the exact tsconfig path that failed; bubbling the error would
+ * conceal which file was at fault when many tsconfigs are loaded.
+ */
+function parseTsConfigObject(raw) {
   const normalized = normalizeJsonc(raw);
-  let parsed;
   try {
-    parsed = JSON.parse(normalized);
+    return JSON.parse(normalized);
   } catch {
     try {
-      parsed = JSON.parse(raw);
+      return JSON.parse(raw);
     } catch {
       return null;
     }
   }
-  const compilerOptions = parsed?.compilerOptions ?? {};
-  const baseUrl = compilerOptions.baseUrl ?? '.';
-  const paths = new Map();
-  if (compilerOptions.paths && typeof compilerOptions.paths === 'object') {
-    for (const [alias, targets] of Object.entries(compilerOptions.paths)) {
-      if (Array.isArray(targets)) {
-        paths.set(alias, targets);
+}
+
+const MAX_TSCONFIG_EXTENDS_DEPTH = 16;
+
+/**
+ * Resolve the `extends` chain of an already-parsed tsconfig and return the
+ * effective path-alias settings:
+ *   `{ paths: Map<alias, targets[]>, pathsBaseAbs: string }`
+ *
+ * Nx and most pnpm monorepos keep every `paths` alias in a root
+ * `tsconfig.base.json` that package tsconfigs only `extends`, so reading a
+ * tsconfig's own `compilerOptions` sees no aliases at all. Mirrors the
+ * TypeScript rules:
+ *   - configs apply base-first; a later `paths` / `baseUrl` replaces earlier
+ *     ones (array `extends` applies left to right, TS >= 5.0);
+ *   - `baseUrl` is relative to the config that declares it;
+ *   - with no `baseUrl`, `paths` targets are relative to the config that
+ *     declares `paths` (TS >= 4.1).
+ * Only relative / absolute `extends` specifiers are followed. Package
+ * specifiers (`@tsconfig/node20/tsconfig.json`) live in node_modules and
+ * never carry project path aliases, so they are skipped. A missing target or
+ * a cycle is reported through `warn` and contributes nothing.
+ */
+function resolveTsConfigEffective(absPath, parsed, warn) {
+  const chain = [];
+  const visit = (configAbs, config, seen, depth) => {
+    const ext = config?.extends;
+    const specs = typeof ext === 'string' ? [ext] : Array.isArray(ext) ? ext : [];
+    for (const spec of specs) {
+      if (typeof spec !== 'string' || !(spec.startsWith('.') || isAbsolute(spec))) continue;
+      let target = resolve(dirname(configAbs), spec);
+      if (!existsSync(target) && !target.endsWith('.json')) target += '.json';
+      if (seen.has(target) || depth >= MAX_TSCONFIG_EXTENDS_DEPTH) {
+        warn(`extends ${spec} forms a cycle or is nested too deeply`);
+        continue;
       }
+      let raw;
+      try {
+        raw = readFileSync(target, 'utf-8');
+      } catch {
+        warn(`extends ${spec}, which was not found`);
+        continue;
+      }
+      const base = parseTsConfigObject(raw);
+      if (base === null) {
+        warn(`extends ${spec}, which failed to parse`);
+        continue;
+      }
+      visit(target, base, new Set([...seen, target]), depth + 1);
+    }
+    chain.push({ dirAbs: dirname(configAbs), compilerOptions: config?.compilerOptions ?? {} });
+  };
+  visit(absPath, parsed, new Set([absPath]), 0);
+
+  let paths = new Map();
+  let pathsDirAbs = dirname(absPath);
+  let baseUrlAbs = null;
+  for (const { dirAbs, compilerOptions } of chain) {
+    if (typeof compilerOptions.baseUrl === 'string') {
+      baseUrlAbs = resolve(dirAbs, compilerOptions.baseUrl);
+    }
+    if (compilerOptions.paths && typeof compilerOptions.paths === 'object') {
+      paths = new Map();
+      for (const [alias, targets] of Object.entries(compilerOptions.paths)) {
+        if (Array.isArray(targets)) paths.set(alias, targets);
+      }
+      pathsDirAbs = dirAbs;
     }
   }
-  return { baseUrl, paths };
+  return { paths, pathsBaseAbs: baseUrlAbs ?? pathsDirAbs };
 }
 
 /**
  * Load every `tsconfig.json` discovered in the input file list and parse
- * each. Returns `Map<dirPath, { baseUrl, paths }>` keyed by the
- * project-relative POSIX directory containing the tsconfig (empty string
- * for a root-level tsconfig.json).
+ * each, following its relative `extends` chain. Returns
+ * `Map<dirPath, { paths, pathsBase }>` keyed by the project-relative POSIX
+ * directory containing the tsconfig (empty string for a root-level
+ * tsconfig.json). `pathsBase` is the project-relative POSIX directory that
+ * `paths` targets resolve against; it may point above the project root when
+ * the aliases come from a base config outside it (scanning one package of a
+ * monorepo whose aliases live in the repo-root `tsconfig.base.json`).
  *
  * `paths` keys keep their trailing `*` wildcards intact (e.g. `"@/*"`); the
  * resolver matches them by prefix. Values are arrays because tsconfig
@@ -316,7 +377,7 @@ function parseTsConfigText(raw) {
  * failure for a specific tsconfig, emits a Warning: pointing at the bad
  * file and skips it (the rest of the project keeps working).
  *
- * Parse strategy (per-file, in parseTsConfigText):
+ * Parse strategy (per-file, in parseTsConfigObject):
  *   1. Try the comment-stripped text (handles JSONC-style tsconfigs).
  *   2. If that fails, retry the ORIGINAL raw text — recovers the case
  *      where the stripper damaged a string literal containing `//`.
@@ -349,7 +410,7 @@ async function loadTsConfigs(projectRoot, files) {
       );
       continue;
     }
-    const parsed = parseTsConfigText(raw);
+    const parsed = parseTsConfigObject(raw);
     if (!parsed) {
       failures.push({
         path: p,
@@ -363,7 +424,15 @@ async function loadTsConfigs(projectRoot, files) {
       );
       continue;
     }
-    out.set(dirOf(p), parsed);
+    // Absolute, so cycle detection compares like with like.
+    const absPath = resolve(projectRoot, p);
+    const { paths, pathsBaseAbs } = resolveTsConfigEffective(absPath, parsed, (reason) => {
+      warnings.push(
+        `Warning: extract-import-map: tsconfig.json at ${absPath} ${reason} — ` +
+        `path aliases inherited through it will not be applied — relative imports unaffected\n`,
+      );
+    });
+    out.set(dirOf(p), { paths, pathsBase: toPosix(relative(projectRoot, pathsBaseAbs)) });
   }
   return { configs: out, warnings, failures };
 }
@@ -577,9 +646,9 @@ function findNearestConfigDir(startDir, configMap) {
 /**
  * Resolution context shared across all per-file resolver calls. Holds:
  *  - fileSet: Set<string> of every input file's posix path
- *  - tsConfigs: Map<dir, { baseUrl, paths }> from every tsconfig.json in
- *    `files[]`. Per-import resolution walks up from the importer to the
- *    nearest enclosing tsconfig.
+ *  - tsConfigs: Map<dir, { paths, pathsBase }> from every tsconfig.json in
+ *    `files[]`, with `extends` chains applied. Per-import resolution walks
+ *    up from the importer to the nearest enclosing tsconfig.
  *  - goModules: Map<dir, moduleName> from every go.mod in `files[]`.
  *  - phpAutoloads: Map<dir, autoloadMap> from every composer.json in
  *    `files[]`. Resolved paths are anchored at the composer's directory.
@@ -766,40 +835,29 @@ export function resolveTsJsImport(rawImport, file, ctx) {
   }
 
   // tsconfig path aliases. Walk up from the importer to find the nearest
-  // tsconfig.json; resolve targets relative to THAT tsconfig's directory.
+  // tsconfig.json; its effective `paths` (own or inherited via `extends`)
+  // resolve against `pathsBase`, the directory TypeScript anchors them to.
   // Without the walk-up, a root tsconfig would either swallow aliases that
   // belong to a sub-package or fail to apply sub-package-defined aliases.
   const tsConfigDir = findNearestConfigDir(importerDir, ctx.tsConfigs);
   if (tsConfigDir !== undefined) {
     const tsConfig = ctx.tsConfigs.get(tsConfigDir);
-    const { baseUrl, paths } = tsConfig;
+    const { paths, pathsBase } = tsConfig;
     if (paths && paths.size > 0) {
       for (const [alias, targets] of paths) {
         const aliasMatch = matchTsAlias(alias, src);
         if (aliasMatch === null) continue;
         for (const target of targets) {
           const mapped = applyTsAlias(target, aliasMatch);
-          // baseUrl is tsconfig-dir-relative; '.', './', '' all mean the
-          // tsconfig's own directory. We anchor at tsConfigDir so a nested
-          // tsconfig's `baseUrl: '.'` maps to its package, not project root.
-          const normalizedBase = baseUrl === '.' || baseUrl === ''
-            ? ''
-            : toPosix(baseUrl);
-          const relativeToConfig = normalizedBase
-            ? posix.join(normalizedBase, mapped)
-            : mapped;
-          // posix.normalize strips a leading "./" left over when both
-          // tsConfigDir and normalizedBase are empty (root tsconfig with
-          // `"@/*": ["./*"]`, the create-next-app default). Without this the
-          // candidate stays as "./foo" while ctx.fileSet stores "foo", and
-          // probeWithExtensions silently drops every cross-module edge.
-          const candidate = posix.normalize(
-            tsConfigDir
-              ? posix.join(tsConfigDir, relativeToConfig)
-              : relativeToConfig,
+          // Resolve through absolute paths: `pathsBase` may sit above the
+          // project root (aliases inherited from a monorepo-root base config
+          // while scanning one package) and its targets may point back into
+          // the project. Normalizing also drops a leading "./" (#214).
+          const candidate = toPosix(
+            relative(ctx.projectRoot, resolve(ctx.projectRoot, pathsBase, mapped)),
           );
           // Defensive: tsconfig targets shouldn't escape the project root.
-          if (candidate.startsWith('..')) continue;
+          if (!candidate || candidate.startsWith('..') || isAbsolute(candidate)) continue;
           const probed = probeWithExtensions(candidate, ctx.fileSet);
           if (probed) return probed;
         }
