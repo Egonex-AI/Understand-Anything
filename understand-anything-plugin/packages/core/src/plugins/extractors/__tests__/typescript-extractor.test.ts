@@ -86,3 +86,42 @@ describe("TypeScriptExtractor", () => {
     });
   });
 });
+
+describe("TypeScriptExtractor - file-scope calls", () => {
+  const extractor = new TypeScriptExtractor();
+  const calls = (code: string) => {
+    const { tree, parser, root } = parse(code);
+    const result = extractor.extractCallGraph(root);
+    tree.delete();
+    parser.delete();
+    return result;
+  };
+
+  it("attributes a top-level main() call to <file>", () => {
+    const result = calls(`function main() {}\nmain();\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "main", lineNumber: 2 });
+  });
+
+  it("captures app.use at module scope", () => {
+    const result = calls(`const app = express();\napp.use(router);\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "express", lineNumber: 1 });
+    expect(result).toContainEqual({ caller: "<file>", callee: "app.use", lineNumber: 2 });
+  });
+
+  it("captures calls inside a top-level IIFE", () => {
+    const result = calls(`(function () {\n  boot();\n})();\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "boot", lineNumber: 2 });
+  });
+
+  it("captures calls inside an anonymous forEach callback at file scope", () => {
+    const result = calls(`items.forEach((x) => {\n  register(x);\n});\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "items.forEach", lineNumber: 1 });
+    expect(result).toContainEqual({ caller: "<file>", callee: "register", lineNumber: 2 });
+  });
+
+  it("keeps attributing calls inside named functions to the function", () => {
+    const result = calls(`function a() {\n  b();\n  [1].forEach(() => c());\n}\n`);
+    expect(result.every((e) => e.caller === "a")).toBe(true);
+    expect(result.some((e) => e.caller === "<file>")).toBe(false);
+  });
+});

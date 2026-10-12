@@ -552,15 +552,18 @@ def main():
       parser.delete();
     });
 
-    it("ignores top-level calls (no caller)", () => {
+    it("attributes top-level calls to the synthetic <file> caller", () => {
       const { tree, parser, root } = parse(`
 print("hello")
 main()
 `);
       const result = extractor.extractCallGraph(root);
 
-      // Top-level calls have no enclosing function, so they are skipped
-      expect(result).toHaveLength(0);
+      // Top-level calls have no enclosing function, so they are attributed
+      // to the file node via the synthetic "<file>" caller.
+      expect(result).toHaveLength(2);
+      expect(result.every((e) => e.caller === "<file>")).toBe(true);
+      expect(result.map((e) => e.callee)).toEqual(["print", "main"]);
 
       tree.delete();
       parser.delete();
@@ -655,5 +658,39 @@ def utility_func(*args, **kwargs) -> None:
       tree.delete();
       parser.delete();
     });
+  });
+});
+
+describe("PythonExtractor - file-scope calls", () => {
+  const extractor = new PythonExtractor();
+  const calls = (code: string) => {
+    const { tree, parser, root } = parse(code);
+    const result = extractor.extractCallGraph(root);
+    tree.delete();
+    parser.delete();
+    return result;
+  };
+
+  it("attributes a top-level main() call to <file>", () => {
+    const result = calls(`def main():\n    pass\n\nmain()\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "main", lineNumber: 4 });
+  });
+
+  it("captures calls under an if __name__ == '__main__' guard", () => {
+    const result = calls(`def run():\n    pass\n\nif __name__ == "__main__":\n    app.run(debug=True)\n    run()\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "app.run", lineNumber: 5 });
+    expect(result).toContainEqual({ caller: "<file>", callee: "run", lineNumber: 6 });
+  });
+
+  it("captures module-level app.use style wiring", () => {
+    const result = calls(`app = Flask(__name__)\napp.register_blueprint(bp)\n`);
+    expect(result).toContainEqual({ caller: "<file>", callee: "Flask", lineNumber: 1 });
+    expect(result).toContainEqual({ caller: "<file>", callee: "app.register_blueprint", lineNumber: 2 });
+  });
+
+  it("emits no <file> entries when all calls are inside functions", () => {
+    const result = calls(`def a():\n    b()\n\ndef b():\n    print("x")\n`);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.some((e) => e.caller === "<file>")).toBe(false);
   });
 });
