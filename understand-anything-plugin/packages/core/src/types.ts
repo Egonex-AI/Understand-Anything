@@ -182,6 +182,25 @@ export interface ReferenceResolution {
 }
 
 // Plugin interfaces
+/**
+ * Kind of top-level (module-scope) code that sits between symbols.
+ * - `statement`: executable glue (calls, side effects, control flow)
+ * - `config`: assignments / non-function declarations (constants, wiring)
+ * - `guard`: entry-point guard (`if __name__ == "__main__":`, `if (require.main === module)`)
+ * - `iife`: immediately-invoked function expression
+ */
+export type TopLevelSegmentKind = "statement" | "config" | "guard" | "iife";
+
+/** A run of consecutive module-level code not covered by any extracted symbol. */
+export interface TopLevelSegment {
+  kind: TopLevelSegmentKind;
+  lineRange: [number, number];
+  /** Unique callee expressions invoked inside the segment, in source order. */
+  calls: string[];
+  /** First line of the segment, trimmed and capped (preview only). */
+  text?: string;
+}
+
 export interface StructuralAnalysis {
   functions: Array<{
     name: string;
@@ -202,6 +221,8 @@ export interface StructuralAnalysis {
   endpoints?: EndpointInfo[];
   steps?: StepInfo[];
   resources?: ResourceInfo[];
+  /** Module-level code between symbols (optional; omitted when there is none). */
+  topLevel?: TopLevelSegment[];
 }
 
 export interface ImportResolution {

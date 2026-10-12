@@ -369,6 +369,18 @@ export class Greeter {
       expect(empty.structure?.functions).toEqual([]);
     });
 
+    it("counts top-level segments toward line coverage in symbol evidence", () => {
+      const code = "import fs from 'fs';\n\nfunction main() {\n  return 1;\n}\n\nif (require.main === module) {\n  main();\n}\n";
+      const strict = plugin.analyzeFileStrict("entry.ts", code);
+      expect(strict.status).toBe("succeeded");
+      expect(strict.structure?.topLevel).toEqual([
+        expect.objectContaining({ kind: "guard", lineRange: [7, 9], calls: ["main"] }),
+      ]);
+      expect(strict.symbolEvidence?.coverage.lines).toEqual({
+        totalLines: 9, symbolLines: 4, topLevelLines: 3, coveredLines: 7, ratio: 7 / 9,
+      });
+    });
+
     it("uses the same extractor and preserves evidence of unextracted members", () => {
       const code = "class A { run() {} callback = () => {}; }";
       const strict = plugin.analyzeFileStrict("test.ts", code);

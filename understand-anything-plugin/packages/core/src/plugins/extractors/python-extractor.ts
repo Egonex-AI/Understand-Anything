@@ -1,5 +1,7 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
+import { FILE_SCOPE_CALLER } from "./types.js";
+import { collectTopLevelSegments, type SegmentClassifier } from "./top-level-segments.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
@@ -92,6 +94,38 @@ function unwrapDecorated(node: TreeSitterNode): TreeSitterNode {
   return node;
 }
 
+
+/** Root-level node types already represented as symbols or imports. */
+const PY_HANDLED = new Set([
+  "function_definition", "class_definition", "decorated_definition",
+  "import_statement", "import_from_statement", "future_import_statement", "pass_statement",
+]);
+
+function isMainGuard(node: TreeSitterNode): boolean {
+  const cond = node.childForFieldName("condition");
+  if (!cond) return false;
+  const text = cond.text.replace(/\s+/g, "").replace(/'/g, '"');
+  return text === '__name__=="__main__"' || text === '"__main__"==__name__';
+}
+
+const pySegmentClassifier: SegmentClassifier = {
+  classify(node) {
+    if (PY_HANDLED.has(node.type)) return null;
+    if (node.type === "if_statement" && isMainGuard(node)) return "guard";
+    if (node.type === "expression_statement") {
+      const expr = node.namedChildren[0];
+      // Module docstring is documentation, not code.
+      if (expr?.type === "string" && node.namedChildren.length === 1) return null;
+      if (expr && (expr.type === "assignment" || expr.type === "augmented_assignment")) return "config";
+    }
+    return "statement";
+  },
+  callee(node) {
+    if (node.type !== "call") return null;
+    return node.children.find((c) => c.type === "identifier" || c.type === "attribute")?.text ?? null;
+  },
+};
+
 /**
  * Python extractor for tree-sitter structural analysis and call graph extraction.
  *
@@ -138,7 +172,10 @@ export class PythonExtractor implements LanguageExtractor {
       }
     }
 
-    return { functions, classes, imports, exports };
+    const topLevel = collectTopLevelSegments(rootNode, pySegmentClassifier);
+    return topLevel.length > 0
+      ? { functions, classes, imports, exports, topLevel }
+      : { functions, classes, imports, exports };
   }
 
   extractCallGraph(rootNode: TreeSitterNode): CallGraphEntry[] {
@@ -164,9 +201,12 @@ export class PythonExtractor implements LanguageExtractor {
             c.type === "identifier" ||
             c.type === "attribute",
         );
-        if (calleeNode && functionStack.length > 0) {
+        if (calleeNode) {
           entries.push({
-            caller: functionStack[functionStack.length - 1],
+            caller:
+              functionStack.length > 0
+                ? functionStack[functionStack.length - 1]
+                : FILE_SCOPE_CALLER,
             callee: calleeNode.text,
             lineNumber: node.startPosition.row + 1,
           });

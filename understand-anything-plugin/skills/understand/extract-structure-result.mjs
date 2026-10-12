@@ -254,6 +254,16 @@ export function buildResult(file, totalLines, nonEmptyLines, analysis, callGraph
     }));
   }
 
+  if (analysis.topLevel && analysis.topLevel.length > 0) {
+    base.topLevel = analysis.topLevel.map(seg => ({
+      kind: seg.kind,
+      startLine: seg.lineRange[0],
+      endLine: seg.lineRange[1],
+      calls: seg.calls || [],
+      ...(seg.text ? { text: seg.text } : {}),
+    }));
+  }
+
   if (analysis.sections && analysis.sections.length > 0) {
     base.sections = analysis.sections.map(s => ({
       heading: s.name,
