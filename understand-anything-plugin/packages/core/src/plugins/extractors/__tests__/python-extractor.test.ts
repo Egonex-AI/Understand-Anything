@@ -694,3 +694,61 @@ describe("PythonExtractor - file-scope calls", () => {
     expect(result.some((e) => e.caller === "<file>")).toBe(false);
   });
 });
+
+describe("PythonExtractor - top-level segments", () => {
+  const extractor = new PythonExtractor();
+  const structure = (code: string) => {
+    const { tree, parser, root } = parse(code);
+    const result = extractor.extractStructure(root);
+    tree.delete();
+    parser.delete();
+    return result;
+  };
+
+  it("captures a segment between two functions with the right lineRange", () => {
+    const result = structure(
+      ["def a():", "    pass", "", "register(a)", "log.info('ready')", "", "def b():", "    pass", ""].join("\n"),
+    );
+    expect(result.topLevel).toEqual([
+      { kind: "statement", lineRange: [4, 5], calls: ["register", "log.info"], text: "register(a)" },
+    ]);
+  });
+
+  it("detects if __name__ == '__main__' guards with either quote style or operand order", () => {
+    const result = structure(
+      [
+        "def main():",
+        "    pass",
+        "",
+        "if __name__ == '__main__':",
+        "    main()",
+        "if \"__main__\" == __name__:",
+        "    main()",
+        "if DEBUG:",
+        "    enable()",
+      ].join("\n"),
+    );
+    expect(result.topLevel).toEqual([
+      expect.objectContaining({ kind: "guard", lineRange: [4, 5], calls: ["main"] }),
+      expect.objectContaining({ kind: "guard", lineRange: [6, 7], calls: ["main"] }),
+      expect.objectContaining({ kind: "statement", lineRange: [8, 9], calls: ["enable"] }),
+    ]);
+  });
+
+  it("groups module-level assignments into config segments", () => {
+    const result = structure(
+      ["import os", "", "app = Flask(__name__)", "DEBUG = os.getenv('DEBUG')", "COUNT += 1", "app.register_blueprint(bp)", ""].join("\n"),
+    );
+    expect(result.topLevel).toEqual([
+      { kind: "config", lineRange: [3, 5], calls: ["Flask", "os.getenv"], text: "app = Flask(__name__)" },
+      { kind: "statement", lineRange: [6, 6], calls: ["app.register_blueprint"], text: "app.register_blueprint(bp)" },
+    ]);
+  });
+
+  it("omits topLevel for files with only docstrings, imports, decorators and symbols", () => {
+    const result = structure(
+      ['"""Module docstring."""', "from x import y", "# comment", "", "@decorator", "def f():", "    y()", "", "class C:", "    pass", ""].join("\n"),
+    );
+    expect(result.topLevel).toBeUndefined();
+  });
+});
