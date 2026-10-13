@@ -528,6 +528,71 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
   });
 
+  // ── jsconfig.json path aliases ──────────────────────────────────────────
+  //
+  // `create-next-app` writes jsconfig.json (not tsconfig.json) when you
+  // decline TypeScript, carrying the identical `compilerOptions.paths`.
+  // Matching only the literal filename "tsconfig.json" meant every alias in a
+  // JS-only Next.js project resolved to nothing, so the graph lost all of its
+  // app→lib import edges.
+
+  it('resolves jsconfig.json paths aliases in a JS-only project', () => {
+    projectRoot = setupTree({
+      'jsconfig.json': JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@/*': ['./*'] },
+        },
+      }),
+      'app/page.js': `import { x } from '@/lib/thing.js';\nconst _ = x;\n`,
+      'lib/thing.js': `export const x = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'jsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'app/page.js', language: 'javascript', fileCategory: 'code' },
+        { path: 'lib/thing.js', language: 'javascript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['app/page.js']).toContain('lib/thing.js');
+  });
+
+  it('prefers tsconfig.json over jsconfig.json when a directory holds both', () => {
+    // A vestigial jsconfig alongside a real tsconfig must not win, whichever
+    // order the parallel reads happen to complete in. Only the tsconfig alias
+    // (@ts/*) resolves; the jsconfig-only alias (@js/*) does not.
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: { paths: { '@ts/*': ['./lib/*'] } },
+      }),
+      'jsconfig.json': JSON.stringify({
+        compilerOptions: { paths: { '@js/*': ['./lib/*'] } },
+      }),
+      'src/app.ts': `import { x } from '@ts/thing';\nimport { y } from '@js/other';\nconst _ = x + y;\n`,
+      'lib/thing.ts': `export const x = 1;\n`,
+      'lib/other.ts': `export const y = 2;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'jsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'lib/thing.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'lib/other.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
+    expect(result.output.importMap['src/app.ts']).not.toContain('lib/other.ts');
+  });
+
   // ── #294: NodeNext / ESM TypeScript `.js → .ts` rewrite ────────────────
   //
   // Under `moduleResolution: NodeNext`, TypeScript does NOT rewrite import
