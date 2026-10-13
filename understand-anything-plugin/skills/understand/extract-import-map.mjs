@@ -948,7 +948,8 @@ function extractKotlinSources(content) {
 export function resolvePythonImport(rawImport, specifiers, file, ctx) {
   if (typeof rawImport !== 'string') return [];
   const src = rawImport;
-  const importerDir = dirOf(toPosix(file.path));
+  const importerPath = toPosix(file.path);
+  const importerDir = dirOf(importerPath);
 
   // Count leading dots; the rest is a dotted module path
   let dots = 0;
@@ -996,14 +997,20 @@ export function resolvePythonImport(rawImport, specifiers, file, ctx) {
   }
 
   // Absolute import. Walk up from the importer's directory and try every
-  // ancestor as a candidate Python root — the first one where probing
-  // resolves anything wins. This handles the multi-service / multi-package
-  // case where each service's directory acts as its own implicit
+  // ancestor that could be a sys.path root as a candidate — the first one
+  // where probing resolves anything wins. This handles the multi-service /
+  // multi-package case where each service's directory acts as its own implicit
   // sys.path entry (e.g. `import demo_pb2_grpc` from
   // `src/emailservice/email_server.py` should resolve to
   // `src/emailservice/demo_pb2_grpc.py`, NOT fail because the file isn't
   // at `<projectRoot>/demo_pb2_grpc.py`).
   //
+  // Two candidate roots are ruled out below, because Python's import system
+  // does not treat them as sys.path entries: a directory carrying an
+  // `__init__.py` is a package (only its parent goes on sys.path), and the
+  // importing file is never the target of its own import. Both rules narrow
+  // the walk without changing the multi-service case above, whose service
+  // directories carry no `__init__.py`.
   // Importer-scope precedence (deepest ancestor first) means that when
   // the same module name exists in multiple services, each service's
   // file shadows the others — no cross-service edges.
@@ -1016,8 +1023,25 @@ export function resolvePythonImport(rawImport, specifiers, file, ctx) {
   const importerParts = importerDir ? importerDir.split('/').filter(Boolean) : [];
   for (let i = importerParts.length; i >= 0; i--) {
     const rootParts = importerParts.slice(0, i);
+    // A directory holding an `__init__.py` is a PACKAGE, and Python puts a
+    // package's PARENT on sys.path — never the package itself. Offering one
+    // as a root makes any stdlib or third-party module whose name collides
+    // with a module inside the package (`logging`, `types`, `json`, `email`,
+    // `queue`, ...) resolve to the in-tree file, and lets a module resolve to
+    // itself. Its parent is still a candidate on the next iteration, so the
+    // real `from app.logging import ...` edge is unaffected.
+    if (rootParts.length > 0 && ctx.fileSet.has(`${rootParts.join('/')}/__init__.py`)) {
+      continue;
+    }
     const candidateModule = rootParts.concat(tailSegments);
-    const matches = resolvePythonProbe(candidateModule, specifiers, ctx);
+    // A module is never its own import target. `import pkg.mod` from
+    // `pkg/mod.py` reaches itself whenever an enclosing namespace directory
+    // is a candidate root; the real target is the stdlib / third-party module
+    // of that name. Filtering here (rather than at the call site) keeps the
+    // walk going, so a shallower root can still match.
+    const matches = resolvePythonProbe(candidateModule, specifiers, ctx).filter(
+      (m) => m !== importerPath,
+    );
     if (matches.length > 0) return matches;
   }
   return [];

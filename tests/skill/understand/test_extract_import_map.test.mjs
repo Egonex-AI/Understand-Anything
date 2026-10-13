@@ -798,6 +798,66 @@ describe('extract-import-map.mjs — Python resolver', () => {
     expect(result.output.importMap['app.py']).toEqual(['local.py']);
   });
 
+  // Regression for #621: the absolute-import walk-up offered every ancestor
+  // directory as a candidate sys.path root, including directories that hold
+  // an `__init__.py`. Those are packages, and Python puts a package's PARENT
+  // on sys.path — never the package itself. Offering one let a module inside
+  // the package shadow the stdlib module of the same name, and let a module
+  // resolve to itself.
+  it('does not treat a package directory as a sys.path root', () => {
+    projectRoot = setupTree({
+      'service/app/__init__.py': `# package\n`,
+      // `service/app/logging.py` shadows the stdlib `logging` module by name.
+      'service/app/logging.py': `import logging\n`,
+      // `service/` has no __init__.py -> legitimately a sys.path root, so
+      // `from app.logging import ...` is still a real in-tree edge.
+      'service/app/main.py': `from app.logging import get_logger\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'service/app/__init__.py', language: 'python', fileCategory: 'code' },
+        { path: 'service/app/logging.py', language: 'python', fileCategory: 'code' },
+        { path: 'service/app/main.py', language: 'python', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // `import logging` inside the package is the stdlib module: the in-tree
+    // `service/app/logging.py` is not on sys.path, so there is no edge — and
+    // above all no self-edge.
+    expect(result.output.importMap['service/app/logging.py']).toEqual([]);
+    // The genuine edge survives: `service/` is still a candidate root.
+    expect(result.output.importMap['service/app/main.py']).toEqual([
+      'service/app/logging.py',
+    ]);
+  });
+
+  it('never resolves a python import to the importing file', () => {
+    projectRoot = setupTree({
+      // No __init__.py anywhere — PEP 420 namespace packages throughout.
+      'src/svc/main.py': `import svc.main\nimport helpers\n`,
+      'src/svc/helpers.py': `def help(): pass\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/svc/main.py', language: 'python', fileCategory: 'code' },
+        { path: 'src/svc/helpers.py', language: 'python', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // `import svc.main` from `src/svc/main.py` resolves to itself under the
+    // `src/` root; a module is never its own import target. `import helpers`
+    // is the real sibling edge and must be kept.
+    expect(result.output.importMap['src/svc/main.py']).toEqual([
+      'src/svc/helpers.py',
+    ]);
+  });
+
   it('resolves absolute imports against the importers per-service root in multi-service repos', () => {
     // Mirrors microservices-demo: each service ships its own sibling files
     // under src/<service>/, and uses bare `import helpers` to reach them.
