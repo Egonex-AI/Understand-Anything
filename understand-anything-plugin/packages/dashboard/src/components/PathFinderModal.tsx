@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDashboardStore } from "../store";
+import SearchableSelect from "./SearchableSelect";
 
 interface PathFinderModalProps {
   isOpen: boolean;
@@ -14,12 +15,27 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
   const [path, setPath] = useState<string[] | null>(null);
   const [searching, setSearching] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const nodes = graph?.nodes ?? [];
+  const edges = graph?.edges ?? [];
+  const nodeOptions = useMemo(
+    () =>
+      nodes.map((node) => ({
+        value: node.id,
+        label: node.name,
+        meta: node.type,
+        searchText: `${node.id} ${node.filePath ?? ""}`,
+      })),
+    [nodes],
+  );
 
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("[data-searchable-select-dropdown]")) {
+        return;
+      }
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -34,6 +50,10 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
     if (!isOpen) return;
 
     const handleEscape = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("[data-searchable-select]")) {
+        return;
+      }
+
       if (e.key === "Escape") {
         onClose();
       }
@@ -44,9 +64,6 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
   }, [isOpen, onClose]);
 
   if (!isOpen || !graph) return null;
-
-  const nodes = graph.nodes;
-  const edges = graph.edges;
 
   // BFS to find shortest path
   const findPath = () => {
@@ -147,21 +164,15 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
               From Node
             </label>
-            <select
+            <SearchableSelect
               value={fromNodeId}
-              onChange={(e) => {
-                setFromNodeId(e.target.value);
+              options={nodeOptions}
+              placeholder="Search nodes..."
+              onChange={(nodeId) => {
+                setFromNodeId(nodeId);
                 setPath(null);
               }}
-              className="w-full bg-elevated text-text-primary text-sm rounded-lg px-3 py-2 border border-border-subtle focus:outline-none focus:border-gold/50"
-            >
-              <option value="">Select a node...</option>
-              {nodes.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {node.name} ({node.type})
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* To Node */}
@@ -169,21 +180,15 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
               To Node
             </label>
-            <select
+            <SearchableSelect
               value={toNodeId}
-              onChange={(e) => {
-                setToNodeId(e.target.value);
+              options={nodeOptions}
+              placeholder="Search nodes..."
+              onChange={(nodeId) => {
+                setToNodeId(nodeId);
                 setPath(null);
               }}
-              className="w-full bg-elevated text-text-primary text-sm rounded-lg px-3 py-2 border border-border-subtle focus:outline-none focus:border-gold/50"
-            >
-              <option value="">Select a node...</option>
-              {nodes.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {node.name} ({node.type})
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {/* Find Path Button */}
