@@ -14,5 +14,7 @@
     "architecture",
     "onboarding",
     "dashboard"
-  ]
+  ],
+  "skills": "./understand-anything-plugin/skills/",
+  "agents": "./understand-anything-plugin/agents/"
 }
