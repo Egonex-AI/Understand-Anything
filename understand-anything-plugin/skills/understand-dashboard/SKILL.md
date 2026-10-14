@@ -66,6 +66,8 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
    COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-dashboard 2>/dev/null || readlink -f ~/.copilot/skills/understand-dashboard 2>/dev/null || echo "")
    COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+   CODEBUDDY_SKILL_REAL=$(realpath ~/.codebuddy/skills/understand-dashboard 2>/dev/null || readlink -f ~/.codebuddy/skills/understand-dashboard 2>/dev/null || echo "")
+   CODEBUDDY_SELF_RELATIVE=$([ -n "$CODEBUDDY_SKILL_REAL" ] && cd "$CODEBUDDY_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
 
    PLUGIN_ROOT=""
    for candidate in \
@@ -73,6 +75,7 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
      "$HOME/.understand-anything-plugin" \
      "$SELF_RELATIVE" \
      "$COPILOT_SELF_RELATIVE" \
+     "$CODEBUDDY_SELF_RELATIVE" \
      "$HOME/.codex/understand-anything/understand-anything-plugin" \
      "$HOME/.opencode/understand-anything/understand-anything-plugin" \
      "$HOME/.pi/understand-anything/understand-anything-plugin" \
@@ -89,6 +92,7 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
      echo "  - $HOME/.understand-anything-plugin"
      echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-dashboard>}"
      echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-dashboard>}"
+     echo "  - ${CODEBUDDY_SELF_RELATIVE:-<unresolved path derived from ~/.codebuddy/skills/understand-dashboard>}"
      echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
      echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
      echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
