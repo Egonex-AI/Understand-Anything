@@ -408,6 +408,98 @@ public class Foo {}
       parser.delete();
     });
 
+    it("strips inner call args from chained method-call callee", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void run() {
+        builder().build();
+    }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      // The chained call should yield a clean method name "build" for the
+      // outer call (not the malformed "builder().build"), plus an entry for
+      // the inner "builder" call.
+      expect(result.some((e) => e.callee === "build")).toBe(true);
+      // The inner call still emits its own well-formed entry.
+      expect(result.some((e) => e.callee === "builder")).toBe(true);
+      expect(result.some((e) => e.callee.includes("()"))).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not leak '()' for an object-creation receiver (new Foo().bar())", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void run() {
+        new Bar().bar();
+    }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      // `new Bar()` is an object_creation_expression receiver; the outer call
+      // must collapse to the bare method name rather than "new Bar().bar".
+      expect(result.some((e) => e.callee === "bar")).toBe(true);
+      expect(result.some((e) => e.callee.includes("()"))).toBe(false);
+      // The `new Bar()` construction still emits its own entry.
+      expect(result.some((e) => e.callee === "new Bar")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not leak cast tokens for a parenthesized/cast receiver (((Foo) x).bar())", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void run() {
+        ((Bar) x).bar();
+    }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      // `((Bar) x)` is a parenthesized_expression receiver; the callee must
+      // collapse to the bare method name, never leaking cast/paren tokens.
+      expect(result.some((e) => e.callee === "bar")).toBe(true);
+      expect(result.some((e) => e.callee.includes("("))).toBe(false);
+      expect(result.some((e) => e.callee.includes(")"))).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("preserves a simple super receiver (super.bar())", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void run() {
+        super.bar();
+    }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      // `super` is a simple receiver, so the qualified callee is preserved.
+      expect(result.some((e) => e.callee === "super.bar")).toBe(true);
+      expect(result.some((e) => e.callee.includes("()"))).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("preserves a simple this receiver (this.bar())", () => {
+      const { tree, parser, root } = parse(`public class Foo {
+    public void run() {
+        this.bar();
+    }
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result.some((e) => e.callee === "this.bar")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("tracks correct caller for constructors", () => {
       const { tree, parser, root } = parse(`public class Foo {
     public Foo() {
