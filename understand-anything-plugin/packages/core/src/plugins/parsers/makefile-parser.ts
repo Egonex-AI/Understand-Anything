@@ -26,7 +26,11 @@ export class MakefileParser implements AnalyzerPlugin {
     for (let i = 0; i < lines.length; i++) {
       // Match target: dependencies (not variable assignments or comments)
       const match = lines[i].match(/^([a-zA-Z_.][a-zA-Z0-9_.-]*)(?:\s+.*)?:/);
-      if (match && !lines[i].includes(":=") && !lines[i].includes("?=")) {
+      // An `=` before the first `:` makes the line an assignment whose value holds a colon
+      // (`OBJ = $(SRC:.c=.o)`, `URL = https://...`), not a rule.
+      const equals = lines[i].indexOf("=");
+      const isAssignment = equals !== -1 && equals < lines[i].indexOf(":");
+      if (match && !isAssignment && !lines[i].includes(":=") && !lines[i].includes("?=")) {
         const name = match[1];
         // Skip special Make targets (.PHONY, .DEFAULT, .SUFFIXES, etc.)
         if (name.startsWith(".")) continue;
