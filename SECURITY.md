@@ -4,13 +4,16 @@ Thanks for taking the time to disclose responsibly.
 
 ## How to report
 
-Please use GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability)
-on this repository. That keeps the report visible to the maintainer without
-exposing the details publicly.
+👉 **Please use the [Security Advisories](https://github.com/Egonex-AI/Understand-Anything/security/advisories/new) page** to privately report a vulnerability.
+This sends the report directly to the maintainers and keeps details confidential
+until a fix ships.
 
-If private reporting is unavailable for any reason, open a regular issue
-titled `security: brief description` **without** any exploit details, and
-the maintainer will reply with a private channel.
+If the Security Advisories page is unavailable for any reason, email
+**security@egonex.ai** or open a regular issue titled `security: brief description`
+**without** any exploit details, and the maintainer will reply with a private channel.
+
+> ⚠️ **Do not** submit vulnerability details in a public issue, pull request, or
+> discussion — that puts every user at risk before a fix can ship.
 
 ## What to include
 
@@ -42,6 +45,10 @@ Issues we care about:
 - The dashboard's file-content endpoint serving files outside the allowlist.
 - The `/understand` skill running shell commands derived from untrusted
   paths or contents.
+- Supply-chain attacks via pull requests (obfuscated payloads, dependency
+  hijacking, build-time code execution from PR-diff content).
+- Malicious PRs that modify build-config files (e.g. `astro.config.mjs`,
+  `vite.config.ts`, `next.config.js`) with obfuscated or packed code.
 
 Issues that are **out of scope**:
 
@@ -49,3 +56,4 @@ Issues that are **out of scope**:
   analyzed project (they could just edit the source directly).
 - Anything that requires the user to copy a malicious URL and paste it back
   into the dashboard.
+- Social-engineering-only attacks with no technical exploit.
