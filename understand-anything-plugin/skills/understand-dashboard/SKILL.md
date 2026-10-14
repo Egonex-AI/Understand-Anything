@@ -51,6 +51,8 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 3. Find the dashboard code. The dashboard is at `packages/dashboard/` relative to this plugin's root directory. Check these paths in order and use the first that exists:
    - `${CLAUDE_PLUGIN_ROOT}/packages/dashboard/` (Claude Code runtime root, highest priority)
+   - `${DEVIN_PLUGIN_ROOT}/packages/dashboard/` (explicit override, when set)
+   - Two levels up from this skill's own directory, `<SKILL_DIR>` (the base directory your platform reported when loading this skill — covers plugin installs with no fixed location, such as Devin's)
    - `~/.understand-anything-plugin/packages/dashboard/` (universal symlink, all installs)
    - Two levels up from `~/.agents/skills/understand-dashboard` real path (self-relative fallback)
    - Two levels up from `~/.copilot/skills/understand-dashboard` real path (Copilot personal skills fallback)
@@ -62,6 +64,7 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
    Use the Bash tool to resolve:
    ```bash
+   SKILL_DIR_RELATIVE=$(cd -P "<SKILL_DIR>" 2>/dev/null && cd ../.. && pwd || echo "")
    SKILL_REAL=$(realpath ~/.agents/skills/understand-dashboard 2>/dev/null || readlink -f ~/.agents/skills/understand-dashboard 2>/dev/null || echo "")
    SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
    COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-dashboard 2>/dev/null || readlink -f ~/.copilot/skills/understand-dashboard 2>/dev/null || echo "")
@@ -70,6 +73,8 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    PLUGIN_ROOT=""
    for candidate in \
      "${CLAUDE_PLUGIN_ROOT}" \
+     "${DEVIN_PLUGIN_ROOT}" \
+     "$SKILL_DIR_RELATIVE" \
      "$HOME/.understand-anything-plugin" \
      "$SELF_RELATIVE" \
      "$COPILOT_SELF_RELATIVE" \
@@ -86,6 +91,8 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
      echo "Error: Cannot find the understand-anything plugin root."
      echo "Checked:"
      echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
+     echo "  - ${DEVIN_PLUGIN_ROOT:-<unset DEVIN_PLUGIN_ROOT>}"
+     echo "  - ${SKILL_DIR_RELATIVE:-<unresolved path derived from the skill directory>}"
      echo "  - $HOME/.understand-anything-plugin"
      echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-dashboard>}"
      echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-dashboard>}"

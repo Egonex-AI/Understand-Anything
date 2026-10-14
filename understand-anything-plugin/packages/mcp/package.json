@@ -1,0 +1,28 @@
+{
+  "name": "@understand-anything/mcp",
+  "version": "2.9.7",
+  "description": "MCP server exposing Understand Anything knowledge graphs (status, search, explain, diff, onboard, dashboard) to any MCP-capable agent.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Egonex-AI/Understand-Anything.git",
+    "directory": "understand-anything-plugin/packages/mcp"
+  },
+  "bin": {
+    "understand-anything-mcp": "bin/understand-anything-mcp.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@understand-anything/core": "workspace:*",
+    "@understand-anything/skill": "workspace:*",
+    "zod": "^4.3.6"
+  }
+}
