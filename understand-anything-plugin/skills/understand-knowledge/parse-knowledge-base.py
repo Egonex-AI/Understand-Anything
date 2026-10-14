@@ -18,6 +18,7 @@ Output:
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -26,6 +27,39 @@ def resolve_ua_dir(root: Path) -> Path:
     """Mirror core resolveUaDir: legacy .understand-anything/ wins if present."""
     legacy = root / ".understand-anything"
     return legacy if legacy.is_dir() else root / ".ua"
+
+
+def git_tracked_files(wiki_root: Path) -> set[Path] | None:
+    """Return paths (relative to wiki_root) of git-tracked files under it.
+
+    Returns None when wiki_root is not inside a git work tree or git is
+    unavailable — callers then fall back to scanning every file.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(wiki_root), "ls-files", "-z", "--", "."],
+            capture_output=True, text=True, timeout=30, check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return {Path(line) for line in result.stdout.split("\0") if line.strip()}
+
+
+def list_wiki_md_files(wiki_root: Path) -> tuple[list[Path], int]:
+    """All markdown files under wiki_root, sorted, plus the excluded count.
+
+    When wiki_root is inside a git work tree, only git-tracked files are
+    returned. Locally generated, untracked, or gitignored files (private
+    overlays, generated index files, scratch notes) are excluded so their
+    content and link targets never enter the knowledge graph. Falls back
+    to every file when the wiki is not inside a git repository.
+    """
+    files = sorted(wiki_root.rglob("*.md"))
+    tracked = git_tracked_files(wiki_root)
+    if tracked is None:
+        return files, 0
+    kept = [f for f in files if f.relative_to(wiki_root) in tracked]
+    return kept, len(files) - len(kept)
 
 # ---------------------------------------------------------------------------
 # Regex patterns
@@ -84,8 +118,8 @@ def detect_format(root: Path) -> dict:
     else:
         wiki_root = root
 
-    # Count markdown files in the wiki root
-    md_files = list(wiki_root.rglob("*.md"))
+    # Count markdown files in the wiki root (git-tracked only when applicable)
+    md_files, _ = list_wiki_md_files(wiki_root)
     signals["md_count"] = len(md_files)
     signals["wiki_root"] = str(wiki_root)
 
@@ -261,7 +295,8 @@ def build_name_to_stem_map(wiki_root: Path) -> dict[str, str]:
     name_map: dict[str, str] = {}
     # Track which bare basenames appear more than once
     basename_counts: dict[str, int] = {}
-    for md_file in wiki_root.rglob("*.md"):
+    md_files, _ = list_wiki_md_files(wiki_root)
+    for md_file in md_files:
         rel = md_file.relative_to(wiki_root)
         stem = rel.with_suffix("").as_posix()  # e.g., "decisions/decision-foo"
         basename = md_file.stem            # e.g., "decision-foo"
@@ -364,8 +399,9 @@ def parse_wiki(root: Path) -> dict:
     # --- Pre-compute article IDs (for edge resolution validation) ---
     # Only skip infra files at the wiki root level, not in subdirectories
     # (e.g., wiki/index.md is infra, but wiki/concepts/index.md is content)
+    md_files, excluded_count = list_wiki_md_files(wiki_root)
     article_ids: set[str] = set()
-    for md_file in sorted(wiki_root.rglob("*.md")):
+    for md_file in sorted(md_files):
         rel = md_file.relative_to(wiki_root)
         stem = rel.with_suffix("").as_posix()
         # Only filter infra files at root level (no parent directory)
@@ -377,9 +413,14 @@ def parse_wiki(root: Path) -> dict:
     nodes = []
     edges = []
     warnings = []
+    if excluded_count:
+        warnings.append(
+            f"git-filter: excluded {excluded_count} untracked markdown "
+            "file(s) under the wiki root (generated/private overlay content)"
+        )
     stats = {"articles": 0, "sources": 0, "topics": 0, "wikilinks": 0, "unresolved": 0}
 
-    for md_file in sorted(wiki_root.rglob("*.md")):
+    for md_file in sorted(md_files):
         rel = md_file.relative_to(wiki_root)
         stem = rel.with_suffix("").as_posix()
         basename = md_file.stem
