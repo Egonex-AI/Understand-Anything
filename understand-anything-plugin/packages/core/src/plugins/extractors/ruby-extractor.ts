@@ -18,8 +18,8 @@ const ATTR_METHODS = new Set(["attr_accessor", "attr_reader", "attr_writer"]);
  * Extract parameter names from a Ruby `method_parameters` node.
  *
  * Handles: identifier (plain), optional_parameter (with default),
- * splat_parameter (*args), hash_splat_parameter (**kwargs),
- * block_parameter (&block).
+ * keyword_parameter (name:), splat_parameter (*args),
+ * hash_splat_parameter (**kwargs), block_parameter (&block).
  */
 function extractParams(paramsNode: TreeSitterNode | null): string[] {
   if (!paramsNode) return [];
@@ -37,6 +37,12 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
       case "optional_parameter": {
         const ident = child.childForFieldName("name");
         if (ident) params.push(ident.text);
+        break;
+      }
+
+      case "keyword_parameter": {
+        const ident = child.childForFieldName("name");
+        if (ident) params.push(ident.text + ":");
         break;
       }
 
@@ -314,7 +320,7 @@ export class RubyExtractor implements LanguageExtractor {
 
     const body = node.childForFieldName("body");
     if (body) {
-      this.extractClassBody(body, methods, properties, functions);
+      this.extractClassBody(body, methods, properties, functions, classes);
     }
 
     classes.push({
@@ -341,7 +347,7 @@ export class RubyExtractor implements LanguageExtractor {
 
     const body = node.childForFieldName("body");
     if (body) {
-      this.extractClassBody(body, methods, properties, functions);
+      this.extractClassBody(body, methods, properties, functions, classes);
     }
 
     classes.push({
@@ -357,13 +363,16 @@ export class RubyExtractor implements LanguageExtractor {
 
   /**
    * Extract methods and properties from a class/module body_statement.
-   * Also pushes each method into the top-level functions array.
+   * Also pushes each method into the top-level functions array, and recurses
+   * into nested class/module declarations (appending them to the shared
+   * `classes` array along with their methods).
    */
   private extractClassBody(
     body: TreeSitterNode,
     methods: string[],
     properties: string[],
     functions: StructuralAnalysis["functions"],
+    classes: StructuralAnalysis["classes"],
   ): void {
     for (let i = 0; i < body.childCount; i++) {
       const member = body.child(i);
@@ -386,6 +395,26 @@ export class RubyExtractor implements LanguageExtractor {
         const methodNode = member.childForFieldName("method");
         if (methodNode && ATTR_METHODS.has(methodNode.text)) {
           properties.push(...extractAttrProperties(member));
+        }
+      } else if (member.type === "class" || member.type === "module") {
+        // Nested class/module declarations are surfaced into the flat
+        // `classes` array, but intentionally with their bare name only:
+        // namespace qualification (e.g. "Outer::Inner") is NOT applied here.
+        // This matches the python-extractor convention of pushing bare
+        // nameNode.text, and avoids inventing a new cross-extractor naming
+        // scheme. Consequence: two same-named nested declarations in
+        // different enclosing scopes are indistinguishable in `classes[]`.
+        //
+        // Note also that nested declarations are deliberately NOT added to
+        // `exports`: per this extractor's contract, only top-level
+        // declarations are treated as exports (Ruby has no formal export
+        // syntax and a class nested inside a module is not a top-level
+        // export surface), so `classes[]` and `exports[]` can legitimately
+        // diverge for nested decls.
+        if (member.type === "class") {
+          this.extractClass(member, classes, functions);
+        } else {
+          this.extractModule(member, classes, functions);
         }
       }
     }
