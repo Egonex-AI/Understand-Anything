@@ -1444,6 +1444,22 @@ export function resolveSwiftImport(rawImport, file, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Dart resolver
+//
+// Dart imports are URIs. `dart:` (SDK) and `package:` (pub) URIs carry a
+// scheme and stay unresolved; scheme-less URIs (`foo.dart`,
+// `../widgets/bar.dart`) are relative to the importer's directory.
+// ---------------------------------------------------------------------------
+
+export function resolveDartImport(rawImport, file, _ctx) {
+  if (!rawImport || typeof rawImport !== 'string') return [];
+  const src = rawImport.trim();
+  if (!src || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(src)) return [];
+  const out = resolveRelative(dirOf(toPosix(file.path)), src);
+  return out ? [out] : [];
+}
+
+// ---------------------------------------------------------------------------
 // Ruby resolver
 //
 // Two distinct Ruby import forms, with different resolution semantics:
@@ -1926,6 +1942,9 @@ function resolveImport(imp, file, ctx) {
   }
   if (lang === 'c' || lang === 'cpp') {
     return resolveCppImport(src, file, ctx);
+  }
+  if (lang === 'dart') {
+    return resolveDartImport(src, file, ctx);
   }
   // Ruby is handled via a dedicated pathway because its tree-sitter
   // extractor flattens require vs require_relative into a single field,
