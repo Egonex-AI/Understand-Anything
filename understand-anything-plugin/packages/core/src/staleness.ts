@@ -1,4 +1,6 @@
 import { execFile, execFileSync } from "child_process";
+import { existsSync, readdirSync, type Dirent } from "node:fs";
+import { join } from "node:path";
 import type { KnowledgeGraph, GraphNode, GraphEdge } from "./types.js";
 
 export interface StalenessResult {
@@ -68,6 +70,7 @@ interface ProjectGitSnapshot {
 }
 
 const GIT_TIMEOUT_MS = 5_000;
+const NESTED_REPO_SCAN_LIMIT = 32;
 const GIT_MAX_BUFFER_BYTES = 4 * 1024 * 1024;
 const PROJECT_PATHSPEC = [
   "--",
@@ -191,6 +194,88 @@ async function createProjectGitSnapshot(
       parseNulDelimitedPaths(untracked),
     ),
   };
+}
+
+/**
+ * List immediate subdirectories of `projectDir` that are themselves Git repos.
+ *
+ * A parent directory holding several checkouts (e.g. `~/Code/Acme/{api,web}`)
+ * is a valid analysis root, but it has no HEAD of its own. Scanning one level
+ * down recovers the repos the graph was actually built from.
+ */
+function findNestedRepoDirs(projectDir: string): string[] {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(projectDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  return entries
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        !entry.name.startsWith(".") &&
+        entry.name !== "node_modules",
+    )
+    .map((entry) => join(projectDir, entry.name))
+    .filter((dir) => existsSync(join(dir, ".git")))
+    .sort()
+    .slice(0, NESTED_REPO_SCAN_LIMIT);
+}
+
+async function createNestedRepoSnapshots(
+  projectDir: string,
+): Promise<ProjectGitSnapshot[]> {
+  const repoDirs = findNestedRepoDirs(projectDir);
+  if (repoDirs.length === 0) return [];
+
+  const snapshots = await Promise.all(
+    repoDirs.map(async (repoDir) => {
+      try {
+        return await createProjectGitSnapshot(repoDir);
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+
+  return snapshots.filter(
+    (snapshot): snapshot is ProjectGitSnapshot => snapshot !== undefined,
+  );
+}
+
+async function containsCommit(
+  snapshot: ProjectGitSnapshot,
+  commitHash: string,
+): Promise<boolean> {
+  try {
+    await runGit(snapshot.projectDir, [
+      "rev-parse",
+      "--verify",
+      "--end-of-options",
+      `${commitHash}^{commit}`,
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Pick the nested repo that actually holds the commit a graph was built from.
+ *
+ * Commit hashes are unique, so ownership is unambiguous — and each graph
+ * resolves on its own, which keeps sibling checkouts from being conflated.
+ */
+async function resolveSnapshotForCommit(
+  snapshots: ProjectGitSnapshot[],
+  commitHash: string,
+): Promise<ProjectGitSnapshot | undefined> {
+  for (const snapshot of snapshots) {
+    if (await containsCommit(snapshot, commitHash)) return snapshot;
+  }
+  return undefined;
 }
 
 async function isAncestor(
@@ -417,11 +502,21 @@ export async function getGraphFreshnessBatch<T extends string>(
 
   if (comparableEntries.length === 0) return results;
 
-  let snapshot: ProjectGitSnapshot;
+  let snapshot: ProjectGitSnapshot | undefined;
+  let nestedSnapshots: ProjectGitSnapshot[] = [];
+  let snapshotError: unknown;
   try {
     snapshot = await createProjectGitSnapshot(projectDir);
   } catch (error) {
-    const reason = unknownReason(error, "git-head-unavailable");
+    snapshotError = error;
+    // A timeout will only repeat one level down, so don't multiply the wait.
+    if (!(error instanceof GitCommandError && error.timedOut)) {
+      nestedSnapshots = await createNestedRepoSnapshots(projectDir);
+    }
+  }
+
+  if (snapshot === undefined && nestedSnapshots.length === 0) {
+    const reason = unknownReason(snapshotError, "git-head-unavailable");
     for (const [key, input, graphCommitHash] of comparableEntries) {
       results[key] = {
         status: "unknown",
@@ -435,8 +530,22 @@ export async function getGraphFreshnessBatch<T extends string>(
 
   await Promise.all(
     comparableEntries.map(async ([key, input, graphCommitHash]) => {
+      const resolved =
+        snapshot ??
+        (await resolveSnapshotForCommit(nestedSnapshots, graphCommitHash));
+
+      if (resolved === undefined) {
+        results[key] = {
+          status: "unknown",
+          reason: "graph-commit-unavailable",
+          graphCommitHash,
+          ...optionalAnalysisTime(input),
+        };
+        return;
+      }
+
       results[key] = await evaluateGraphFreshness(
-        snapshot,
+        resolved,
         input,
         graphCommitHash,
       );
