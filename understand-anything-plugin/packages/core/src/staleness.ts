@@ -374,7 +374,7 @@ export function getChangedFiles(
     ).trim();
     const output = execFileSync(
       "git",
-      ["diff", "--end-of-options", `${commit}..HEAD`, "--name-only"],
+      ["diff", "--name-only", "--end-of-options", `${commit}..HEAD`],
       {
         cwd: projectDir,
         encoding: "utf-8",

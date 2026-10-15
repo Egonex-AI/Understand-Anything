@@ -152,12 +152,7 @@ export const EDGE_TYPE_ALIASES: Record<string, string> = {
 // Edge type aliases that invert direction when mapped to their canonical form.
 // For example, "A documented_by B" means B documents A, so normalizing to
 // "documents" requires swapping source and target to "B documents A".
-const CONVERSE_EDGE_ALIASES = new Set([
-  "documented_by",
-  "written_by",
-  "created_by",
-  "example_of",
-]);
+const CONVERSE_EDGE_ALIASES = new Set(["documented_by"]);
 
 // Design edge aliases — applied only when the graph's kind is "design".
 export const DESIGN_EDGE_TYPE_ALIASES: Record<string, string> = {
@@ -564,7 +559,12 @@ export function normalizeGraph(data: unknown): unknown {
         const originalType = edge.type;
         const canonicalType = edgeAliases[originalType];
         if (CONVERSE_EDGE_ALIASES.has(originalType)) {
-          return { ...edge, type: canonicalType, source: edge.target, target: edge.source };
+          return {
+            ...edge,
+            type: canonicalType,
+            source: edge.target,
+            target: edge.source,
+          };
         }
         return { ...edge, type: canonicalType };
       }

@@ -75,7 +75,7 @@ describe("getChangedFiles", () => {
     expect(mockedExecFileSync).toHaveBeenNthCalledWith(
       2,
       "git",
-      ["diff", "--end-of-options", "abc123..HEAD", "--name-only"],
+      ["diff", "--name-only", "--end-of-options", "abc123..HEAD"],
       { cwd: "/project", encoding: "utf-8" },
     );
   });
