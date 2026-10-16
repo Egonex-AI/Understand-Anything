@@ -978,15 +978,26 @@ export function resolvePythonImport(rawImport, specifiers, file, ctx) {
     if (tailSegments.length === 0) {
       if (!Array.isArray(specifiers) || specifiers.length === 0) return [];
       const base = baseParts.join('/');
+      const pkgInit = base ? `${base}/__init__.py` : '__init__.py';
       const matches = [];
       for (const spec of specifiers) {
-        // Wildcard `*` and qualified specifiers (`Foo.bar`) skip; the
-        // surface name is what tree-sitter records for `from . import x`.
-        if (!spec || spec === '*' || spec.includes('.')) continue;
+        // Qualified specifiers (`Foo.bar`) skip; the surface name is what
+        // tree-sitter records for `from . import x`.
+        if (!spec || spec.includes('.')) continue;
+        const usePkgInit =
+          ctx.fileSet.has(pkgInit) && pkgInit !== toPosix(file.path) && !matches.includes(pkgInit);
+        // `from . import *` binds the package's own names from `__init__.py`.
+        if (spec === '*') {
+          if (usePkgInit) matches.push(pkgInit);
+          continue;
+        }
         const subFile = base ? `${base}/${spec}.py` : `${spec}.py`;
         const subInit = base ? `${base}/${spec}/__init__.py` : `${spec}/__init__.py`;
         if (ctx.fileSet.has(subFile)) matches.push(subFile);
         else if (ctx.fileSet.has(subInit)) matches.push(subInit);
+        // Not a submodule, so the name is defined in (or re-exported by)
+        // the package itself: `from . import NAME` binds from `__init__.py`.
+        else if (usePkgInit) matches.push(pkgInit);
       }
       return matches;
     }

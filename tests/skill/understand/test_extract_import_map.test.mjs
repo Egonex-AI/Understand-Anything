@@ -713,6 +713,49 @@ describe('extract-import-map.mjs — Python resolver', () => {
     ]);
   });
 
+  it('falls back to the package __init__.py for `from . import NAME` / `from .. import NAME` (#727)', () => {
+    projectRoot = setupTree({
+      'pkg/__init__.py': `class BaseAnalyzer:\n    pass\n`,
+      'pkg/stats/__init__.py': `LIMIT = 10\n`,
+      'pkg/core/__init__.py': `def boot():\n    return 1\n`,
+      'pkg/stats/regression.py':
+        `from .. import BaseAnalyzer\nfrom . import LIMIT\nfrom ..core import boot\n`,
+      'pkg/stats/other.py': `from . import regression, LIMIT, MORE\n`,
+      'lone/__init__.py': `from . import NAME\n`,
+      'pkg/core/star.py': `from .. import *\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        'pkg/__init__.py',
+        'pkg/stats/__init__.py',
+        'pkg/core/__init__.py',
+        'pkg/stats/regression.py',
+        'pkg/stats/other.py',
+        'lone/__init__.py',
+        'pkg/core/star.py',
+      ].map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status).toBe(0);
+    // `from .. import *` binds from the parent package's __init__.py.
+    expect(result.output.importMap['pkg/core/star.py']).toEqual(['pkg/__init__.py']);
+    // The importer is its own package `__init__.py`: no self-edge.
+    expect(result.output.importMap['lone/__init__.py'] ?? []).toEqual([]);
+    expect(result.output.importMap['pkg/stats/regression.py']).toEqual([
+      'pkg/__init__.py',
+      'pkg/core/__init__.py',
+      'pkg/stats/__init__.py',
+    ]);
+    // A submodule match still wins; the unresolved names collapse to one
+    // edge to the package __init__.py.
+    expect(result.output.importMap['pkg/stats/other.py']).toEqual([
+      'pkg/stats/__init__.py',
+      'pkg/stats/regression.py',
+    ]);
+  });
+
   // Regression for Codex review #2 on PR #204: `from . import x` was
   // dropped when no `__init__.py` was present at the importer's package
   // dir, because resolvePythonProbe gated specifier probing on the package
