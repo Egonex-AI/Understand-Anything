@@ -1079,6 +1079,8 @@ class FileLevelNodeTests(unittest.TestCase):
         for nid, expected in [
             ("table:migrations/001_init.sql:users", "migrations/001_init.sql"),
             ("endpoint:src/api/routes.py:GET /users", "src/api/routes.py"),
+            ("endpoint:src/routes.ts:/users/:id", "src/routes.ts"),
+            ("table:src/schema.ts:namespace:users", "src/schema.ts"),
         ]:
             with self.subTest(nid=nid):
                 node = {"id": nid, "type": nid.split(":", 1)[0]}
@@ -1103,6 +1105,75 @@ class FileLevelNodeTests(unittest.TestCase):
         self.assertEqual(edges[0]["source"], config["id"])
         self.assertEqual(edges[0]["target"], test["id"])
         self.assertIn("tested", config["tags"])
+
+    def test_path_convention_targets_whole_files_in_either_node_order(self) -> None:
+        for node_type in ("table", "endpoint", "service", "schema", "resource"):
+            for reverse in (False, True):
+                with self.subTest(node_type=node_type, reverse=reverse):
+                    prod = _file_node("src/routes.ts")
+                    test = _file_node("src/routes.test.ts")
+                    child = _file_node(
+                        "src/routes.ts",
+                        id=f"{node_type}:src/routes.ts:/users/:id",
+                        type=node_type,
+                    )
+                    test_child = _file_node(
+                        "src/routes.test.ts",
+                        id=f"{node_type}:src/routes.test.ts:fixture",
+                        type=node_type,
+                    )
+                    nodes = [prod, child, test, test_child]
+                    if reverse:
+                        nodes.reverse()
+                    edges: list[dict[str, Any]] = []
+
+                    result = mbg.link_tests({n["id"]: n for n in nodes}, edges)
+
+                    self.assertEqual(result, (1, 0, 1, 0))
+                    self.assertEqual(edges[0]["source"], prod["id"])
+                    self.assertEqual(edges[0]["target"], test["id"])
+                    self.assertIn("tested", prod["tags"])
+                    self.assertNotIn("tested", child["tags"])
+
+    def test_path_convention_does_not_guess_child_coverage(self) -> None:
+        child = _file_node(
+            "src/routes.ts", id="endpoint:src/routes.ts:/users/:id", type="endpoint"
+        )
+        test = _file_node("src/routes.test.ts")
+        edges: list[dict[str, Any]] = []
+
+        result = mbg.link_tests({n["id"]: n for n in (child, test)}, edges)
+
+        self.assertEqual(result, (0, 0, 0, 0))
+        self.assertEqual(edges, [])
+        self.assertNotIn("tested", child["tags"])
+
+    def test_explicit_child_coverage_survives_in_either_direction(self) -> None:
+        for node_type in ("table", "endpoint"):
+            for inverted in (False, True):
+                with self.subTest(node_type=node_type, inverted=inverted):
+                    prod = _file_node("src/routes.ts")
+                    child = _file_node(
+                        "src/routes.ts",
+                        id=f"{node_type}:src/routes.ts:/users/:id",
+                        type=node_type,
+                    )
+                    test = _file_node("src/routes.test.ts")
+                    source, target = (test, child) if inverted else (child, test)
+                    edges = [{
+                        "source": source["id"], "target": target["id"],
+                        "type": "tested_by", "weight": 0.5,
+                    }]
+
+                    result = mbg.link_tests(
+                        {n["id"]: n for n in (prod, child, test)}, edges
+                    )
+
+                    self.assertEqual(result, (0, 0, 1, int(inverted)))
+                    self.assertEqual(edges[0]["source"], child["id"])
+                    self.assertEqual(edges[0]["target"], test["id"])
+                    self.assertIn("tested", child["tags"])
+                    self.assertNotIn("tested", prod["tags"])
 
     def test_inverted_edge_into_a_config_node_is_swapped_not_dropped(self) -> None:
         config = _whole_file_node("config", "docs/app.config.json")

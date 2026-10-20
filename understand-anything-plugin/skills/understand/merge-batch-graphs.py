@@ -590,19 +590,15 @@ def production_candidates(test_path: str) -> list[str]:
     return candidates
 
 
-# Node ID prefixes that stand for a whole file, mirroring the `fileLevelTypes`
-# set the skill's Phase 6 validator uses (SKILL.md). Every one of these carries
-# a project-relative path in its ID, so any of them can sit on either end of a
-# `tested_by` edge. Sub-file and logical types (`function`, `class`, `module`,
-# `concept`) have no single path and stay out.
+# File-level ID prefixes recognized by the skill's Phase 6 validator.
+# Explicit tested_by edges may refer to these nodes, including named children.
 _FILE_LEVEL_PREFIXES: frozenset[str] = frozenset({
     "file", "config", "document", "service",
     "pipeline", "table", "schema", "resource", "endpoint",
 })
 
 # `table:` and `endpoint:` IDs are `<prefix>:<relative-path>:<name>` (SKILL.md
-# schema reference), so the trailing name has to come off before what is left
-# is a path. The other file-level prefixes are `<prefix>:<relative-path>`.
+# schema reference). The name can itself contain colons, as in `/users/:id`.
 _NAMED_FILE_LEVEL_PREFIXES: frozenset[str] = frozenset({"table", "endpoint"})
 
 
@@ -617,8 +613,8 @@ def _file_node_path(node: dict[str, Any]) -> str | None:
     fp = node.get("filePath")
     if isinstance(fp, str) and fp:
         return fp
-    if prefix in _NAMED_FILE_LEVEL_PREFIXES and ":" in rest:
-        rest = rest.rsplit(":", 1)[0]
+    if prefix in _NAMED_FILE_LEVEL_PREFIXES:
+        rest = rest.partition(":")[0]
     return rest or None
 
 
@@ -691,23 +687,26 @@ def link_tests(
       swapped: pre-existing `tested_by` edges flipped (test → production
                became production → test)
     """
-    # ── Index file-level nodes by relative path; classify each as
-    # test/production. `is_prod` here means "is a known file-level node AND
-    # is not a test by path convention", used both to validate edge
-    # endpoints and to drive path-convention candidate matching.
-    file_paths_to_nodes: dict[str, dict[str, Any]] = {}
+    # ── Classify file-level endpoints for explicit edges.
+    resolved_nodes: list[dict[str, Any]] = []
     node_id_to_classification: dict[str, str] = {}  # id → "test" | "prod"
-    test_nodes: list[tuple[str, dict[str, Any]]] = []
     for node in nodes_by_id.values():
         path = _file_node_path(node)
         if path is None:
             continue
-        file_paths_to_nodes[path] = node
+        resolved_nodes.append({**node, "filePath": path})
         if is_test_path(path):
             node_id_to_classification[node["id"]] = "test"
-            test_nodes.append((path, node))
         else:
             node_id_to_classification[node["id"]] = "prod"
+
+    # Path conventions identify whole files, not which child a test covers.
+    file_paths_to_ids, _ = build_whole_file_node_index(resolved_nodes)
+    test_nodes = [
+        (path, nodes_by_id[node_id])
+        for path, node_id in file_paths_to_ids.items()
+        if node_id_to_classification[node_id] == "test"
+    ]
 
     # ── Pass 1: walk existing tested_by edges, canonicalize or drop.
     # `covered` tracks (production_id, test_id) pairs that have a kept edge
@@ -790,17 +789,17 @@ def link_tests(
         if test_node["id"] in paired_test_ids:
             continue
         for cand_path in production_candidates(test_path):
-            prod_node = file_paths_to_nodes.get(cand_path)
-            if prod_node is None:
+            prod_id = file_paths_to_ids.get(cand_path)
+            if prod_id is None:
                 continue
             if is_test_path(cand_path):
                 # Don't link a test to another test even if naming aligns.
                 continue
-            pair = (prod_node["id"], test_node["id"])
+            pair = (prod_id, test_node["id"])
             if pair in covered:
                 continue
             edges.append({
-                "source": prod_node["id"],
+                "source": prod_id,
                 "target": test_node["id"],
                 "type": "tested_by",
                 "direction": "forward",
