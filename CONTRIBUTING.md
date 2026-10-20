@@ -39,7 +39,7 @@ Thank you for your interest in contributing to Understand Anything! This documen
 4. **Run Tests**
    ```bash
    pnpm --filter @understand-anything/core test
-   pnpm --filter @understand-anything/skill test
+   pnpm test
    ```
 
 5. **Start Dashboard (Optional)**
@@ -70,7 +70,7 @@ git checkout -b docs/update-readme     # For documentation
 ```bash
 # Run all tests
 pnpm --filter @understand-anything/core test
-pnpm --filter @understand-anything/skill test
+pnpm test
 
 # Run linter
 pnpm lint
@@ -145,15 +145,17 @@ describe('MyFeature', () => {
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run skill and dashboard tests from the repository root
 pnpm test
 
-# Run tests for specific package
+# Run core package tests (excluded from the root suite)
 pnpm --filter @understand-anything/core test
 
 # Run tests in watch mode
 pnpm --filter @understand-anything/core test --watch
 ```
+
+Run both commands for the complete test coverage used by CI. The root Vitest config covers `tests/skill/`, plugin source, and dashboard tests; it excludes the core package. The skill package's own `test` script only prints a reminder to run `pnpm test` from the repository root.
 
 ## 📚 Code Style Guidelines
 
@@ -243,7 +245,7 @@ When requesting features:
 Before submitting a PR, ensure:
 
 - [ ] Code follows the project's style guidelines
-- [ ] All tests pass (`pnpm test`)
+- [ ] Core tests and root skill/dashboard tests pass (`pnpm --filter @understand-anything/core test` and `pnpm test`)
 - [ ] New code has test coverage
 - [ ] Documentation is updated (if needed)
 - [ ] Commit messages follow convention

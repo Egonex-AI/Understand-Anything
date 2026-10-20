@@ -183,7 +183,15 @@ export interface ReferenceResolution {
 
 // Plugin interfaces
 export interface StructuralAnalysis {
-  functions: Array<{ name: string; lineRange: [number, number]; params: string[]; returnType?: string }>;
+  functions: Array<{
+    name: string;
+    lineRange: [number, number];
+    params: string[];
+    returnType?: string;
+    /** Declaring type/scope; empty means free function, null means unresolved.
+     * Omitted by extractors that only represent methods in classes[].methods. */
+    owner?: string | null;
+  }>;
   classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
   imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;

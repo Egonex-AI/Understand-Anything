@@ -360,6 +360,52 @@ export class Greeter {
     });
   });
 
+  describe("analyzeFileStrict", () => {
+    it("distinguishes unsupported syntax and parse errors from valid empty files", () => {
+      expect(plugin.analyzeFileStrict("test.xyz", "function f() {}").status).toBe("unsupported");
+      expect(plugin.analyzeFileStrict("test.ts", "class Broken {").status).toBe("failed");
+      const empty = plugin.analyzeFileStrict("test.ts", "// intentionally empty\n");
+      expect(empty.status).toBe("succeeded");
+      expect(empty.structure?.functions).toEqual([]);
+    });
+
+    it("uses the same extractor and preserves evidence of unextracted members", () => {
+      const code = "class A { run() {} callback = () => {}; }";
+      const strict = plugin.analyzeFileStrict("test.ts", code);
+      expect(strict.status).toBe("succeeded");
+      expect(strict.structure).toEqual(plugin.analyzeFile("test.ts", code));
+      expect(strict.structure?.classes[0].methods).toEqual(["run"]);
+      expect(strict.symbolEvidence?.coverage.gaps).toContainEqual(expect.objectContaining({ scope: { kind: "class", name: "A" }, name: "callback" }));
+    });
+
+    it.each(["test.js", "test.jsx", "test.ts", "test.tsx"])("exposes unresolved computed and escaped names in %s", (filePath) => {
+      for (const code of [
+        'class A { ["r" + "un"]() {} keep() {} }',
+        String.raw`class A { r\u0075n() {} keep() {} }`,
+        String.raw`class A { "r\u0075n"() {} keep() {} }`,
+        'class A { keep() {} }; A.prototype["r" + "un"] = function() {};',
+        'class A { keep() {} }; A.prototype[key] ||= function() {};',
+        'class A { keep() {} }; ({method: A.prototype[key]} = obj);',
+        String.raw`class A { keep() {} }; A.prototype.r\u0075n = function() {};`,
+        'class A { keep() {} }; Object.defineProperty(A.prototype, "r" + "un", { value() {} });',
+        'class A { keep() {} }; Reflect.defineProperty(A.prototype, "r" + "un", { value() {} });',
+        'const define = Object.defineProperty; define(A.prototype, key, { value() {} });',
+        'const { defineProperty: define } = Object; define(A.prototype, key, { value() {} });',
+        'Object["define" + "Property"](A.prototype, key, { value() {} });',
+        'Reflect.set(A.prototype, "r" + "un", function() {});',
+        'Object.assign(A.prototype, descriptors);',
+      ]) {
+        const result = plugin.analyzeFileStrict(filePath, code);
+        expect(result.status).toBe("succeeded");
+        expect([...(result.symbolEvidence?.effects ?? []), ...(result.symbolEvidence?.coverage.gaps ?? [])].length).toBeGreaterThan(0);
+      }
+      expect(plugin.analyzeFileStrict(filePath, String.raw`function keep(r\u0075n) { return r\u0075n; }`)
+        .symbolEvidence?.effects).toEqual([]);
+      expect(plugin.analyzeFileStrict(filePath, 'class A { keep() { return this["x" + "y"]; } }')
+        .symbolEvidence?.effects).toEqual([]);
+    });
+  });
+
   describe("plugin metadata", () => {
     it("should have correct name", () => {
       expect(plugin.name).toBe("tree-sitter");

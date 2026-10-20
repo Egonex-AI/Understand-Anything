@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_merge_batch_graphs.py, Tests for the deterministic tested_by linker.
+test_merge_batch_graphs.py — Tests for the deterministic tested_by linker.
 
 Run from the repo root:
     python -m unittest tests.skill.understand.test_merge_batch_graphs -v
@@ -60,12 +60,36 @@ def _file_node(path: str, **extra: Any) -> dict[str, Any]:
     return node
 
 
-def _typed_node(node_type: str, path: str, **extra: Any) -> dict[str, Any]:
-    """Build a minimal file-level node of `node_type` at the given path."""
-    node = _file_node(path, **extra)
-    node["id"] = f"{node_type}:{path}"
-    node["type"] = node_type
-    return node
+def _whole_file_node(node_type: str, path: str, **extra: Any) -> dict[str, Any]:
+    return _file_node(path, id=f"{node_type}:{path}", type=node_type, **extra)
+
+
+class WholeFileImportIndexTests(unittest.TestCase):
+    """Import recovery resolves every valid whole-file node type by path."""
+
+    def test_indexes_supported_whole_file_types(self) -> None:
+        nodes = [
+            _whole_file_node(node_type, f"project/{node_type}.txt")
+            for node_type in sorted(mbg.WHOLE_FILE_NODE_TYPES)
+        ]
+        index, warnings = mbg.build_whole_file_node_index(nodes)
+        self.assertEqual(warnings, [])
+        for node_type in mbg.WHOLE_FILE_NODE_TYPES:
+            path = f"project/{node_type}.txt"
+            self.assertEqual(index[path], f"{node_type}:{path}")
+
+    def test_prefers_file_and_rejects_child_or_malformed_nodes(self) -> None:
+        path = "config/app.json"
+        nodes = [
+            _whole_file_node("config", path),
+            _whole_file_node("file", path),
+            _file_node(path, id=f"table:{path}:users", type="table"),
+            _file_node("bad.json", id="config:not-bad.json", type="config"),
+        ]
+        index, warnings = mbg.build_whole_file_node_index(nodes)
+        self.assertEqual(index, {path: f"file:{path}"})
+        self.assertEqual(len(warnings), 1)
+        self.assertIn(f"selected file:{path}", warnings[0])
 
 
 # ── is_test_path ──────────────────────────────────────────────────────────
@@ -123,6 +147,36 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTest.scala"))
         self.assertTrue(mbg.is_test_path("src/test/scala/com/foo/BarTests.scala"))
 
+    def test_swift_test_files(self) -> None:
+        for path in [
+            "Sources/App/AppTests.swift",
+            "Sources/App/AppTest.swift",
+            "Sources/App/AppSpec.swift",
+            "Tests/AppTests/AppTests.swift",
+            "Tests/AppTests/TestSupport.swift",
+        ]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
+    def test_rust_test_files(self) -> None:
+        for path in ["src/parser_test.rs", "tests/parser.rs"]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
+    def test_ruby_test_files(self) -> None:
+        for path in [
+            "test/user_test.rb",
+            "spec/user_spec.rb",
+            "spec/spec_helper.rb",
+        ]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
+    def test_php_test_files(self) -> None:
+        for path in ["src/UserTest.php", "tests/Feature/User.php"]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
     def test_csharp_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTests.cs"))
         self.assertTrue(mbg.is_test_path("Foo.Tests/BarTest.cs"))
@@ -147,6 +201,10 @@ class IsTestPathTests(unittest.TestCase):
             "Foo.cs",
             "Bar.kt",
             "Bar.java",
+            "Sources/App/Contest.swift",
+            "src/contest.rs",
+            "lib/latest.rb",
+            "src/Contest.php",
         ]:
             with self.subTest(path=path):
                 self.assertFalse(mbg.is_test_path(path), f"{path} should be production")
@@ -238,7 +296,7 @@ class ProductionCandidatesTests(unittest.TestCase):
 
     def test_python_in_package_tests_walkout(self) -> None:
         # `mypkg/tests/test_bar.py` (Django-app style) should pair with
-        # `mypkg/bar.py`, walk out of the in-package tests/ dir.
+        # `mypkg/bar.py` — walk out of the in-package tests/ dir.
         cands = mbg.production_candidates("mypkg/tests/test_bar.py")
         self.assertIn("mypkg/bar.py", cands)
         # Also nested:
@@ -369,6 +427,88 @@ class LinkTestsTests(unittest.TestCase):
             "file:modules/core/src/test/scala/com/foo/BarSpec.scala",
         )
 
+    def test_swift_canonical_llm_edge_is_preserved(self) -> None:
+        # Regression for #646: a production → test edge must not be treated
+        # as production → production just because the test file is Swift.
+        nodes_by_id = {
+            "file:Sources/App/App.swift": _file_node("Sources/App/App.swift"),
+            "file:Sources/App/AppTests.swift": _file_node(
+                "Sources/App/AppTests.swift",
+            ),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:Sources/App/App.swift",
+                "target": "file:Sources/App/AppTests.swift",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+                "description": "from LLM",
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 0, 1, 0))
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["source"], "file:Sources/App/App.swift")
+        self.assertEqual(edges[0]["target"], "file:Sources/App/AppTests.swift")
+
+    def test_other_missing_language_patterns_preserve_canonical_edges(self) -> None:
+        cases = [
+            ("src/parser.rs", "tests/parser.rs"),
+            ("lib/user.rb", "spec/user_spec.rb"),
+            ("src/User.php", "tests/Feature/User.php"),
+        ]
+        for production_path, test_path in cases:
+            with self.subTest(test_path=test_path):
+                production_id = f"file:{production_path}"
+                test_id = f"file:{test_path}"
+                nodes_by_id = {
+                    production_id: _file_node(production_path),
+                    test_id: _file_node(test_path),
+                }
+                edges: list[dict[str, Any]] = [
+                    {
+                        "source": production_id,
+                        "target": test_id,
+                        "type": "tested_by",
+                        "direction": "forward",
+                        "weight": 0.5,
+                    },
+                ]
+
+                result = mbg.link_tests(nodes_by_id, edges)
+
+                self.assertEqual(result, (0, 0, 1, 0))
+                self.assertEqual(len(edges), 1)
+                self.assertEqual(edges[0]["source"], production_id)
+                self.assertEqual(edges[0]["target"], test_id)
+
+    def test_swift_inverted_llm_edge_is_swapped_and_tagged(self) -> None:
+        nodes_by_id = {
+            "file:Sources/App/App.swift": _file_node("Sources/App/App.swift"),
+            "file:Sources/App/AppTests.swift": _file_node(
+                "Sources/App/AppTests.swift",
+            ),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:Sources/App/AppTests.swift",
+                "target": "file:Sources/App/App.swift",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 0, 1, 1))
+        self.assertEqual(edges[0]["source"], "file:Sources/App/App.swift")
+        self.assertEqual(edges[0]["target"], "file:Sources/App/AppTests.swift")
+        self.assertIn("tested", nodes_by_id["file:Sources/App/App.swift"]["tags"])
+
     def test_no_production_counterpart_no_edge(self) -> None:
         nodes_by_id = {
             "file:src/foo.test.ts": _file_node("src/foo.test.ts"),
@@ -470,7 +610,7 @@ class LinkTestsTests(unittest.TestCase):
         self.assertEqual(tested_by_edges, [])
 
     def test_drops_orphan_endpoint_edge(self) -> None:
-        # Endpoint references a node that doesn't exist in nodes_by_id,
+        # Endpoint references a node that doesn't exist in nodes_by_id —
         # nothing to canonicalize against, drop it.
         nodes_by_id = {
             "file:src/foo.ts": _file_node("src/foo.ts"),
@@ -492,7 +632,7 @@ class LinkTestsTests(unittest.TestCase):
 
     def test_dup_keeps_higher_weight_canonical(self) -> None:
         # Two canonical tested_by edges for the same pair, weights 0.3 and
-        # 0.9. The heavier one must be kept, mirroring the weight-aware
+        # 0.9. The heavier one must be kept — mirroring the weight-aware
         # dedup at Step 6 (which never sees the discarded duplicate).
         nodes_by_id = {
             "file:src/foo.ts": _file_node("src/foo.ts"),
@@ -512,7 +652,7 @@ class LinkTestsTests(unittest.TestCase):
 
     def test_dup_lighter_inverted_dropped_no_swap_counted(self) -> None:
         # Heavier canonical first, lighter inverted second. The lighter
-        # inverted edge is dropped without being swapped, no point
+        # inverted edge is dropped without being swapped — no point
         # canonicalizing an edge that's about to die in the dedup.
         nodes_by_id = {
             "file:src/foo.ts": _file_node("src/foo.ts"),
@@ -529,7 +669,7 @@ class LinkTestsTests(unittest.TestCase):
         tested_by_edges = [e for e in edges if e["type"] == "tested_by"]
         self.assertEqual(len(tested_by_edges), 1)
         self.assertEqual(tested_by_edges[0]["weight"], 0.9)
-        # Surviving edge is the original canonical, no audit marker.
+        # Surviving edge is the original canonical — no audit marker.
         self.assertNotIn(
             "direction corrected",
             (tested_by_edges[0].get("description") or "").lower(),
@@ -562,7 +702,7 @@ class LinkTestsTests(unittest.TestCase):
 
     def test_dup_swapped_then_canonical_heavier_clears_swapped_count(self) -> None:
         # Inverted lighter first (swap is applied, swapped_pairs={pair}),
-        # then canonical heavier replaces, the surviving edge is canonical
+        # then canonical heavier replaces — the surviving edge is canonical
         # so `swapped` must drop back to 0.
         nodes_by_id = {
             "file:src/foo.ts": _file_node("src/foo.ts"),
@@ -607,7 +747,7 @@ class LinkTestsTests(unittest.TestCase):
         self.assertIn("direction corrected", edge["description"].lower())
 
     def test_drops_duplicate_canonical_edges(self) -> None:
-        # Two LLM edges describing the same (production, test) pair, keep
+        # Two LLM edges describing the same (production, test) pair — keep
         # one, drop the other.
         nodes_by_id = {
             "file:src/foo.ts": _file_node("src/foo.ts"),
@@ -676,7 +816,7 @@ class LinkTestsTests(unittest.TestCase):
 
     def test_swap_recovers_real_world_one_test_many_production(self) -> None:
         # Real case from microservices-demo: shippingservice_test.go does
-        # not have a `shippingservice.go` sibling, it tests `main.go`,
+        # not have a `shippingservice.go` sibling — it tests `main.go`,
         # `tracker.go`, and `quote.go`. Path convention can't pair these,
         # but the LLM saw the same-package usage and emitted the edges
         # (with wrong direction). Swap should recover them.
@@ -707,7 +847,7 @@ class LinkTestsTests(unittest.TestCase):
 
         self.assertEqual(swapped, 2)
         # Pass 2 fallback: the test file with no shippingservice.go sibling
-        # produces no path-convention candidate, we rely entirely on swap.
+        # produces no path-convention candidate — we rely entirely on swap.
         self.assertEqual(added, 0)
         self.assertEqual(dropped, 0)
         # main.go and tracker.go were tagged; quote.go was not (LLM didn't
@@ -818,7 +958,7 @@ class LinkTestsTests(unittest.TestCase):
         self.assertTrue(ts_tagged)
 
     def test_does_not_match_test_to_test(self) -> None:
-        # If only test files exist, no edges are produced, we never link a
+        # If only test files exist, no edges are produced — we never link a
         # test to another test.
         nodes_by_id = {
             "file:src/foo.test.ts": _file_node("src/foo.test.ts"),
@@ -832,7 +972,7 @@ class LinkTestsTests(unittest.TestCase):
         self.assertEqual(tagged, 0)
 
     def test_does_not_duplicate_existing_tag(self) -> None:
-        # Production node already carries the "tested" tag, linker should
+        # Production node already carries the "tested" tag — linker should
         # not duplicate it.
         nodes_by_id = {
             "file:src/foo.ts": _file_node("src/foo.ts", tags=["tested", "core"]),
@@ -874,7 +1014,7 @@ class LinkTestsTests(unittest.TestCase):
 
     def test_malformed_tags_is_replaced_not_crashed(self) -> None:
         # Raw LLM batch JSON can ship `tags` as None, a string, or other
-        # non-list values, the TypeScript autoFixGraph normalizer runs
+        # non-list values — the TypeScript autoFixGraph normalizer runs
         # downstream of this script. The linker must coerce instead of crash.
         for bad_tags in (None, "tested,foo", "single", 0, {"k": "v"}):
             with self.subTest(bad_tags=bad_tags):
@@ -914,7 +1054,7 @@ class FileLevelNodeTests(unittest.TestCase):
     def test_every_file_level_type_resolves_to_its_path(self) -> None:
         for node_type in self.FILE_LEVEL_TYPES:
             with self.subTest(node_type=node_type):
-                node = _typed_node(node_type, "docs/app.config.json")
+                node = _whole_file_node(node_type, "docs/app.config.json")
                 self.assertEqual(
                     mbg._file_node_path(node), "docs/app.config.json"
                 )
@@ -945,7 +1085,7 @@ class FileLevelNodeTests(unittest.TestCase):
                 self.assertEqual(mbg._file_node_path(node), expected)
 
     def test_config_production_endpoint_is_kept_and_tagged(self) -> None:
-        config = _typed_node("config", "docs/app.config.json")
+        config = _whole_file_node("config", "docs/app.config.json")
         test = _file_node("tests/test_config.py")
         nodes_by_id = {config["id"]: config, test["id"]: test}
         edges: list[dict[str, Any]] = [{
@@ -965,7 +1105,7 @@ class FileLevelNodeTests(unittest.TestCase):
         self.assertIn("tested", config["tags"])
 
     def test_inverted_edge_into_a_config_node_is_swapped_not_dropped(self) -> None:
-        config = _typed_node("config", "docs/app.config.json")
+        config = _whole_file_node("config", "docs/app.config.json")
         test = _file_node("tests/test_config.py")
         nodes_by_id = {config["id"]: config, test["id"]: test}
         edges: list[dict[str, Any]] = [{
@@ -981,6 +1121,19 @@ class FileLevelNodeTests(unittest.TestCase):
         self.assertEqual((added, dropped, tagged, swapped), (0, 0, 1, 1))
         self.assertEqual(edges[0]["source"], config["id"])
         self.assertEqual(edges[0]["target"], test["id"])
+
+    def test_path_convention_supplements_a_config_node(self) -> None:
+        config = _whole_file_node("config", "src/app.config.ts")
+        test = _file_node("src/app.config.test.ts")
+        nodes_by_id = {config["id"]: config, test["id"]: test}
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (1, 0, 1, 0))
+        self.assertEqual(edges[0]["source"], config["id"])
+        self.assertEqual(edges[0]["target"], test["id"])
+        self.assertIn("tested", config["tags"])
 
     def test_sub_file_production_endpoint_is_still_dropped(self) -> None:
         func = {
@@ -1014,6 +1167,34 @@ class FileLevelNodeTests(unittest.TestCase):
 class MergeIntegrationTests(unittest.TestCase):
     """Verify the linker is wired into merge_and_normalize correctly."""
 
+    def test_swift_canonical_edge_survives_full_merge(self) -> None:
+        production_path = "Sources/App/App.swift"
+        test_path = "Tests/AppTests/AppTests.swift"
+        batch = {
+            "nodes": [_file_node(production_path), _file_node(test_path)],
+            "edges": [
+                {
+                    "source": f"file:{production_path}",
+                    "target": f"file:{test_path}",
+                    "type": "tested_by",
+                    "direction": "forward",
+                    "weight": 0.5,
+                    "description": "LLM-emitted Swift coverage edge",
+                },
+            ],
+        }
+
+        assembled, _report = mbg.merge_and_normalize([batch])
+
+        tested_by_edges = [e for e in assembled["edges"] if e["type"] == "tested_by"]
+        self.assertEqual(len(tested_by_edges), 1)
+        self.assertEqual(tested_by_edges[0]["source"], f"file:{production_path}")
+        self.assertEqual(tested_by_edges[0]["target"], f"file:{test_path}")
+        production_node = next(
+            node for node in assembled["nodes"] if node["id"] == f"file:{production_path}"
+        )
+        self.assertIn("tested", production_node["tags"])
+
     def test_linker_runs_during_merge(self) -> None:
         batch = {
             "nodes": [
@@ -1037,7 +1218,7 @@ class MergeIntegrationTests(unittest.TestCase):
                 },
             ],
             "edges": [
-                # An LLM-emitted (inverted) tested_by edge, should be dropped
+                # An LLM-emitted (inverted) tested_by edge — should be dropped
                 {
                     "source": "file:src/foo.test.ts",
                     "target": "file:src/foo.ts",
@@ -1064,7 +1245,7 @@ class MergeIntegrationTests(unittest.TestCase):
         """Repro from the issue: a `config:` production endpoint is kept."""
         batch = {
             "nodes": [
-                _typed_node("config", "docs/app.config.json", tags=["config"]),
+                _whole_file_node("config", "docs/app.config.json", tags=["config"]),
                 _file_node("src/app.py", tags=["code"]),
                 _file_node("tests/test_config.py", tags=["test"]),
                 _file_node("tests/test_app.py", tags=["test"]),
@@ -1280,7 +1461,7 @@ class TestMultiPart(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertRegex(stderr,
             r"Warning: merge: batch 1 has parts \[2, 3\] but "
-            r"missing part \[1\], possible truncated write")
+            r"missing part \[1\] — possible truncated write")
 
     def test_stderr_report_format(self) -> None:
         self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
@@ -1362,7 +1543,7 @@ class TestIncrementalBatchExisting(unittest.TestCase):
 
 class TestUnrecognizedBatchFilename(unittest.TestCase):
     """File-analyzer fuses multiple batches into one output (e.g.,
-    `batch-fused-8-13.json`, `batch-8-13.json`), the merge script's regex
+    `batch-fused-8-13.json`, `batch-8-13.json`) — the merge script's regex
     requires `batch-<N>.json` or `batch-<N>-part-<K>.json` and would
     otherwise silently drop the contents. The script must warn loudly and
     surface the drop in its report so the downstream review step catches it.
@@ -1397,7 +1578,7 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
         return result.returncode, result.stderr, assembled
 
     def test_fused_filename_emits_stderr_warning(self) -> None:
-        # `batch-fused-3-5.json` does not match the merge regex,
+        # `batch-fused-3-5.json` does not match the merge regex —
         # script must warn on stderr (not silently drop).
         self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
         self._write_batch("batch-2.json", [_file_node("src/b.ts")], [])
@@ -1455,7 +1636,7 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
 
     def test_range_filename_also_unrecognized(self) -> None:
         # A bare range like `batch-8-13.json` is just as broken as
-        # `batch-fused-8-13.json`, both must be flagged. The regex
+        # `batch-fused-8-13.json` — both must be flagged. The regex
         # `batch-(\d+)(?:-part-(\d+))?\.json` requires the literal
         # `-part-` separator before a second number.
         self._write_batch("batch-1.json", [_file_node("src/a.ts")], [])
@@ -1476,7 +1657,7 @@ class TestUnrecognizedBatchFilename(unittest.TestCase):
 
 class TestEmptyBatchGuard(unittest.TestCase):
     """A batch file that parses but contributes 0 nodes + 0 edges is how a
-    silent partial merge looks from the outside (#484), it must be flagged
+    silent partial merge looks from the outside (#484) — it must be flagged
     loudly on stderr AND in the phase report, without failing the merge.
     """
 
@@ -1576,6 +1757,30 @@ class TestUaDirResolution(unittest.TestCase):
             (self.tmp / ".understand-anything" / "intermediate" / "assembled-graph.json").is_file()
         )
         self.assertFalse((self.tmp / ".ua" / "intermediate" / "assembled-graph.json").exists())
+
+
+class TestIncrementalEdgeCandidates(unittest.TestCase):
+    def test_preserves_only_current_normalized_dangling_edges(self) -> None:
+        source = _file_node("src/b.ts", id="demo:file:src/b.ts")
+        old_edge = {"source": source["id"], "target": "function:src/a.ts:old", "type": "calls"}
+        fresh_edges = [
+            {"source": source["id"], "target": "function:src/a.ts:lost", "type": "calls", "direction": "both", "weight": 0.6},
+            {"source": source["id"], "target": "function:src/a.ts:lost", "type": "calls", "direction": "both", "weight": 0.9},
+            {"source": "missing", "target": "function:src/a.ts:lost", "type": "calls"},
+        ]
+        candidates: list[dict[str, Any]] = []
+        assembled, _report = mbg.merge_and_normalize(
+            [{"nodes": [source], "edges": [old_edge]}, {"nodes": [], "edges": fresh_edges}],
+            current_edge_ids={id(edge) for edge in fresh_edges},
+            dangling_candidates=candidates,
+        )
+        self.assertEqual(assembled["edges"], [])
+        self.assertEqual(candidates, [{
+            "source": "file:src/b.ts", "target": "function:src/a.ts:lost", "type": "calls",
+            "direction": "bidirectional", "weight": 0.9,
+        }, {
+            "source": "missing", "target": "function:src/a.ts:lost", "type": "calls", "direction": "forward",
+        }])
 
 
 if __name__ == "__main__":

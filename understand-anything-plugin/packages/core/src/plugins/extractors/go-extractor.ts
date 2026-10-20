@@ -50,17 +50,12 @@ function extractReceiverType(receiverNode: TreeSitterNode): string | undefined {
   const decl = findChild(receiverNode, "parameter_declaration");
   if (!decl) return undefined;
 
-  // Look for type_identifier directly or inside pointer_type
-  for (let i = 0; i < decl.childCount; i++) {
-    const child = decl.child(i);
-    if (!child) continue;
-    if (child.type === "type_identifier") {
-      return child.text;
-    }
-    if (child.type === "pointer_type") {
-      const typeId = findChild(child, "type_identifier");
-      if (typeId) return typeId.text;
-    }
+  // Follow only the receiver's base type, never its generic type arguments.
+  let type = decl.childForFieldName("type");
+  if (type?.type === "pointer_type") type = type.namedChildren[0] ?? null;
+  if (type?.type === "generic_type") type = type.childForFieldName("type");
+  if (type?.type === "type_identifier") {
+    return type.text;
   }
   return undefined;
 }
@@ -197,6 +192,7 @@ export class GoExtractor implements LanguageExtractor {
 
     functions.push({
       name: nameNode.text,
+      owner: "",
       lineRange: [
         node.startPosition.row + 1,
         node.endPosition.row + 1,
@@ -225,9 +221,12 @@ export class GoExtractor implements LanguageExtractor {
     const paramsNode = node.childForFieldName("parameters");
     const params = extractParams(paramsNode ?? null);
     const returnType = extractResultType(node);
+    const receiverNode = node.childForFieldName("receiver");
+    const receiverType = receiverNode ? extractReceiverType(receiverNode) : undefined;
 
     functions.push({
       name: nameNode.text,
+      owner: receiverType ?? null,
       lineRange: [
         node.startPosition.row + 1,
         node.endPosition.row + 1,
@@ -237,15 +236,11 @@ export class GoExtractor implements LanguageExtractor {
     });
 
     // Track receiver type for struct association
-    const receiverNode = node.childForFieldName("receiver");
-    if (receiverNode) {
-      const receiverType = extractReceiverType(receiverNode);
-      if (receiverType) {
-        if (!methodsByReceiver.has(receiverType)) {
-          methodsByReceiver.set(receiverType, []);
-        }
-        methodsByReceiver.get(receiverType)!.push(nameNode.text);
+    if (receiverType) {
+      if (!methodsByReceiver.has(receiverType)) {
+        methodsByReceiver.set(receiverType, []);
       }
+      methodsByReceiver.get(receiverType)!.push(nameNode.text);
     }
 
     if (isExported(nameNode.text)) {

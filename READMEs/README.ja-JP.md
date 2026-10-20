@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a>
+  <a href="../README.md">English</a> | <a href="README.zh-CN.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja-JP.md">日本語</a> | <a href="README.ko-KR.md">한국어</a> | <a href="README.es-ES.md">Español</a> | <a href="README.tr-TR.md">Türkçe</a> | <a href="README.ru-RU.md">Русский</a> | <a href="README.vi-VN.md">Tiếng Việt</a>
 </p>
 
 <p align="center">
@@ -38,12 +38,6 @@
 
 <p align="center">
   <img src="../assets/hero.png" alt="Understand Anything — あらゆるコードベースをインタラクティブなナレッジグラフに変換" width="800" />
-</p>
-
-<p align="center">
-  <strong><a href="https://github.com/Egonex-AI">Egonex</a> によるオープンソースプロジェクト</strong>
-  <br />
-  <em>原作者: <a href="https://github.com/Lum1104">Lum1104</a></em>
 </p>
 
 ---
@@ -135,7 +129,7 @@ Understand Anything は [Claude Code Plugin](https://code.claude.com/docs/en/plu
 # 日本語でコンテンツを生成（ナレッジグラフのノード説明とダッシュボードUI）
 /understand --language ja
 
-# サポート言語：en（デフォルト）、zh、zh-TW、ja、ko、ru
+# サポート言語：en（デフォルト）、zh、zh-TW、ja、ko、ru、vi
 ```
 
 プロジェクトでの**初回実行時**に `--language` を指定せず、保存済みの言語設定もない場合、`/understand` は会話で使われている言語を検出します。英語以外が検出された場合は、生成前にその言語を使用するか、別の言語へ変更するかを確認します。英語での会話には影響しません。選択結果は `.ua/config.json` に保存され、以降の実行でも再利用されます。
@@ -323,7 +317,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 
 ### マルチエージェントパイプライン
 
-`/understand` コマンドは5つの専門エージェントをオーケストレーションし、`/understand-domain` は6つ目を追加します：
+`/understand` コマンドは5つの専門エージェントをオーケストレーションし、`/understand-domain` は6つ目、`/understand-knowledge` は7つ目を追加します：
 
 | エージェント | 役割 |
 |-------|------|

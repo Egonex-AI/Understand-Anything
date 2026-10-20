@@ -98,6 +98,7 @@ export {
   type ImportFingerprint,
   type FileFingerprint,
   type FingerprintStore,
+  type FingerprintBuildOptions,
   type ChangeLevel,
   type FileChangeResult,
   type ChangeAnalysis,

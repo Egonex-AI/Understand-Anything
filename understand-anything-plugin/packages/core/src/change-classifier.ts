@@ -21,7 +21,8 @@ export interface UpdateDecision {
 export function classifyUpdate(
   analysis: ChangeAnalysis,
   totalFilesInGraph: number,
-  allKnownFiles: string[] = [],
+  previousFiles: string[] = [],
+  currentFiles?: string[],
 ): UpdateDecision {
   const { newFiles, deletedFiles, structurallyChangedFiles, cosmeticOnlyFiles } = analysis;
   const structuralCount = structurallyChangedFiles.length + newFiles.length + deletedFiles.length;
@@ -62,7 +63,12 @@ export function classifyUpdate(
   }
 
   // Check if directory structure changed (new/deleted top-level directories)
-  const hasDirectoryChanges = detectDirectoryChanges(newFiles, deletedFiles, allKnownFiles);
+  const hasDirectoryChanges = detectDirectoryChanges(
+    newFiles,
+    deletedFiles,
+    previousFiles,
+    currentFiles,
+  );
 
   if (hasDirectoryChanges || structuralCount > 10) {
     return {
@@ -94,23 +100,39 @@ export function classifyUpdate(
 function detectDirectoryChanges(
   newFiles: string[],
   deletedFiles: string[],
-  allKnownFiles: string[],
+  previousFiles: string[],
+  currentFiles?: string[],
 ): boolean {
-  const existingDirs = new Set(
-    allKnownFiles.map((f) => topDirectory(f)).filter(Boolean),
-  );
+  // Older callers only provided one inventory. Reconstruct both sides from
+  // the change analysis so that the optional fourth argument remains fully
+  // backwards compatible while still fixing deletion-only directory changes.
+  const before = new Set(previousFiles);
+  for (const file of deletedFiles) before.add(file);
 
-  for (const f of newFiles) {
-    const dir = topDirectory(f);
-    if (dir && !existingDirs.has(dir)) return true;
+  const after = currentFiles === undefined
+    ? new Set(previousFiles.filter(file => !deletedFiles.includes(file)))
+    : new Set(currentFiles);
+  if (currentFiles === undefined) {
+    for (const file of newFiles) after.add(file);
   }
 
-  for (const f of deletedFiles) {
-    const dir = topDirectory(f);
-    if (dir && !existingDirs.has(dir)) return true;
+  const beforeDirs = topDirectories(before);
+  const afterDirs = topDirectories(after);
+  if (beforeDirs.size !== afterDirs.size) return true;
+  for (const dir of beforeDirs) {
+    if (!afterDirs.has(dir)) return true;
   }
-
   return false;
+}
+
+function topDirectories(files: Iterable<string>): Set<string> {
+  const dirs = new Set<string>();
+  for (const file of files) {
+    const platformPath = process.platform === "win32" ? file.replaceAll("\\", "/") : file;
+    const dir = topDirectory(platformPath);
+    if (dir) dirs.add(dir);
+  }
+  return dirs;
 }
 
 /**

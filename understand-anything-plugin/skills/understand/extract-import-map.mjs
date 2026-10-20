@@ -18,8 +18,14 @@
  * Input JSON:
  *   {
  *     projectRoot: <abs-path>,
- *     files: [{ path, language, fileCategory }, ...]
+ *     files: [{ path, language, fileCategory }, ...],
+ *     analysisPaths?: [<project-relative-path>, ...]
  *   }
+ *
+ * `files` is always the complete current inventory because import resolution
+ * needs it for path/module probes. When `analysisPaths` is present, only those
+ * files are read and emitted in `importMap`; omitting it preserves the original
+ * full-scan behaviour.
  *
  * Output JSON:
  *   {
@@ -34,7 +40,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { dirname, resolve, join, posix } from 'node:path';
+import { dirname, resolve, join, posix, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -93,7 +99,55 @@ const { TreeSitterPlugin, PluginRegistry, builtinLanguageConfigs, registerAllPar
  * cross-platform.
  */
 function toPosix(p) {
-  return p.split(/[\\/]/).filter(Boolean).join('/');
+  const separators = process.platform === 'win32' ? /[\\/]/ : /\//;
+  return p.split(separators).filter(Boolean).join('/');
+}
+
+/**
+ * Validate and normalize the optional selective-analysis path list. Keeping
+ * this strict prevents an incremental caller from accidentally asking the
+ * extractor to read outside projectRoot or silently miss a typo.
+ */
+function selectAnalysisFiles(files, analysisPaths) {
+  if (analysisPaths === undefined) return files;
+  if (!Array.isArray(analysisPaths)) {
+    throw new Error('Invalid input: analysisPaths must be an array when provided');
+  }
+
+  const filesByPath = new Map();
+  for (const file of files) {
+    if (!file || typeof file.path !== 'string' || file.path.length === 0) {
+      throw new Error('Invalid input: every files entry must contain a non-empty path');
+    }
+    filesByPath.set(toPosix(file.path), file);
+  }
+
+  const selected = [];
+  const seen = new Set();
+  for (const rawPath of analysisPaths) {
+    if (typeof rawPath !== 'string' || rawPath.length === 0) {
+      throw new Error('Invalid input: every analysisPaths entry must be a non-empty string');
+    }
+    // Use the host's path semantics here. On POSIX, backslashes and drive-like
+    // prefixes are ordinary project-relative filename characters; on Windows,
+    // path.isAbsolute also rejects drive-rooted and root-relative paths.
+    if (isAbsolute(rawPath)) {
+      throw new Error(`Invalid input: analysisPaths entry must be project-relative: ${rawPath}`);
+    }
+    const path = toPosix(rawPath);
+    if (!path || path.split('/').some(part => part === '..')) {
+      throw new Error(`Invalid input: analysisPaths entry escapes projectRoot: ${rawPath}`);
+    }
+    const file = filesByPath.get(path);
+    if (!file) {
+      throw new Error(`Invalid input: analysisPaths entry is not present in files: ${rawPath}`);
+    }
+    if (!seen.has(path)) {
+      seen.add(path);
+      selected.push(file);
+    }
+  }
+  return selected;
 }
 
 // ECMAScript relational string comparison is lexicographic over UTF-16 code
@@ -153,16 +207,74 @@ function dirOf(p) {
  * with the exact tsconfig path that failed; bubbling the error would
  * conceal which file was at fault when many tsconfigs are loaded.
  */
+function normalizeJsonc(raw) {
+  let withoutComments = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    const next = raw[i + 1];
+    if (inString) {
+      withoutComments += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      withoutComments += ch;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      while (i < raw.length && raw[i] !== '\n') i++;
+      if (i < raw.length) withoutComments += '\n';
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < raw.length && !(raw[i] === '*' && raw[i + 1] === '/')) {
+        if (raw[i] === '\n') withoutComments += '\n';
+        i++;
+      }
+      i++;
+      continue;
+    }
+    withoutComments += ch;
+  }
+
+  let normalized = '';
+  inString = false;
+  escaped = false;
+  for (let i = 0; i < withoutComments.length; i++) {
+    const ch = withoutComments[i];
+    if (inString) {
+      normalized += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      normalized += ch;
+      continue;
+    }
+    if (ch === ',') {
+      let nextIndex = i + 1;
+      while (/\s/.test(withoutComments[nextIndex] ?? '')) nextIndex++;
+      if (withoutComments[nextIndex] === '}' || withoutComments[nextIndex] === ']') continue;
+    }
+    normalized += ch;
+  }
+  return normalized.replace(/^\uFEFF/, '');
+}
+
 function parseTsConfigText(raw) {
-  // tsconfig.json often contains JSONC-style comments; strip line and block
-  // comments before parsing. The strip is naive (it doesn't honor string
-  // contents), so we fall back to the raw text on failure.
-  const stripped = raw
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const normalized = normalizeJsonc(raw);
   let parsed;
   try {
-    parsed = JSON.parse(stripped);
+    parsed = JSON.parse(normalized);
   } catch {
     try {
       parsed = JSON.parse(raw);
@@ -213,6 +325,7 @@ function parseTsConfigText(raw) {
 async function loadTsConfigs(projectRoot, files) {
   const out = new Map();
   const warnings = [];
+  const failures = [];
   // Collect the candidate paths in the original file order before reading,
   // so warning emit order matches the previous sequential implementation.
   const candidates = [];
@@ -227,6 +340,7 @@ async function loadTsConfigs(projectRoot, files) {
   const reads = await readFilesParallel(candidates);
   for (const { key: p, raw, err } of reads) {
     if (err) {
+      failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
       // absPath isn't carried through the helper return shape; reconstruct it.
       warnings.push(
         `Warning: extract-import-map: tsconfig.json at ${join(projectRoot, p)} failed ` +
@@ -237,6 +351,11 @@ async function loadTsConfigs(projectRoot, files) {
     }
     const parsed = parseTsConfigText(raw);
     if (!parsed) {
+      failures.push({
+        path: p,
+        stage: 'resolver-config-parse',
+        message: 'invalid tsconfig.json',
+      });
       warnings.push(
         `Warning: extract-import-map: tsconfig.json at ${join(projectRoot, p)} failed ` +
         `to parse — path aliases from this config will not be applied ` +
@@ -246,7 +365,7 @@ async function loadTsConfigs(projectRoot, files) {
     }
     out.set(dirOf(p), parsed);
   }
-  return { configs: out, warnings };
+  return { configs: out, warnings, failures };
 }
 
 /**
@@ -281,6 +400,7 @@ async function loadGoModules(projectRoot, files) {
   // so the concurrent caller in buildResolutionContext can drain them
   // uniformly in canonical order.
   const warnings = [];
+  const failures = [];
   const candidates = [];
   for (const f of files) {
     const p = toPosix(f.path);
@@ -292,7 +412,14 @@ async function loadGoModules(projectRoot, files) {
   }
   const reads = await readFilesParallel(candidates);
   for (const { key: p, raw, err } of reads) {
-    if (err) continue;
+    if (err) {
+      failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
+      warnings.push(
+        `Warning: extract-import-map: go.mod at ${join(projectRoot, p)} failed ` +
+        `to read (${err.message}) — Go module imports may not resolve\n`,
+      );
+      continue;
+    }
     let moduleName = '';
     for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.replace(/\/\/.*$/, '').trim();
@@ -300,10 +427,21 @@ async function loadGoModules(projectRoot, files) {
       moduleName = trimmed.slice('module '.length).trim();
       break;
     }
-    if (!moduleName) continue;
+    if (!moduleName) {
+      failures.push({
+        path: p,
+        stage: 'resolver-config-parse',
+        message: 'module directive missing',
+      });
+      warnings.push(
+        `Warning: extract-import-map: go.mod at ${join(projectRoot, p)} has no ` +
+        `module directive — Go module imports may not resolve\n`,
+      );
+      continue;
+    }
     out.set(dirOf(p), moduleName);
   }
-  return { modules: out, warnings };
+  return { modules: out, warnings, failures };
 }
 
 /**
@@ -375,6 +513,7 @@ function parseSwiftPackageTargets(raw) {
 async function loadSwiftPackageTargets(projectRoot, files) {
   const targets = new Map();
   const warnings = [];
+  const failures = [];
   const candidates = [];
 
   for (const f of files) {
@@ -388,7 +527,14 @@ async function loadSwiftPackageTargets(projectRoot, files) {
 
   const reads = await readFilesParallel(candidates);
   for (const { key: p, raw, err } of reads) {
-    if (err) continue;
+    if (err) {
+      failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
+      warnings.push(
+        `Warning: extract-import-map: Package.swift at ${join(projectRoot, p)} failed ` +
+        `to read (${err.message}) — Swift module imports may not resolve\n`,
+      );
+      continue;
+    }
     const packageDir = dirOf(p);
     for (const target of parseSwiftPackageTargets(raw)) {
       const targetPath = resolveRelative(packageDir, target.path.replace(/\\/g, '/'));
@@ -398,7 +544,7 @@ async function loadSwiftPackageTargets(projectRoot, files) {
     }
   }
 
-  return { targets, warnings };
+  return { targets, warnings, failures };
 }
 
 /**
@@ -508,6 +654,12 @@ async function buildResolutionContext(projectRoot, files) {
     scalaPackageIndex,
     csIndex,
     swiftModuleIndex,
+    failures: [
+      ...tsResult.failures,
+      ...goResult.failures,
+      ...phpResult.failures,
+      ...swiftResult.failures,
+    ],
     phpAutoloads,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
@@ -1440,6 +1592,7 @@ function parseComposerAutoloadText(raw) {
 async function loadPhpAutoloads(projectRoot, files) {
   const out = new Map();
   const warnings = [];
+  const failures = [];
   const candidates = [];
   for (const f of files) {
     const p = toPosix(f.path);
@@ -1452,6 +1605,7 @@ async function loadPhpAutoloads(projectRoot, files) {
   const reads = await readFilesParallel(candidates);
   for (const { key: p, raw, err } of reads) {
     if (err) {
+      failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
       warnings.push(
         `Warning: extract-import-map: composer.json at ${join(projectRoot, p)} failed ` +
         `to read (${err.message}) — PSR-4 namespace mapping from this ` +
@@ -1462,6 +1616,11 @@ async function loadPhpAutoloads(projectRoot, files) {
     }
     const parsed = parseComposerAutoloadText(raw);
     if (parsed === null) {
+      failures.push({
+        path: p,
+        stage: 'resolver-config-parse',
+        message: 'invalid composer.json',
+      });
       warnings.push(
         `Warning: extract-import-map: composer.json at ${join(projectRoot, p)} failed ` +
         `to parse — PSR-4 namespace mapping unavailable — PHP imports ` +
@@ -1471,7 +1630,7 @@ async function loadPhpAutoloads(projectRoot, files) {
     }
     out.set(dirOf(p), parsed);
   }
-  return { autoloads: out, warnings };
+  return { autoloads: out, warnings, failures };
 }
 
 /**
@@ -1806,10 +1965,26 @@ async function main() {
 
   const inputRaw = readFileSync(inputPath, 'utf-8');
   const input = JSON.parse(inputRaw);
-  const { projectRoot, files } = input;
+  const { projectRoot, files, analysisPaths } = input;
 
   if (!projectRoot || !Array.isArray(files)) {
     throw new Error('Invalid input: must contain projectRoot and files array');
+  }
+
+  const analysisFiles = selectAnalysisFiles(files, analysisPaths);
+
+  if (analysisFiles.length === 0) {
+    const output = {
+      scriptCompleted: true,
+      stats: { filesScanned: 0, filesWithImports: 0, totalEdges: 0 },
+      failures: [],
+      importMap: {},
+    };
+    writeFileSync(outputPath, JSON.stringify(output, null, 2), 'utf-8');
+    process.stderr.write(
+      'extract-import-map: filesScanned=0 filesWithImports=0 totalEdges=0\n',
+    );
+    return;
   }
 
   // Create tree-sitter plugin with all configs that have WASM grammars.
@@ -1823,6 +1998,7 @@ async function main() {
   // (file inventory, exports inferred from filenames, etc.) keeps working.
   let registry = null;
   let treeSitterReady = false;
+  const failures = [];
   try {
     const tsConfigs = builtinLanguageConfigs.filter(c => c.treeSitter);
     const tsPlugin = new TreeSitterPlugin(tsConfigs);
@@ -1832,6 +2008,7 @@ async function main() {
     registerAllParsers(registry);
     treeSitterReady = true;
   } catch (err) {
+    failures.push({ path: null, stage: 'tree-sitter-init', message: err.message });
     process.stderr.write(
       `Warning: extract-import-map: tree-sitter init failed ` +
       `(${err.message}) — all importMap entries will be empty — ` +
@@ -1843,12 +2020,13 @@ async function main() {
   // tsconfig/go.mod/composer.json files inside is parallelised — see
   // `buildResolutionContext`.
   const ctx = await buildResolutionContext(projectRoot, files);
+  failures.push(...ctx.failures);
 
   const importMap = {};
   let filesWithImports = 0;
   let totalEdges = 0;
 
-  for (const file of files) {
+  for (const file of analysisFiles) {
     const path = toPosix(file.path);
 
     // Non-code files always get an empty array
@@ -1872,6 +2050,7 @@ async function main() {
     try {
       content = readFileSync(absolutePath, 'utf-8');
     } catch (err) {
+      failures.push({ path, stage: 'file-read', message: err.message });
       process.stderr.write(
         `Warning: extract-import-map: import resolution failed for ${path} ` +
         `(read error: ${err.message}) — importMap[${path}]=[]\n`,
@@ -1923,6 +2102,7 @@ async function main() {
           : comparePaths(a, b),
       );
     } catch (err) {
+      failures.push({ path, stage: 'file-analyze', message: err.message });
       process.stderr.write(
         `Warning: extract-import-map: import resolution failed for ${path} ` +
         `(analyze error: ${err.message}) — importMap[${path}]=[]\n`,
@@ -1941,10 +2121,11 @@ async function main() {
   const output = {
     scriptCompleted: true,
     stats: {
-      filesScanned: files.length,
+      filesScanned: analysisFiles.length,
       filesWithImports,
       totalEdges,
     },
+    failures,
     importMap,
   };
 
@@ -1955,7 +2136,7 @@ async function main() {
   }
 
   process.stderr.write(
-    `extract-import-map: filesScanned=${files.length} ` +
+    `extract-import-map: filesScanned=${analysisFiles.length} ` +
     `filesWithImports=${filesWithImports} totalEdges=${totalEdges}\n`,
   );
 }

@@ -31,6 +31,22 @@ function parse(code: string) {
 describe("RustExtractor", () => {
   const extractor = new RustExtractor();
 
+  it("preserves impl ownership and leaves trait identity unresolved", () => {
+    const { tree, parser, root } = parse(`struct A;
+impl A { fn run(&self) {} }
+impl B<u32> { fn run(&self) {} }
+impl Trait for A { fn run(&self) {} }
+fn run() {}
+`);
+    expect(root.hasError).toBe(false);
+    const result = extractor.extractStructure(root);
+    expect(result.functions.map(fn => [fn.name, fn.owner])).toEqual([
+      ["run", "A"], ["run", "B<u32>"], ["run", null], ["run", ""],
+    ]);
+    tree.delete();
+    parser.delete();
+  });
+
   it("has correct languageIds", () => {
     expect(extractor.languageIds).toEqual(["rust"]);
   });

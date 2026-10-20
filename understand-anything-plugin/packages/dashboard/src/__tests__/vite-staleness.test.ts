@@ -7,7 +7,7 @@ import {
 } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDashboardDataMiddleware } from "../../vite.config";
 import { isDashboardFreshnessReport } from "../freshness";
 
@@ -20,6 +20,7 @@ interface HttpResult {
 let originalGraphDir: string | undefined;
 let tempProject: string;
 let baselineCommit: string;
+let restoreCwd: (() => void) | undefined;
 const servers: Server[] = [];
 
 function git(...args: string[]): string {
@@ -114,6 +115,12 @@ beforeEach(() => {
   originalGraphDir = process.env.GRAPH_DIR;
   tempProject = fs.mkdtempSync(path.join(os.tmpdir(), "ua-dashboard-"));
   process.env.GRAPH_DIR = tempProject;
+  // Keep both cwd fallback roots inside the fixture. A developer's existing
+  // knowledge graph must not satisfy this suite's missing-graph request.
+  const fixtureCwd = path.join(tempProject, "runtime", "a", "b");
+  fs.mkdirSync(fixtureCwd, { recursive: true });
+  const cwd = vi.spyOn(process, "cwd").mockReturnValue(fixtureCwd);
+  restoreCwd = () => cwd.mockRestore();
 
   git("init");
   git("config", "user.email", "dashboard-tests@example.com");
@@ -126,6 +133,8 @@ afterEach(async () => {
   for (const server of servers.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+  restoreCwd?.();
+  restoreCwd = undefined;
   if (originalGraphDir === undefined) {
     delete process.env.GRAPH_DIR;
   } else {

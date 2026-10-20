@@ -44,12 +44,9 @@ describe('skill command hardening', () => {
       'understand-anything-plugin/hooks/auto-update-prompt.md',
     );
 
-    expect(content).toMatch(
-      /Before filtering by extension, remove every path under the selected `\$UA_DIR`/,
-    );
-    expect(content).toMatch(
-      /If no paths remain after removing `\$UA_DIR`[\s\S]*without writing `meta\.json`/,
-    );
+    expect(content).toContain('generated-artifact-only');
+    expect(content).toContain('intentionally advances nothing for generated-only commits');
+    expect(content).toContain('Never update `meta.json` for a generated-artifact-only commit');
   });
 
   it('quotes dashboard cd targets and GRAPH_DIR assignment', () => {

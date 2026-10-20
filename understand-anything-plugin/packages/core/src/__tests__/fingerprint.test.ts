@@ -5,6 +5,7 @@ import {
   extractFileFingerprint,
   compareFingerprints,
   analyzeChanges,
+  buildFingerprintStore,
   type FileFingerprint,
   type FingerprintStore,
 } from "../fingerprint.js";
@@ -24,6 +25,34 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+describe("buildFingerprintStore", () => {
+  it("uses content-only fingerprints when parser structure is not fully represented", () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReadFileSync.mockReturnValue('{"enabled":true}');
+    const registry = {
+      analyzeFile: vi.fn().mockReturnValue({
+        functions: [],
+        classes: [],
+        imports: [],
+        exports: [],
+        definitions: [{ name: "enabled", kind: "property" }],
+      }),
+      getLanguageForFile: vi.fn().mockReturnValue("json"),
+    } as any;
+
+    const store = buildFingerprintStore(
+      "/project",
+      ["config.json"],
+      registry,
+      "abc123",
+      { structuralFingerprintLanguages: new Set(["typescript"]) },
+    );
+
+    expect(store.files["config.json"].hasStructuralAnalysis).toBe(false);
+    expect(store.files["config.json"].contentHash).toBe(contentHash('{"enabled":true}'));
+  });
+});
+
 describe("contentHash", () => {
   it("produces consistent SHA-256 hashes", () => {
     const hash1 = contentHash("hello world");
@@ -38,6 +67,33 @@ describe("contentHash", () => {
 });
 
 describe("extractFileFingerprint", () => {
+  it("never classifies changed unresolved receivers as cosmetic", () => {
+    const fingerprint = (content: string) => extractFileFingerprint("a.rs", content, {
+      functions: [{ name: "run", owner: null, lineRange: [1, 1], params: ["self"] }],
+      classes: [], imports: [], exports: [],
+    });
+    const before = fingerprint("impl TraitA for A { fn run(&self) {} }");
+    const after = fingerprint("impl TraitB for B { fn run(&self) {} }");
+    expect(compareFingerprints(before, before).changeLevel).toBe("NONE");
+    expect(compareFingerprints(before, after).changeLevel).toBe("STRUCTURAL");
+    const resolved = { ...after, functions: after.functions.map(fn => ({ ...fn, owner: "B" })) };
+    expect(compareFingerprints(before, resolved).changeLevel).toBe("STRUCTURAL");
+    expect(compareFingerprints(resolved, before).changeLevel).toBe("STRUCTURAL");
+  });
+
+  it("classifies receiver changes as structural without a local class declaration", () => {
+    const fingerprint = (owner: string | undefined, content: string) => extractFileFingerprint("a.go", content, {
+      functions: [{ name: "Run", owner, lineRange: [2, 2], params: [] }],
+      classes: [], imports: [], exports: [],
+    });
+    const original = fingerprint("A", "func (a A) Run() {}");
+    const changed = fingerprint("B", "func (a B) Run() {}");
+    expect(changed.functions[0].owner).toBe("B");
+    expect(compareFingerprints(original, changed).changeLevel).toBe("STRUCTURAL");
+    expect(compareFingerprints(fingerprint(undefined, "old evidence"), changed).changeLevel).toBe("STRUCTURAL");
+    expect(compareFingerprints(changed, fingerprint("B", "body edit")).changeLevel).toBe("COSMETIC");
+  });
+
   it("extracts function fingerprints from analysis", () => {
     const analysis: StructuralAnalysis = {
       functions: [

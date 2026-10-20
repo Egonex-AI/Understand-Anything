@@ -26,6 +26,10 @@ describe("IgnoreFilter", () => {
       expect(DEFAULT_IGNORE_PATTERNS).toContain(".git/");
     });
 
+    it("contains the .understandignore control file", () => {
+      expect(DEFAULT_IGNORE_PATTERNS).toContain(".understandignore");
+    });
+
     it("contains obj for .NET", () => {
       expect(DEFAULT_IGNORE_PATTERNS).toContain("obj/");
     });

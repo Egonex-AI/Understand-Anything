@@ -31,6 +31,19 @@ function parse(code: string) {
 describe("CppExtractor", () => {
   const extractor = new CppExtractor();
 
+  it("distinguishes free functions from inline and out-of-class methods", () => {
+    const { tree, parser, root } = parse(`struct A { void run() {} };
+void B::run() {}
+void run() {}
+`);
+    expect(root.hasError).toBe(false);
+    expect(extractor.extractStructure(root).functions.map(fn => [fn.name, fn.owner])).toEqual([
+      ["run", "A"], ["run", "B"], ["run", ""],
+    ]);
+    tree.delete();
+    parser.delete();
+  });
+
   it("has correct languageIds", () => {
     expect(extractor.languageIds).toEqual(["cpp", "c"]);
   });

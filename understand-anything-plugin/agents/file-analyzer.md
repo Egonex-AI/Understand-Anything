@@ -88,6 +88,7 @@ Read `$UA_DIR/tmp/ua-file-extract-results-<batchIndex>.json`. The output format 
   "scriptCompleted": true,
   "filesAnalyzed": 5,
   "filesSkipped": ["path/to/binary.wasm"],
+  "filesUnreadable": [],
   "results": [
     {
       "path": "src/index.ts",
@@ -117,6 +118,8 @@ Read `$UA_DIR/tmp/ua-file-extract-results-<batchIndex>.json`. The output format 
   ]
 }
 ```
+
+**Read failures are not skips.** `filesSkipped` lists every batch file that produced no result, including benign cases (`.wasm`, `.sln`, `.xaml` — no registered parser). `filesUnreadable` is the subset that could not be read from disk at all (`[{ "path": ..., "code": "ENOENT" }]`). A non-empty `filesUnreadable` means the paths are wrong, not the code — most often a `projectRoot` that does not resolve. When it is non-empty the script also writes a note to stderr, and when *every* file in the batch is unreadable it exits non-zero (per Step 2, report that as a hard failure). Never treat an unreadable file as "unsupported language" and never emit a bare stub node for it: report the failure instead.
 
 **Non-code structural fields.** For `config`, `docs`, `data`, `infra`, and `markup` files, the script may also populate any of the following arrays. Treat each entry as a potential sub-file node and emit a corresponding `<prefix>:<path>:<name>` node in your output if it meets the significance filter:
 
@@ -245,6 +248,10 @@ For significant functions and classes from the script output (code files only), 
 - Any function or class that is exported (visible to other modules)
 
 Skip trivial one-liners, type aliases, simple re-exports, and auto-generated boilerplate.
+
+**Incremental preservation overrides significance filtering for existing symbols.** If the prompt provides `previousSymbols`, reconcile every listed function, class, and method against current source, including methods in `classes[].methods` rather than just top-level `functions`. A symbol already in the graph that still exists MUST be emitted even if it has become short, private, or otherwise falls below the significance thresholds. New symbols continue to use the filter above. Match by file, kind, owning class, and name; use line ranges only to locate code within that revision. Preserve canonical IDs where the symbol identity is unchanged.
+
+Before writing output, check the complete `previousSymbols` checklist for every file. Emit all surviving symbols with newly derived summaries, tags, complexity, and edges. For confirmed deletions, omit the nodes and report the deleted IDs. If a checklist item cannot be accounted for (ambiguous ownership, unsupported syntax, parse failure, or incomplete source), explicitly report an error with its ID/name; do not claim successful completion or silently drop it. A `missingSymbols` repair prompt requires a complete replacement analysis of the affected files, including their other nodes and edges. Never copy the old semantic nodes/edges back merely to pass validation.
 
 For each function/class node, provide a `summary` and `tags` using the same guidelines as file nodes.
 

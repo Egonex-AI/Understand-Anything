@@ -64,6 +64,7 @@ export const DEFAULT_IGNORE_PATTERNS: string[] = [
   // Misc
   "LICENSE",
   ".gitignore",
+  ".understandignore",
   ".editorconfig",
   ".prettierrc",
   ".eslintrc*",
