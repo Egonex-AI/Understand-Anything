@@ -312,6 +312,7 @@ const PROTECTED = new Set([
   "/diff-overlay.json",
   "/meta.json",
   "/config.json",
+  "/code-lessons.json",
   "/file-content.json",
   "/staleness.json",
 ]);
@@ -360,6 +361,23 @@ const server = createServer((req, res) => {
       return;
     }
     sendJson(res, 200, { autoUpdate: false, outputLanguage: "en" });
+    return;
+  }
+
+  if (pathname === "/code-lessons.json") {
+    const candidate = path.join(graphDir, "code-lessons.json");
+    if (fs.existsSync(candidate)) {
+      try {
+        sendJson(res, 200, JSON.parse(fs.readFileSync(candidate, "utf-8")));
+      } catch {
+        sendJson(res, 500, { error: "Failed to read code lessons file" });
+      }
+      return;
+    }
+    // Code lessons are optional — absent file means the dashboard
+    // renders the code viewer without the lesson panel.
+    res.statusCode = 404;
+    res.end();
     return;
   }
 

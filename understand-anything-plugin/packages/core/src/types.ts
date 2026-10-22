@@ -93,6 +93,29 @@ export interface TourStep {
   languageLesson?: string;
 }
 
+// One explained segment of a source file. When the file is a tour stop,
+// `tourOrder` links the section back to the TourStep with that order.
+export interface CodeLessonSection {
+  title: string;
+  lineRange: [number, number];
+  explanation: string;
+  tourOrder?: number;
+}
+
+// Per-file learning explanation served from the project data directory
+// (`.ua/code-lessons.json`) alongside the knowledge graph.
+export interface CodeLessonFile {
+  overview: string;
+  sections: CodeLessonSection[];
+}
+
+// Root document of code-lessons.json, keyed by graph-relative file path.
+export interface CodeLessons {
+  version: number;
+  generatedAt: string;
+  files: Record<string, CodeLessonFile>;
+}
+
 // ProjectMeta
 export interface ProjectMeta {
   name: string;

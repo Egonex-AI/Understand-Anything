@@ -183,6 +183,9 @@ export const zhTW = {
     sourceUnavailable: "原始碼不可用",
     rendered: "渲染",
     source: "原始碼",
+    lesson: "講解",
+    tourStep: "導覽",
+    overviewOnly: "該檔案僅有概覽講解，暫無分段講解。",
   },
   customNode: {
     tested: "已測試",

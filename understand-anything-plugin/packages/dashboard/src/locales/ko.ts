@@ -183,6 +183,9 @@ export const ko = {
     sourceUnavailable: "소스 사용 불가",
     rendered: "렌더링",
     source: "소스",
+    lesson: "해설",
+    tourStep: "투어",
+    overviewOnly: "이 파일에는 개요만 있고 구간별 해설이 없습니다.",
   },
   customNode: {
     tested: "테스트됨",

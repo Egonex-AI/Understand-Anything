@@ -368,6 +368,7 @@ const config: DashboardViteConfig = {
             pathname === "/diff-overlay.json" ||
             pathname === "/meta.json" ||
             pathname === "/config.json" ||
+            pathname === "/code-lessons.json" ||
             pathname === "/file-content.json";
 
           if (!isProtectedEndpoint) {
@@ -403,6 +404,26 @@ const config: DashboardViteConfig = {
               }
             }
             sendJson(res, 200, { autoUpdate: false, outputLanguage: "en" });
+            return;
+          }
+
+          if (pathname === "/code-lessons.json") {
+            const lessonsCandidates = graphFileCandidates("code-lessons.json");
+            for (const candidate of lessonsCandidates) {
+              if (!fs.existsSync(candidate)) continue;
+              try {
+                const raw = fs.readFileSync(candidate, "utf-8");
+                res.setHeader("Content-Type", "application/json");
+                res.end(raw);
+              } catch {
+                sendJson(res, 500, { error: "Failed to read code lessons file" });
+              }
+              return;
+            }
+            // Code lessons are optional — absent file means the dashboard
+            // renders the code viewer without the lesson panel.
+            res.statusCode = 404;
+            res.end();
             return;
           }
 

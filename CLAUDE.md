@@ -14,7 +14,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
   - **packages/dashboard** — React + TypeScript web dashboard (React Flow, Zustand, TailwindCSS v4)
   - **src/** — Skill TypeScript source for `/understand-chat`, `/understand-diff`, `/understand-explain`, `/understand-onboard`
   - **skills/** — Skill definitions (`/understand`, `/understand-dashboard`, etc.)
-  - **agents/** — Agent definitions (project-scanner, file-analyzer, architecture-analyzer, tour-builder, graph-reviewer)
+  - **agents/** — Agent definitions (project-scanner, file-analyzer, architecture-analyzer, tour-builder, code-lesson-writer, graph-reviewer)
 
 ## Dashboard
 - Dark luxury theme: deep blacks (#0a0a0a), gold/amber accents (#d4a574), DM Serif Display typography
@@ -22,6 +22,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - No ChatPanel or Monaco Editor
 - Sidebar tabs: `Info` (ProjectOverview default → NodeInfo when node selected → LearnPanel in Learn persona, composing) and `Files` (FileExplorer tree built from the structural graph)
 - Code viewer: prism-react-renderer source viewer that slides up from the bottom on file node click; an expand button promotes it into a full-screen modal. Source content is fetched from the dev server's `/file-content.json` endpoint, gated by access token + a graph-derived path allowlist
+- Code lessons: `/understand` Phase 5 dispatches the `code-lesson-writer` agent to write `.ua/code-lessons.json` — per-file learning explanations aligned with the tour (detailed sections for tour-covered files, overview-only for the rest). The dev server and `bin/viewer.mjs` serve it from `/code-lessons.json` (same token gate); the code viewer renders it as a right-hand lesson panel where clicking a section highlights its line range. Optional file — absent means no panel. Line ranges may drift on `PARTIAL_UPDATE` until the next tour rerun
 - Schema validation on graph load with error banner
 
 ## Agent Pipeline

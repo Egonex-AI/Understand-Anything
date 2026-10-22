@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Highlight, themes } from "prism-react-renderer";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { CodeLessonSection, CodeLessons } from "@understand-anything/core/types";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 
@@ -24,6 +25,34 @@ type SourceState =
   | { status: "idle" | "loading"; source: null; error: null }
   | { status: "loaded"; source: SourceFile; error: null }
   | { status: "error"; source: null; error: string };
+
+// Module-level cache so the sidebar and modal CodeViewer instances (and
+// repeat opens) share one /code-lessons.json fetch. Only successful loads are
+// cached — a 404 (no lessons yet) is retried on the next file open so lessons
+// generated after this page load still appear without a manual reload.
+let lessonsCache: CodeLessons | null = null;
+let lessonsPromise: Promise<CodeLessons | null> | null = null;
+
+function fetchCodeLessons(token: string): Promise<CodeLessons | null> {
+  if (lessonsCache) return Promise.resolve(lessonsCache);
+  if (!lessonsPromise) {
+    lessonsPromise = fetch(`/code-lessons.json?token=${encodeURIComponent(token)}`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const data = (await res.json()) as CodeLessons;
+        if (data && typeof data === "object" && data.files && typeof data.files === "object") {
+          lessonsCache = data;
+          return data;
+        }
+        return null;
+      })
+      .catch(() => null)
+      .finally(() => {
+        lessonsPromise = null;
+      });
+  }
+  return lessonsPromise;
+}
 
 function fileContentUrl(filePath: string, token: string): string {
   const params = new URLSearchParams({ token, path: filePath });
@@ -118,6 +147,38 @@ function MarkdownView({ content }: { content: string }) {
   );
 }
 
+/** Compact markdown view for lesson explanations, styled for the dark theme. */
+function LessonMarkdown({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      components={{
+        p: ({ children }) => <p className="mb-1.5 last:mb-0">{children}</p>,
+        strong: ({ children }) => (
+          <strong className="font-semibold text-text-primary">{children}</strong>
+        ),
+        code: ({ className, children }) => {
+          const isBlock = className?.includes("language-");
+          return isBlock ? (
+            <code className="block bg-elevated rounded px-2 py-1.5 mb-1.5 overflow-x-auto text-[11px] leading-relaxed">
+              {children}
+            </code>
+          ) : (
+            <code className="bg-elevated rounded px-1 py-0.5 text-[11px] text-accent">{children}</code>
+          );
+        },
+        ul: ({ children }) => (
+          <ul className="list-disc list-inside mb-1.5 space-y-0.5">{children}</ul>
+        ),
+        ol: ({ children }) => (
+          <ol className="list-decimal list-inside mb-1.5 space-y-0.5">{children}</ol>
+        ),
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+}
+
 export default function CodeViewer({
   accessToken,
   presentation = "sidebar",
@@ -144,7 +205,25 @@ export default function CodeViewer({
   // Markdown files default to the rendered view (#555); toggle back to
   // source for line numbers / lineRange highlighting.
   const [mdView, setMdView] = useState<"rendered" | "source">("rendered");
+  // Per-file learning explanations from the project data directory
+  // (.ua/code-lessons.json), aligned with the guided tour.
+  const [lessons, setLessons] = useState<CodeLessons | null>(null);
+  // Line range selected from a lesson section — takes precedence over the
+  // node's own lineRange highlight until deselected or the file changes.
+  const [lessonHighlight, setLessonHighlight] = useState<{ start: number; end: number } | null>(null);
+  const codeScrollRef = useRef<HTMLDivElement | null>(null);
   const { t } = useI18n();
+
+  useEffect(() => {
+    if (accessToken === "__demo__") return;
+    let cancelled = false;
+    fetchCodeLessons(accessToken).then((data) => {
+      if (!cancelled) setLessons(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!node?.filePath) {
@@ -163,6 +242,7 @@ export default function CodeViewer({
 
     const controller = new AbortController();
     setState({ status: "loading", source: null, error: null });
+    setLessonHighlight(null);
 
     fetch(fileContentUrl(node.filePath, accessToken), { signal: controller.signal })
       .then(async (res) => {
@@ -184,10 +264,19 @@ export default function CodeViewer({
     return () => controller.abort();
   }, [accessToken, node?.filePath]);
 
+  const lesson = node?.filePath ? lessons?.files[node.filePath] ?? null : null;
+  // A lesson-section selection overrides the node's own lineRange highlight.
   const highlightedRange = useMemo(() => {
+    if (lessonHighlight) return lessonHighlight;
     if (!node?.lineRange) return null;
     return { start: node.lineRange[0], end: node.lineRange[1] };
-  }, [node?.lineRange]);
+  }, [lessonHighlight, node?.lineRange]);
+
+  const scrollToLine = (line: number) => {
+    codeScrollRef.current
+      ?.querySelector(`[data-line="${line}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
 
   if (!node) {
     return (
@@ -206,6 +295,16 @@ export default function CodeViewer({
     : t.codeViewer.fullFile;
   const isModal = presentation === "modal";
   const handleClose = onClose ?? closeCodeViewer;
+
+  const toggleSection = (section: CodeLessonSection) => {
+    const [start, end] = section.lineRange;
+    if (lessonHighlight && lessonHighlight.start === start && lessonHighlight.end === end) {
+      setLessonHighlight(null);
+      return;
+    }
+    setLessonHighlight({ start, end });
+    if (!showRendered) scrollToLine(start);
+  };
 
   return (
     <div className="h-full w-full flex flex-col bg-surface overflow-hidden">
@@ -261,88 +360,158 @@ export default function CodeViewer({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto bg-root">
-        {state.status === "loading" && (
-          <div className="p-5 text-sm text-text-muted">{t.codeViewer.loading}</div>
-        )}
+      <div className="flex-1 min-h-0 flex overflow-hidden bg-root">
+        <div ref={codeScrollRef} className="flex-1 min-w-0 overflow-auto">
+          {state.status === "loading" && (
+            <div className="p-5 text-sm text-text-muted">{t.codeViewer.loading}</div>
+          )}
 
-        {state.status === "error" && (
-          <div className="p-5">
-            <div className="rounded-lg border border-border-subtle bg-elevated p-4">
-              <div className="text-sm font-medium text-text-primary mb-2">{t.codeViewer.sourceUnavailable}</div>
-              <p className="text-sm text-text-secondary leading-relaxed">{state.error}</p>
-            </div>
-          </div>
-        )}
-
-        {source && (
-          <>
-            <div className="px-4 py-2 border-b border-border-subtle bg-surface text-[11px] text-text-muted flex items-center justify-between">
-              <span>{source.lineCount} {t.codeViewer.linesLabel}</span>
-              <div className="flex items-center gap-3">
-                {isMarkdown && (
-                  <div className="flex items-center rounded border border-border-subtle overflow-hidden" role="group">
-                    {(["rendered", "source"] as const).map((view) => (
-                      <button
-                        key={view}
-                        type="button"
-                        onClick={() => setMdView(view)}
-                        className={`px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors ${
-                          mdView === view
-                            ? "bg-accent/15 text-accent"
-                            : "text-text-muted hover:text-text-primary"
-                        }`}
-                        aria-pressed={mdView === view}
-                      >
-                        {view === "rendered" ? t.codeViewer.rendered : t.codeViewer.source}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <span>{formatBytes(source.sizeBytes)}</span>
+          {state.status === "error" && (
+            <div className="p-5">
+              <div className="rounded-lg border border-border-subtle bg-elevated p-4">
+                <div className="text-sm font-medium text-text-primary mb-2">{t.codeViewer.sourceUnavailable}</div>
+                <p className="text-sm text-text-secondary leading-relaxed">{state.error}</p>
               </div>
             </div>
-            {showRendered && <MarkdownView content={source.content} />}
-            {!showRendered && (
-            <Highlight code={source.content} language={language} theme={themes.vsDark}>
-              {({ className, style, tokens, getLineProps, getTokenProps }) => (
-                <pre
-                  className={`${className} min-w-max p-0 m-0 ${
-                    isModal ? "text-xs leading-5" : "text-[11px] leading-5"
-                  } font-mono`}
-                  style={{ ...style, background: "transparent" }}
-                >
-                  {tokens.map((line, index) => {
-                    const lineNumber = index + 1;
-                    const isHighlighted =
-                      highlightedRange !== null &&
-                      lineNumber >= highlightedRange.start &&
-                      lineNumber <= highlightedRange.end;
-                    const lineProps = getLineProps({ line });
+          )}
+
+          {source && (
+            <>
+              <div className="px-4 py-2 border-b border-border-subtle bg-surface text-[11px] text-text-muted flex items-center justify-between">
+                <span>{source.lineCount} {t.codeViewer.linesLabel}</span>
+                <div className="flex items-center gap-3">
+                  {isMarkdown && (
+                    <div className="flex items-center rounded border border-border-subtle overflow-hidden" role="group">
+                      {(["rendered", "source"] as const).map((view) => (
+                        <button
+                          key={view}
+                          type="button"
+                          onClick={() => setMdView(view)}
+                          className={`px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors ${
+                            mdView === view
+                              ? "bg-accent/15 text-accent"
+                              : "text-text-muted hover:text-text-primary"
+                          }`}
+                          aria-pressed={mdView === view}
+                        >
+                          {view === "rendered" ? t.codeViewer.rendered : t.codeViewer.source}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <span>{formatBytes(source.sizeBytes)}</span>
+                </div>
+              </div>
+              {showRendered && <MarkdownView content={source.content} />}
+              {!showRendered && (
+              <Highlight code={source.content} language={language} theme={themes.vsDark}>
+                {({ className, style, tokens, getLineProps, getTokenProps }) => (
+                  <pre
+                    className={`${className} min-w-max p-0 m-0 ${
+                      isModal ? "text-xs leading-5" : "text-[11px] leading-5"
+                    } font-mono`}
+                    style={{ ...style, background: "transparent" }}
+                  >
+                    {tokens.map((line, index) => {
+                      const lineNumber = index + 1;
+                      const isHighlighted =
+                        highlightedRange !== null &&
+                        lineNumber >= highlightedRange.start &&
+                        lineNumber <= highlightedRange.end;
+                      const lineProps = getLineProps({ line });
+                      return (
+                        <div
+                          key={lineNumber}
+                          {...lineProps}
+                          data-line={lineNumber}
+                          className={`${lineProps.className} flex ${
+                            isHighlighted ? "bg-accent/15" : "hover:bg-elevated/40"
+                          }`}
+                        >
+                          <span className="w-12 shrink-0 select-none border-r border-border-subtle pr-3 text-right text-text-muted bg-surface/60">
+                            {lineNumber}
+                          </span>
+                          <span className="pl-3 pr-6 whitespace-pre">
+                            {line.map((token, key) => (
+                              <span key={key} {...getTokenProps({ token })} />
+                            ))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </pre>
+                )}
+              </Highlight>
+              )}
+            </>
+          )}
+        </div>
+
+        {lesson && (
+          <aside className="w-72 xl:w-80 shrink-0 border-l border-border-subtle bg-surface overflow-y-auto">
+            <div className="sticky top-0 z-10 px-4 py-2.5 bg-surface border-b border-border-subtle">
+              <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider">
+                {t.codeViewer.lesson}
+              </h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-sm text-text-secondary leading-relaxed">
+                <LessonMarkdown content={lesson.overview} />
+              </div>
+
+              {lesson.sections.length > 0 && (
+                <div className="space-y-2">
+                  {lesson.sections.map((section, i) => {
+                    const [start, end] = section.lineRange;
+                    const active =
+                      lessonHighlight !== null &&
+                      lessonHighlight.start === start &&
+                      lessonHighlight.end === end;
                     return (
                       <div
-                        key={lineNumber}
-                        {...lineProps}
-                        className={`${lineProps.className} flex ${
-                          isHighlighted ? "bg-accent/15" : "hover:bg-elevated/40"
+                        key={i}
+                        className={`rounded-lg border transition-colors ${
+                          active
+                            ? "border-accent/40 bg-accent/5"
+                            : "border-border-subtle bg-elevated hover:border-accent/20"
                         }`}
                       >
-                        <span className="w-12 shrink-0 select-none border-r border-border-subtle pr-3 text-right text-text-muted bg-surface/60">
-                          {lineNumber}
-                        </span>
-                        <span className="pl-3 pr-6 whitespace-pre">
-                          {line.map((token, key) => (
-                            <span key={key} {...getTokenProps({ token })} />
-                          ))}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(section)}
+                          aria-pressed={active}
+                          className="w-full text-left px-3 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-text-primary flex-1 min-w-0 truncate">
+                              {section.title}
+                            </span>
+                            {section.tourOrder !== undefined && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wider text-accent border border-accent/30 rounded px-1 py-0.5 shrink-0">
+                                {t.codeViewer.tourStep} {section.tourOrder}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] font-mono text-text-muted mt-0.5">
+                            {t.codeViewer.lines} {start}–{end}
+                          </div>
+                        </button>
+                        {active && (
+                          <div className="px-3 pb-2.5 pt-2 border-t border-border-subtle/60 text-xs text-text-secondary leading-relaxed">
+                            <LessonMarkdown content={section.explanation} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
-                </pre>
+                </div>
               )}
-            </Highlight>
-            )}
-          </>
+
+              {lesson.sections.length === 0 && (
+                <p className="text-[11px] text-text-muted">{t.codeViewer.overviewOnly}</p>
+              )}
+            </div>
+          </aside>
         )}
       </div>
     </div>

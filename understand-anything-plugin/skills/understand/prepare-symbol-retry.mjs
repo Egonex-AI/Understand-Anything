@@ -123,7 +123,7 @@ async function main() {
   atomicWriteJson(join(intermediateDir, 'batch-0.json'), retained);
   // Force another merge and regenerate any architecture/tour based on the
   // incomplete candidate. Keep the failure report for inspection.
-  for (const name of ['assembled-graph.json', 'layers.json', 'tour.json']) {
+  for (const name of ['assembled-graph.json', 'layers.json', 'tour.json', 'code-lessons.json']) {
     if (existsSync(join(intermediateDir, name))) unlinkSync(join(intermediateDir, name));
   }
   process.stdout.write(`Prepared symbol retry 1/1 for ${paths.size} file(s); dispatch batches from ${retryPath}\n`);

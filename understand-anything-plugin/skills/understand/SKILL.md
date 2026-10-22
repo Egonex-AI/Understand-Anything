@@ -554,7 +554,7 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 
 ## Phase 5 — TOUR
 
-Run this phase for full analysis and for incremental plans where `rerunTour === true`. For `PARTIAL_UPDATE`, dispatch no tour agent and do not rewrite the narrative; finalization only removes dangling node IDs from the existing steps.
+Run this phase for full analysis and for incremental plans where `rerunTour === true`. For `PARTIAL_UPDATE`, dispatch no tour agent and do not rewrite the narrative; finalization only removes dangling node IDs from the existing steps. The code-lessons step below runs under the same condition.
 
 Report to the user: `[Phase 5/7] Building guided tour...`
 
@@ -624,6 +624,47 @@ Each element of the final `tour` array MUST have this shape:
 ```
 
 Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `languageLesson` when present.
+
+### Code Lessons — per-file learning explanations
+
+Run this step whenever the tour is (re)built — full analysis and incremental plans with `rerunTour === true`. For `PARTIAL_UPDATE`, keep the existing `$UA_DIR/code-lessons.json` untouched (line ranges may drift slightly; the next `rerunTour` rebuild refreshes them).
+
+Report to the user: `[Phase 5/7] Writing code lessons...`
+
+1. **Resolve tour-covered files.** For each normalized tour step, resolve every `nodeIds` entry to its file-level node and collect the node's `filePath`. Record for each covered file the smallest referencing step `order` as its primary tour anchor.
+
+2. **Dispatch a subagent** using the `code-lesson-writer` agent definition (at `agents/code-lesson-writer.md`). Pass these parameters in the dispatch prompt:
+
+> Write per-file code lessons for this codebase.
+> Project root: `$PROJECT_ROOT`
+> Write output to: `$UA_DIR/intermediate/code-lessons.json`
+>
+> Tour steps:
+> ```json
+> [<the normalized tour array>]
+> ```
+>
+> Detailed files (read source from disk; produce overview + sections):
+> ```json
+> [{"filePath": "src/main.tsx", "tourOrder": 2}, ...]
+> ```
+>
+> All other file-level nodes (overview only — do NOT read these files):
+> ```json
+> [list of {filePath, summary} for every file-level node NOT in the detailed list]
+> ```
+>
+> $LANGUAGE_DIRECTIVE
+
+3. **Normalize** `$UA_DIR/intermediate/code-lessons.json` into the final `$UA_DIR/code-lessons.json`. Apply these steps **in order**:
+   1. **Unwrap envelope:** Accept both `{ "files": {...} }` and a bare files object at the top level.
+   2. **Drop unknown files:** Remove entries whose key does not exactly match a file-level node's `filePath` (relative, forward slashes).
+   3. **Validate sections:** `lineRange` must be two integers `[start, end]` with `1 <= start <= end`; drop invalid sections, then enforce a maximum of 10 sections per file (truncate beyond that).
+   4. **Validate tour anchors:** Drop any `tourOrder` that does not match a tour step's `order`.
+   5. **Fallback overview:** If `overview` is missing or empty, substitute the matching node's `summary`.
+   6. **Stamp metadata:** Ensure `version: 1` and `generatedAt` (current ISO 8601 timestamp) are present.
+
+4. **On failure:** retry the dispatch once (see Error Handling); if it still fails, skip lessons entirely — do not write a partial `$UA_DIR/code-lessons.json`, record the failure in `$PHASE_WARNINGS`, and continue. The dashboard degrades gracefully when the file is absent.
 
 ### Incremental deterministic save gate
 
@@ -870,6 +911,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
    - Edges created (broken down by type)
    - Layers identified (with names)
    - Tour steps generated (count)
+   - Code lessons written (detailed / overview-only counts; report when skipped)
    - Any warnings from the reviewer
    - Path to the output file: `$UA_DIR/knowledge-graph.json`
 

@@ -183,6 +183,9 @@ export const zh = {
     sourceUnavailable: "源码不可用",
     rendered: "渲染",
     source: "源码",
+    lesson: "讲解",
+    tourStep: "导览",
+    overviewOnly: "该文件仅有概览讲解，暂无分段讲解。",
   },
   customNode: {
     tested: "已测试",
