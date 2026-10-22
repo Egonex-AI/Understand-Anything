@@ -1,0 +1,9 @@
+# @understand-anything/dsh bundle patch: mounts the Understand Anything plugin
+# into a DSH profile layer stack. The plugin registers the /understand skill set
+# and the Understand Anything agents on ctx.skills / ctx.agents.
+#
+# Users override runtime defaults in their profile cordis.patch.yml with the
+# same id (e.g. to disable a skill or point at a different skills root).
+- insert:
+    - id: understand-anything
+      name: '@understand-anything/dsh'
