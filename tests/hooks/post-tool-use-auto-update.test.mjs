@@ -35,6 +35,8 @@ function runHook({
   dataDirName = '.understand-anything',
   input,
   pluginRoot,
+  toolName = 'Bash',
+  unsetPluginRoot = false,
 } = {}) {
   const projectRoot = mkdtempSync(join(tmpdir(), 'ua-post-tool-use-'));
   const dataDir = join(projectRoot, dataDirName);
@@ -48,15 +50,17 @@ function runHook({
   if (createGraph) writeFileSync(join(dataDir, 'knowledge-graph.json'), '{}');
 
   const resolvedPluginRoot = pluginRoot ?? join(projectRoot, 'plugin root');
+  const env = { ...process.env, CLAUDE_PLUGIN_ROOT: resolvedPluginRoot };
+  if (unsetPluginRoot) delete env.CLAUDE_PLUGIN_ROOT;
   const result = spawnSync(process.execPath, [hookScript], {
     cwd: projectRoot,
     input:
       input ??
       JSON.stringify({
-        tool_name: 'Bash',
+        tool_name: toolName,
         tool_input: { command },
       }),
-    env: { ...process.env, CLAUDE_PLUGIN_ROOT: resolvedPluginRoot },
+    env,
     encoding: 'utf8',
   });
 
@@ -65,10 +69,13 @@ function runHook({
 }
 
 describe('PostToolUse auto-update hook', () => {
-  it('is registered as the Bash PostToolUse handler', () => {
+  it('is registered as the PostToolUse handler for Bash (Claude) and exec (Devin)', () => {
     const registration = hooksConfig.hooks.PostToolUse[0];
+    const matcher = new RegExp(registration.matcher);
 
-    expect(registration.matcher).toBe('Bash');
+    expect(matcher.test('Bash')).toBe(true);
+    expect(matcher.test('exec')).toBe(true);
+    expect(matcher.test('get_output')).toBe(false);
     expect(registration.hooks).toEqual([
       {
         type: 'command',
@@ -116,6 +123,23 @@ describe('PostToolUse auto-update hook', () => {
 
     expect(output.hookSpecificOutput.additionalContext).toContain(
       `${pluginRoot}/hooks/auto-update-prompt.md`,
+    );
+  });
+
+  it('handles Devin exec tool payloads', () => {
+    const result = runHook({ toolName: 'exec' });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).hookSpecificOutput.hookEventName).toBe(
+      'PostToolUse',
+    );
+  });
+
+  it('falls back to the script-relative prompt path without CLAUDE_PLUGIN_ROOT', () => {
+    const result = runHook({ unsetPluginRoot: true });
+
+    expect(JSON.parse(result.stdout).hookSpecificOutput.additionalContext).toContain(
+      join(repoRoot, 'understand-anything-plugin', 'hooks', 'auto-update-prompt.md'),
     );
   });
 
