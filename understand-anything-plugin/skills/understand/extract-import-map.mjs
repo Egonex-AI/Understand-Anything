@@ -911,7 +911,7 @@ function extractKotlinSources(content) {
 // Tree-sitter's Python extractor emits one entry per import statement:
 //   - `import a.b.c`          -> { source: 'a.b.c', specifiers: ['a.b.c'] }
 //   - `from a.b.c import x,y` -> { source: 'a.b.c', specifiers: ['x','y'] }
-//   - `from . import x`       -> { source: '', specifiers: ['x'] }
+//   - `from . import x`       -> { source: '.', specifiers: ['x'] }
 //   - `from .x import y`      -> { source: '.x', specifiers: ['y'] }
 //   - `from ..pkg import y`   -> { source: '..pkg', specifiers: ['y'] }
 //
@@ -972,21 +972,32 @@ export function resolvePythonImport(rawImport, specifiers, file, ctx) {
 
     // `from .[..] import x, y` with no dotted tail — specifiers are siblings
     // at `baseParts`. Probe directly without requiring `<baseParts>/__init__.py`
-    // to exist: PEP 328 implicit namespace packages are common in modern
+    // to exist: PEP 420 implicit namespace packages are common in modern
     // Python (no `__init__.py`), and `resolvePythonProbe` would otherwise
     // gate specifier resolution on the package marker and drop these imports.
     if (tailSegments.length === 0) {
       if (!Array.isArray(specifiers) || specifiers.length === 0) return [];
       const base = baseParts.join('/');
+      const packageInit = base ? `${base}/__init__.py` : '__init__.py';
       const matches = [];
+      let needsPackageInit = false;
       for (const spec of specifiers) {
-        // Wildcard `*` and qualified specifiers (`Foo.bar`) skip; the
-        // surface name is what tree-sitter records for `from . import x`.
-        if (!spec || spec === '*' || spec.includes('.')) continue;
+        // Qualified specifiers (`Foo.bar`) are not sibling module names.
+        if (!spec || spec.includes('.')) continue;
+        if (spec === '*') {
+          needsPackageInit = true;
+          continue;
+        }
         const subFile = base ? `${base}/${spec}.py` : `${spec}.py`;
         const subInit = base ? `${base}/${spec}/__init__.py` : `${spec}/__init__.py`;
         if (ctx.fileSet.has(subFile)) matches.push(subFile);
         else if (ctx.fileSet.has(subInit)) matches.push(subInit);
+        else needsPackageInit = true;
+      }
+      // Names that are not submodules (and wildcard imports) bind from the
+      // package initializer. Add it once, without creating a self-edge.
+      if (needsPackageInit && ctx.fileSet.has(packageInit) && packageInit !== toPosix(file.path)) {
+        matches.push(packageInit);
       }
       return matches;
     }
