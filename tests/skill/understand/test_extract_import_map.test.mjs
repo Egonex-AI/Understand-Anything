@@ -713,6 +713,98 @@ describe('extract-import-map.mjs — Python resolver', () => {
     ]);
   });
 
+  it('resolves names defined in the current and parent package initializers (#727)', () => {
+    const sources = {
+      'pkg/__init__.py': `class BaseAnalyzer:\n    pass\n`,
+      'pkg/stats/__init__.py': `LIMIT = 10\n`,
+      'pkg/core/__init__.py': `def boot():\n    return 1\n`,
+      'pkg/stats/regression.py':
+        `from .. import BaseAnalyzer\nfrom . import LIMIT\nfrom ..core import boot\n`,
+    };
+    projectRoot = setupTree(sources);
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: Object.keys(sources).map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.failures).toEqual([]);
+    expect(result.output.importMap['pkg/stats/regression.py']).toEqual([
+      'pkg/__init__.py',
+      'pkg/core/__init__.py',
+      'pkg/stats/__init__.py',
+    ]);
+  });
+
+  it('keeps submodule precedence while deduplicating package-name fallbacks', () => {
+    const sources = {
+      'pkg/__init__.py': `FIRST = 1\nSECOND = 2\n`,
+      'pkg/helper.py': '',
+      'pkg/nested/__init__.py': '',
+      'pkg/modules.py': `from . import helper, nested\n`,
+      'pkg/mixed.py': `from . import helper, nested, FIRST, SECOND\nfrom . import FIRST\n`,
+    };
+    projectRoot = setupTree(sources);
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: Object.keys(sources).map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['pkg/modules.py']).toEqual([
+      'pkg/helper.py',
+      'pkg/nested/__init__.py',
+    ]);
+    expect(result.output.importMap['pkg/mixed.py']).toEqual([
+      'pkg/__init__.py',
+      'pkg/helper.py',
+      'pkg/nested/__init__.py',
+    ]);
+  });
+
+  it('resolves relative wildcard imports and a project-root package initializer', () => {
+    const sources = {
+      '__init__.py': `ROOT = 1\n`,
+      'root_consumer.py': `from . import ROOT\n`,
+      'pkg/__init__.py': `VALUE = 2\n`,
+      'pkg/current.py': `from . import *\n`,
+      'pkg/child/parent.py': `from .. import *\n`,
+      'namespace/consumer.py': `from . import MISSING\nfrom . import *\n`,
+    };
+    projectRoot = setupTree(sources);
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: Object.keys(sources).map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['root_consumer.py']).toEqual(['__init__.py']);
+    expect(result.output.importMap['pkg/current.py']).toEqual(['pkg/__init__.py']);
+    expect(result.output.importMap['pkg/child/parent.py']).toEqual(['pkg/__init__.py']);
+    expect(result.output.importMap['namespace/consumer.py']).toEqual([]);
+  });
+
+  it('does not add a self-edge when package initializers import their own names', () => {
+    const sources = {
+      'pkg/__init__.py': `VALUE = 1\nfrom . import VALUE\nfrom . import *\nfrom . import helper\n`,
+      'pkg/helper.py': '',
+      'pkg/child/__init__.py': `from .. import VALUE\n`,
+    };
+    projectRoot = setupTree(sources);
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: Object.keys(sources).map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['pkg/__init__.py']).toEqual(['pkg/helper.py']);
+    expect(result.output.importMap['pkg/child/__init__.py']).toEqual(['pkg/__init__.py']);
+  });
+
   // Regression for Codex review #2 on PR #204: `from . import x` was
   // dropped when no `__init__.py` was present at the importer's package
   // dir, because resolvePythonProbe gated specifier probing on the package
