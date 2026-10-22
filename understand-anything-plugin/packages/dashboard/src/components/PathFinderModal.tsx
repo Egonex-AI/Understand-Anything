@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDashboardStore } from "../store";
+import { useI18n } from "../contexts/I18nContext";
+import { nodeTypeLabel } from "../utils/i18nLabels";
 
 interface PathFinderModalProps {
   isOpen: boolean;
@@ -14,6 +16,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
   const [path, setPath] = useState<string[] | null>(null);
   const [searching, setSearching] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const { t } = useI18n();
 
   // Close on outside click
   useEffect(() => {
@@ -124,11 +127,12 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
                 d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
               />
             </svg>
-            <h2 className="font-heading text-xl text-text-primary">Dependency Path Finder</h2>
+            <h2 className="font-heading text-xl text-text-primary">{t.pathFinder.heading}</h2>
           </div>
           <button
             onClick={onClose}
             className="text-text-muted hover:text-text-primary transition-colors"
+            aria-label={t.common.close}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -139,13 +143,13 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
         {/* Body */}
         <div className="p-5 space-y-4 overflow-y-auto max-h-[calc(80vh-180px)]">
           <p className="text-sm text-text-secondary">
-            Find the shortest path between two nodes in the dependency graph.
+            {t.pathFinder.description}
           </p>
 
           {/* From Node */}
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-              From Node
+              {t.pathFinder.fromNode}
             </label>
             <select
               value={fromNodeId}
@@ -155,10 +159,10 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
               }}
               className="w-full bg-elevated text-text-primary text-sm rounded-lg px-3 py-2 border border-border-subtle focus:outline-none focus:border-gold/50"
             >
-              <option value="">Select a node...</option>
+              <option value="">{t.pathFinder.selectNode}</option>
               {nodes.map((node) => (
                 <option key={node.id} value={node.id}>
-                  {node.name} ({node.type})
+                  {node.name} ({nodeTypeLabel(t, node.type)})
                 </option>
               ))}
             </select>
@@ -167,7 +171,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
           {/* To Node */}
           <div>
             <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-              To Node
+              {t.pathFinder.toNode}
             </label>
             <select
               value={toNodeId}
@@ -177,10 +181,10 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
               }}
               className="w-full bg-elevated text-text-primary text-sm rounded-lg px-3 py-2 border border-border-subtle focus:outline-none focus:border-gold/50"
             >
-              <option value="">Select a node...</option>
+              <option value="">{t.pathFinder.selectNode}</option>
               {nodes.map((node) => (
                 <option key={node.id} value={node.id}>
-                  {node.name} ({node.type})
+                  {node.name} ({nodeTypeLabel(t, node.type)})
                 </option>
               ))}
             </select>
@@ -192,7 +196,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
             disabled={!fromNodeId || !toNodeId || fromNodeId === toNodeId || searching}
             className="w-full bg-gold/10 border border-gold/30 text-gold text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-gold/20 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {searching ? "Searching..." : "Find Path"}
+            {searching ? t.pathFinder.searching : t.pathFinder.findPath}
           </button>
 
           {/* Path Result */}
@@ -213,7 +217,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
                       d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <p className="text-sm text-red-200">No path found between these nodes.</p>
+                  <p className="text-sm text-red-200">{t.pathFinder.noPath}</p>
                 </div>
               ) : (
                 <div className="bg-elevated border border-border-subtle rounded-lg p-4">
@@ -232,7 +236,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
                       />
                     </svg>
                     <h3 className="text-sm font-semibold text-text-primary">
-                      Path Found ({path.length} nodes)
+                      {t.pathFinder.pathFound(path.length)}
                     </h3>
                   </div>
                   <div className="space-y-2">
@@ -253,7 +257,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="text-sm text-text-primary truncate">{node.name}</div>
-                              <div className="text-xs text-text-muted capitalize">{node.type}</div>
+                              <div className="text-xs text-text-muted capitalize">{nodeTypeLabel(t, node.type)}</div>
                             </div>
                             <svg
                               className="w-4 h-4 text-text-muted"
@@ -302,7 +306,7 @@ export default function PathFinderModal({ isOpen, onClose }: PathFinderModalProp
             onClick={onClose}
             className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
           >
-            Close
+            {t.common.close}
           </button>
         </div>
       </div>

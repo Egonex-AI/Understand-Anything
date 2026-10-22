@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CustomNodeData } from "./CustomNode";
+import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel, nodeTypeLabel } from "../utils/i18nLabels";
 
 interface NodeTooltipProps {
   data: CustomNodeData;
@@ -18,6 +20,7 @@ export default function NodeTooltip({
 }: NodeTooltipProps) {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [visible, setVisible] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     const handleMouseMove = (e: Event) => {
@@ -59,11 +62,11 @@ export default function NodeTooltip({
         {/* Header */}
         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border-subtle">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-gold">
-            {data.nodeType}
+            {nodeTypeLabel(t, data.nodeType)}
           </span>
           {data.complexity && (
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-elevated text-text-muted font-mono">
-              {data.complexity}
+              {complexityLabel(t, data.complexity)}
             </span>
           )}
         </div>
@@ -79,13 +82,13 @@ export default function NodeTooltip({
             <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
             </svg>
-            <span className="text-text-secondary">{incomingCount} in</span>
+            <span className="text-text-secondary">{t.graphNodes.incoming(incomingCount)}</span>
           </div>
           <div className="flex items-center gap-1">
             <svg className="w-3 h-3 text-green-400" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" transform="rotate(180 10 10)" />
             </svg>
-            <span className="text-text-secondary">{outgoingCount} out</span>
+            <span className="text-text-secondary">{t.graphNodes.outgoing(outgoingCount)}</span>
           </div>
           <div className="flex items-center gap-1">
             <svg className="w-3 h-3 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">

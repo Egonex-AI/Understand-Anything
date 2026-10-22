@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel, nodeTypeLabel } from "../utils/i18nLabels";
 import type { NodeType, EdgeType, KnowledgeGraph, GraphNode } from "@understand-anything/core/types";
 
 // Badge color classes keyed by NodeType — must be kept in sync with core NodeType union.
@@ -47,7 +48,7 @@ function getDirectionalLabel(edgeType: string, isSource: boolean, t: ReturnType<
   const labels = (t.edgeLabels as Partial<Record<EdgeType, { forward: string; backward: string }>>)[edgeType as EdgeType];
   if (!labels) {
     const formatted = edgeType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    return isSource ? formatted : `${formatted} (reverse)`;
+    return isSource ? formatted : `${formatted} (${t.nodeInfo.reverse})`;
   }
   return isSource ? labels.forward : labels.backward;
 }
@@ -376,12 +377,12 @@ export default function NodeInfo() {
         <span
           className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded ${typeBadge}`}
         >
-          {node.type}
+          {nodeTypeLabel(t, node.type)}
         </span>
         <span
           className={`text-[10px] font-semibold px-2 py-0.5 rounded ${complexityBadge}`}
         >
-          {node.complexity}
+          {complexityLabel(t, node.complexity)}
         </span>
       </div>
 
@@ -503,11 +504,11 @@ export default function NodeInfo() {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${childTypeBadge}`}>
-                      {child.type}
+                      {nodeTypeLabel(t, child.type)}
                     </span>
                     <span className="text-text-primary truncate">{child.name}</span>
                     <span className={`text-[9px] ml-auto ${childComplexity} px-1 py-0.5 rounded`}>
-                      {child.complexity}
+                      {complexityLabel(t, child.complexity)}
                     </span>
                   </div>
                   {child.summary && (

@@ -25,6 +25,7 @@ import type {
   ForceLayoutPosition,
 } from "../utils/force-layout";
 import { useI18n } from "../contexts/I18nContext";
+import { edgeTypeLabel } from "../utils/i18nLabels";
 import type { KnowledgeGraph } from "@understand-anything/core/types";
 
 const nodeTypes = {
@@ -331,7 +332,7 @@ function KnowledgeGraphViewInner() {
         style,
         animated: e.type === "contradicts" && (!activeId || !!isConnected),
         label: isConnected && e.type !== "related" && e.type !== "categorized_under"
-          ? e.type.replace(/_/g, " ")
+          ? edgeTypeLabel(t, e.type)
           : undefined,
         labelStyle: { fill: "var(--color-text-muted)", fontSize: 9, opacity: 0.7 },
         labelBgStyle: { fill: "var(--color-surface)", fillOpacity: 0.9 },
@@ -341,12 +342,12 @@ function KnowledgeGraphViewInner() {
     });
 
     return { nodes: rfNodes, edges: rfEdges };
-  }, [filteredGraph, layoutIsReady, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts]);
+  }, [filteredGraph, layoutIsReady, selectedNodeId, focusNodeId, searchResults, tourSet, onNodeClick, positionMap, edgeCounts, t]);
 
   if (!graph) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        No knowledge graph available. Run /understand-knowledge to generate one.
+        {t.graphView.noKnowledgeGraph}
       </div>
     );
   }
