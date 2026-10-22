@@ -48,6 +48,41 @@ void run() {}
     expect(extractor.languageIds).toEqual(["cpp", "c"]);
   });
 
+  it("extracts classes, methods and imports inside a classic include guard", () => {
+    const { tree, parser, root } = parse(`#ifndef FOO_HH
+#define FOO_HH
+#include <vector>
+namespace example {
+class Foo { public: int Bar() const { return 1; } };
+}
+#endif
+`);
+    expect(root.hasError).toBe(false);
+    const result = extractor.extractStructure(root);
+    expect(result.classes.map(cls => cls.name)).toEqual(["Foo"]);
+    expect(result.functions.map(fn => fn.name)).toEqual(["Bar"]);
+    expect(result.imports.map(imp => imp.source)).toEqual(["vector"]);
+    tree.delete();
+    parser.delete();
+  });
+
+  it("extracts declarations from all preprocessor branches without evaluating them", () => {
+    const { tree, parser, root } = parse(`#if FIRST
+void first() {}
+#elif SECOND
+void second() {}
+#else
+void fallback() {}
+#endif
+`);
+    expect(root.hasError).toBe(false);
+    expect(extractor.extractStructure(root).functions.map(fn => fn.name)).toEqual([
+      "first", "second", "fallback",
+    ]);
+    tree.delete();
+    parser.delete();
+  });
+
   // ---- Functions ----
 
   describe("extractStructure - functions", () => {
