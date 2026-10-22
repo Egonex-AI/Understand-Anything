@@ -590,15 +590,32 @@ def production_candidates(test_path: str) -> list[str]:
     return candidates
 
 
+# File-level ID prefixes recognized by the skill's Phase 6 validator.
+# Explicit tested_by edges may refer to these nodes, including named children.
+_FILE_LEVEL_PREFIXES: frozenset[str] = frozenset({
+    "file", "config", "document", "service",
+    "pipeline", "table", "schema", "resource", "endpoint",
+})
+
+# `table:` and `endpoint:` IDs are `<prefix>:<relative-path>:<name>` (SKILL.md
+# schema reference). The name can itself contain colons, as in `/users/:id`.
+_NAMED_FILE_LEVEL_PREFIXES: frozenset[str] = frozenset({"table", "endpoint"})
+
+
 def _file_node_path(node: dict[str, Any]) -> str | None:
-    """Return the relative project path for a `file:`-prefixed node, else None."""
+    """Return the relative project path for a file-level node, else None."""
     nid = node.get("id", "")
-    if not isinstance(nid, str) or not nid.startswith("file:"):
+    if not isinstance(nid, str):
+        return None
+    prefix, sep, rest = nid.partition(":")
+    if not sep or prefix not in _FILE_LEVEL_PREFIXES:
         return None
     fp = node.get("filePath")
     if isinstance(fp, str) and fp:
         return fp
-    return nid[len("file:"):]
+    if prefix in _NAMED_FILE_LEVEL_PREFIXES:
+        rest = rest.partition(":")[0]
+    return rest or None
 
 
 def _swap_tested_by_in_place(
@@ -650,8 +667,8 @@ def link_tests(
          (production → test) edges as-is. Flip inverted (test → production)
          edges so the swap preserves the LLM's pairing evidence with the
          right direction. Drop edges that don't classify cleanly as
-         file ↔ file or where one endpoint is missing — they have no
-         recoverable meaning.
+         file-level ↔ file-level or where one endpoint is missing, they
+         have no recoverable meaning.
       2. For every test file not yet paired by Pass 1, walk path-convention
          candidates and emit a fresh `production → test` edge for the first
          match.
@@ -670,23 +687,26 @@ def link_tests(
       swapped: pre-existing `tested_by` edges flipped (test → production
                became production → test)
     """
-    # ── Index file nodes by relative path; classify each as test/production.
-    # `is_prod` here means "is a known file node AND is not a test by
-    # path convention" — used both to validate edge endpoints and to drive
-    # path-convention candidate matching.
-    file_paths_to_nodes: dict[str, dict[str, Any]] = {}
+    # ── Classify file-level endpoints for explicit edges.
+    resolved_nodes: list[dict[str, Any]] = []
     node_id_to_classification: dict[str, str] = {}  # id → "test" | "prod"
-    test_nodes: list[tuple[str, dict[str, Any]]] = []
     for node in nodes_by_id.values():
         path = _file_node_path(node)
         if path is None:
             continue
-        file_paths_to_nodes[path] = node
+        resolved_nodes.append({**node, "filePath": path})
         if is_test_path(path):
             node_id_to_classification[node["id"]] = "test"
-            test_nodes.append((path, node))
         else:
             node_id_to_classification[node["id"]] = "prod"
+
+    # Path conventions identify whole files, not which child a test covers.
+    file_paths_to_ids, _ = build_whole_file_node_index(resolved_nodes)
+    test_nodes = [
+        (path, nodes_by_id[node_id])
+        for path, node_id in file_paths_to_ids.items()
+        if node_id_to_classification[node_id] == "test"
+    ]
 
     # ── Pass 1: walk existing tested_by edges, canonicalize or drop.
     # `covered` tracks (production_id, test_id) pairs that have a kept edge
@@ -717,9 +737,9 @@ def link_tests(
         src_class = node_id_to_classification.get(src)
         tgt_class = node_id_to_classification.get(tgt)
 
-        # Both endpoints must be known file nodes; one test, one production.
-        # Anything else (orphan, test↔test, prod↔prod, non-file endpoint)
-        # has no recoverable meaning — drop it.
+        # Both endpoints must be known file-level nodes; one test, one
+        # production. Anything else (orphan, test↔test, prod↔prod, sub-file
+        # or logical endpoint) has no recoverable meaning, drop it.
         if (src_class, tgt_class) == ("prod", "test"):
             pair = (src, tgt)
             needs_swap = False
@@ -769,17 +789,17 @@ def link_tests(
         if test_node["id"] in paired_test_ids:
             continue
         for cand_path in production_candidates(test_path):
-            prod_node = file_paths_to_nodes.get(cand_path)
-            if prod_node is None:
+            prod_id = file_paths_to_ids.get(cand_path)
+            if prod_id is None:
                 continue
             if is_test_path(cand_path):
                 # Don't link a test to another test even if naming aligns.
                 continue
-            pair = (prod_node["id"], test_node["id"])
+            pair = (prod_id, test_node["id"])
             if pair in covered:
                 continue
             edges.append({
-                "source": prod_node["id"],
+                "source": prod_id,
                 "target": test_node["id"],
                 "type": "tested_by",
                 "direction": "forward",
