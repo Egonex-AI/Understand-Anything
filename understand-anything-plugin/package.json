@@ -4,9 +4,13 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "ugraph": "./bin/ugraph.js"
+  },
   "scripts": {
     "build": "tsc",
-    "test": "node -e \"console.log('skill tests live at <repo-root>/tests/skill — run via root \\`pnpm test\\`')\""
+    "test": "node -e \"console.log('skill tests live at <repo-root>/tests/skill — run via root \\`pnpm test\\`')\"",
+    "ugraph": "node bin/ugraph.js"
   },
   "dependencies": {
     "@understand-anything/core": "workspace:*",
