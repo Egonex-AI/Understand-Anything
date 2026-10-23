@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, isAbsolute, relative, basename } from "node:path";
-import type { KnowledgeGraph, AnalysisMeta, ProjectConfig } from "../types.js";
+import type { KnowledgeGraph, AnalysisMeta, ProjectConfig, DiffOverlay } from "../types.js";
 import type { FingerprintStore } from "../fingerprint.js";
 import { validateGraph } from "../schema.js";
 
@@ -50,32 +50,31 @@ function ensureDir(projectRoot: string): string {
  * This means the developer's home directory, username, and company
  * directory layout are never written to knowledge-graph.json.
  */
+function sanitiseFilePath(fp: string, projectRoot: string): string {
+  const normalRoot = projectRoot.endsWith("/") ? projectRoot : projectRoot + "/";
+
+  if (!isAbsolute(fp)) {
+    // Already relative — nothing to do.
+    return fp;
+  }
+
+  if (fp.startsWith(normalRoot) || fp.startsWith(projectRoot)) {
+    // Inside the project root — make it relative.
+    return relative(projectRoot, fp);
+  }
+
+  // Absolute but outside the project root — use only the filename
+  // so we leak as little as possible.
+  return basename(fp);
+}
+
 function sanitiseFilePaths(
   graph: KnowledgeGraph,
   projectRoot: string,
 ): KnowledgeGraph {
-  const normalRoot = projectRoot.endsWith("/")
-    ? projectRoot
-    : projectRoot + "/";
-
   const sanitisedNodes = graph.nodes.map((node) => {
     if (typeof node.filePath !== "string") return node;
-
-    const fp = node.filePath;
-
-    if (!isAbsolute(fp)) {
-      // Already relative — nothing to do.
-      return node;
-    }
-
-    if (fp.startsWith(normalRoot) || fp.startsWith(projectRoot)) {
-      // Inside the project root — make it relative.
-      return { ...node, filePath: relative(projectRoot, fp) };
-    }
-
-    // Absolute but outside the project root — use only the filename
-    // so we leak as little as possible.
-    return { ...node, filePath: basename(fp) };
+    return { ...node, filePath: sanitiseFilePath(node.filePath, projectRoot) };
   });
 
   return { ...graph, nodes: sanitisedNodes };
@@ -194,4 +193,25 @@ export function loadDomainGraph(
   }
 
   return data as KnowledgeGraph;
+}
+
+const DIFF_OVERLAY_FILE = "diff-overlay.json";
+
+export function saveDiffOverlay(projectRoot: string, overlay: DiffOverlay): void {
+  const dir = ensureDir(projectRoot);
+  const sanitised: DiffOverlay = {
+    ...overlay,
+    changedFiles: overlay.changedFiles.map((fp) => sanitiseFilePath(fp, projectRoot)),
+  };
+  writeFileSync(join(dir, DIFF_OVERLAY_FILE), JSON.stringify(sanitised, null, 2), "utf-8");
+}
+
+export function loadDiffOverlay(projectRoot: string): DiffOverlay | null {
+  const filePath = join(resolveUaDir(projectRoot), DIFF_OVERLAY_FILE);
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8")) as DiffOverlay;
+  } catch {
+    return null;
+  }
 }
