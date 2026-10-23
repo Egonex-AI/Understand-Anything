@@ -192,7 +192,7 @@ Understand-Anything hoạt động trên nhiều nền tảng AI coding.
 ```
 
 
-### Cài đặt một dòng (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
+### Cài đặt một dòng (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / DeepSeek Harness)
 
 
 **macOS / Linux:**
@@ -211,7 +211,7 @@ Trình cài đặt clone repo vào `~/.understand-anything/repo` và tạo symli
 
 > **Lưu ý về cách gọi skill:** tiền tố gọi khác nhau tùy nền tảng. Hầu hết nền tảng dùng slash command (`/understand`), nhưng **Codex dùng `$`** — gõ `$understand`, không phải `/understand`. Nếu nền tảng của bạn không nhận cả hai tiền tố, chỉ cần hỏi bằng ngôn ngữ tự nhiên: *"Use the understand skill to analyze this project."*
 
-- Các giá trị `<platform>` được hỗ trợ: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
+- Các giá trị `<platform>` được hỗ trợ: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `dsh`
 - Cập nhật sau:
   - macOS / Linux: `./install.sh --update`
   - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Update`
@@ -270,6 +270,7 @@ Sau khi cài đặt:
 | Trae | ✅ Hỗ trợ | `install.sh trae` |
 | Nanobot | ✅ Hỗ trợ | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Hỗ trợ | `install.sh kiro` |
+| DeepSeek Harness | ✅ Hỗ trợ | `install.sh dsh` |
 
 
 ---

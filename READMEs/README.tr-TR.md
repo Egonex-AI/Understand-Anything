@@ -189,7 +189,7 @@ Understand-Anything birden fazla AI kodlama platformunda çalışır.
 /plugin install understand-anything
 ```
 
-### Tek satırlık kurulum (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
+### Tek satırlık kurulum (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / DeepSeek Harness)
 
 **macOS / Linux:**
 ```bash
@@ -207,7 +207,7 @@ Kurulum betiği depoyu `~/.understand-anything/repo` dizinine klonlar ve seçile
 
 > **Skill çağırma hakkında not:** Çağırma öneki platforma göre değişir. Çoğu platform eğik çizgi komutları (`/understand`) kullanır, ancak **Codex `$` kullanır** — `/understand` değil, `$understand` yaz. İki önek de tanınmıyorsa doğal dille iste: *"understand skill'ini kullanarak bu projeyi analiz et."*
 
-- Desteklenen `<platform>` değerleri: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
+- Desteklenen `<platform>` değerleri: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `dsh`
 - Daha sonra güncelle: `./install.sh --update`
 - Kaldır: `./install.sh --uninstall <platform>`
 
@@ -262,6 +262,7 @@ Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıda
 | Trae | ✅ Destekleniyor | `install.sh trae` |
 | Nanobot | ✅ Destekleniyor | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Destekleniyor | `install.sh kiro` |
+| DeepSeek Harness | ✅ Destekleniyor | `install.sh dsh` |
 
 ---
 

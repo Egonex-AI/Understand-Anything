@@ -15,6 +15,8 @@
 # Environment:
 #   UA_REPO_URL  Override clone URL (default: official GitHub repo)
 #   UA_DIR       Override clone destination (default: $HOME/.understand-anything/repo)
+#   DSH_HOME     DeepSeek Harness data dir (default: $HOME/.dsh).
+#                Only used by the "dsh" platform: $DSH_HOME/skills
 
 set -euo pipefail
 
@@ -42,6 +44,7 @@ kimi|$HOME/.kimi-code/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+dsh|${DSH_HOME:-$HOME/.dsh}/skills|per-skill
 EOF
 }
 
@@ -282,6 +285,7 @@ $(platform_ids | sed 's/^/  - /')
 Environment:
   UA_REPO_URL  Override clone URL (default: official repo)
   UA_DIR       Override clone destination (default: \$HOME/.understand-anything/repo)
+  DSH_HOME     DeepSeek Harness data dir (default: \$HOME/.dsh)
 USAGE
 }
 

@@ -25,6 +25,8 @@ $ErrorActionPreference = 'Stop'
 $RepoUrl    = if ($env:UA_REPO_URL) { $env:UA_REPO_URL } else { 'https://github.com/Egonex-AI/Understand-Anything.git' }
 $RepoDir    = if ($env:UA_DIR)      { $env:UA_DIR }      else { Join-Path $HOME '.understand-anything\repo' }
 $PluginLink = Join-Path $HOME '.understand-anything-plugin'
+# DeepSeek Harness stores its skills under $DSH_HOME (default ~/.dsh).
+$DshHome    = if ($env:DSH_HOME)    { $env:DSH_HOME }    else { Join-Path $HOME '.dsh' }
 
 # Platform table - Target = skills directory; Style = "per-skill" | "folder"
 $Platforms = [ordered]@{
@@ -42,6 +44,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    dsh         = @{ Target = (Join-Path $DshHome 'skills');                  Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -60,6 +63,7 @@ $($Platforms.Keys -join ', ')
 Environment:
   UA_REPO_URL   Override clone URL
   UA_DIR        Override clone destination (default: %USERPROFILE%\.understand-anything\repo)
+  DSH_HOME      DeepSeek Harness data dir (default: %USERPROFILE%\.dsh)
 "@
 }
 
