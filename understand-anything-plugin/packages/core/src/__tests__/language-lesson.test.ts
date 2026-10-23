@@ -140,6 +140,101 @@ describe("language-lesson", () => {
       expect(concepts).toContain("middleware pattern");
     });
 
+    it.each([
+      "This function adds two numbers",
+      "Persists data to disk",
+      "Renders a list of items",
+    ])(
+      "does not flag type guards from the 'is' substring in common prose: %s",
+      (summary) => {
+        const plainNode: GraphNode = {
+          id: "function:misc:fn",
+          type: "function",
+          name: "fn",
+          filePath: "src/misc/fn.ts",
+          summary,
+          tags: ["utility"],
+          complexity: "simple",
+        };
+        const concepts = detectLanguageConcepts(plainNode, "typescript");
+        expect(concepts).not.toContain("type guards");
+      },
+    );
+
+    it("still detects type guards when the summary genuinely describes one", () => {
+      const guardNode: GraphNode = {
+        id: "function:guards:isUser",
+        type: "function",
+        name: "isUser",
+        filePath: "src/guards/isUser.ts",
+        summary: "Type guard that narrows the value to a User",
+        tags: ["validation"],
+        complexity: "simple",
+      };
+      const concepts = detectLanguageConcepts(guardNode, "typescript");
+      expect(concepts).toContain("type guards");
+    });
+
+    it("detects decorators from a specific keyword, not from '@' in prose", () => {
+      // '@' was removed from the decorators pattern because it matched any
+      // JSDoc `@param`/`@returns` fragment or email in a summary.
+      const jsdocNode: GraphNode = {
+        id: "function:util:format",
+        type: "function",
+        name: "format",
+        filePath: "src/util/format.ts",
+        summary: "Formats a value. @param input the raw value @returns text",
+        tags: ["utility"],
+        complexity: "simple",
+      };
+      expect(
+        detectLanguageConcepts(jsdocNode, "typescript"),
+      ).not.toContain("decorators");
+
+      const decoratorNode: GraphNode = {
+        id: "class:http:controller",
+        type: "class",
+        name: "Controller",
+        filePath: "src/http/controller.ts",
+        summary: "Uses a decorator to register the route handler",
+        tags: ["http"],
+        complexity: "moderate",
+      };
+      expect(
+        detectLanguageConcepts(decoratorNode, "typescript"),
+      ).toContain("decorators");
+    });
+
+    it("detects dependency injection from a specific keyword, not from 'di' in prose", () => {
+      // 'di' was removed because it matched "audio", "edit", "directory",
+      // "modifies", "loading", "reading", etc.
+      const diSubstringNode: GraphNode = {
+        id: "function:fs:readDirectory",
+        type: "function",
+        name: "readDirectory",
+        filePath: "src/fs/readDirectory.ts",
+        summary: "Reads and modifies a directory while loading audio files",
+        tags: ["fs"],
+        complexity: "simple",
+      };
+      expect(
+        detectLanguageConcepts(diSubstringNode, "typescript"),
+      ).not.toContain("dependency injection");
+
+      const diNode: GraphNode = {
+        id: "class:di:service",
+        type: "class",
+        name: "Service",
+        filePath: "src/di/service.ts",
+        summary: "Resolves dependencies from the injection container",
+        tags: ["inject"],
+        complexity: "moderate",
+      };
+      expect(
+        detectLanguageConcepts(diNode, "typescript"),
+      ).toContain("dependency injection");
+    });
+
     it("returns empty for nodes with no detectable concepts", () => {
       const plainNode: GraphNode = {
         id: "file:src/config.ts",
