@@ -132,6 +132,29 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("bar_test.py"))
         self.assertTrue(mbg.is_test_path("test_bar.py"))
 
+    def test_python_tests_directory(self) -> None:
+        # Files under `tests/` count as tests even without a `test_` prefix or
+        # `_test` suffix — e.g. `tests/run_tests.py`, `tests/stage4_e2e.py`.
+        for path in [
+            "tests/run_tests.py",
+            "tests/stage3_tests.py",
+            "tests/stage4_e2e.py",
+            "tests/gen_data.py",
+            "tests/helpers.py",
+        ]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+
+    def test_python_non_test_paths(self) -> None:
+        # A `tests` substring elsewhere in the path must not trigger a match.
+        for path in [
+            "data_agent/core/sqlite_utils.py",
+            "mypkg/testing/helpers.py",
+            "src/latest.py",
+        ]:
+            with self.subTest(path=path):
+                self.assertFalse(mbg.is_test_path(path), f"{path} should NOT be a test")
+
     def test_java_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("src/test/java/com/foo/BarTest.java"))
         self.assertTrue(mbg.is_test_path("src/test/java/com/foo/BarTests.java"))
