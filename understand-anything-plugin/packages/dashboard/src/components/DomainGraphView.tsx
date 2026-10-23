@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -6,8 +6,9 @@ import {
   BackgroundVariant,
   Controls,
   MiniMap,
+  applyNodeChanges,
 } from "@xyflow/react";
-import type { Edge, Node } from "@xyflow/react";
+import type { Edge, Node, NodeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
 import DomainClusterNode from "./DomainClusterNode";
@@ -220,6 +221,10 @@ function DomainGraphViewInner() {
 
   const { nodes, edges } = layout;
 
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setLayout((prev) => ({ ...prev, nodes: applyNodeChanges(changes, prev.nodes) }));
+  }, []);
+
   // Double-click is handled by individual node components (e.g. DomainClusterNode)
 
   if (!domainGraph) {
@@ -246,6 +251,7 @@ function DomainGraphViewInner() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.2 }}
