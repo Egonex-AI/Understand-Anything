@@ -316,6 +316,12 @@ function parseTsConfigText(raw) {
  * failure for a specific tsconfig, emits a Warning: pointing at the bad
  * file and skips it (the rest of the project keeps working).
  *
+ * `jsconfig.json` is read on equal footing: JavaScript-only projects
+ * (notably `create-next-app` without TypeScript) declare the very same
+ * `compilerOptions.paths` aliases there, and editors and bundlers honor it
+ * identically. When a directory holds both, tsconfig.json wins — a project
+ * carrying both is a TypeScript project whose jsconfig is vestigial.
+ *
  * Parse strategy (per-file, in parseTsConfigText):
  *   1. Try the comment-stripped text (handles JSONC-style tsconfigs).
  *   2. If that fails, retry the ORIGINAL raw text — recovers the case
@@ -332,18 +338,22 @@ async function loadTsConfigs(projectRoot, files) {
   for (const f of files) {
     const p = toPosix(f.path);
     const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
-    if (base !== 'tsconfig.json') continue;
+    if (base !== 'tsconfig.json' && base !== 'jsconfig.json') continue;
     const absPath = join(projectRoot, p);
     if (!existsSync(absPath)) continue;
     candidates.push({ key: p, absPath });
   }
   const reads = await readFilesParallel(candidates);
+  // Which basename supplied each directory's config, so a tsconfig.json can
+  // override a jsconfig.json regardless of the order the parallel reads land.
+  const wonBy = new Map();
   for (const { key: p, raw, err } of reads) {
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
     if (err) {
       failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
       // absPath isn't carried through the helper return shape; reconstruct it.
       warnings.push(
-        `Warning: extract-import-map: tsconfig.json at ${join(projectRoot, p)} failed ` +
+        `Warning: extract-import-map: ${base} at ${join(projectRoot, p)} failed ` +
         `to read (${err.message}) — path aliases from this config will ` +
         `not be applied — relative imports unaffected\n`,
       );
@@ -354,16 +364,19 @@ async function loadTsConfigs(projectRoot, files) {
       failures.push({
         path: p,
         stage: 'resolver-config-parse',
-        message: 'invalid tsconfig.json',
+        message: `invalid ${base}`,
       });
       warnings.push(
-        `Warning: extract-import-map: tsconfig.json at ${join(projectRoot, p)} failed ` +
+        `Warning: extract-import-map: ${base} at ${join(projectRoot, p)} failed ` +
         `to parse — path aliases from this config will not be applied ` +
         `— relative imports unaffected\n`,
       );
       continue;
     }
-    out.set(dirOf(p), parsed);
+    const dir = dirOf(p);
+    if (wonBy.get(dir) === 'tsconfig.json' && base !== 'tsconfig.json') continue;
+    out.set(dir, parsed);
+    wonBy.set(dir, base);
   }
   return { configs: out, warnings, failures };
 }
