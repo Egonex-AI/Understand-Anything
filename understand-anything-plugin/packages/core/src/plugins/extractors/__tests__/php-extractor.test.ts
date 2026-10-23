@@ -322,6 +322,28 @@ use App\\Models\\Post;
       tree.delete();
       parser.delete();
     });
+
+    it("extracts require_once / include dependencies as imports (#367)", () => {
+      const { tree, parser, root } = parse(`<?php
+require_once __DIR__ . '/helpers.php';
+include 'config.php';
+require 'bootstrap.php';
+include_once 'extra.php';
+`);
+      const result = extractor.extractStructure(root);
+
+      // Procedural PHP wires files together via include/require, not `use`.
+      // Dropping these leaves cross-file dependencies invisible (~0% coverage).
+      const sources = result.imports.map((i) => i.source);
+      expect(sources.some((s) => s.includes("helpers.php"))).toBe(true);
+      expect(sources.some((s) => s.includes("config.php"))).toBe(true);
+      expect(sources.some((s) => s.includes("bootstrap.php"))).toBe(true);
+      expect(sources.some((s) => s.includes("extra.php"))).toBe(true);
+      expect(result.imports).toHaveLength(4);
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Exports ----
@@ -454,15 +476,39 @@ class Service {
       parser.delete();
     });
 
-    it("ignores top-level calls (no caller)", () => {
+    it("captures top-level (file-scope) calls under a synthetic caller (#367)", () => {
       const { tree, parser, root } = parse(`<?php
 echo "hello";
 main();
 `);
       const result = extractor.extractCallGraph(root);
 
-      // Top-level calls have no enclosing function, so they are skipped
-      expect(result).toHaveLength(0);
+      // Top-level calls have no enclosing function. Attribute them to a
+      // synthetic file-scope caller instead of dropping them — procedural PHP
+      // (scripts with no functions) would otherwise yield ~0% call coverage.
+      expect(result.some((e) => e.caller === "<file>" && e.callee === "main")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("captures file-scope calls alongside in-function calls (#367)", () => {
+      const { tree, parser, root } = parse(`<?php
+require_once __DIR__ . '/helpers.php';
+function helper() { return 1; }
+helper();
+function caller() { helper(); }
+`);
+      const result = extractor.extractCallGraph(root);
+
+      // File-scope call: helper() at top level
+      expect(
+        result.some((e) => e.caller === "<file>" && e.callee === "helper"),
+      ).toBe(true);
+      // In-function call still works: caller() -> helper()
+      expect(
+        result.some((e) => e.caller === "caller" && e.callee === "helper"),
+      ).toBe(true);
 
       tree.delete();
       parser.delete();
