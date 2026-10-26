@@ -1,4 +1,5 @@
 import type { AnalyzerPlugin, StructuralAnalysis, ResourceInfo, DefinitionInfo } from "../../types.js";
+import { findClosingBrace, TERRAFORM_SYNTAX } from "./brace-matcher.js";
 
 /**
  * Parses Terraform (.tf) files to extract resource, data, module, variable, and output blocks.
@@ -114,17 +115,6 @@ export class TerraformParser implements AnalyzerPlugin {
   }
 
   private findClosingBrace(content: string): number {
-    let depth = 0;
-    for (let i = 0; i < content.length; i++) {
-      if (content[i] === "{") depth++;
-      if (content[i] === "}") {
-        depth--;
-        if (depth === 0) return i;
-      }
-    }
-    if (depth !== 0) {
-      console.warn(`[terraform-parser] Unbalanced braces detected (depth=${depth}), results may be incomplete`);
-    }
-    return content.length;
+    return findClosingBrace(content, TERRAFORM_SYNTAX, "terraform-parser");
   }
 }
