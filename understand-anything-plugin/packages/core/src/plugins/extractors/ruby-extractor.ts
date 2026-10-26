@@ -15,6 +15,51 @@ const IMPORT_METHODS = new Set(["require", "require_relative"]);
 const ATTR_METHODS = new Set(["attr_accessor", "attr_reader", "attr_writer"]);
 
 /**
+ * ActiveSupport::Concern block calls whose `def`s belong to the enclosing
+ * module: `class_methods do` defines class methods, `included do` instance methods.
+ */
+const CLASS_METHOD_BLOCK_CALLS = new Set(["class_methods"]);
+const METHOD_BLOCK_CALLS = new Set(["included", ...CLASS_METHOD_BLOCK_CALLS]);
+
+type RubyFunction = StructuralAnalysis["functions"][number];
+type RubyClass = StructuralAnalysis["classes"][number];
+
+interface ExtractionTarget {
+  classes: RubyClass[];
+  functions: RubyFunction[];
+}
+
+function lineRangeOf(node: TreeSitterNode): [number, number] {
+  return [node.startPosition.row + 1, node.endPosition.row + 1];
+}
+
+function isSelf(node: TreeSitterNode | null): boolean {
+  return node?.type === "self";
+}
+
+/**
+ * Whether a `def` defines a class method because it sits inside
+ * `class << self` or a Concern `class_methods do` block.
+ */
+function isClassMethodContext(node: TreeSitterNode): boolean {
+  for (let cur = node.parent; cur; cur = cur.parent) {
+    switch (cur.type) {
+      case "class":
+      case "module":
+        return false;
+      case "singleton_class":
+        return isSelf(cur.childForFieldName("value"));
+      case "call":
+        if (CLASS_METHOD_BLOCK_CALLS.has(cur.childForFieldName("method")?.text ?? "")) {
+          return true;
+        }
+        break;
+    }
+  }
+  return false;
+}
+
+/**
  * Extract parameter names from a Ruby `method_parameters` node.
  *
  * Handles: identifier (plain), optional_parameter (with default),
@@ -102,7 +147,11 @@ function getStringContent(node: TreeSitterNode): string {
  *
  * Ruby-specific mapping decisions:
  * - Both `class` and `module` nodes are mapped to the `classes` array.
- * - `singleton_method` (def self.foo) is prefixed with "self." in the name.
+ * - Nested classes/modules are emitted with fully qualified names
+ *   (`Outer::Inner`); the outer namespaces are emitted as well.
+ * - Class methods are prefixed with "self.": `def self.foo`, defs inside
+ *   `class << self`, and defs inside Concern `class_methods do` blocks.
+ * - Defs inside Concern `included do` blocks are instance methods.
  * - `attr_accessor`/`attr_reader`/`attr_writer` define properties on classes.
  * - `require` and `require_relative` calls are mapped to imports.
  * - All top-level definitions (classes, modules, methods) are treated as exports,
@@ -123,33 +172,21 @@ export class RubyExtractor implements LanguageExtractor {
 
       switch (node.type) {
         case "method":
-          this.extractMethod(node, functions);
+        case "singleton_method": {
+          const fn = this.toFunction(node);
+          if (fn) functions.push(fn);
           exports.push({
             name: this.getMethodName(node),
             lineNumber: node.startPosition.row + 1,
           });
           break;
-
-        case "singleton_method":
-          this.extractSingletonMethod(node, functions);
-          exports.push({
-            name: "self." + this.getSingletonMethodName(node),
-            lineNumber: node.startPosition.row + 1,
-          });
-          break;
+        }
 
         case "class":
-          this.extractClass(node, classes, functions);
-          exports.push({
-            name: this.getClassName(node),
-            lineNumber: node.startPosition.row + 1,
-          });
-          break;
-
         case "module":
-          this.extractModule(node, classes, functions);
+          this.extractNamespace(node, "", { classes, functions });
           exports.push({
-            name: this.getModuleName(node),
+            name: this.getDefinitionName(node),
             lineNumber: node.startPosition.row + 1,
           });
           break;
@@ -171,16 +208,10 @@ export class RubyExtractor implements LanguageExtractor {
       let pushedName = false;
 
       // Track entering method definitions
-      if (node.type === "method") {
-        const nameNode = node.childForFieldName("name");
-        if (nameNode) {
-          functionStack.push(nameNode.text);
-          pushedName = true;
-        }
-      } else if (node.type === "singleton_method") {
-        const nameNode = node.childForFieldName("name");
-        if (nameNode) {
-          functionStack.push("self." + nameNode.text);
+      if (node.type === "method" || node.type === "singleton_method") {
+        const name = this.getMethodName(node);
+        if (name) {
+          functionStack.push(name);
           pushedName = true;
         }
       }
@@ -239,156 +270,127 @@ export class RubyExtractor implements LanguageExtractor {
 
   // ---- Private helpers ----
 
+  private getDefinitionName(node: TreeSitterNode): string {
+    const nameNode = node.childForFieldName("name");
+    // Can be `constant` ("Foo") or `scope_resolution` ("Foo::Bar")
+    return nameNode ? nameNode.text : "";
+  }
+
+  /** Method name as exposed in the graph: class methods get a "self." prefix. */
   private getMethodName(node: TreeSitterNode): string {
     const nameNode = node.childForFieldName("name");
-    return nameNode ? nameNode.text : "";
-  }
-
-  private getSingletonMethodName(node: TreeSitterNode): string {
-    const nameNode = node.childForFieldName("name");
-    return nameNode ? nameNode.text : "";
-  }
-
-  private getClassName(node: TreeSitterNode): string {
-    const nameNode = node.childForFieldName("name");
     if (!nameNode) return "";
-    // Can be `constant` ("Foo") or `scope_resolution` ("Foo::Bar")
-    return nameNode.text;
+    const isClassMethod =
+      node.type === "singleton_method" || isClassMethodContext(node);
+    return isClassMethod ? "self." + nameNode.text : nameNode.text;
   }
 
-  private getModuleName(node: TreeSitterNode): string {
-    const nameNode = node.childForFieldName("name");
-    return nameNode ? nameNode.text : "";
-  }
-
-  private extractMethod(
-    node: TreeSitterNode,
-    functions: StructuralAnalysis["functions"],
-  ): void {
-    const nameNode = node.childForFieldName("name");
-    if (!nameNode) return;
+  private toFunction(node: TreeSitterNode): RubyFunction | null {
+    const name = this.getMethodName(node);
+    if (!name) return null;
 
     const paramsNode = node.childForFieldName("parameters");
-    const params = extractParams(paramsNode ?? null);
-
-    functions.push({
-      name: nameNode.text,
-      lineRange: [
-        node.startPosition.row + 1,
-        node.endPosition.row + 1,
-      ],
-      params,
-    });
-  }
-
-  private extractSingletonMethod(
-    node: TreeSitterNode,
-    functions: StructuralAnalysis["functions"],
-  ): void {
-    const nameNode = node.childForFieldName("name");
-    if (!nameNode) return;
-
-    const paramsNode = node.childForFieldName("parameters");
-    const params = extractParams(paramsNode ?? null);
-
-    functions.push({
-      name: "self." + nameNode.text,
-      lineRange: [
-        node.startPosition.row + 1,
-        node.endPosition.row + 1,
-      ],
-      params,
-    });
-  }
-
-  private extractClass(
-    node: TreeSitterNode,
-    classes: StructuralAnalysis["classes"],
-    functions: StructuralAnalysis["functions"],
-  ): void {
-    const name = this.getClassName(node);
-    if (!name) return;
-
-    const methods: string[] = [];
-    const properties: string[] = [];
-
-    const body = node.childForFieldName("body");
-    if (body) {
-      this.extractClassBody(body, methods, properties, functions);
-    }
-
-    classes.push({
+    return {
       name,
-      lineRange: [
-        node.startPosition.row + 1,
-        node.endPosition.row + 1,
-      ],
-      methods,
-      properties,
-    });
-  }
-
-  private extractModule(
-    node: TreeSitterNode,
-    classes: StructuralAnalysis["classes"],
-    functions: StructuralAnalysis["functions"],
-  ): void {
-    const name = this.getModuleName(node);
-    if (!name) return;
-
-    const methods: string[] = [];
-    const properties: string[] = [];
-
-    const body = node.childForFieldName("body");
-    if (body) {
-      this.extractClassBody(body, methods, properties, functions);
-    }
-
-    classes.push({
-      name,
-      lineRange: [
-        node.startPosition.row + 1,
-        node.endPosition.row + 1,
-      ],
-      methods,
-      properties,
-    });
+      lineRange: lineRangeOf(node),
+      params: extractParams(paramsNode ?? null),
+    };
   }
 
   /**
-   * Extract methods and properties from a class/module body_statement.
-   * Also pushes each method into the top-level functions array.
+   * Record a class/module under its fully qualified name, then walk its body
+   * so nested definitions are qualified with this name as their scope.
    */
-  private extractClassBody(
+  private extractNamespace(
+    node: TreeSitterNode,
+    scope: string,
+    target: ExtractionTarget,
+  ): void {
+    const localName = this.getDefinitionName(node);
+    if (!localName) return;
+
+    const entry: RubyClass = {
+      name: scope ? `${scope}::${localName}` : localName,
+      lineRange: lineRangeOf(node),
+      methods: [],
+      properties: [],
+    };
+    target.classes.push(entry);
+
+    const body = node.childForFieldName("body");
+    if (body) this.extractBody(body, entry, target);
+  }
+
+  /**
+   * Extract members of a class/module body into `owner`, recursing into
+   * nested definitions, `class << self` and Concern method blocks.
+   */
+  private extractBody(
     body: TreeSitterNode,
-    methods: string[],
-    properties: string[],
-    functions: StructuralAnalysis["functions"],
+    owner: RubyClass,
+    target: ExtractionTarget,
   ): void {
     for (let i = 0; i < body.childCount; i++) {
       const member = body.child(i);
       if (!member) continue;
 
-      if (member.type === "method") {
-        const nameNode = member.childForFieldName("name");
-        if (nameNode) {
-          methods.push(nameNode.text);
-          this.extractMethod(member, functions);
-        }
-      } else if (member.type === "singleton_method") {
-        const nameNode = member.childForFieldName("name");
-        if (nameNode) {
-          methods.push("self." + nameNode.text);
-          this.extractSingletonMethod(member, functions);
-        }
-      } else if (member.type === "call") {
-        // Check for attr_accessor/attr_reader/attr_writer
-        const methodNode = member.childForFieldName("method");
-        if (methodNode && ATTR_METHODS.has(methodNode.text)) {
-          properties.push(...extractAttrProperties(member));
-        }
+      switch (member.type) {
+        case "method":
+        case "singleton_method":
+          this.addMethod(member, owner, target.functions);
+          break;
+        case "class":
+        case "module":
+          this.extractNamespace(member, owner.name, target);
+          break;
+        case "singleton_class":
+          if (isSelf(member.childForFieldName("value"))) {
+            this.extractNestedBody(member, owner, target);
+          }
+          break;
+        case "call":
+          this.extractBodyCall(member, owner, target);
+          break;
       }
     }
+  }
+
+  private extractBodyCall(
+    call: TreeSitterNode,
+    owner: RubyClass,
+    target: ExtractionTarget,
+  ): void {
+    const methodName = call.childForFieldName("method")?.text ?? "";
+    if (ATTR_METHODS.has(methodName)) {
+      owner.properties.push(...extractAttrProperties(call));
+      return;
+    }
+
+    const block = call.childForFieldName("block");
+    if (block && METHOD_BLOCK_CALLS.has(methodName)) {
+      this.extractNestedBody(block, owner, target);
+    }
+  }
+
+  /** Walk the body of a `class << self` or block as part of `owner`. */
+  private extractNestedBody(
+    node: TreeSitterNode,
+    owner: RubyClass,
+    target: ExtractionTarget,
+  ): void {
+    const body = node.childForFieldName("body");
+    if (body) this.extractBody(body, owner, target);
+  }
+
+  private addMethod(
+    node: TreeSitterNode,
+    owner: RubyClass,
+    functions: RubyFunction[],
+  ): void {
+    const fn = this.toFunction(node);
+    if (!fn) return;
+    owner.methods.push(fn.name);
+    functions.push(fn);
   }
 
   /**
