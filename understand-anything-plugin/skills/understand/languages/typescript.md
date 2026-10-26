@@ -20,6 +20,7 @@
 - `import type { X } from 'module'` — type-only import (erased at runtime)
 - `import * as X from 'module'` — namespace import
 - `import X from 'module'` — default import
+- Static top-level CommonJS `require(...)`, `exports.name`, and `module.exports` assignments are included in structural imports/exports alongside ES modules. Dynamic require paths are not inferred.
 
 ## File Patterns
 
