@@ -612,13 +612,48 @@ describe("DockerfileParser edge cases", () => {
 describe("EnvParser edge cases", () => {
   const parser = new EnvParser();
 
-  it("does not handle export VAR=value syntax", () => {
+  it("handles export VAR=value syntax", () => {
     const content = "export DB_HOST=localhost\nAPI_KEY=secret";
     const result = parser.analyzeFile(".env", content);
-    // The `export` prefix is not handled — only plain KEY=value is parsed
-    const names = result.definitions!.map(d => d.name);
-    expect(names).toContain("API_KEY");
-    expect(names).not.toContain("DB_HOST");
+    expect(result.definitions!.map(d => d.name)).toEqual(["DB_HOST", "API_KEY"]);
+  });
+
+  it("allows whitespace around the equals sign", () => {
+    const content = "DB_HOST = localhost\nDB_PORT\t=5432";
+    const result = parser.analyzeFile(".env", content);
+    expect(result.definitions!.map(d => d.name)).toEqual(["DB_HOST", "DB_PORT"]);
+  });
+
+  it("spans multi-line quoted values and ignores lines inside them", () => {
+    const content = [
+      "BEFORE=1",
+      'PRIVATE_KEY="-----BEGIN KEY-----',
+      "abc123",
+      'NOT_A_VAR=inside',
+      '-----END KEY-----"',
+      "JSON='{",
+      '  "a": 1',
+      "}'",
+      "AFTER=2",
+    ].join("\n");
+    const result = parser.analyzeFile(".env", content);
+    expect(result.definitions!.map(d => [d.name, d.lineRange])).toEqual([
+      ["BEFORE", [1, 1]],
+      ["PRIVATE_KEY", [2, 5]],
+      ["JSON", [6, 8]],
+      ["AFTER", [9, 9]],
+    ]);
+  });
+
+  it("keeps single-line quoted values and escaped quotes on one line", () => {
+    const content = 'A="one"\nB="say \\"hi\\""\nC=\'it\'\nD=plain # comment';
+    const result = parser.analyzeFile(".env", content);
+    expect(result.definitions!.map(d => [d.name, d.lineRange])).toEqual([
+      ["A", [1, 1]],
+      ["B", [2, 2]],
+      ["C", [3, 3]],
+      ["D", [4, 4]],
+    ]);
   });
 });
 
