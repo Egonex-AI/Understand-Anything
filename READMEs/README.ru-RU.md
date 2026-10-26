@@ -129,7 +129,7 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 # Генерация контента на русском (описания узлов графа знаний и UI панели)
 /understand --language ru
 
-# Поддерживаемые языки: en (по умолчанию), zh, zh-TW, ja, ko, ru, vi
+# Поддерживаемые языки: en (по умолчанию), zh, zh-TW, ja, ko, ru, vi, pt-BR
 ```
 
 Параметр `--language` влияет на:

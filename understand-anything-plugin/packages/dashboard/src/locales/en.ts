@@ -1,5 +1,17 @@
+
+type StalenessGraph = "knowledge" | "domain";
+
+const graphName = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "knowledge graph" : "domain graph";
+const filesChanged = (count: number) =>
+  `${count} ${count === 1 ? "file has" : "files have"} changed since analysis.`;
+const plural = (count: number, singular: string, pluralForm = `${singular}s`) =>
+  `${count} ${count === 1 ? singular : pluralForm}`;
+
 export const en = {
   common: {
+    unnamed: "unnamed",
+    close: "Close",
     loading: "Loading project...",
     computingGraphLayout: "Computing graph layout...",
     forceLayoutFallback: "Force layout unavailable; showing a fallback grid.",
@@ -48,6 +60,7 @@ export const en = {
     avgConnectionsPerNode: "Avg Connections per Node",
   },
   nodeInfo: {
+    reverse: "reverse",
     definedInThisFile: "Defined in this file",
     languageConcepts: "Language Concepts",
     category: "Category",
@@ -67,6 +80,7 @@ export const en = {
     noFilePathsFound: "No file paths found.",
   },
   filterPanel: {
+    title: "Filter graph (F)",
     nodeTypes: "Node Types",
     complexity: "Complexity",
     layers: "Layers",
@@ -125,10 +139,22 @@ export const en = {
     knowledge: "Knowledge",
   },
   tokenGate: {
+    title: "Access Token Required",
+    instructionsBefore: "Paste the access token from your terminal. Look for the",
+    instructionsAfter: " line.",
+    keyIcon: "key",
+    placeholder: "Paste token here...",
+    invalidToken: "Invalid token. Please check and try again.",
+    unexpectedResponse: (status: number) =>
+      `Unexpected response (${status}). Is the dashboard server running?`,
+    unreachable: (detail: string) => `Could not reach the server: ${detail}`,
     validating: "Validating...",
     continue: "Continue",
   },
   diffToggle: {
+    label: "Diff",
+    on: "ON",
+    off: "OFF",
     hideOverlay: "Hide diff overlay",
     showOverlay: "Show diff overlay",
     noData: "No diff data loaded",
@@ -136,6 +162,9 @@ export const en = {
     affected: "Affected",
   },
   learnPanel: {
+    languageLesson: "Language Lesson",
+    referencedComponents: "Referenced Components",
+    goToStep: (step: number) => `Go to step ${step}`,
     finish: "Finish",
     next: "Next",
     prev: "Prev",
@@ -159,6 +188,18 @@ export const en = {
     escBack: "Esc to go back",
   },
   warningBanner: {
+    autoCorrected: "Auto-corrected",
+    fatalErrors: (count: number) => plural(count, "fatal error"),
+    autoCorrections: (count: number) => plural(count, "auto-correction"),
+    droppedItems: (count: number) => plural(count, "dropped item"),
+    summaryFatal: (parts: string[]) => `Dashboard hit ${parts.join(", ")}`,
+    summaryLoaded: (parts: string[]) => `Knowledge graph loaded with ${parts.join(" and ")}`,
+    clickToExpand: "click to expand",
+    clickToCollapse: "click to collapse",
+    footerFatal: "Copy these issues and file a bug report on GitHub",
+    footerFix: "Copy these issues and ask your agent to fix them in knowledge-graph.json",
+    copied: "Copied!",
+    copyIssues: "Copy Issues",
     dropped: "Dropped",
     fatal: "Fatal",
   },
@@ -172,6 +213,8 @@ export const en = {
     mono: "Mono",
   },
   codeViewer: {
+    noFilePath: "This node does not have a file path.",
+    demoUnavailable: "Source preview is available only when the local dashboard server is running.",
     fullFile: "Full file",
     lines: "Lines",
     linesLabel: "lines",
@@ -222,9 +265,17 @@ export const en = {
     placeholder: "Search nodes by name, summary, or tags...",
     fuzzy: "Fuzzy",
     semantic: "Semantic",
-    result: "result",
+    resultCount: (count: number) => plural(count, "result"),
   },
   export: {
+    notReady: "Graph not ready for export",
+    noNodes: "No nodes to export",
+    pngRenderFailed: "Failed to export PNG: could not render graph as image.",
+    canvasFailed: "Failed to create canvas context",
+    pngEncodingFailed: "Failed to export PNG: image encoding failed.",
+    pngFailed: (detail: string) => `Failed to export PNG: ${detail}`,
+    svgFailed: (detail: string) => `Failed to export SVG: ${detail}`,
+    jsonFailed: (detail: string) => `Failed to export JSON: ${detail}`,
     label: "Export",
     title: "Export graph (E)",
     asPNG: "Export as PNG",
@@ -269,7 +320,117 @@ export const en = {
     authored_by: { forward: "authored by", backward: "authored" },
   },
   pathFinder: {
+    heading: "Dependency Path Finder",
+    description: "Find the shortest path between two nodes in the dependency graph.",
+    fromNode: "From Node",
+    toNode: "To Node",
+    selectNode: "Select a node...",
+    searching: "Searching...",
+    findPath: "Find Path",
+    noPath: "No path found between these nodes.",
+    pathFound: (count: number) => `Path Found (${plural(count, "node")})`,
     title: "Find path between nodes (P)",
+  },
+  graphNodes: {
+    matches: (count: number) => plural(count, "match", "matches"),
+    files: (count: number) => plural(count, "file"),
+    flows: (count: number) => plural(count, "flow"),
+    steps: (count: number) => plural(count, "step"),
+    connections: (count: number) => plural(count, "connection"),
+    hits: (count: number) => plural(count, "hit"),
+    clickToExplore: "Click to explore →",
+    root: "(root)",
+    containerAria: (name: string, count: number, expanded: boolean) =>
+      `${name} container, ${plural(count, "item")}, ${expanded ? "expanded" : "collapsed"}`,
+    incoming: (count: number) => `${count} in`,
+    outgoing: (count: number) => `${count} out`,
+  },
+  graphView: {
+    showingNeighborhood: "Showing neighborhood",
+    locatingTourHighlight: "Locating tour highlight…",
+    computingLayout: "Computing layout…",
+    noKnowledgeGraph: "No knowledge graph available. Run /understand-knowledge to generate one.",
+    noDomainGraph: "No domain graph available. Run /understand-domain to generate one.",
+  },
+  loadErrors: {
+    invalidGraph: (detail: string) => `Invalid knowledge graph: ${detail}`,
+    unknownValidation: "Invalid knowledge graph: unknown validation error",
+    loadFailed: (detail: string) => `Failed to load knowledge graph: ${detail}`,
+  },
+  staleness: {
+    subjectKnowledge: "Knowledge graph",
+    subjectDomain: "Domain graph",
+    subjectBoth: "Knowledge and domain graphs",
+    titleStale: (subject: string, _multiple: boolean) => `${subject} may be stale`,
+    titleDirty: (subject: string, multiple: boolean) =>
+      `${subject} ${multiple ? "have" : "has"} working-tree changes`,
+    titleUnknown: (subject: string, _multiple: boolean) =>
+      `${subject} freshness could not be verified`,
+    staleBehind: (graph: StalenessGraph, commits: number, files: number) =>
+      `The ${graphName(graph)} is ${plural(commits, "project commit")} behind HEAD; ${filesChanged(files)}`,
+    staleAhead: (graph: StalenessGraph, files: number) =>
+      `The ${graphName(graph)} comes from a newer project history than HEAD; ${filesChanged(files)}`,
+    staleDiverged: (graph: StalenessGraph, files: number) =>
+      `The ${graphName(graph)} and HEAD come from different project histories; ${filesChanged(files)}`,
+    dirty: (graph: StalenessGraph, files: number) =>
+      `${plural(files, "working-tree file")} ${files === 1 ? "has" : "have"} changed and ${
+        files === 1 ? "is" : "are"
+      } not represented by the ${graphName(graph)}'s commit metadata.`,
+    unknownMissingGraphCommit: (graph: StalenessGraph) =>
+      `The ${graphName(graph)} does not include a Git commit hash to compare with HEAD.`,
+    unknownGitHeadUnavailable: (graph: StalenessGraph) =>
+      `The ${graphName(graph)} could not be compared because the dashboard could not read Git HEAD.`,
+    unknownGraphCommitUnavailable: (graph: StalenessGraph) =>
+      `The ${graphName(graph)} references a commit that is not available in this checkout.`,
+    unknownGitCommandTimeout: (graph: StalenessGraph) =>
+      `The ${graphName(graph)} could not be checked because Git freshness commands timed out.`,
+    unknownRequestFailed: "The dashboard could not refresh graph freshness data.",
+    refresh: (commands: string[], multiple: boolean) =>
+      `Run ${commands.join(" and ")} to refresh ${multiple ? "them" : "it"} before relying on impact or onboarding answers.`,
+    retry: "Refocus the window to retry the freshness check.",
+    showFiles: "show files",
+    hideFiles: "hide files",
+    moreFiles: (count: number) => `+${count} more`,
+  },
+  nodeTypeNames: {
+    file: "file",
+    function: "function",
+    class: "class",
+    module: "module",
+    concept: "concept",
+    config: "config",
+    document: "document",
+    service: "service",
+    table: "table",
+    endpoint: "endpoint",
+    pipeline: "pipeline",
+    schema: "schema",
+    resource: "resource",
+    domain: "domain",
+    flow: "flow",
+    step: "step",
+    article: "article",
+    entity: "entity",
+    topic: "topic",
+    claim: "claim",
+    source: "source",
+    page: "page",
+    screen: "screen",
+    component: "component",
+    componentSet: "component set",
+    instance: "instance",
+    token: "token",
+  },
+  edgeCategoryNames: {
+    structural: "structural",
+    behavioral: "behavioral",
+    "data-flow": "data flow",
+    dependencies: "dependencies",
+    semantic: "semantic",
+    infrastructure: "infrastructure",
+    domain: "domain",
+    knowledge: "knowledge",
+    design: "design",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · GET STARTED",

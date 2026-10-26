@@ -90,7 +90,7 @@ export default function MobileDrawer({
       {/* Backdrop */}
       <button
         type="button"
-        aria-label="Close menu"
+        aria-label={t.ariaLabels.closeMenu}
         onClick={onClose}
         className={`absolute inset-0 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0"
@@ -103,7 +103,7 @@ export default function MobileDrawer({
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         role="dialog"
-        aria-label="Settings"
+        aria-label={t.ariaLabels.settings}
       >
         {/* Drawer header */}
         <header className="flex items-center justify-between px-5 py-4 border-b border-border-subtle shrink-0">
@@ -118,7 +118,7 @@ export default function MobileDrawer({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close menu"
+            aria-label={t.ariaLabels.closeMenu}
             className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-elevated transition-colors"
           >
             <svg

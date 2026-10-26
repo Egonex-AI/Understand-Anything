@@ -4,6 +4,7 @@ import type {
   GraphFreshnessResult,
 } from "../../freshness";
 import { buildFreshnessBanner } from "../StalenessBanner";
+import { locales } from "../../locales";
 
 const fresh: GraphFreshnessResult = {
   status: "fresh",
@@ -164,6 +165,30 @@ describe("buildFreshnessBanner", () => {
       title: "Knowledge graph freshness could not be verified",
       summary: "The dashboard could not refresh graph freshness data.",
       changedFiles: [],
+    });
+  });
+
+  it("localizes the banner when a locale is passed", () => {
+    const banner = buildFreshnessBanner(
+      report({
+        status: "stale",
+        relation: "behind",
+        graphCommitHash: "a".repeat(40),
+        headCommitHash: "b".repeat(40),
+        changedFileCount: 2,
+        changedFiles: ["src/a.ts", "src/b.ts"],
+        commitsBehind: 3,
+        commitsAhead: 0,
+      }),
+      locales["pt-BR"],
+    );
+
+    expect(banner).toMatchObject({
+      title: "O grafo de conhecimento pode estar desatualizado",
+      summary:
+        "O grafo de conhecimento está 3 commits atrás do HEAD do projeto; 2 arquivos mudaram desde a análise.",
+      action:
+        "Execute /understand para atualizá-lo antes de confiar em respostas sobre impacto ou onboarding.",
     });
   });
 });

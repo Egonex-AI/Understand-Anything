@@ -103,14 +103,14 @@ export default function ExportMenu() {
 
   const exportPNG = async () => {
     if (!reactFlowInstance) {
-      alert("Graph not ready for export");
+      alert(t.export.notReady);
       return;
     }
 
     try {
       const result = buildCleanSvg();
       if (!result) {
-        alert("No nodes to export");
+        alert(t.export.noNodes);
         return;
       }
 
@@ -121,7 +121,7 @@ export default function ExportMenu() {
       const img = new Image();
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        alert("Failed to export PNG: could not render graph as image.");
+        alert(t.export.pngRenderFailed);
       };
       img.onload = () => {
         const canvas = document.createElement("canvas");
@@ -130,7 +130,7 @@ export default function ExportMenu() {
         const ctx = canvas.getContext("2d");
         if (!ctx) {
           URL.revokeObjectURL(url);
-          alert("Failed to create canvas context");
+          alert(t.export.canvasFailed);
           return;
         }
         ctx.drawImage(img, 0, 0, width * 2, height * 2);
@@ -142,27 +142,27 @@ export default function ExportMenu() {
             downloadBlob(blob, filename);
             toggleExportMenu();
           } else {
-            alert("Failed to export PNG: image encoding failed.");
+            alert(t.export.pngEncodingFailed);
           }
         }, "image/png");
       };
       img.src = url;
     } catch (error) {
       console.error("PNG export failed:", error);
-      alert(`Failed to export PNG: ${error instanceof Error ? error.message : String(error)}`);
+      alert(t.export.pngFailed(error instanceof Error ? error.message : String(error)));
     }
   };
 
   const exportSVG = () => {
     if (!reactFlowInstance) {
-      alert("Graph not ready for export");
+      alert(t.export.notReady);
       return;
     }
 
     try {
       const result = buildCleanSvg();
       if (!result) {
-        alert("No nodes to export");
+        alert(t.export.noNodes);
         return;
       }
 
@@ -172,13 +172,13 @@ export default function ExportMenu() {
       toggleExportMenu();
     } catch (error) {
       console.error("SVG export failed:", error);
-      alert(`Failed to export SVG: ${error instanceof Error ? error.message : String(error)}`);
+      alert(t.export.svgFailed(error instanceof Error ? error.message : String(error)));
     }
   };
 
   const exportJSON = () => {
     if (!graph) {
-      alert("No graph loaded");
+      alert(t.common.noGraphLoaded);
       return;
     }
 
@@ -211,7 +211,7 @@ export default function ExportMenu() {
       toggleExportMenu();
     } catch (error) {
       console.error("JSON export failed:", error);
-      alert(`Failed to export JSON: ${error instanceof Error ? error.message : String(error)}`);
+      alert(t.export.jsonFailed(error instanceof Error ? error.message : String(error)));
     }
   };
 

@@ -129,7 +129,7 @@ Understand Anything は [Claude Code Plugin](https://code.claude.com/docs/en/plu
 # 日本語でコンテンツを生成（ナレッジグラフのノード説明とダッシュボードUI）
 /understand --language ja
 
-# サポート言語：en（デフォルト）、zh、zh-TW、ja、ko、ru、vi
+# サポート言語：en（デフォルト）、zh、zh-TW、ja、ko、ru、vi、pt-BR
 ```
 
 プロジェクトでの**初回実行時**に `--language` を指定せず、保存済みの言語設定もない場合、`/understand` は会話で使われている言語を検出します。英語以外が検出された場合は、生成前にその言語を使用するか、別の言語へ変更するかを確認します。英語での会話には影響しません。選択結果は `.ua/config.json` に保存され、以降の実行でも再利用されます。
