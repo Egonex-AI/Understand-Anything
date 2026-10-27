@@ -3,7 +3,7 @@
 <p align="center">
   <strong>Turn any codebase, knowledge base, or docs into an interactive knowledge graph you can explore, search, and ask questions about.</strong>
   <br />
-  <em>Works with Claude Code, Codex, Cursor, Copilot, Gemini CLI, and more.</em>
+  <em>Works with Claude Code, Devin, Codex, Cursor, Copilot, Gemini CLI, and more.</em>
 </p>
 
 <p align="center">
@@ -31,6 +31,7 @@
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-38bdf8" alt="OpenCode" /></a>
   <a href="#mistral-vibe-cli"><img src="https://img.shields.io/badge/Vibe_CLI-7c3aed" alt="Vibe CLI" /></a>
   <a href="#trae"><img src="https://img.shields.io/badge/Trae-7e22ce" alt="Trae" /></a>
+  <a href="#devin"><img src="https://img.shields.io/badge/Devin-111111" alt="Devin" /></a>
   <a href="https://understand-anything.com"><img src="https://img.shields.io/badge/Homepage-d4a574" alt="Homepage" /></a>
   <a href="https://understand-anything.com/demo/"><img src="https://img.shields.io/badge/Live_Demo-00c853" alt="Live Demo" /></a>
   <a href="https://egonex.ai"><img src="https://img.shields.io/badge/Understand_Anyone-egonex.ai-d4a574" alt="Understand Anyone" /></a>
@@ -192,7 +193,7 @@ Understand-Anything works across multiple AI coding platforms.
 ```
 
 
-### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / Devin)
 
 
 **macOS / Linux:**
@@ -211,7 +212,7 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 
-- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `devin`
 - Update later:
   - macOS / Linux: `./install.sh --update`
   - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Update`
@@ -249,6 +250,40 @@ After installation:
 
 For personal skills (available across all projects), run the `install.sh` above with the `kiro` platform.
 
+### Devin
+
+Devin support comes in two parts: a **plugin** that generates graphs, and an optional **MCP server** for querying them and opening dashboards.
+
+**Plugin (recommended).** You get the namespaced `/understand-anything:*` skills, the post-commit auto-update hooks, and the analysis subagents. Devin loads the plugin through its Claude-plugin compatibility:
+
+```bash
+devin auth login   # plugin management requires sign-in
+devin plugins install Egonex-AI/Understand-Anything#understand-anything-plugin
+```
+
+Then, in any project:
+
+```bash
+/understand-anything:understand
+```
+
+**Skills only.** This uses the one-line installer above with the `devin` platform. It symlinks the skills into `~/.agents/skills/`, which Devin loads globally, and gives you un-namespaced `/understand`, `/understand-chat`, etc. It does not register the auto-update hooks.
+
+**MCP server (optional).** It serves an existing graph to Devin (status / search / explain / diff / onboard / dashboard). Build the workspace once (`pnpm install && pnpm -r build`), then register the server in the project's `.devin/config.json`:
+
+```json
+{
+  "mcpServers": {
+    "understand-anything": {
+      "command": "node",
+      "args": ["/absolute/path/to/Understand-Anything/understand-anything-plugin/packages/mcp/bin/understand-anything-mcp.mjs"]
+    }
+  }
+}
+```
+
+The full tool reference and examples for other clients are in [`understand-anything-plugin/packages/mcp/README.md`](understand-anything-plugin/packages/mcp/README.md).
+
 ### Platform Compatibility
 
 | Platform | Status | Install Method |
@@ -270,6 +305,7 @@ For personal skills (available across all projects), run the `install.sh` above 
 | Trae | ✅ Supported | `install.sh trae` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
+| Devin | ✅ Supported | `devin plugins install` or `install.sh devin` |
 
 
 ---
