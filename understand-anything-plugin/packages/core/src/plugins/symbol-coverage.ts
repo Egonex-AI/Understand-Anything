@@ -1,3 +1,4 @@
+import type { StructuralAnalysis } from "../types.js";
 import type { TreeSitterNode as Node } from "./extractors/types.js";
 import type { SymbolEvidenceEntry } from "./symbol-evidence.js";
 import { declarationKey, declarationName } from "./symbol-ast.js";
@@ -34,4 +35,40 @@ export function declarationGap(node: Node, scope: SymbolScope, receiver: SymbolS
   if (!name || HANDLED_NAMES.has(node.type) || NON_DECLARATION_NAMES.has(node.type)) return null;
   return { kind: null, scope, name: declarationName(name), lineRange: range,
     reason: `Declaration surface is not covered: ${node.type}` };
+}
+
+/** Line-level structural coverage: how much of a file the structure accounts for. */
+export interface StructuralLineCoverage {
+  totalLines: number;
+  /** Lines inside functions, classes, imports or exports. */
+  symbolLines: number;
+  /** Lines inside top-level segments that are not already symbol lines. */
+  topLevelLines: number;
+  /** Union of symbol and top-level lines. */
+  coveredLines: number;
+  /** coveredLines / totalLines (1 for an empty file). */
+  ratio: number;
+}
+
+/**
+ * Count the lines the structural analysis accounts for. Top-level segments
+ * (module-scope code between symbols) count as covered, so entry-point and
+ * wiring files are no longer reported as mostly uncovered.
+ */
+export function structuralLineCoverage(structure: StructuralAnalysis, totalLines: number): StructuralLineCoverage {
+  const symbol = new Set<number>();
+  const topLevel = new Set<number>();
+  const add = (set: Set<number>, [start, end]: [number, number]) => {
+    for (let line = Math.max(1, start); line <= Math.min(totalLines, end); line++) set.add(line);
+  };
+  for (const fn of structure.functions) add(symbol, fn.lineRange);
+  for (const cls of structure.classes) add(symbol, cls.lineRange);
+  for (const imp of structure.imports) add(symbol, [imp.lineNumber, imp.lineNumber]);
+  for (const exp of structure.exports) add(symbol, [exp.lineNumber, exp.lineNumber]);
+  for (const seg of structure.topLevel ?? []) add(topLevel, seg.lineRange);
+  let topLevelOnly = 0;
+  for (const line of topLevel) if (!symbol.has(line)) topLevelOnly++;
+  const covered = symbol.size + topLevelOnly;
+  return { totalLines, symbolLines: symbol.size, topLevelLines: topLevelOnly, coveredLines: covered,
+    ratio: totalLines === 0 ? 1 : covered / totalLines };
 }
