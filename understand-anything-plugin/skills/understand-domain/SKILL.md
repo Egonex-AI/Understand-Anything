@@ -151,8 +151,29 @@ The preprocessing script does NOT produce a domain graph — it produces **raw m
 1. Read the domain analysis output
 2. Validate using the standard graph validation pipeline (the schema now supports domain/flow/step types)
 3. If validation fails, log warnings but save what's valid (error tolerance)
-4. Save to `$UA_DIR/domain-graph.json`
-5. Clean up `$UA_DIR/intermediate/domain-analysis.json` and `$UA_DIR/intermediate/domain-context.json`
+4. **Protect manual edits before overwriting.** If `$UA_DIR/domain-graph.json` already exists and `$UA_DIR/domain-graph.generated.json` (the baseline from the previous run) exists too, capture any manual edits first so they are not lost:
+   ```bash
+   node "<SKILL_DIR>/domain-curation.mjs" capture --dir "$UA_DIR" --note "auto-capture before /understand-domain"
+   ```
+   If only `domain-graph.json` exists (no baseline, e.g. a graph produced before this feature), there is nothing to compare against: copy it to `$UA_DIR/domain-graph.pre-regenerate.json`, tell the user, and continue.
+5. Save the new analysis to `$UA_DIR/domain-graph.json`
+6. **Re-apply curated analysis.** Run:
+   ```bash
+   node "<SKILL_DIR>/domain-curation.mjs" apply --dir "$UA_DIR"
+   ```
+   This stores the fresh output as the new baseline (`domain-graph.generated.json`) and merges `$UA_DIR/domain-curated.json` on top of it. When no curated file exists, the merged graph equals the fresh output. Report the summary to the user, in particular:
+   - `possibleDuplicates`: regenerated flows/domains that look like a curated one under a different ID. Ask the user whether to keep, delete, or merge them; never delete curated nodes automatically.
+   - `needsReview`: curated steps whose `filePath` no longer exists or whose `lineRange` exceeds the file length. They are kept and tagged `needs-review`.
+7. Clean up `$UA_DIR/intermediate/domain-analysis.json` and `$UA_DIR/intermediate/domain-context.json`
+
+### Curated analysis (manual deep dives)
+
+`domain-graph.json` is regenerated from scratch on every run, so manual improvements (deeper flows, corrected steps, business rules, known issues) are kept in `$UA_DIR/domain-curated.json` and re-applied by Phase 5:
+
+- After editing `domain-graph.json` by hand or with an agent, run `node "<SKILL_DIR>/domain-curation.mjs" capture --dir "$UA_DIR" --note "<what changed>"`. It records added/changed nodes and edges and deletions (as tombstones) relative to the generated baseline.
+- Curated values win on conflict. A curated flow owns its step list. For curated domains, list fields in `domainMeta` (e.g. `businessRules`) keep the curated items and append only items that are new in the latest regenerate, so corrected or removed facts do not come back.
+- `node "<SKILL_DIR>/domain-curation.mjs" status` shows what is curated.
+- Commit `domain-curated.json` and `domain-graph.generated.json` with the graph so teammates keep the same analysis.
 
 ### Phase 6: Launch Dashboard
 
