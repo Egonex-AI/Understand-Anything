@@ -7,6 +7,7 @@ import type {
   CallGraphEntry,
 } from "../types.js";
 import type { LanguageConfig } from "../languages/types.js";
+import { interpreterFromShebang } from "../languages/language-registry.js";
 import type { LanguageExtractor } from "./extractors/types.js";
 import { collectSymbolEvidence, type SymbolEvidence } from "./symbol-evidence.js";
 import { builtinExtractors } from "./extractors/index.js";
@@ -41,6 +42,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     | null = null;
   private _languages = new Map<string, TreeSitterLanguage>();
   private _extensionToLang = new Map<string, string>();
+  private _interpreterToLang = new Map<string, string>();
   // One reusable parser per language key. web-tree-sitter parsers are reusable
   // across parse() calls (only the Tree is per-parse, and it's still deleted);
   // creating + setLanguage + delete on every call wasted an allocation and a
@@ -74,6 +76,9 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       for (const ext of config.extensions) {
         const key = ext.startsWith(".") ? ext : `.${ext}`;
         this._extensionToLang.set(key, config.id);
+      }
+      for (const interpreter of config.interpreters ?? []) {
+        this._interpreterToLang.set(interpreter, config.id);
       }
     }
 
@@ -114,13 +119,19 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     return this.extractors.get(key) ?? null;
   }
 
-  private languageKeyFromPath(filePath: string): string | null {
+  private languageKeyFromPath(filePath: string, content?: string): string | null {
     const ext = extname(filePath).toLowerCase();
 
     // Special case: .tsx needs its own grammar
     if (ext === ".tsx") return "tsx";
 
-    return this._extensionToLang.get(ext) ?? null;
+    const byExtension = this._extensionToLang.get(ext);
+    if (byExtension) return byExtension;
+    const interpreter = content === undefined ? null : interpreterFromShebang(content);
+    if (!interpreter) return null;
+    return this._interpreterToLang.get(interpreter)
+      ?? this._interpreterToLang.get(interpreter.replace(/[\d.]+$/, ""))
+      ?? null;
   }
 
   /**
@@ -206,13 +217,13 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
    * Create a parser set to the appropriate language for the given file.
    * This is synchronous because all languages are pre-loaded during init().
    */
-  private getParser(filePath: string): TreeSitterParser | null {
+  private getParser(filePath: string, content?: string): TreeSitterParser | null {
     if (!this._initialized || !this._ParserClass) {
       throw new Error(
         "TreeSitterPlugin.init() must be called before use",
       );
     }
-    const langKey = this.languageKeyFromPath(filePath);
+    const langKey = this.languageKeyFromPath(filePath, content);
     if (!langKey) return null;
     const lang = this._languages.get(langKey);
     if (!lang) {
@@ -239,7 +250,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     filePath: string,
     content: string,
   ): StructuralAnalysis {
-    const parser = this.getParser(filePath);
+    const parser = this.getParser(filePath, content);
     if (!parser) {
       return { functions: [], classes: [], imports: [], exports: [] };
     }
@@ -249,7 +260,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return { functions: [], classes: [], imports: [], exports: [] };
     }
 
-    const langKey = this.languageKeyFromPath(filePath);
+    const langKey = this.languageKeyFromPath(filePath, content);
     const extractor = langKey ? this.getExtractor(langKey) : null;
 
     let result: StructuralAnalysis;
@@ -282,8 +293,8 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
   } {
     let tree: ReturnType<TreeSitterParser["parse"]> = null;
     try {
-      const parser = this.getParser(filePath);
-      const langKey = this.languageKeyFromPath(filePath);
+      const parser = this.getParser(filePath, content);
+      const langKey = this.languageKeyFromPath(filePath, content);
       const extractor = langKey ? this.getExtractor(langKey) : null;
       if (!parser || !extractor) {
         return { status: "unsupported", structure: null, symbolEvidence: null };
@@ -319,7 +330,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     filePath: string,
     content: string,
   ): { structure: StructuralAnalysis; callGraph: CallGraphEntry[] } {
-    const parser = this.getParser(filePath);
+    const parser = this.getParser(filePath, content);
     if (!parser) {
       return { structure: TreeSitterPlugin.emptyStructure(), callGraph: [] };
     }
@@ -329,7 +340,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return { structure: TreeSitterPlugin.emptyStructure(), callGraph: [] };
     }
 
-    const langKey = this.languageKeyFromPath(filePath);
+    const langKey = this.languageKeyFromPath(filePath, content);
     const extractor = langKey ? this.getExtractor(langKey) : null;
 
     const structure = extractor
@@ -371,7 +382,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     filePath: string,
     content: string,
   ): CallGraphEntry[] {
-    const parser = this.getParser(filePath);
+    const parser = this.getParser(filePath, content);
     if (!parser) return [];
 
     const tree = parser.parse(content);
@@ -379,7 +390,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return [];
     }
 
-    const langKey = this.languageKeyFromPath(filePath);
+    const langKey = this.languageKeyFromPath(filePath, content);
     const extractor = langKey ? this.getExtractor(langKey) : null;
     const result = extractor ? extractor.extractCallGraph(tree.rootNode) : [];
 

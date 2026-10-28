@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LanguageRegistry } from "../languages/language-registry.js";
+import { LanguageRegistry, interpreterFromShebang } from "../languages/language-registry.js";
 import { StrictLanguageConfigSchema } from "../languages/types.js";
 import { typescriptConfig } from "../languages/configs/typescript.js";
 import { pythonConfig } from "../languages/configs/python.js";
@@ -202,6 +202,38 @@ describe("LanguageRegistry", () => {
         filePatterns: { entryPoints: [], barrels: [], tests: [], config: [] },
       });
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("shebang detection", () => {
+    const registry = LanguageRegistry.createDefault();
+
+    it.each([
+      ["#!/usr/bin/env python3\nimport sys\n", "python3"],
+      ["#!/usr/bin/env -S python3 -u\n", "python3"],
+      ["#!/usr/bin/env LC_ALL=C node\n", "node"],
+      ["#!/bin/bash -e\n", "bash"],
+      ["#!/usr/bin/python3.12", "python3.12"],
+      ["import os\n", null],
+    ])("reads the interpreter of %j", (content, expected) => {
+      expect(interpreterFromShebang(content)).toBe(expected);
+    });
+
+    it("detects an extensionless script from its first line", () => {
+      expect(registry.getForFile("bin/tool", "#!/usr/bin/env python3\n")?.id).toBe("python");
+      expect(registry.getForFile("bin/tool", "#!/usr/bin/python3.12\n")?.id).toBe("python");
+      expect(registry.getForFile("bin/run", "#!/usr/bin/env node\n")?.id).toBe("javascript");
+      expect(registry.getForFile("bin/deploy", "#!/bin/bash\n")?.id).toBe("shell");
+    });
+
+    it("keeps the extension ahead of the first line", () => {
+      expect(registry.getForFile("bin/tool.js", "#!/usr/bin/env python3\n")?.id).toBe("javascript");
+    });
+
+    it("leaves an extensionless file without shebang or content undetected", () => {
+      expect(registry.getForFile("bin/tool", "print(1)\n")).toBeNull();
+      expect(registry.getForFile("bin/tool")).toBeNull();
+      expect(registry.getForFile("bin/tool", "#!/usr/bin/env perl\n")).toBeNull();
     });
   });
 });

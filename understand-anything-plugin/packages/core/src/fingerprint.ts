@@ -295,7 +295,7 @@ export function buildFingerprintStore(
     const analysis = registry.analyzeFile(filePath, content);
     let fingerprintCoversAnalysis = true;
     if (options.structuralFingerprintLanguages !== undefined) {
-      const language = registry.getLanguageForFile(filePath);
+      const language = registry.getLanguageForFile(filePath, content);
       fingerprintCoversAnalysis =
         language !== null && options.structuralFingerprintLanguages.has(language);
     }
