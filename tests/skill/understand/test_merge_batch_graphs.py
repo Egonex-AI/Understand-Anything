@@ -60,8 +60,8 @@ def _file_node(path: str, **extra: Any) -> dict[str, Any]:
     return node
 
 
-def _whole_file_node(node_type: str, path: str) -> dict[str, Any]:
-    return _file_node(path, id=f"{node_type}:{path}", type=node_type)
+def _whole_file_node(node_type: str, path: str, **extra: Any) -> dict[str, Any]:
+    return _file_node(path, id=f"{node_type}:{path}", type=node_type, **extra)
 
 
 class WholeFileImportIndexTests(unittest.TestCase):
@@ -1035,6 +1035,204 @@ class LinkTestsTests(unittest.TestCase):
                 self.assertEqual(prod["tags"], ["tested"])
 
 
+# ── file-level node classification ────────────────────────────────────────
+
+class FileLevelNodeTests(unittest.TestCase):
+    """`tested_by` endpoints span every file-level node type, not just `file:`.
+
+    SKILL.md documents nine node types whose IDs carry a project-relative
+    path, and its Phase 6 validator treats all nine as file-level. The linker
+    used to classify `file:` only, so a `tested_by` edge whose production
+    endpoint was a `config:`/`schema:`/... node was discarded as an orphan.
+    """
+
+    FILE_LEVEL_TYPES = (
+        "file", "config", "document", "service",
+        "pipeline", "table", "schema", "resource", "endpoint",
+    )
+
+    def test_every_file_level_type_resolves_to_its_path(self) -> None:
+        for node_type in self.FILE_LEVEL_TYPES:
+            with self.subTest(node_type=node_type):
+                node = _whole_file_node(node_type, "docs/app.config.json")
+                self.assertEqual(
+                    mbg._file_node_path(node), "docs/app.config.json"
+                )
+
+    def test_sub_file_and_logical_types_have_no_path(self) -> None:
+        for nid in [
+            "function:src/app.py:main",
+            "class:src/app.py:App",
+            "module:billing",
+            "concept:event-sourcing",
+        ]:
+            with self.subTest(nid=nid):
+                node = {"id": nid, "type": nid.split(":", 1)[0], "filePath": ""}
+                self.assertIsNone(mbg._file_node_path(node))
+
+    def test_id_fallback_when_file_path_missing(self) -> None:
+        node = {"id": "config:docs/app.config.json", "type": "config"}
+        self.assertEqual(mbg._file_node_path(node), "docs/app.config.json")
+
+    def test_id_fallback_drops_trailing_name_for_table_and_endpoint(self) -> None:
+        # `table:`/`endpoint:` IDs are `<prefix>:<path>:<name>` (SKILL.md).
+        for nid, expected in [
+            ("table:migrations/001_init.sql:users", "migrations/001_init.sql"),
+            ("endpoint:src/api/routes.py:GET /users", "src/api/routes.py"),
+            ("endpoint:src/routes.ts:/users/:id", "src/routes.ts"),
+            ("table:src/schema.ts:namespace:users", "src/schema.ts"),
+        ]:
+            with self.subTest(nid=nid):
+                node = {"id": nid, "type": nid.split(":", 1)[0]}
+                self.assertEqual(mbg._file_node_path(node), expected)
+
+    def test_config_production_endpoint_is_kept_and_tagged(self) -> None:
+        config = _whole_file_node("config", "docs/app.config.json")
+        test = _file_node("tests/test_config.py")
+        nodes_by_id = {config["id"]: config, test["id"]: test}
+        edges: list[dict[str, Any]] = [{
+            "source": config["id"],
+            "target": test["id"],
+            "type": "tested_by",
+            "direction": "forward",
+            "weight": 0.5,
+        }]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 0, 1, 0))
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0]["source"], config["id"])
+        self.assertEqual(edges[0]["target"], test["id"])
+        self.assertIn("tested", config["tags"])
+
+    def test_path_convention_targets_whole_files_in_either_node_order(self) -> None:
+        for node_type in ("table", "endpoint", "service", "schema", "resource"):
+            for reverse in (False, True):
+                with self.subTest(node_type=node_type, reverse=reverse):
+                    prod = _file_node("src/routes.ts")
+                    test = _file_node("src/routes.test.ts")
+                    child = _file_node(
+                        "src/routes.ts",
+                        id=f"{node_type}:src/routes.ts:/users/:id",
+                        type=node_type,
+                    )
+                    test_child = _file_node(
+                        "src/routes.test.ts",
+                        id=f"{node_type}:src/routes.test.ts:fixture",
+                        type=node_type,
+                    )
+                    nodes = [prod, child, test, test_child]
+                    if reverse:
+                        nodes.reverse()
+                    edges: list[dict[str, Any]] = []
+
+                    result = mbg.link_tests({n["id"]: n for n in nodes}, edges)
+
+                    self.assertEqual(result, (1, 0, 1, 0))
+                    self.assertEqual(edges[0]["source"], prod["id"])
+                    self.assertEqual(edges[0]["target"], test["id"])
+                    self.assertIn("tested", prod["tags"])
+                    self.assertNotIn("tested", child["tags"])
+
+    def test_path_convention_does_not_guess_child_coverage(self) -> None:
+        child = _file_node(
+            "src/routes.ts", id="endpoint:src/routes.ts:/users/:id", type="endpoint"
+        )
+        test = _file_node("src/routes.test.ts")
+        edges: list[dict[str, Any]] = []
+
+        result = mbg.link_tests({n["id"]: n for n in (child, test)}, edges)
+
+        self.assertEqual(result, (0, 0, 0, 0))
+        self.assertEqual(edges, [])
+        self.assertNotIn("tested", child["tags"])
+
+    def test_explicit_child_coverage_survives_in_either_direction(self) -> None:
+        for node_type in ("table", "endpoint"):
+            for inverted in (False, True):
+                with self.subTest(node_type=node_type, inverted=inverted):
+                    prod = _file_node("src/routes.ts")
+                    child = _file_node(
+                        "src/routes.ts",
+                        id=f"{node_type}:src/routes.ts:/users/:id",
+                        type=node_type,
+                    )
+                    test = _file_node("src/routes.test.ts")
+                    source, target = (test, child) if inverted else (child, test)
+                    edges = [{
+                        "source": source["id"], "target": target["id"],
+                        "type": "tested_by", "weight": 0.5,
+                    }]
+
+                    result = mbg.link_tests(
+                        {n["id"]: n for n in (prod, child, test)}, edges
+                    )
+
+                    self.assertEqual(result, (0, 0, 1, int(inverted)))
+                    self.assertEqual(edges[0]["source"], child["id"])
+                    self.assertEqual(edges[0]["target"], test["id"])
+                    self.assertIn("tested", child["tags"])
+                    self.assertNotIn("tested", prod["tags"])
+
+    def test_inverted_edge_into_a_config_node_is_swapped_not_dropped(self) -> None:
+        config = _whole_file_node("config", "docs/app.config.json")
+        test = _file_node("tests/test_config.py")
+        nodes_by_id = {config["id"]: config, test["id"]: test}
+        edges: list[dict[str, Any]] = [{
+            "source": test["id"],
+            "target": config["id"],
+            "type": "tested_by",
+            "direction": "forward",
+            "weight": 0.5,
+        }]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 0, 1, 1))
+        self.assertEqual(edges[0]["source"], config["id"])
+        self.assertEqual(edges[0]["target"], test["id"])
+
+    def test_path_convention_supplements_a_config_node(self) -> None:
+        config = _whole_file_node("config", "src/app.config.ts")
+        test = _file_node("src/app.config.test.ts")
+        nodes_by_id = {config["id"]: config, test["id"]: test}
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (1, 0, 1, 0))
+        self.assertEqual(edges[0]["source"], config["id"])
+        self.assertEqual(edges[0]["target"], test["id"])
+        self.assertIn("tested", config["tags"])
+
+    def test_sub_file_production_endpoint_is_still_dropped(self) -> None:
+        func = {
+            "id": "function:src/app.py:main",
+            "type": "function",
+            "name": "main",
+            "filePath": "src/app.py",
+            "summary": "",
+            "tags": [],
+            "complexity": "simple",
+        }
+        test = _file_node("tests/test_app.py")
+        nodes_by_id = {func["id"]: func, test["id"]: test}
+        edges: list[dict[str, Any]] = [{
+            "source": func["id"],
+            "target": test["id"],
+            "type": "tested_by",
+            "direction": "forward",
+            "weight": 0.5,
+        }]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (0, 1, 0, 0))
+        self.assertEqual(edges, [])
+        self.assertNotIn("tested", func["tags"])
+
+
 # ── merge_and_normalize integration ───────────────────────────────────────
 
 class MergeIntegrationTests(unittest.TestCase):
@@ -1113,6 +1311,49 @@ class MergeIntegrationTests(unittest.TestCase):
         # Production node tagged
         prod_node = next(n for n in assembled["nodes"] if n["id"] == "file:src/foo.ts")
         self.assertIn("tested", prod_node["tags"])
+
+    def test_config_tested_by_survives_the_merge(self) -> None:
+        """Repro from the issue: a `config:` production endpoint is kept."""
+        batch = {
+            "nodes": [
+                _whole_file_node("config", "docs/app.config.json", tags=["config"]),
+                _file_node("src/app.py", tags=["code"]),
+                _file_node("tests/test_config.py", tags=["test"]),
+                _file_node("tests/test_app.py", tags=["test"]),
+            ],
+            "edges": [
+                {
+                    "source": "config:docs/app.config.json",
+                    "target": "file:tests/test_config.py",
+                    "type": "tested_by",
+                    "direction": "forward",
+                    "weight": 0.5,
+                },
+                {
+                    "source": "file:src/app.py",
+                    "target": "file:tests/test_app.py",
+                    "type": "tested_by",
+                    "direction": "forward",
+                    "weight": 0.5,
+                },
+            ],
+        }
+
+        assembled, _report = mbg.merge_and_normalize([batch])
+
+        pairs = sorted(
+            (e["source"], e["target"])
+            for e in assembled["edges"]
+            if e["type"] == "tested_by"
+        )
+        self.assertEqual(pairs, [
+            ("config:docs/app.config.json", "file:tests/test_config.py"),
+            ("file:src/app.py", "file:tests/test_app.py"),
+        ])
+        config_node = next(
+            n for n in assembled["nodes"] if n["id"] == "config:docs/app.config.json"
+        )
+        self.assertIn("tested", config_node["tags"])
 
 
 class NormalizeDirectionTests(unittest.TestCase):
