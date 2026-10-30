@@ -32,27 +32,44 @@ function parseShPlatforms(source) {
 /**
  * Parse the $Platforms ordered hashtable in install.ps1:
  *   id = @{ Target = (Join-Path $HOME 'target\dir'); Style = 'style' }
+ *
+ * A platform may root its target at a dedicated home variable instead of
+ * $HOME, which is how an installer honours an env-var override (dsh resolves
+ * $DSH_HOME, falling back to $HOME\.dsh) while keeping the table itself a
+ * plain `Join-Path <var> '<dir>'` expression. The map below records the
+ * $HOME-relative directory each supported variable defaults to.
  */
+const PS1_HOME_DIRS = { $HOME: '', $DshHome: '.dsh' };
+
 function parsePs1Platforms(source) {
   const block = source.match(/\$Platforms\s*=\s*\[ordered\]@\{\r?\n([\s\S]*?)\r?\n\}/);
   if (!block) return [];
   const rows = [];
   for (const line of block[1].split('\n')) {
     const m = line.match(
-      /^\s*([a-z0-9][a-z0-9-]*)\s*=\s*@\{\s*Target\s*=\s*\(Join-Path \$HOME '([^']+)'\);\s*Style\s*=\s*'(per-skill|folder)'\s*\}/,
+      /^\s*([a-z0-9][a-z0-9-]*)\s*=\s*@\{\s*Target\s*=\s*\(Join-Path (\$[A-Za-z_][A-Za-z0-9_]*) '([^']+)'\);\s*Style\s*=\s*'(per-skill|folder)'\s*\}/,
     );
-    if (m) rows.push({ id: m[1], target: m[2], style: m[3] });
+    // An unlisted home variable drops the row, so the id/order comparison
+    // below reports the offending platform instead of this parser guessing.
+    if (!m || !(m[2] in PS1_HOME_DIRS)) continue;
+    const prefix = PS1_HOME_DIRS[m[2]];
+    rows.push({ id: m[1], target: prefix ? `${prefix}/${m[3]}` : m[3], style: m[4] });
   }
   return rows;
 }
 
 /**
- * Normalize a skills target dir for cross-script comparison: drop the
- * home-dir prefix (`$HOME/` in bash; PowerShell targets are already relative
- * to $HOME via Join-Path) and unify path separators.
+ * Normalize a skills target dir for cross-script comparison: resolve a
+ * `${VAR:-default}` override to its default (both scripts fall back to the
+ * same $HOME-relative dir), drop the home-dir prefix (`$HOME/` in bash;
+ * PowerShell targets are already relative to $HOME via Join-Path) and unify
+ * path separators.
  */
 function normalizeTarget(target) {
-  return target.replace(/^\$HOME\//, '').replace(/\\/g, '/');
+  return target
+    .replace(/^\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}/, '$1')
+    .replace(/^\$HOME\//, '')
+    .replace(/\\/g, '/');
 }
 
 /** Backtick-quoted ids on the "Supported `<platform>` values:" README line. */
