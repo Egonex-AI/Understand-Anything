@@ -520,6 +520,20 @@ describe("MakefileParser edge cases", () => {
     expect(targetNames).toContain("build");
     expect(targetNames).toContain("test");
   });
+
+  it("does not report a variable whose value contains a colon as a target", () => {
+    const content = [
+      "SRC = main.c util.c",
+      "OBJ = $(SRC:.c=.o)",
+      "URL = https://example.com/releases",
+      "export PATH = /usr/local/bin:$(PATH)",
+      "",
+      "build: $(OBJ)",
+      "\t$(CC) -o app $(OBJ)",
+    ].join("\n");
+    const result = parser.analyzeFile("Makefile", content);
+    expect(result.steps!.map(s => s.name)).toEqual(["build"]);
+  });
 });
 
 describe("ShellParser edge cases", () => {
