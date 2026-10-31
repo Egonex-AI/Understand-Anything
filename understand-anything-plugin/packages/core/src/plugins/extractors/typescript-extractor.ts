@@ -136,14 +136,19 @@ export class TypeScriptExtractor implements LanguageExtractor {
     const walkForCalls = (node: TreeSitterNode) => {
       const isFunctionLike =
         node.type === "function_declaration" ||
+        node.type === "generator_function_declaration" ||
         node.type === "method_definition" ||
         node.type === "arrow_function" ||
-        node.type === "function_expression";
+        node.type === "function_expression" ||
+        node.type === "generator_function";
 
       let pushedName = false;
       if (isFunctionLike) {
         let name: string | undefined;
-        if (node.type === "function_declaration") {
+        if (
+          node.type === "function_declaration" ||
+          node.type === "generator_function_declaration"
+        ) {
           name = (
             node.childForFieldName("name") ??
             node.children.find((c) => c.type === "identifier")
@@ -154,7 +159,8 @@ export class TypeScriptExtractor implements LanguageExtractor {
           )?.text;
         } else if (
           node.type === "arrow_function" ||
-          node.type === "function_expression"
+          node.type === "function_expression" ||
+          node.type === "generator_function"
         ) {
           const parent = node.parent;
           if (parent && parent.type === "variable_declarator") {
@@ -205,6 +211,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
   ): void {
     switch (node.type) {
       case "function_declaration":
+      case "generator_function_declaration":
         this.extractFunction(node, functions);
         break;
 
@@ -332,7 +339,8 @@ export class TypeScriptExtractor implements LanguageExtractor {
         valueNode &&
         (valueNode.type === "arrow_function" ||
           valueNode.type === "function_expression" ||
-          valueNode.type === "function")
+          valueNode.type === "function" ||
+          valueNode.type === "generator_function")
       ) {
         const params = extractParams(
           valueNode.childForFieldName("parameters") ??
@@ -395,7 +403,8 @@ export class TypeScriptExtractor implements LanguageExtractor {
       if (!child) continue;
 
       switch (child.type) {
-        case "function_declaration": {
+        case "function_declaration":
+        case "generator_function_declaration": {
           this.extractFunction(child, functions);
           const nameNode =
             child.childForFieldName("name") ??
