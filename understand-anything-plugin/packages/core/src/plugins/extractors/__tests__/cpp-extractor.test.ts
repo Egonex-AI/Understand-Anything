@@ -570,6 +570,23 @@ struct Store {
       tree.delete();
       parser.delete();
     });
+
+    it("does not qualify inline friend functions with the enclosing class", () => {
+      const { tree, parser, root } = parse(`
+struct Store {
+    friend void refresh(Store) {
+        helper();
+    }
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "refresh", callee: "helper", lineNumber: 4 });
+      expect(result.some((e) => e.caller === "Store::refresh")).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Comprehensive C++ test ----

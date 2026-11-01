@@ -60,6 +60,23 @@ function extractFuncDeclName(
 }
 
 /**
+ * Check whether a function_definition is an inline friend definition.
+ *
+ * `struct Store { friend void refresh(Store) { ... } };` declares a namespace
+ * function, not a member of Store, even though its body sits inside the class.
+ * The nearest class/struct ancestor decides: a friend_declaration hit first
+ * means the definition is a friend (non-member), a class/struct hit first
+ * means it is a member whose body is nested in the class body.
+ */
+function isInlineFriendFunction(node: TreeSitterNode): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === "friend_declaration") return true;
+    if (parent.type === "class_specifier" || parent.type === "struct_specifier") return false;
+  }
+  return false;
+}
+
+/**
  * Extract parameter names from a parameter_list node.
  *
  * Each parameter_declaration has a `declarator` field which may be an identifier,
@@ -171,10 +188,14 @@ export class CppExtractor implements LanguageExtractor {
       // Track entering function_definition. C++ method identity is
       // `Class::method`: an out-of-class definition carries the qualifier in
       // its declarator, an in-class definition inherits the enclosing class.
+      // Inline friend definitions are namespace functions, not members, so
+      // they must not inherit the enclosing class (Codex P2 on #749).
       if (node.type === "function_definition") {
         const info = this.extractFunctionInfo(node);
         if (info) {
-          const owner = info.qualifier ?? classStack[classStack.length - 1] ?? "";
+          const enclosingClass =
+            isInlineFriendFunction(node) ? "" : classStack[classStack.length - 1] ?? "";
+          const owner = info.qualifier ?? enclosingClass;
           functionStack.push(owner ? `${owner}::${info.name}` : info.name);
           pushedName = true;
         }
