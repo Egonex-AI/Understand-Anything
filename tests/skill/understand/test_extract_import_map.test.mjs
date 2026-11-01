@@ -958,6 +958,59 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
     ]);
   });
 
+  it('honors the node condition for ESM imports', () => {
+    // Node ESM consumers get the `node` condition. Without it, a package like
+    // { "node": { "import": "./src/node.mjs" }, "default": "./src/browser.mjs" }
+    // falls through to the browser target.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        exports: {
+          node: { import: './src/node.mjs' },
+          default: './src/browser.mjs',
+        },
+      }),
+      'packages/shared/src/node.mjs': 'export const VERSION = 1;\n',
+      'packages/shared/src/browser.mjs': 'export const VERSION = 2;\n',
+      'apps/web/src/main.mjs': "import { VERSION } from '@acme/shared';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // `node` outranks `default`, and its nested `import` condition resolves
+    // inside it; resolving to browser.mjs would mean the node branch was skipped.
+    expect(result.output.importMap['apps/web/src/main.mjs']).toEqual([
+      'packages/shared/src/node.mjs',
+    ]);
+  });
+
+  it('prefers main over module for require() on packages without exports', () => {
+    // Legacy dual-entry packages have no `exports`: `module` is the ESM entry
+    // and `main` the CommonJS one. A require() consumer must get main, while
+    // an ESM import keeps the historical source→module→main order.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*', 'apps/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        module: './src/esm.mjs',
+        main: './src/cjs.cjs',
+      }),
+      'packages/shared/src/esm.mjs': 'export const VERSION = 1;\n',
+      'packages/shared/src/cjs.cjs': 'exports.VERSION = 1;\n',
+      'apps/web/src/main.mjs': "import { VERSION } from '@acme/shared';\n",
+      'apps/web/src/consumer.cjs': "const { VERSION } = require('@acme/shared');\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.mjs']).toEqual([
+      'packages/shared/src/esm.mjs',
+    ]);
+    // require() prefers main (CJS) before module (ESM).
+    expect(result.output.importMap['apps/web/src/consumer.cjs']).toEqual([
+      'packages/shared/src/cjs.cjs',
+    ]);
+  });
+
   it('treats an array root exports list as the package root export', () => {
     // An array is a fallback target list for the root export; dropping it made
     // resolution fall through to the conventional src/index.ts (the decoy).

@@ -1086,10 +1086,13 @@ function probeWithExtensions(basePath, fileSet) {
 //
 // ESM imports and CommonJS `require()` resolve through different condition
 // sets: a dual package can point them at different files (`import` → ESM
-// build, `require` → CJS build), and Node's `node` condition outranks the
-// generic `module`/`default` fallbacks for require() consumers. Picking the
-// import set for a require() source would silently attach the ESM target.
-const WORKSPACE_IMPORT_CONDITIONS = ['source', 'import', 'module', 'default', 'types'];
+// build, `require` → CJS build). Node's `node` condition outranks the
+// generic `module`/`default` fallbacks for both consumers, so it sits ahead
+// of them in each set (and after the wire-specific key, which is more
+// specific: a dual package's `import`/`require` target should win over a
+// bare `node` target). Picking the wrong set silently attaches the other
+// module system's target.
+const WORKSPACE_IMPORT_CONDITIONS = ['source', 'import', 'node', 'module', 'default', 'types'];
 const WORKSPACE_REQUIRE_CONDITIONS = ['source', 'require', 'node', 'module', 'default', 'types'];
 
 /**
@@ -1161,7 +1164,8 @@ function workspaceRootExportTargets(exports, conditions) {
  * Order: root `exports` (see `workspaceRootExportTargets`) →
  * `package.json#source/module/main` → conventional `src/index` / `index`,
  * each probed against the scanned inventory. `isRequire` selects the
- * CommonJS condition family inside `exports`.
+ * CommonJS condition family inside `exports` and the CommonJS metadata entry
+ * in the legacy fallback: `module` is the ESM entry, `main` the CommonJS one.
  */
 function resolveWorkspaceEntry(pkg, ctx, isRequire) {
   const conditions = isRequire
@@ -1172,7 +1176,8 @@ function resolveWorkspaceEntry(pkg, ctx, isRequire) {
     const probed = probeWorkspaceTarget(pkg.dir, target, ctx);
     if (probed) return probed;
   }
-  for (const field of ['source', 'module', 'main']) {
+  const entryFields = isRequire ? ['source', 'main', 'module'] : ['source', 'module', 'main'];
+  for (const field of entryFields) {
     const probed = probeWorkspaceTarget(pkg.dir, pkg[field], ctx);
     if (probed) return probed;
   }
