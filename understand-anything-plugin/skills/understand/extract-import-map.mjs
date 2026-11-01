@@ -1117,43 +1117,53 @@ function probeWithExtensions(basePath, fileSet) {
 // resolves to null and falls through to the next candidate.
 // ---------------------------------------------------------------------------
 
-// Condition keys honored inside `exports` objects, in resolution-priority
-// order. `source` is a bundler convention; `default`/`types` come last so a
-// real source target wins whenever a package declares one.
+// Condition keys honored inside `exports` objects. Node evaluates the keys of
+// a condition object in the order the manifest declares them, not by a global
+// ranking: `{ "node": ..., "import": ... }` selects the node target while
+// `{ "import": ..., "node": ... }` selects the import one. `runtime` holds the
+// conditions Node itself matches for each consumer; `module`/`types` are
+// non-runtime fallbacks probed only when no runtime key matched. `source` is
+// a bundler convention that the scan deliberately prefers over build output
+// and is handled separately in `workspaceExportTargets`.
 //
-// ESM imports and CommonJS `require()` resolve through different condition
-// sets: a dual package can point them at different files (`import` → ESM
-// build, `require` → CJS build). Node's `node` condition outranks the
-// generic `module`/`default` fallbacks for both consumers, so it sits ahead
-// of them in each set (and after the wire-specific key, which is more
-// specific: a dual package's `import`/`require` target should win over a
-// bare `node` target). Picking the wrong set silently attaches the other
-// module system's target.
-const WORKSPACE_IMPORT_CONDITIONS = ['source', 'import', 'node', 'module', 'default', 'types'];
-const WORKSPACE_REQUIRE_CONDITIONS = ['source', 'require', 'node', 'module', 'default', 'types'];
+// ESM imports and CommonJS `require()` resolve through different runtime
+// sets: a dual package can point them at different builds.
+const WORKSPACE_IMPORT_CONDITIONS = {
+  runtime: new Set(['import', 'node', 'default']),
+  fallback: new Set(['module', 'types']),
+};
+const WORKSPACE_REQUIRE_CONDITIONS = {
+  runtime: new Set(['require', 'node', 'default']),
+  fallback: new Set(['module', 'types']),
+};
 
 /**
  * Flatten an `exports` target (string | condition object | array) into the
- * candidate strings to probe, ordered by `conditions`. Unknown conditions are
- * ignored, and nested condition objects are flattened recursively so
- * `{ "import": { "types": ..., "default": ... } }` works.
+ * candidate strings to probe, in the order the manifest declares them.
+ * Unknown conditions are ignored. `source` (bundler convention) is kept ahead
+ * of runtime conditions, runtime keys follow manifest order, and non-runtime
+ * fallbacks (`module`, `types`) are appended last. Nested condition objects are
+ * flattened recursively so `{ "import": { "types": ..., "default": ... } }`
+ * works.
  */
 function workspaceExportTargets(value, conditions) {
   if (typeof value === 'string') return [value];
   if (Array.isArray(value)) {
-    const out = [];
-    for (const entry of value) out.push(...workspaceExportTargets(entry, conditions));
-    return out;
+    return value.flatMap(entry => workspaceExportTargets(entry, conditions));
   }
-  if (value && typeof value === 'object') {
-    const out = [];
-    for (const condition of conditions) {
-      if (!Object.prototype.hasOwnProperty.call(value, condition)) continue;
-      out.push(...workspaceExportTargets(value[condition], conditions));
-    }
-    return out;
+  if (!value || typeof value !== 'object') return [];
+  const keys = Object.keys(value);
+  const out = [];
+  if (keys.includes('source')) out.push(...workspaceExportTargets(value.source, conditions));
+  for (const key of keys) {
+    if (key === 'source' || !conditions.runtime.has(key)) continue;
+    out.push(...workspaceExportTargets(value[key], conditions));
   }
-  return [];
+  for (const key of keys) {
+    if (!conditions.fallback.has(key)) continue;
+    out.push(...workspaceExportTargets(value[key], conditions));
+  }
+  return out;
 }
 
 /** Whether a candidate stays inside a package directory ('' = pnpm workspace root). */

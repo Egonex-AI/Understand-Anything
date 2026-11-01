@@ -1045,6 +1045,45 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
     ]);
   });
 
+  function dualConditionFixture(exports) {
+    return {
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*'] }),
+      'packages/shared/package.json': JSON.stringify({ name: '@acme/shared', exports }),
+      'packages/shared/src/node.mjs': 'export const VERSION = 1;\n',
+      'packages/shared/src/esm.mjs': 'export const VERSION = 2;\n',
+      'apps/web/src/main.mjs': "import { VERSION } from '@acme/shared';\n",
+    };
+  }
+
+  it('evaluates active export conditions in manifest declaration order', () => {
+    // Node walks condition keys in object order, so `node` declared before
+    // `import` must select node.mjs; the old fixed ranking always picked
+    // import and attributed the edge to the wrong implementation.
+    const result = runFixture(dualConditionFixture({
+      node: './src/node.mjs',
+      import: './src/esm.mjs',
+    }));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.mjs']).toEqual([
+      'packages/shared/src/node.mjs',
+    ]);
+  });
+
+  it('selects the import target when it is declared before node', () => {
+    // Control for the test above: the winner is manifest order, not a fixed
+    // condition ranking, so reversing the keys reverses the resolved file.
+    const result = runFixture(dualConditionFixture({
+      import: './src/esm.mjs',
+      node: './src/node.mjs',
+    }));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.mjs']).toEqual([
+      'packages/shared/src/esm.mjs',
+    ]);
+  });
+
   it('prefers main over module for require() on packages without exports', () => {
     // Legacy dual-entry packages have no `exports`: `module` is the ESM entry
     // and `main` the CommonJS one. A require() consumer must get main, while
