@@ -608,10 +608,20 @@ function parsePnpmWorkspaceGlobs(raw) {
   return globs;
 }
 
+/** Expand workspace-glob brace alternations (`packages/{a,b}`). */
+function expandWorkspaceBraces(glob) {
+  const match = /\{([^{}]*)\}/.exec(glob);
+  if (!match) return [glob];
+  return match[1]
+    .split(',')
+    .flatMap(alternative => expandWorkspaceBraces(glob.replace(match[0], alternative)));
+}
+
 /**
  * Match a workspace glob against a project-relative POSIX directory.
  * Workspace globs select directories, so only whole path segments are
  * compared:
+ *   - `{a,b}` alternations select either branch (expanded above);
  *   - `**` matches zero or more segments (nested workspaces);
  *   - a segment containing `*` matches within that single segment (`*`,
  *     `*-app`, `pkg*`), with each `*` matching any run of characters;
@@ -620,6 +630,10 @@ function parsePnpmWorkspaceGlobs(raw) {
  * Negation (`!glob`) is applied by the caller, not here.
  */
 function matchWorkspaceGlob(glob, dir) {
+  return expandWorkspaceBraces(glob).some(expanded => matchExpandedWorkspaceGlob(expanded, dir));
+}
+
+function matchExpandedWorkspaceGlob(glob, dir) {
   const globParts = glob
     .replace(/^\.\//, '')
     .split('/')
@@ -665,8 +679,9 @@ function matchWorkspaceSegment(pattern, segment) {
  * `files` inventory is the single source of truth for what is part of the
  * project (#589). So instead: read the root `package.json#workspaces` (array
  * or `{ packages: [] }` yarn form) and the root `pnpm-workspace.yaml`, expand
- * their globs against the package.json directories present in `files`, and index
- * each matched package's `name`, `exports`, `source`, `module`, and `main`.
+ * their globs (brace alternations included) against the package.json
+ * directories present in `files`, and index each matched package's `name`,
+ * `exports`, `source`, `module`, and `main`.
  *
  * Returns `{ packages, warnings, failures }` where `packages` is a
  * `Map<packageName, { dir, packageJsonPath, exports, source, module, main }>`.
@@ -770,6 +785,7 @@ async function loadWorkspacePackages(projectRoot, files) {
   // whatever the root package.json declared (a repo can carry both when it
   // supports npm and pnpm consumers). Root manifests are always reported on
   // read/parse failure — they are the workspace definition itself.
+  let pnpmWorkspaceDetected = false;
   for (const manifest of rootPnpmManifests) {
     if (manifest.err) {
       failures.push({
@@ -798,13 +814,32 @@ async function loadWorkspacePackages(projectRoot, files) {
       continue;
     }
     workspaceGlobs.push(...globs);
+    pnpmWorkspaceDetected = true;
   }
+
+  // pnpm lists the root project in `pnpm ls -r`, so a named root package is
+  // importable by children. Index it last to keep member-first duplicate order.
+  const addPnpmRootPackage = () => {
+    const name = rootManifest && typeof rootManifest.name === 'string' ? rootManifest.name : '';
+    if (!pnpmWorkspaceDetected || name.length === 0 || packages.has(name)) return;
+    packages.set(name, {
+      dir: '',
+      packageJsonPath: 'package.json',
+      exports: rootManifest.exports,
+      source: typeof rootManifest.source === 'string' ? rootManifest.source : undefined,
+      module: typeof rootManifest.module === 'string' ? rootManifest.module : undefined,
+      main: typeof rootManifest.main === 'string' ? rootManifest.main : undefined,
+    });
+  };
 
   const includeGlobs = workspaceGlobs.filter(glob => !glob.startsWith('!'));
   const excludeGlobs = workspaceGlobs
     .filter(glob => glob.startsWith('!'))
     .map(glob => glob.slice(1));
-  if (includeGlobs.length === 0) return { packages, warnings, failures };
+  if (includeGlobs.length === 0) {
+    addPnpmRootPackage();
+    return { packages, warnings, failures };
+  }
 
   // Only member manifests selected by the include globs can affect
   // resolution, so only those are parsed and only their read/parse failures
@@ -854,6 +889,8 @@ async function loadWorkspacePackages(projectRoot, files) {
       main: typeof parsed.main === 'string' ? parsed.main : undefined,
     });
   }
+
+  addPnpmRootPackage();
 
   return { packages, warnings, failures };
 }
@@ -1119,6 +1156,12 @@ function workspaceExportTargets(value, conditions) {
   return [];
 }
 
+/** Whether a candidate stays inside a package directory ('' = pnpm workspace root). */
+function isWorkspaceTargetContained(dir, candidate) {
+  if (dir === '') return candidate !== '..' && !candidate.startsWith('../') && !candidate.startsWith('/');
+  return candidate.startsWith(dir + '/');
+}
+
 /**
  * Probe one package-relative target string against the scanned file set.
  * Returns null when the target escapes the package directory or is not a
@@ -1128,7 +1171,7 @@ function probeWorkspaceTarget(dir, target, ctx) {
   if (typeof target !== 'string' || target.length === 0) return null;
   const candidate = posix.normalize(posix.join(dir, target));
   // Defensive: exports/main targets must stay inside the package directory.
-  if (!candidate.startsWith(dir + '/')) return null;
+  if (!isWorkspaceTargetContained(dir, candidate)) return null;
   return probeWithExtensions(candidate, ctx.fileSet);
 }
 
@@ -1254,7 +1297,7 @@ function resolveWorkspaceImport(specifier, ctx, isRequire = false) {
   ]) {
     const normalized = posix.normalize(base);
     // Defensive: a subpath containing `..` must not escape the package.
-    if (!normalized.startsWith(pkg.dir + '/')) continue;
+    if (!isWorkspaceTargetContained(pkg.dir, normalized)) continue;
     const probed = probeWithExtensions(normalized, ctx.fileSet);
     if (probed) return probed;
   }

@@ -827,6 +827,67 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
     );
   });
 
+  it('expands brace alternations in workspace globs', () => {
+    // npm documents workspace entries as globs, so `packages/{shared,utils}`
+    // selects both directories. Treating the braces as literals matched
+    // neither, leaving the package index empty and dropping both imports.
+    const result = runFixture({
+      'package.json': JSON.stringify({
+        private: true,
+        workspaces: ['packages/{shared,utils}'],
+      }),
+      'packages/shared/package.json': JSON.stringify({ name: '@acme/shared' }),
+      'packages/shared/src/index.ts': 'export const shared = 1;\n',
+      'packages/utils/package.json': JSON.stringify({ name: '@acme/utils' }),
+      'packages/utils/src/index.ts': 'export const utils = 2;\n',
+      'apps/web/src/main.ts':
+        "import { shared } from '@acme/shared';\n" +
+        "import { utils } from '@acme/utils';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/shared/src/index.ts',
+      'packages/utils/src/index.ts',
+    ]);
+  });
+
+  it('indexes the pnpm workspace root as an importable package', () => {
+    // pnpm lists the root project in `pnpm ls -r`, so a named root package is
+    // importable by children that depend on it through workspace:*. The root
+    // manifest must enter the package index and its empty package directory
+    // ("") must pass the target-containment probe for exports targets.
+    const result = runFixture({
+      'package.json': JSON.stringify({
+        name: '@acme/root',
+        private: true,
+        exports: {
+          '.': './src/root.ts',
+          './shared': './src/shared.ts',
+        },
+      }),
+      'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n",
+      'src/root.ts': 'export const root = 1;\n',
+      'src/shared.ts': 'export const shared = 2;\n',
+      // Decoy: the conventional fallback would resolve here if the root
+      // package's exports targets were rejected by containment.
+      'src/index.ts': 'export const decoy = 3;\n',
+      'packages/child/package.json': JSON.stringify({
+        name: '@acme/child',
+        dependencies: { '@acme/root': 'workspace:*' },
+      }),
+      'packages/child/src/index.ts':
+        "import { root } from '@acme/root';\n" +
+        "import { shared } from '@acme/root/shared';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['packages/child/src/index.ts']).toEqual([
+      'src/root.ts',
+      'src/shared.ts',
+    ]);
+  });
+
   it('ignores nested pnpm-workspace.yaml manifests outside the project root', () => {
     // This repo ships understand-anything-plugin/pnpm-workspace.yaml for
     // standalone plugin development. pnpm only honors the workspace manifest
