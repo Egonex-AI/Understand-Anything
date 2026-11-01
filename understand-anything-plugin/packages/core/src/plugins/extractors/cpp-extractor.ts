@@ -179,10 +179,8 @@ export class CppExtractor implements LanguageExtractor {
       // Track the enclosing class/struct so method callers carry their owner.
       if (node.type === "class_specifier" || node.type === "struct_specifier") {
         const className = node.childForFieldName("name");
-        if (className) {
-          classStack.push(className.text);
-          pushedClass = true;
-        }
+        classStack.push(className?.text ?? "");
+        pushedClass = true;
       }
 
       // Track entering function_definition. C++ method identity is
@@ -194,7 +192,7 @@ export class CppExtractor implements LanguageExtractor {
         const info = this.extractFunctionInfo(node);
         if (info) {
           const enclosingClass =
-            isInlineFriendFunction(node) ? "" : classStack[classStack.length - 1] ?? "";
+            isInlineFriendFunction(node) ? "" : classStack.at(-1) ?? "";
           const owner = info.qualifier ?? enclosingClass;
           functionStack.push(owner ? `${owner}::${info.name}` : info.name);
           pushedName = true;

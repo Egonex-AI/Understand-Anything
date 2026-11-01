@@ -571,6 +571,43 @@ struct Store {
       parser.delete();
     });
 
+    it("does not inherit the enclosing class for methods of an unnamed nested struct", () => {
+      const { tree, parser, root } = parse(`
+struct Outer {
+    struct {
+        void refresh() {
+            helper();
+        }
+    } inner;
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "refresh", callee: "helper", lineNumber: 5 });
+      expect(result.some((e) => e.caller === "Outer::refresh")).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("still qualifies methods of a named nested class with their class", () => {
+      const { tree, parser, root } = parse(`
+struct Outer {
+    struct Inner {
+        void refresh() {
+            helper();
+        }
+    };
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "Inner::refresh", callee: "helper", lineNumber: 5 });
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("does not qualify inline friend functions with the enclosing class", () => {
       const { tree, parser, root } = parse(`
 struct Store {
