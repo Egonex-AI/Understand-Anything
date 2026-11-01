@@ -153,15 +153,29 @@ export class CppExtractor implements LanguageExtractor {
   extractCallGraph(rootNode: TreeSitterNode): CallGraphEntry[] {
     const entries: CallGraphEntry[] = [];
     const functionStack: string[] = [];
+    const classStack: string[] = [];
 
     const walkForCalls = (node: TreeSitterNode) => {
       let pushedName = false;
+      let pushedClass = false;
 
-      // Track entering function_definition
+      // Track the enclosing class/struct so method callers carry their owner.
+      if (node.type === "class_specifier" || node.type === "struct_specifier") {
+        const className = node.childForFieldName("name");
+        if (className) {
+          classStack.push(className.text);
+          pushedClass = true;
+        }
+      }
+
+      // Track entering function_definition. C++ method identity is
+      // `Class::method`: an out-of-class definition carries the qualifier in
+      // its declarator, an in-class definition inherits the enclosing class.
       if (node.type === "function_definition") {
-        const name = this.extractFunctionName(node);
-        if (name) {
-          functionStack.push(name);
+        const info = this.extractFunctionInfo(node);
+        if (info) {
+          const owner = info.qualifier ?? classStack[classStack.length - 1] ?? "";
+          functionStack.push(owner ? `${owner}::${info.name}` : info.name);
           pushedName = true;
         }
       }
@@ -187,6 +201,9 @@ export class CppExtractor implements LanguageExtractor {
 
       if (pushedName) {
         functionStack.pop();
+      }
+      if (pushedClass) {
+        classStack.pop();
       }
     };
 
@@ -258,15 +275,14 @@ export class CppExtractor implements LanguageExtractor {
   }
 
   /**
-   * Extract the simple function name from a function_definition.
-   * For qualified names (e.g., Server::start), returns just the method name.
+   * Resolve the function/method name and its class/namespace qualifier from a
+   * function_definition. Out-of-class definitions (`void Server::start()`) keep
+   * their qualifier so callers are reported as `Server::start`.
    */
-  private extractFunctionName(node: TreeSitterNode): string | null {
+  private extractFunctionInfo(node: TreeSitterNode): { name: string; qualifier: string | null } | null {
     const declNode = node.childForFieldName("declarator");
     if (!declNode || declNode.type !== "function_declarator") return null;
-
-    const info = extractFuncDeclName(declNode);
-    return info ? info.name : null;
+    return extractFuncDeclName(declNode);
   }
 
   /**

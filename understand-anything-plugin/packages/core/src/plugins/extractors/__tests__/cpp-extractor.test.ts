@@ -531,6 +531,45 @@ void process() {
       tree.delete();
       parser.delete();
     });
+
+    it("qualifies out-of-class method callers with their class (issue #732)", () => {
+      const { tree, parser, root } = parse(`
+void first() {}
+void second() {}
+
+void Alpha::run() {
+    first();
+}
+
+void Beta::run() {
+    second();
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result.filter((e) => e.caller === "Alpha::run").map((e) => e.callee)).toEqual(["first"]);
+      expect(result.filter((e) => e.caller === "Beta::run").map((e) => e.callee)).toEqual(["second"]);
+      expect(result.some((e) => e.caller === "run")).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("qualifies inline class method callers with their class", () => {
+      const { tree, parser, root } = parse(`
+struct Store {
+    void refresh() {
+        helper();
+    }
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "Store::refresh", callee: "helper", lineNumber: 4 });
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Comprehensive C++ test ----
