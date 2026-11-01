@@ -909,6 +909,101 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
     expect(result.output.importMap['src/index.ts']).toEqual(['src/local.ts']);
   });
 
+  it('uses require conditions for CJS require() sources and import conditions for ESM imports', () => {
+    // A dual package can point `import` and `require` at different files. Both
+    // consumers name the same package, so only the source kind can decide
+    // between the ESM and CJS targets (`node`/`default` must not win over
+    // `require` for require() sources).
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*', 'apps/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        exports: {
+          '.': {
+            import: './src/esm.ts',
+            require: './src/cjs.ts',
+            node: './src/node.ts',
+            default: './src/fallback.ts',
+          },
+          './sub': {
+            import: './src/sub-esm.ts',
+            require: './src/sub-cjs.ts',
+          },
+        },
+      }),
+      'packages/shared/src/esm.ts': 'export const VERSION = 1;\n',
+      'packages/shared/src/cjs.ts': 'exports.VERSION = 1;\n',
+      'packages/shared/src/node.ts': 'exports.VERSION = 2;\n',
+      'packages/shared/src/fallback.ts': 'exports.VERSION = 3;\n',
+      'packages/shared/src/sub-esm.ts': 'export const sub = 1;\n',
+      'packages/shared/src/sub-cjs.ts': 'exports.sub = 1;\n',
+      'apps/web/src/main.mjs':
+        "import { VERSION } from '@acme/shared';\n" +
+        "import { sub } from '@acme/shared/sub';\n",
+      'apps/web/src/consumer.cjs':
+        "const { VERSION } = require('@acme/shared');\n" +
+        "const { sub } = require('@acme/shared/sub');\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // ESM importer: the `import` condition wins for entry and deep subpath.
+    expect(result.output.importMap['apps/web/src/main.mjs']).toEqual([
+      'packages/shared/src/esm.ts',
+      'packages/shared/src/sub-esm.ts',
+    ]);
+    // CJS consumer: the `require` condition wins, not import/node/default.
+    expect(result.output.importMap['apps/web/src/consumer.cjs']).toEqual([
+      'packages/shared/src/cjs.ts',
+      'packages/shared/src/sub-cjs.ts',
+    ]);
+  });
+
+  it('treats an array root exports list as the package root export', () => {
+    // An array is a fallback target list for the root export; dropping it made
+    // resolution fall through to the conventional src/index.ts (the decoy).
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        exports: ['./src/public.ts', './src/other.ts'],
+      }),
+      'packages/shared/src/public.ts': 'export const VERSION = 1;\n',
+      'packages/shared/src/other.ts': 'export const VERSION = 2;\n',
+      'packages/shared/src/index.ts': 'export const VERSION = 3;\n',
+      'apps/web/src/main.ts': "import { VERSION } from '@acme/shared';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // First array entry wins over later entries and the src/index decoy.
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/shared/src/public.ts',
+    ]);
+  });
+
+  it('never resolves Node builtin modules to same-named workspace packages', () => {
+    // Builtins always win over node_modules in Node, so a local workspace
+    // package named `util` must not capture import 'util' (or builtin subpaths
+    // such as 'util/types' / the node: prefix).
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*', 'apps/*'] }),
+      'packages/util/package.json': JSON.stringify({ name: 'util', main: 'src/index.ts' }),
+      'packages/util/src/index.ts': 'export const util = 1;\n',
+      'packages/kit/package.json': JSON.stringify({ name: '@acme/kit', main: 'src/index.ts' }),
+      'packages/kit/src/index.ts': 'export const kit = 1;\n',
+      'apps/web/src/main.ts':
+        "import util from 'util';\n" +
+        "import { types } from 'util/types';\n" +
+        "import fs from 'node:fs';\n" +
+        "import { kit } from '@acme/kit';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // Only the real workspace package resolves; every builtin stays external.
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/kit/src/index.ts',
+    ]);
+  });
+
   it('still drops bare external imports when no workspace manifests exist', () => {
     // Regression guard: the workspace branch is consulted for every bare
     // specifier, so a project without workspace manifests must keep dropping

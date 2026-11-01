@@ -39,7 +39,7 @@
  * set importMap[path] = [], they do not abort the script.
  */
 
-import { createRequire } from 'node:module';
+import { createRequire, isBuiltin } from 'node:module';
 import { dirname, resolve, join, posix, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -1083,26 +1083,33 @@ function probeWithExtensions(basePath, fileSet) {
 // Condition keys honored inside `exports` objects, in resolution-priority
 // order. `source` is a bundler convention; `default`/`types` come last so a
 // real source target wins whenever a package declares one.
-const WORKSPACE_EXPORT_CONDITIONS = ['source', 'import', 'module', 'default', 'types'];
+//
+// ESM imports and CommonJS `require()` resolve through different condition
+// sets: a dual package can point them at different files (`import` → ESM
+// build, `require` → CJS build), and Node's `node` condition outranks the
+// generic `module`/`default` fallbacks for require() consumers. Picking the
+// import set for a require() source would silently attach the ESM target.
+const WORKSPACE_IMPORT_CONDITIONS = ['source', 'import', 'module', 'default', 'types'];
+const WORKSPACE_REQUIRE_CONDITIONS = ['source', 'require', 'node', 'module', 'default', 'types'];
 
 /**
  * Flatten an `exports` target (string | condition object | array) into the
- * candidate strings to probe, ordered by condition priority. Unknown
- * conditions are ignored, and nested condition objects are flattened
- * recursively so `{ "import": { "types": ..., "default": ... } }` works.
+ * candidate strings to probe, ordered by `conditions`. Unknown conditions are
+ * ignored, and nested condition objects are flattened recursively so
+ * `{ "import": { "types": ..., "default": ... } }` works.
  */
-function workspaceExportTargets(value) {
+function workspaceExportTargets(value, conditions) {
   if (typeof value === 'string') return [value];
   if (Array.isArray(value)) {
     const out = [];
-    for (const entry of value) out.push(...workspaceExportTargets(entry));
+    for (const entry of value) out.push(...workspaceExportTargets(entry, conditions));
     return out;
   }
   if (value && typeof value === 'object') {
     const out = [];
-    for (const condition of WORKSPACE_EXPORT_CONDITIONS) {
+    for (const condition of conditions) {
       if (!Object.prototype.hasOwnProperty.call(value, condition)) continue;
-      out.push(...workspaceExportTargets(value[condition]));
+      out.push(...workspaceExportTargets(value[condition], conditions));
     }
     return out;
   }
@@ -1125,35 +1132,42 @@ function probeWorkspaceTarget(dir, target, ctx) {
 /**
  * Return the candidate targets for a package's ROOT export.
  *
- * Node's `exports` field has two grammars:
+ * Node's `exports` field has three root-export grammars:
  *   - A subpath map: every key starts with "." (".", "./sub", ...); the
  *     package root is the "." entry.
  *   - A top-level condition object: no subpath keys at all, e.g.
  *     `{ "import": "./src/public.ts", "default": "./dist/index.js" }`. The
  *     whole object describes the root export.
- * A plain string is shorthand for the root target. Returns [] when the
+ *   - An array of target strings (or nested condition objects): a fallback
+ *     list for the root export.
+ * A plain string is shorthand for the single root target. Returns [] when the
  * package declares no resolvable root export, leaving the caller's
  * `source`/`module`/`main`/conventional fallbacks in charge.
  */
-function workspaceRootExportTargets(exports) {
+function workspaceRootExportTargets(exports, conditions) {
   if (typeof exports === 'string') return [exports];
-  if (!exports || typeof exports !== 'object' || Array.isArray(exports)) return [];
+  if (Array.isArray(exports)) return workspaceExportTargets(exports, conditions);
+  if (!exports || typeof exports !== 'object') return [];
   if (Object.prototype.hasOwnProperty.call(exports, '.')) {
-    return workspaceExportTargets(exports['.']);
+    return workspaceExportTargets(exports['.'], conditions);
   }
   const keys = Object.keys(exports);
   if (keys.length === 0 || keys.some(key => key.startsWith('.'))) return [];
-  return workspaceExportTargets(exports);
+  return workspaceExportTargets(exports, conditions);
 }
 
 /**
  * Resolve the package-root specifier (`@acme/shared`) to a source file.
  * Order: root `exports` (see `workspaceRootExportTargets`) →
  * `package.json#source/module/main` → conventional `src/index` / `index`,
- * each probed against the scanned inventory.
+ * each probed against the scanned inventory. `isRequire` selects the
+ * CommonJS condition family inside `exports`.
  */
-function resolveWorkspaceEntry(pkg, ctx) {
-  const rootTargets = workspaceRootExportTargets(pkg.exports);
+function resolveWorkspaceEntry(pkg, ctx, isRequire) {
+  const conditions = isRequire
+    ? WORKSPACE_REQUIRE_CONDITIONS
+    : WORKSPACE_IMPORT_CONDITIONS;
+  const rootTargets = workspaceRootExportTargets(pkg.exports, conditions);
   for (const target of rootTargets) {
     const probed = probeWorkspaceTarget(pkg.dir, target, ctx);
     if (probed) return probed;
@@ -1186,6 +1200,16 @@ function splitWorkspaceSpecifier(specifier) {
 }
 
 /**
+ * Whether a bare specifier is a Node.js builtin module (or a builtin subpath
+ * such as `util/types`). Builtins always win over `node_modules` in Node's
+ * algorithm, so a workspace package that happens to share a builtin's name
+ * (e.g. a local `util` package) must never capture `import util from 'util'`.
+ */
+function isNodeBuiltinSpecifier(specifier) {
+  return specifier.startsWith('node:') || isBuiltin(specifier);
+}
+
+/**
  * Resolve a bare specifier against the workspace package index. Returns the
  * resolved project-relative path, or null when the specifier is external or
  * the workspace target is not in the scanned file set.
@@ -1194,19 +1218,25 @@ function splitWorkspaceSpecifier(specifier) {
  * can point anywhere inside the package, so joining the subpath onto the
  * package directory would miss targets like `./sub: ./src/features/sub.ts` —
  * then fall back to `dir/<subpath>` and `dir/src/<subpath>` probes.
+ * `isRequire` selects the CommonJS condition family for require() sources.
  */
-function resolveWorkspaceImport(specifier, ctx) {
+function resolveWorkspaceImport(specifier, ctx, isRequire = false) {
   if (!ctx.workspacePackages || ctx.workspacePackages.size === 0) return null;
+  // Builtins are external even when a workspace package has the same name.
+  if (isNodeBuiltinSpecifier(specifier)) return null;
   const split = splitWorkspaceSpecifier(specifier);
   if (!split) return null;
   const pkg = ctx.workspacePackages.get(split.name);
   if (!pkg) return null;
-  if (split.subpath === '') return resolveWorkspaceEntry(pkg, ctx);
+  if (split.subpath === '') return resolveWorkspaceEntry(pkg, ctx, isRequire);
 
   if (pkg.exports && typeof pkg.exports === 'object' && !Array.isArray(pkg.exports)) {
     const key = './' + split.subpath;
     if (Object.prototype.hasOwnProperty.call(pkg.exports, key)) {
-      for (const target of workspaceExportTargets(pkg.exports[key])) {
+      const conditions = isRequire
+        ? WORKSPACE_REQUIRE_CONDITIONS
+        : WORKSPACE_IMPORT_CONDITIONS;
+      for (const target of workspaceExportTargets(pkg.exports[key], conditions)) {
         const probed = probeWorkspaceTarget(pkg.dir, target, ctx);
         if (probed) return probed;
       }
@@ -1230,12 +1260,16 @@ function resolveWorkspaceImport(specifier, ctx) {
  * Resolve a TypeScript / JavaScript import. Returns project-relative resolved
  * path or null. External packages return null.
  *
+ * `isRequire` marks specifiers recovered from CommonJS `require()` calls so
+ * workspace package `exports` resolution honors the `require` condition family
+ * instead of the ESM `import` one.
+ *
  * Path-alias resolution walks up from the importer's directory to find the
  * nearest enclosing tsconfig.json (monorepo-friendly). `baseUrl`-relative
  * targets are anchored at THAT tsconfig's directory, matching the way the
  * TypeScript compiler resolves nested project configs.
  */
-export function resolveTsJsImport(rawImport, file, ctx) {
+export function resolveTsJsImport(rawImport, file, ctx, isRequire = false) {
   if (!rawImport || typeof rawImport !== 'string') return null;
   const src = rawImport.trim();
   if (!src) return null;
@@ -1293,7 +1327,7 @@ export function resolveTsJsImport(rawImport, file, ctx) {
   // Workspace monorepo packages: a bare specifier is not external when the
   // root manifest declares it as a workspace member. Consult the workspace
   // index before giving up; non-workspace bare specifiers still return null.
-  const workspaceResolved = resolveWorkspaceImport(src, ctx);
+  const workspaceResolved = resolveWorkspaceImport(src, ctx, isRequire);
   if (workspaceResolved) return workspaceResolved;
 
   // Bare specifier with no leading `./`, no alias match -> external package.
@@ -2394,7 +2428,7 @@ function resolveImport(imp, file, ctx) {
   const lang = file.language;
   const src = imp.source;
   if (TS_JS_LANGS.has(lang)) {
-    const out = resolveTsJsImport(src, file, ctx);
+    const out = resolveTsJsImport(src, file, ctx, imp.isRequire === true);
     return out ? [out] : [];
   }
   if (lang === 'python') {
@@ -2586,9 +2620,16 @@ async function main() {
           }
         }
         // Supplemental pass for sources tree-sitter doesn't capture (e.g.
-        // CJS require() calls, Kotlin imports). Dedup via the same set.
+        // CJS require() calls, Kotlin imports). Dedup via the same set. For
+        // TS/JS these are CommonJS require() literals, so mark them as such:
+        // workspace exports must honor the `require` condition, not `import`.
+        const supplementalSourcesAreRequire = TS_JS_LANGS.has(file.language);
         for (const extra of extractExtraImportSources(file, content)) {
-          const outs = resolveImport({ source: extra, specifiers: [] }, file, ctx);
+          const outs = resolveImport(
+            { source: extra, specifiers: [], isRequire: supplementalSourcesAreRequire },
+            file,
+            ctx,
+          );
           for (const out of outs) {
             if (out && ctx.fileSet.has(out)) {
               resolvedSet.add(out);
