@@ -922,6 +922,49 @@ describe('prepare-incremental.mjs', { timeout: 30_000 }, () => {
     expect(scan.importMap['src/index.ts']).toEqual(['alternate/foo.ts']);
   });
 
+  it('re-resolves unchanged importers when a workspace manifest changes', () => {
+    const { root, baseCommit } = setupRepository({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        exports: { '.': './src/index.ts' },
+      }),
+      'packages/shared/src/index.ts': 'export const value = 1;\n',
+      'packages/shared/src/alternate.ts': 'export const value = 2;\n',
+      'src/index.ts': "import { value } from '@acme/shared';\nexport { value };\n",
+      'src/a.ts': 'export const a = 1;\n',
+    });
+    // Only the member manifest changes, and both export targets already exist,
+    // so no inventory change would trigger re-resolution on its own. Workspace
+    // manifests therefore have to count as import-resolver configuration.
+    writeProjectFile(root, 'packages/shared/package.json', JSON.stringify({
+      name: '@acme/shared',
+      exports: { '.': './src/alternate.ts' },
+    }));
+    commit(root, 'change workspace package export target');
+
+    const { scan } = prepare(root, baseCommit);
+    expect(scan.importMap['src/index.ts']).toEqual(['packages/shared/src/alternate.ts']);
+  });
+
+  it('re-resolves unchanged importers when pnpm workspace globs change', () => {
+    const { root, baseCommit } = setupRepository({
+      'package.json': JSON.stringify({ private: true }),
+      'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n",
+      'packages/shared/package.json': JSON.stringify({ name: '@acme/shared', main: 'src/index.ts' }),
+      'packages/shared/src/index.ts': 'export const value = 1;\n',
+      'src/index.ts': "import { value } from '@acme/shared';\nexport { value };\n",
+      'src/a.ts': 'export const a = 1;\n',
+    });
+    // Dropping the only workspace glob turns the package into an external
+    // import; the importer itself is unchanged, so only a resolver-config
+    // trigger can drop the stale edge.
+    writeProjectFile(root, 'pnpm-workspace.yaml', "packages:\n  - 'other/*'\n");
+    commit(root, 'change pnpm workspace globs');
+
+    const { scan } = prepare(root, baseCommit);
+    expect(scan.importMap['src/index.ts']).toEqual([]);
+  });
   it('aborts without advancing baselines when import extraction reports a config failure', () => {
     const { root, baseCommit } = setupRepository({
       'tsconfig.json': JSON.stringify({

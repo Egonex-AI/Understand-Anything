@@ -750,6 +750,33 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
     ]);
   });
 
+  it('treats a top-level conditional exports object as the package root export', () => {
+    // Node allows the whole `exports` object to be a condition map for the
+    // root subpath (no "." key). Ignoring that shape used to make resolution
+    // fall through to the conventional src/index.ts fallback, i.e. the decoy.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        exports: {
+          import: './src/public.ts',
+          default: './src/other.ts',
+        },
+      }),
+      'packages/shared/src/public.ts': 'export const VERSION = 1;\n',
+      'packages/shared/src/other.ts': 'export const VERSION = 2;\n',
+      'packages/shared/src/index.ts': 'export const VERSION = 3;\n',
+      'apps/web/src/main.ts': "import { VERSION } from '@acme/shared';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // `import` outranks `default`; both targets exist in the inventory, so a
+    // resolver that dropped the condition map would pick src/index.ts instead.
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/shared/src/public.ts',
+    ]);
+  });
+
   it('falls back to dir/ and dir/src/ probes for deep imports without an exports map', () => {
     // Yarn-style `{ packages: [] }` workspaces object; the deep subpath has no
     // `exports` entry, so the resolver tries `dir/<subpath>` then
@@ -774,10 +801,13 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
       'packages/utils/package.json': JSON.stringify({
         name: 'utils',
         exports: {
-          import: { types: './types.d.ts', default: './src/index.ts' },
+          import: { types: './types.d.ts', default: './src/public.ts' },
           default: './dist/index.js',
         },
       }),
+      'packages/utils/src/public.ts': 'export const u = 1;\n',
+      // Decoy: the conventional fallback would resolve here if condition
+      // targets were ignored, so the expected edge proves the exports map won.
       'packages/utils/src/index.ts': 'export const u = 1;\n',
       'packages/utils/dist/index.js': 'export const u = 1;\n',
       'packages/utils/types.d.ts': 'export declare const u: number;\n',
@@ -786,11 +816,15 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
 
     expect(result.status, result.stderr).toBe(0);
     // The top-level `import` condition wins over `default`, and its nested
-    // `default` target wins over `types`: both dist/ and the declaration file
-    // are in the inventory, so the source file must be selected explicitly.
+    // `default` target wins over `types`. The target is deliberately different
+    // from src/index.ts so the assertion distinguishes the exports path from
+    // the conventional src/index fallback.
     expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
-      'packages/utils/src/index.ts',
+      'packages/utils/src/public.ts',
     ]);
+    expect(result.output.importMap['apps/web/src/main.ts']).not.toContain(
+      'packages/utils/src/index.ts',
+    );
   });
 
   it('ignores nested pnpm-workspace.yaml manifests outside the project root', () => {
@@ -811,6 +845,68 @@ describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () =
 
     expect(result.status, result.stderr).toBe(0);
     expect(result.output.importMap['apps/web/src/main.ts']).toEqual([]);
+  });
+
+  it('ignores package.json read/parse failures outside workspace globs', () => {
+    // The incremental pipeline aborts on extraction failures, so an unrelated
+    // broken manifest (fixtures, vendored examples) must not fail the scan when
+    // there are no workspaces to apply (#748 review).
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true }),
+      'fixtures/broken/package.json': '{ "name": "broken", ',
+      'src/index.ts': "import { local } from './local';\n",
+      'src/local.ts': 'export const local = 1;\n',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.failures).toEqual([]);
+    expect(result.stderr).not.toMatch(/workspace (package\.json|manifest)/);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/local.ts']);
+  });
+
+  it('records failures only for package.json files selected by workspace globs', () => {
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*'] }),
+      'packages/ok/package.json': JSON.stringify({ name: '@acme/ok', main: 'src/index.ts' }),
+      'packages/ok/src/index.ts': 'export const ok = 1;\n',
+      'packages/broken/package.json': '{ "name": "@acme/broken", ',
+      'fixtures/other/package.json': '{ "name": "@acme/other", ',
+      'apps/web/src/main.ts': "import { ok } from '@acme/ok';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // The broken member manifest sits inside `packages/*`: report it.
+    expect(result.output.failures).toEqual([
+      expect.objectContaining({
+        path: 'packages/broken/package.json',
+        stage: 'resolver-config-parse',
+      }),
+    ]);
+    expect(result.stderr).toMatch(
+      /workspace package\.json at .*packages\/broken\/package\.json failed to parse/,
+    );
+    // The broken manifest outside the workspace globs stays silent.
+    expect(result.stderr).not.toContain('fixtures/other/package.json');
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/ok/src/index.ts',
+    ]);
+  });
+
+  it('still reports a broken root package.json', () => {
+    // The root manifest defines the workspace itself, so its failure stays
+    // actionable even when no member globs can be recovered from it.
+    const result = runFixture({
+      'package.json': '{ "private": true, ',
+      'src/index.ts': "import { local } from './local';\n",
+      'src/local.ts': 'export const local = 1;\n',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.failures).toEqual([
+      expect.objectContaining({ path: 'package.json', stage: 'resolver-config-parse' }),
+    ]);
+    expect(result.stderr).toMatch(/workspace package\.json at .*package\.json failed to parse/);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/local.ts']);
   });
 
   it('still drops bare external imports when no workspace manifests exist', () => {

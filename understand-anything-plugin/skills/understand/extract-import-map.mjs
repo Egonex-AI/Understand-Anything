@@ -672,6 +672,11 @@ function matchWorkspaceSegment(pattern, segment) {
  * `Map<packageName, { dir, packageJsonPath, exports, source, module, main }>`.
  * Duplicate package names keep the first declaration in `files` order so the
  * index is deterministic.
+ *
+ * Read/parse failures are only reported for the root manifests and for member
+ * manifests selected by the include globs. A broken package.json elsewhere in
+ * the inventory is ignored: callers such as the incremental pipeline abort on
+ * any extraction failure, and an unrelated manifest must not be able to do so.
  */
 async function loadWorkspacePackages(projectRoot, files) {
   const packages = new Map();
@@ -695,28 +700,33 @@ async function loadWorkspacePackages(projectRoot, files) {
   }
 
   const reads = await readFilesParallel(candidates);
-  const manifests = new Map();
-  const pnpmWorkspaceManifests = [];
-  for (const { key: p, raw, err } of reads) {
+  // Root workspace configuration is parsed before any member manifest: the
+  // include globs it declares decide which member manifest failures are
+  // actionable (see the matcher loop below).
+  const rootPnpmManifests = [];
+  const memberManifests = [];
+  let rootManifest = null;
+  for (const read of reads) {
+    const p = read.key;
     const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
-    if (err) {
-      failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
+    const isRootPackageJson = base === 'package.json' && dirOf(p) === '';
+    if (!isRootPackageJson) {
+      if (base === 'package.json') memberManifests.push(read);
+      else rootPnpmManifests.push(read);
+      continue;
+    }
+    if (read.err) {
+      failures.push({ path: p, stage: 'resolver-config-read', message: read.err.message });
       warnings.push(
-        'Warning: extract-import-map: workspace manifest at ' + join(projectRoot, p) + ' failed ' +
-        'to read (' + err.message + ') — workspace imports may not resolve\n',
+        'Warning: extract-import-map: workspace package.json at ' + join(projectRoot, p) +
+        ' failed to read (' + read.err.message + ') — workspace imports may not resolve\n',
       );
       continue;
     }
-    if (base !== 'package.json') {
-      // Candidates above already restrict pnpm manifests to the project root;
-      // keep the guard local so the index can never absorb a nested manifest.
-      if (dirOf(p) === '') pnpmWorkspaceManifests.push({ path: p, raw });
-      continue;
-    }
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(read.raw);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        manifests.set(p, parsed);
+        rootManifest = parsed;
       }
     } catch (parseErr) {
       failures.push({
@@ -735,7 +745,6 @@ async function loadWorkspacePackages(projectRoot, files) {
   // a scan rooted at a subdirectory cannot see globs declared above it, so
   // only the root file is consulted (npm/yarn workspace semantics).
   const workspaceGlobs = [];
-  const rootManifest = manifests.get('package.json');
   if (rootManifest) {
     const workspaces = rootManifest.workspaces;
     if (Array.isArray(workspaces)) {
@@ -759,18 +768,31 @@ async function loadWorkspacePackages(projectRoot, files) {
 
   // pnpm keeps its workspace globs in a separate manifest; merge them with
   // whatever the root package.json declared (a repo can carry both when it
-  // supports npm and pnpm consumers).
-  for (const manifest of pnpmWorkspaceManifests) {
+  // supports npm and pnpm consumers). Root manifests are always reported on
+  // read/parse failure — they are the workspace definition itself.
+  for (const manifest of rootPnpmManifests) {
+    if (manifest.err) {
+      failures.push({
+        path: manifest.key,
+        stage: 'resolver-config-read',
+        message: manifest.err.message,
+      });
+      warnings.push(
+        'Warning: extract-import-map: workspace manifest at ' + join(projectRoot, manifest.key) +
+        ' failed to read (' + manifest.err.message + ') — workspace imports may not resolve\n',
+      );
+      continue;
+    }
     const globs = parsePnpmWorkspaceGlobs(manifest.raw);
     if (globs === null) {
       failures.push({
-        path: manifest.path,
+        path: manifest.key,
         stage: 'resolver-config-parse',
         message: 'unsupported packages shape',
       });
       warnings.push(
         'Warning: extract-import-map: pnpm workspace manifest at ' +
-        join(projectRoot, manifest.path) + ' failed to parse — pnpm workspace globs ' +
+        join(projectRoot, manifest.key) + ' failed to parse — pnpm workspace globs ' +
         'will not be applied\n',
       );
       continue;
@@ -784,21 +806,52 @@ async function loadWorkspacePackages(projectRoot, files) {
     .map(glob => glob.slice(1));
   if (includeGlobs.length === 0) return { packages, warnings, failures };
 
-  for (const [manifestPath, manifest] of manifests) {
-    const dir = dirOf(manifestPath);
-    // The project-root package.json is the workspace root, not a member.
-    if (dir === '') continue;
+  // Only member manifests selected by the include globs can affect
+  // resolution, so only those are parsed and only their read/parse failures
+  // are reported. An unrelated broken package.json (vendored fixtures,
+  // generated examples, ...) must not abort the incremental pipeline, which
+  // treats extraction failures as fatal (#748 review).
+  for (const member of memberManifests) {
+    const dir = dirOf(member.key);
     if (!includeGlobs.some(glob => matchWorkspaceGlob(glob, dir))) continue;
     if (excludeGlobs.some(glob => matchWorkspaceGlob(glob, dir))) continue;
-    if (typeof manifest.name !== 'string' || manifest.name.length === 0) continue;
-    if (packages.has(manifest.name)) continue;
-    packages.set(manifest.name, {
+    if (member.err) {
+      failures.push({
+        path: member.key,
+        stage: 'resolver-config-read',
+        message: member.err.message,
+      });
+      warnings.push(
+        'Warning: extract-import-map: workspace package.json at ' + join(projectRoot, member.key) +
+        ' failed to read (' + member.err.message + ') — workspace imports may not resolve\n',
+      );
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(member.raw);
+    } catch (parseErr) {
+      failures.push({
+        path: member.key,
+        stage: 'resolver-config-parse',
+        message: parseErr.message,
+      });
+      warnings.push(
+        'Warning: extract-import-map: workspace package.json at ' + join(projectRoot, member.key) +
+        ' failed to parse (' + parseErr.message + ') — workspace imports may not resolve\n',
+      );
+      continue;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    if (typeof parsed.name !== 'string' || parsed.name.length === 0) continue;
+    if (packages.has(parsed.name)) continue;
+    packages.set(parsed.name, {
       dir,
-      packageJsonPath: manifestPath,
-      exports: manifest.exports,
-      source: typeof manifest.source === 'string' ? manifest.source : undefined,
-      module: typeof manifest.module === 'string' ? manifest.module : undefined,
-      main: typeof manifest.main === 'string' ? manifest.main : undefined,
+      packageJsonPath: member.key,
+      exports: parsed.exports,
+      source: typeof parsed.source === 'string' ? parsed.source : undefined,
+      module: typeof parsed.module === 'string' ? parsed.module : undefined,
+      main: typeof parsed.main === 'string' ? parsed.main : undefined,
     });
   }
 
@@ -1070,17 +1123,37 @@ function probeWorkspaceTarget(dir, target, ctx) {
 }
 
 /**
+ * Return the candidate targets for a package's ROOT export.
+ *
+ * Node's `exports` field has two grammars:
+ *   - A subpath map: every key starts with "." (".", "./sub", ...); the
+ *     package root is the "." entry.
+ *   - A top-level condition object: no subpath keys at all, e.g.
+ *     `{ "import": "./src/public.ts", "default": "./dist/index.js" }`. The
+ *     whole object describes the root export.
+ * A plain string is shorthand for the root target. Returns [] when the
+ * package declares no resolvable root export, leaving the caller's
+ * `source`/`module`/`main`/conventional fallbacks in charge.
+ */
+function workspaceRootExportTargets(exports) {
+  if (typeof exports === 'string') return [exports];
+  if (!exports || typeof exports !== 'object' || Array.isArray(exports)) return [];
+  if (Object.prototype.hasOwnProperty.call(exports, '.')) {
+    return workspaceExportTargets(exports['.']);
+  }
+  const keys = Object.keys(exports);
+  if (keys.length === 0 || keys.some(key => key.startsWith('.'))) return [];
+  return workspaceExportTargets(exports);
+}
+
+/**
  * Resolve the package-root specifier (`@acme/shared`) to a source file.
- * Order: `exports["."]` → `package.json#source/module/main` → conventional
- * `src/index` / `index`, each probed against the scanned inventory.
+ * Order: root `exports` (see `workspaceRootExportTargets`) →
+ * `package.json#source/module/main` → conventional `src/index` / `index`,
+ * each probed against the scanned inventory.
  */
 function resolveWorkspaceEntry(pkg, ctx) {
-  const rootTargets = typeof pkg.exports === 'string'
-    ? [pkg.exports]
-    : (pkg.exports && typeof pkg.exports === 'object' && !Array.isArray(pkg.exports) &&
-       Object.prototype.hasOwnProperty.call(pkg.exports, '.')
-      ? workspaceExportTargets(pkg.exports['.'])
-      : []);
+  const rootTargets = workspaceRootExportTargets(pkg.exports);
   for (const target of rootTargets) {
     const probed = probeWorkspaceTarget(pkg.dir, target, ctx);
     if (probed) return probed;
