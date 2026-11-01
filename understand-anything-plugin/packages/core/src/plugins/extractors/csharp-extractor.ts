@@ -1,4 +1,9 @@
-import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
+import type {
+  CallGraphEntry,
+  StructuralAnalysis,
+  TypedField,
+  TypedParameter,
+} from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
@@ -7,15 +12,19 @@ import { findChild, findChildren } from "./base-extractor.js";
  *
  * Each `parameter` child has a `name` field (identifier) and a `type` field.
  */
-function extractParams(paramsNode: TreeSitterNode | null): string[] {
+function extractTypedParams(paramsNode: TreeSitterNode | null): TypedParameter[] {
   if (!paramsNode) return [];
-  const params: string[] = [];
+  const params: TypedParameter[] = [];
 
   const paramNodes = findChildren(paramsNode, "parameter");
   for (const param of paramNodes) {
     const nameNode = param.childForFieldName("name");
+    const typeNode = param.childForFieldName("type");
     if (nameNode) {
-      params.push(nameNode.text);
+      params.push({
+        name: nameNode.text,
+        type: typeNode?.text ?? "",
+      });
     }
   }
 
@@ -54,29 +63,83 @@ function hasModifier(node: TreeSitterNode, modifier: string): boolean {
   return false;
 }
 
-/**
- * Extract the namespace source text from a using_directive.
- *
- * Handles both simple identifiers (`using System;`) and qualified names
- * (`using System.Collections.Generic;`). For aliased usings like
- * `using Alias = Some.Namespace;`, extracts the target namespace.
- */
-function extractUsingSource(node: TreeSitterNode): string | null {
-  // Check for alias form: `using Alias = Some.Namespace;`
-  const hasEquals = findChild(node, "=") !== null;
+type CSharpUsingInfo = {
+  source: string;
+  kind: "namespace" | "alias" | "static";
+  alias?: string;
+  isGlobal: boolean;
+};
 
+/**
+ * Extract source and C#-specific kind metadata from a using_directive.
+ */
+function extractUsingInfo(node: TreeSitterNode): CSharpUsingInfo | null {
+  const isGlobal = findChild(node, "global") !== null;
+  const isStatic = findChild(node, "static") !== null;
+  const hasEquals = findChild(node, "=") !== null;
   if (hasEquals) {
-    // The target namespace is the qualified_name after the `=`
     const qualifiedName = findChild(node, "qualified_name");
-    return qualifiedName ? qualifiedName.text : null;
+    const alias = node.childForFieldName("name")?.text;
+    return qualifiedName
+      ? { source: qualifiedName.text, kind: "alias", alias, isGlobal }
+      : null;
   }
 
-  // Simple or qualified using
   const qualifiedName = findChild(node, "qualified_name");
-  if (qualifiedName) return qualifiedName.text;
+  if (qualifiedName) {
+    return {
+      source: qualifiedName.text,
+      kind: isStatic ? "static" : "namespace",
+      isGlobal,
+    };
+  }
 
   const identifier = findChild(node, "identifier");
-  return identifier ? identifier.text : null;
+  return identifier
+    ? { source: identifier.text, kind: isStatic ? "static" : "namespace", isGlobal }
+    : null;
+}
+
+function extractNamespaceName(node: TreeSitterNode): string | null {
+  const nameNode = node.childForFieldName("name");
+  return nameNode?.text ?? null;
+}
+
+function joinNamespace(parentNamespace: string | null, childNamespace: string | null): string | undefined {
+  if (parentNamespace && childNamespace) return `${parentNamespace}.${childNamespace}`;
+  return parentNamespace ?? childNamespace ?? undefined;
+}
+
+function declarationKind(node: TreeSitterNode): "class" | "interface" | "struct" | "record" {
+  switch (node.type) {
+    case "interface_declaration":
+      return "interface";
+    case "struct_declaration":
+      return "struct";
+    case "record_declaration":
+      return "record";
+    default:
+      return "class";
+  }
+}
+
+function extractBaseTypes(node: TreeSitterNode): string[] {
+  const baseList = findChild(node, "base_list");
+  if (!baseList) return [];
+
+  const baseTypes: string[] = [];
+  for (let i = 0; i < baseList.childCount; i++) {
+    const child = baseList.child(i);
+    if (!child) continue;
+    if (
+      child.type === "identifier" ||
+      child.type === "qualified_name" ||
+      child.type === "generic_name"
+    ) {
+      baseTypes.push(child.text);
+    }
+  }
+  return baseTypes;
 }
 
 /**
@@ -132,7 +195,7 @@ export class CSharpExtractor implements LanguageExtractor {
     const imports: StructuralAnalysis["imports"] = [];
     const exports: StructuralAnalysis["exports"] = [];
 
-    this.walkTopLevel(rootNode, functions, classes, imports, exports);
+    this.walkTopLevel(rootNode, functions, classes, imports, exports, null);
 
     return { functions, classes, imports, exports };
   }
@@ -212,34 +275,36 @@ export class CSharpExtractor implements LanguageExtractor {
     classes: StructuralAnalysis["classes"],
     imports: StructuralAnalysis["imports"],
     exports: StructuralAnalysis["exports"],
+    namespaceContext: string | null,
   ): void {
+    let currentNamespace = namespaceContext;
     for (let i = 0; i < node.childCount; i++) {
       const child = node.child(i);
       if (!child) continue;
 
       switch (child.type) {
         case "using_directive":
-          this.extractUsing(child, imports);
+          this.extractUsing(child, imports, currentNamespace);
           break;
 
         case "namespace_declaration":
           // Recurse into namespace body (declaration_list)
-          this.walkNamespaceBody(child, functions, classes, imports, exports);
+          this.walkNamespaceBody(child, functions, classes, imports, exports, currentNamespace);
           break;
 
         case "file_scoped_namespace_declaration":
-          // File-scoped namespace: declarations are siblings at the root,
-          // not children of this node. Nothing to recurse into.
+          // File-scoped namespace: declarations are siblings at the root.
+          currentNamespace = joinNamespace(currentNamespace, extractNamespaceName(child)) ?? null;
           break;
 
         case "class_declaration":
         case "record_declaration":
         case "struct_declaration":
-          this.extractClass(child, functions, classes, exports);
+          this.extractClass(child, functions, classes, exports, currentNamespace);
           break;
 
         case "interface_declaration":
-          this.extractInterface(child, functions, classes, exports);
+          this.extractInterface(child, functions, classes, exports, currentNamespace);
           break;
       }
     }
@@ -255,7 +320,9 @@ export class CSharpExtractor implements LanguageExtractor {
     classes: StructuralAnalysis["classes"],
     imports: StructuralAnalysis["imports"],
     exports: StructuralAnalysis["exports"],
+    namespaceContext: string | null,
   ): void {
+    const currentNamespace = joinNamespace(namespaceContext, extractNamespaceName(nsNode)) ?? null;
     const body = nsNode.childForFieldName("body");
     if (!body) return;
 
@@ -264,19 +331,23 @@ export class CSharpExtractor implements LanguageExtractor {
       if (!child) continue;
 
       switch (child.type) {
+        case "using_directive":
+          this.extractUsing(child, imports, currentNamespace);
+          break;
+
         case "class_declaration":
         case "record_declaration":
         case "struct_declaration":
-          this.extractClass(child, functions, classes, exports);
+          this.extractClass(child, functions, classes, exports, currentNamespace);
           break;
 
         case "interface_declaration":
-          this.extractInterface(child, functions, classes, exports);
+          this.extractInterface(child, functions, classes, exports, currentNamespace);
           break;
 
         case "namespace_declaration":
           // Nested namespaces
-          this.walkNamespaceBody(child, functions, classes, imports, exports);
+          this.walkNamespaceBody(child, functions, classes, imports, exports, currentNamespace);
           break;
       }
     }
@@ -285,14 +356,19 @@ export class CSharpExtractor implements LanguageExtractor {
   private extractUsing(
     node: TreeSitterNode,
     imports: StructuralAnalysis["imports"],
+    namespaceContext: string | null,
   ): void {
-    const source = extractUsingSource(node);
-    if (!source) return;
+    const info = extractUsingInfo(node);
+    if (!info) return;
 
     imports.push({
-      source,
-      specifiers: [lastComponent(source)],
+      source: info.source,
+      specifiers: [lastComponent(info.source)],
       lineNumber: node.startPosition.row + 1,
+      kind: info.kind,
+      ...(info.alias ? { alias: info.alias } : {}),
+      ...(info.isGlobal ? { isGlobal: true } : {}),
+      ...(namespaceContext ? { namespace: namespaceContext } : {}),
     });
   }
 
@@ -301,18 +377,22 @@ export class CSharpExtractor implements LanguageExtractor {
     functions: StructuralAnalysis["functions"],
     classes: StructuralAnalysis["classes"],
     exports: StructuralAnalysis["exports"],
+    namespaceContext: string | null,
   ): void {
     const nameNode = node.childForFieldName("name");
     if (!nameNode) return;
 
     const methods: string[] = [];
     const properties: string[] = [];
+    const fields: TypedField[] = [];
+    const primaryConstructorParams = extractTypedParams(findChild(node, "parameter_list"));
 
     const body = node.childForFieldName("body");
     if (body) {
-      this.extractClassBodyMembers(body, methods, properties, functions, exports);
+      this.extractClassBodyMembers(body, methods, properties, fields, functions, exports);
     }
 
+    const namespace = namespaceContext ?? undefined;
     classes.push({
       name: nameNode.text,
       lineRange: [
@@ -321,6 +401,12 @@ export class CSharpExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      kind: declarationKind(node),
+      namespace,
+      fullName: namespace ? `${namespace}.${nameNode.text}` : nameNode.text,
+      baseTypes: extractBaseTypes(node),
+      primaryConstructorParams,
+      fields,
     });
 
     if (hasModifier(node, "public")) {
@@ -336,6 +422,7 @@ export class CSharpExtractor implements LanguageExtractor {
     functions: StructuralAnalysis["functions"],
     classes: StructuralAnalysis["classes"],
     exports: StructuralAnalysis["exports"],
+    namespaceContext: string | null,
   ): void {
     const nameNode = node.childForFieldName("name");
     if (!nameNode) return;
@@ -351,6 +438,19 @@ export class CSharpExtractor implements LanguageExtractor {
         const methNameNode = methodNode.childForFieldName("name");
         if (methNameNode) {
           methods.push(methNameNode.text);
+          const paramsNode = methodNode.childForFieldName("parameters");
+          const typedParams = extractTypedParams(paramsNode ?? null);
+          functions.push({
+            name: methNameNode.text,
+            lineRange: [
+              methodNode.startPosition.row + 1,
+              methodNode.endPosition.row + 1,
+            ],
+            params: typedParams.map(param => param.name),
+            returnType: extractReturnType(methodNode),
+            typedParams,
+            kind: "method",
+          });
         }
       }
 
@@ -364,6 +464,7 @@ export class CSharpExtractor implements LanguageExtractor {
       }
     }
 
+    const namespace = namespaceContext ?? undefined;
     classes.push({
       name: nameNode.text,
       lineRange: [
@@ -372,6 +473,10 @@ export class CSharpExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      kind: "interface",
+      namespace,
+      fullName: namespace ? `${namespace}.${nameNode.text}` : nameNode.text,
+      baseTypes: extractBaseTypes(node),
     });
 
     if (hasModifier(node, "public")) {
@@ -390,6 +495,7 @@ export class CSharpExtractor implements LanguageExtractor {
     body: TreeSitterNode,
     methods: string[],
     properties: string[],
+    fields: TypedField[],
     functions: StructuralAnalysis["functions"],
     exports: StructuralAnalysis["exports"],
   ): void {
@@ -411,7 +517,7 @@ export class CSharpExtractor implements LanguageExtractor {
           break;
 
         case "field_declaration":
-          this.extractField(child, properties, exports);
+          this.extractField(child, properties, fields, exports);
           break;
       }
     }
@@ -427,7 +533,8 @@ export class CSharpExtractor implements LanguageExtractor {
     if (!nameNode) return;
 
     const paramsNode = node.childForFieldName("parameters");
-    const params = extractParams(paramsNode ?? null);
+    const typedParams = extractTypedParams(paramsNode ?? null);
+    const params = typedParams.map(param => param.name);
     const returnType = extractReturnType(node);
 
     methods.push(nameNode.text);
@@ -440,6 +547,8 @@ export class CSharpExtractor implements LanguageExtractor {
       ],
       params,
       returnType,
+      typedParams,
+      kind: "method",
     });
 
     if (hasModifier(node, "public")) {
@@ -460,7 +569,8 @@ export class CSharpExtractor implements LanguageExtractor {
     if (!nameNode) return;
 
     const paramsNode = node.childForFieldName("parameters");
-    const params = extractParams(paramsNode ?? null);
+    const typedParams = extractTypedParams(paramsNode ?? null);
+    const params = typedParams.map(param => param.name);
 
     methods.push(nameNode.text);
 
@@ -471,6 +581,8 @@ export class CSharpExtractor implements LanguageExtractor {
         node.endPosition.row + 1,
       ],
       params,
+      typedParams,
+      kind: "constructor",
       // Constructors have no return type
     });
 
@@ -503,18 +615,25 @@ export class CSharpExtractor implements LanguageExtractor {
   private extractField(
     node: TreeSitterNode,
     properties: string[],
+    fields: TypedField[],
     exports: StructuralAnalysis["exports"],
   ): void {
     // field_declaration -> variable_declaration -> variable_declarator(s)
     const varDecl = findChild(node, "variable_declaration");
     if (!varDecl) return;
 
+    const type = varDecl.childForFieldName("type")?.text ?? "";
     const declarators = findChildren(varDecl, "variable_declarator");
     for (const decl of declarators) {
       // variable_declarator's first child is the identifier
       const nameNode = findChild(decl, "identifier");
       if (nameNode) {
         properties.push(nameNode.text);
+        fields.push({
+          name: nameNode.text,
+          type,
+          ...(hasModifier(node, "static") ? { isStatic: true } : {}),
+        });
 
         if (hasModifier(node, "public")) {
           exports.push({
