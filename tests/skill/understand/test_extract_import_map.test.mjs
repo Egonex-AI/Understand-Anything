@@ -673,6 +673,163 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
   });
 });
 
+describe('extract-import-map.mjs — TypeScript workspace packages (#589)', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  // Build the fixture tree and derive the input file list from it, so every
+  // fixture keeps its manifests (package.json / pnpm-workspace.yaml) in the
+  // inventory — the workspace loader only consults scanned files.
+  function runFixture(tree) {
+    projectRoot = setupTree(tree);
+    const files = Object.keys(tree).map(path => ({
+      path,
+      language: path.endsWith('.json') ? 'json' : (path.endsWith('.yaml') ? 'yaml' : 'typescript'),
+      fileCategory: path.endsWith('.json') || path.endsWith('.yaml') ? 'config' : 'code',
+    }));
+    return runScript(projectRoot, { projectRoot, files });
+  }
+
+  it('resolves a workspace package name to its source entry point', () => {
+    // Minimal repro from #589: no tsconfig at all, because workspaces do not
+    // need one. `main` points at a gitignored `dist/` file that the scan does
+    // not contain, so resolution has to fall back to `src/index.ts`.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*', 'apps/*'] }),
+      'packages/shared/package.json': JSON.stringify({ name: '@acme/shared', main: 'dist/index.js' }),
+      'packages/shared/src/index.ts': 'export const VERSION = 1;\n',
+      'apps/web/package.json': JSON.stringify({ name: '@acme/web' }),
+      'apps/web/src/helper.ts': 'export const helper = () => 1;\n',
+      'apps/web/src/main.ts':
+        "import { VERSION } from '@acme/shared';\n" +
+        "import { helper } from './helper';\n" +
+        "import react from 'react';\n" +
+        'export const main = () => helper() + VERSION + react;\n',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'apps/web/src/helper.ts',
+      'packages/shared/src/index.ts',
+    ]);
+    // The bare `react` specifier stays external: totalEdges only counts the
+    // relative control edge plus the workspace edge.
+    expect(result.output.stats.totalEdges).toBe(2);
+  });
+
+  it('resolves deep imports through the matched package exports map', () => {
+    // Reviewer follow-up on #589: `./sub` can point anywhere inside the
+    // package, so joining the subpath onto the package directory is not
+    // enough — the exports map has to be consulted.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: ['packages/*', 'apps/*'] }),
+      'packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        exports: {
+          '.': './src/index.ts',
+          './sub': './src/features/sub.ts',
+        },
+      }),
+      'packages/shared/src/index.ts': 'export const VERSION = 1;\n',
+      'packages/shared/src/features/sub.ts': 'export const sub = 2;\n',
+      'apps/web/src/main.ts':
+        "import { VERSION } from '@acme/shared';\n" +
+        "import { sub } from '@acme/shared/sub';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/shared/src/features/sub.ts',
+      'packages/shared/src/index.ts',
+    ]);
+  });
+
+  it('falls back to dir/ and dir/src/ probes for deep imports without an exports map', () => {
+    // Yarn-style `{ packages: [] }` workspaces object; the deep subpath has no
+    // `exports` entry, so the resolver tries `dir/<subpath>` then
+    // `dir/src/<subpath>`.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true, workspaces: { packages: ['packages/*'] } }),
+      'packages/kit/package.json': JSON.stringify({ name: '@acme/kit', main: 'dist/index.js' }),
+      'packages/kit/src/features/thing.ts': 'export const thing = 3;\n',
+      'apps/web/src/main.ts': "import { thing } from '@acme/kit/features/thing';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/kit/src/features/thing.ts',
+    ]);
+  });
+
+  it('discovers pnpm workspace globs and prefers the import export condition', () => {
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true }),
+      'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n  - \"apps/*\"\n\nallowBuilds:\n  esbuild: true\n",
+      'packages/utils/package.json': JSON.stringify({
+        name: 'utils',
+        exports: {
+          import: { types: './types.d.ts', default: './src/index.ts' },
+          default: './dist/index.js',
+        },
+      }),
+      'packages/utils/src/index.ts': 'export const u = 1;\n',
+      'packages/utils/dist/index.js': 'export const u = 1;\n',
+      'packages/utils/types.d.ts': 'export declare const u: number;\n',
+      'apps/web/src/main.ts': "import { u } from 'utils';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    // The top-level `import` condition wins over `default`, and its nested
+    // `default` target wins over `types`: both dist/ and the declaration file
+    // are in the inventory, so the source file must be selected explicitly.
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([
+      'packages/utils/src/index.ts',
+    ]);
+  });
+
+  it('ignores nested pnpm-workspace.yaml manifests outside the project root', () => {
+    // This repo ships understand-anything-plugin/pnpm-workspace.yaml for
+    // standalone plugin development. pnpm only honors the workspace manifest
+    // at the workspace root, so the nested glob must not turn
+    // understand-anything-plugin/packages/shared into a root workspace member.
+    const result = runFixture({
+      'package.json': JSON.stringify({ private: true }),
+      'understand-anything-plugin/pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n",
+      'understand-anything-plugin/packages/shared/package.json': JSON.stringify({
+        name: '@acme/shared',
+        main: 'src/index.ts',
+      }),
+      'understand-anything-plugin/packages/shared/src/index.ts': 'export const VERSION = 1;\n',
+      'apps/web/src/main.ts': "import { VERSION } from '@acme/shared';\n",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['apps/web/src/main.ts']).toEqual([]);
+  });
+
+  it('still drops bare external imports when no workspace manifests exist', () => {
+    // Regression guard: the workspace branch is consulted for every bare
+    // specifier, so a project without workspace manifests must keep dropping
+    // external packages instead of resolving them somewhere unexpected.
+    const result = runFixture({
+      'src/index.ts':
+        "import express from 'express';\n" +
+        "import { local } from './local';\n",
+      'src/local.ts': 'export const local = 1;\n',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual(['src/local.ts']);
+    expect(result.output.stats.totalEdges).toBe(1);
+  });
+});
+
 describe('extract-import-map.mjs — Python resolver', () => {
   let projectRoot;
 

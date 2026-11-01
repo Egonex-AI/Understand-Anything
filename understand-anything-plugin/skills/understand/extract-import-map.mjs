@@ -548,6 +548,264 @@ async function loadSwiftPackageTargets(projectRoot, files) {
 }
 
 /**
+ * Strip one layer of YAML quoting from a workspace glob value.
+ */
+function stripYamlQuotes(value) {
+  if (value.length < 2) return value;
+  const first = value[0];
+  if ((first === "'" || first === '"') && value[value.length - 1] === first) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+/**
+ * Parse the `packages` glob list out of a pnpm-workspace.yaml manifest.
+ *
+ * This is a focused parser, not a general YAML reader: workspace manifests
+ * only need the `packages:` block-sequence form pnpm documents:
+ *
+ *   packages:
+ *     - 'packages/*'
+ *     - 'apps/*'
+ *     - '!packages/legacy'
+ *
+ * The inline flow form (`packages: ['packages/*']`) is accepted because
+ * hand-written one-package configs use it. Returns [] when the manifest has
+ * no `packages` key, and null when the `packages` shape is not understood so
+ * the caller can emit a deterministic Warning instead of silently dropping
+ * every workspace glob.
+ */
+function parsePnpmWorkspaceGlobs(raw) {
+  const globs = [];
+  let inPackages = false;
+  for (const rawLine of raw.split('\n')) {
+    const line = rawLine.trimEnd();
+    // YAML comments start at `#`. Workspace globs never contain `#`, so a
+    // plain strip is enough here.
+    const text = line.replace(/(^|\s)#.*$/, '');
+    if (!inPackages) {
+      const match = /^packages:\s*(.*)$/.exec(text);
+      if (!match) continue;
+      const inline = match[1].trim();
+      if (inline === '') {
+        inPackages = true;
+        continue;
+      }
+      if (!inline.startsWith('[') || !inline.endsWith(']')) return null;
+      for (const item of inline.slice(1, -1).split(',')) {
+        const glob = stripYamlQuotes(item.trim());
+        if (glob) globs.push(glob);
+      }
+      return globs;
+    }
+    if (text.trim() === '') continue; // blank lines are legal inside a sequence
+    const item = /^\s*-\s*(.+)$/.exec(text);
+    if (!item) break; // the next top-level key ends the sequence
+    const glob = stripYamlQuotes(item[1].trim());
+    if (glob) globs.push(glob);
+  }
+  return globs;
+}
+
+/**
+ * Match a workspace glob against a project-relative POSIX directory.
+ * Workspace globs select directories, so only whole path segments are
+ * compared:
+ *   - `**` matches zero or more segments (nested workspaces);
+ *   - a segment containing `*` matches within that single segment (`*`,
+ *     `*-app`, `pkg*`), with each `*` matching any run of characters;
+ *   - every other segment must match literally.
+ *
+ * Negation (`!glob`) is applied by the caller, not here.
+ */
+function matchWorkspaceGlob(glob, dir) {
+  const globParts = glob
+    .replace(/^\.\//, '')
+    .split('/')
+    .filter(part => part !== '' && part !== '.');
+  const dirParts = dir.split('/').filter(Boolean);
+  return matchWorkspaceSegments(globParts, 0, dirParts, 0);
+}
+
+function matchWorkspaceSegments(globParts, globIndex, dirParts, dirIndex) {
+  if (globIndex === globParts.length) return dirIndex === dirParts.length;
+  if (globParts[globIndex] === '**') {
+    for (let next = dirIndex; next <= dirParts.length; next++) {
+      if (matchWorkspaceSegments(globParts, globIndex + 1, dirParts, next)) return true;
+    }
+    return false;
+  }
+  if (dirIndex >= dirParts.length) return false;
+  return matchWorkspaceSegment(globParts[globIndex], dirParts[dirIndex]) &&
+    matchWorkspaceSegments(globParts, globIndex + 1, dirParts, dirIndex + 1);
+}
+
+function matchWorkspaceSegment(pattern, segment) {
+  const parts = pattern.split('*');
+  if (parts.length === 1) return pattern === segment;
+  if (!segment.startsWith(parts[0])) return false;
+  let index = parts[0].length;
+  for (let i = 1; i < parts.length - 1; i++) {
+    const found = segment.indexOf(parts[i], index);
+    if (found === -1) return false;
+    index = found + parts[i].length;
+  }
+  const tail = parts[parts.length - 1];
+  return segment.length - index >= tail.length && segment.endsWith(tail);
+}
+
+/**
+ * Load npm/yarn/pnpm workspace packages from the manifests discovered in the
+ * input file list.
+ *
+ * Workspace monorepos import sibling packages by package name (`@acme/shared`)
+ * instead of by relative path. The mapping cannot come from `node_modules`:
+ * that symlink tree only exists after an install, and the project-scanner's
+ * `files` inventory is the single source of truth for what is part of the
+ * project (#589). So instead: read the root `package.json#workspaces` (array
+ * or `{ packages: [] }` yarn form) and the root `pnpm-workspace.yaml`, expand
+ * their globs against the package.json directories present in `files`, and index
+ * each matched package's `name`, `exports`, `source`, `module`, and `main`.
+ *
+ * Returns `{ packages, warnings, failures }` where `packages` is a
+ * `Map<packageName, { dir, packageJsonPath, exports, source, module, main }>`.
+ * Duplicate package names keep the first declaration in `files` order so the
+ * index is deterministic.
+ */
+async function loadWorkspacePackages(projectRoot, files) {
+  const packages = new Map();
+  const warnings = [];
+  const failures = [];
+  const candidates = [];
+  for (const f of files) {
+    const p = toPosix(f.path);
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (base !== 'package.json') {
+      // pnpm only honors the workspace manifest at the workspace root. Nested
+      // pnpm-workspace.yaml files belong to standalone sub-installs (this repo
+      // ships one inside understand-anything-plugin/); their globs are relative
+      // to that directory and must not leak into root-level package discovery.
+      if (base !== 'pnpm-workspace.yaml' && base !== 'pnpm-workspace.yml') continue;
+      if (dirOf(p) !== '') continue;
+    }
+    const absPath = join(projectRoot, p);
+    if (!existsSync(absPath)) continue;
+    candidates.push({ key: p, absPath });
+  }
+
+  const reads = await readFilesParallel(candidates);
+  const manifests = new Map();
+  const pnpmWorkspaceManifests = [];
+  for (const { key: p, raw, err } of reads) {
+    const base = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p;
+    if (err) {
+      failures.push({ path: p, stage: 'resolver-config-read', message: err.message });
+      warnings.push(
+        'Warning: extract-import-map: workspace manifest at ' + join(projectRoot, p) + ' failed ' +
+        'to read (' + err.message + ') — workspace imports may not resolve\n',
+      );
+      continue;
+    }
+    if (base !== 'package.json') {
+      // Candidates above already restrict pnpm manifests to the project root;
+      // keep the guard local so the index can never absorb a nested manifest.
+      if (dirOf(p) === '') pnpmWorkspaceManifests.push({ path: p, raw });
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        manifests.set(p, parsed);
+      }
+    } catch (parseErr) {
+      failures.push({
+        path: p,
+        stage: 'resolver-config-parse',
+        message: parseErr.message,
+      });
+      warnings.push(
+        'Warning: extract-import-map: workspace package.json at ' + join(projectRoot, p) +
+        ' failed to parse (' + parseErr.message + ') — workspace imports may not resolve\n',
+      );
+    }
+  }
+
+  // Root workspace globs. The root manifest is the project-root package.json;
+  // a scan rooted at a subdirectory cannot see globs declared above it, so
+  // only the root file is consulted (npm/yarn workspace semantics).
+  const workspaceGlobs = [];
+  const rootManifest = manifests.get('package.json');
+  if (rootManifest) {
+    const workspaces = rootManifest.workspaces;
+    if (Array.isArray(workspaces)) {
+      for (const glob of workspaces) {
+        if (typeof glob === 'string' && glob.length > 0) workspaceGlobs.push(glob);
+      }
+    } else if (
+      workspaces && typeof workspaces === 'object' &&
+      Array.isArray(workspaces.packages)
+    ) {
+      for (const glob of workspaces.packages) {
+        if (typeof glob === 'string' && glob.length > 0) workspaceGlobs.push(glob);
+      }
+    } else if (workspaces !== undefined) {
+      warnings.push(
+        'Warning: extract-import-map: package.json at ' + join(projectRoot, 'package.json') +
+        ' has an unsupported "workspaces" value — npm/yarn workspace globs will not be applied\n',
+      );
+    }
+  }
+
+  // pnpm keeps its workspace globs in a separate manifest; merge them with
+  // whatever the root package.json declared (a repo can carry both when it
+  // supports npm and pnpm consumers).
+  for (const manifest of pnpmWorkspaceManifests) {
+    const globs = parsePnpmWorkspaceGlobs(manifest.raw);
+    if (globs === null) {
+      failures.push({
+        path: manifest.path,
+        stage: 'resolver-config-parse',
+        message: 'unsupported packages shape',
+      });
+      warnings.push(
+        'Warning: extract-import-map: pnpm workspace manifest at ' +
+        join(projectRoot, manifest.path) + ' failed to parse — pnpm workspace globs ' +
+        'will not be applied\n',
+      );
+      continue;
+    }
+    workspaceGlobs.push(...globs);
+  }
+
+  const includeGlobs = workspaceGlobs.filter(glob => !glob.startsWith('!'));
+  const excludeGlobs = workspaceGlobs
+    .filter(glob => glob.startsWith('!'))
+    .map(glob => glob.slice(1));
+  if (includeGlobs.length === 0) return { packages, warnings, failures };
+
+  for (const [manifestPath, manifest] of manifests) {
+    const dir = dirOf(manifestPath);
+    // The project-root package.json is the workspace root, not a member.
+    if (dir === '') continue;
+    if (!includeGlobs.some(glob => matchWorkspaceGlob(glob, dir))) continue;
+    if (excludeGlobs.some(glob => matchWorkspaceGlob(glob, dir))) continue;
+    if (typeof manifest.name !== 'string' || manifest.name.length === 0) continue;
+    if (packages.has(manifest.name)) continue;
+    packages.set(manifest.name, {
+      dir,
+      packageJsonPath: manifestPath,
+      exports: manifest.exports,
+      source: typeof manifest.source === 'string' ? manifest.source : undefined,
+      module: typeof manifest.module === 'string' ? manifest.module : undefined,
+      main: typeof manifest.main === 'string' ? manifest.main : undefined,
+    });
+  }
+
+  return { packages, warnings, failures };
+}
+
+/**
  * Walk up from `startDir` (project-relative POSIX, '' for project root)
  * and return the DEEPEST ancestor directory that exists as a key in
  * `configMap`, or undefined if no ancestor matches.
@@ -583,6 +841,11 @@ function findNearestConfigDir(startDir, configMap) {
  *  - goModules: Map<dir, moduleName> from every go.mod in `files[]`.
  *  - phpAutoloads: Map<dir, autoloadMap> from every composer.json in
  *    `files[]`. Resolved paths are anchored at the composer's directory.
+ *  - workspacePackages: Map<packageName, { dir, packageJsonPath, exports,
+ *    source, module, main }> from the npm/yarn/pnpm workspace manifests in
+ *    `files[]`. Bare specifiers matching a workspace package name resolve to
+ *    that package's source entry / `exports` subpath instead of being
+ *    treated as external (#589).
  *  - goFilesByDir: Map<dir, string[]> of .go files per directory (built
  *    once so Go's package-level import dispatch doesn't re-scan the file
  *    set per import).
@@ -600,23 +863,26 @@ async function buildResolutionContext(projectRoot, files) {
   // them to stderr inline. If a loader streamed warnings directly during
   // the concurrent passes, lines from independent loader families could
   // interleave based on I/O timing — that would break the pre-PR
-  // deterministic order (ts → go → php → swift) and make stderr-diff verification
-  // flaky. Drain the buffers in canonical order *after* Promise.all, so
-  // a fixture with `(malformed tsconfig.json, malformed composer.json)`
+  // deterministic order (ts → go → php → swift → workspace) and make stderr-diff
+  // verification flaky. Drain the buffers in canonical order *after* Promise.all,
+  // so a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
-  const [tsResult, goResult, phpResult, swiftResult] = await Promise.all([
+  const [tsResult, goResult, phpResult, swiftResult, workspaceResult] = await Promise.all([
     loadTsConfigs(projectRoot, files),
     loadGoModules(projectRoot, files),
     loadPhpAutoloads(projectRoot, files),
     loadSwiftPackageTargets(projectRoot, files),
+    loadWorkspacePackages(projectRoot, files),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
   for (const w of phpResult.warnings) process.stderr.write(w);
   for (const w of swiftResult.warnings) process.stderr.write(w);
+  for (const w of workspaceResult.warnings) process.stderr.write(w);
   const tsConfigs = tsResult.configs;
   const goModules = goResult.modules;
   const phpAutoloads = phpResult.autoloads;
+  const workspacePackages = workspaceResult.packages;
 
   // Index .go files by their parent directory so the Go resolver can
   // expand a package-level import to all member .go files in O(1).
@@ -659,8 +925,10 @@ async function buildResolutionContext(projectRoot, files) {
       ...goResult.failures,
       ...phpResult.failures,
       ...swiftResult.failures,
+      ...workspaceResult.failures,
     ],
     phpAutoloads,
+    workspacePackages,
     // Dedupe Sets for one-time-per-file warnings. Keyed by importer file
     // path. Mutated by resolvers.
     _warnedNoRustCrateRoot: new Set(),
@@ -743,6 +1011,148 @@ function probeWithExtensions(basePath, fileSet) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Workspace package resolver (npm / yarn / pnpm workspaces)
+//
+// Workspace monorepos import sibling packages by package name (`@acme/shared`)
+// instead of by relative path. Those specifiers are not external — they point
+// at another scanned directory — but `node_modules` symlinks are install
+// artifacts and can never be probed here, so the mapping comes from the
+// workspace manifests indexed in `ctx.workspacePackages` (#589).
+//
+// Entry-point order deliberately prefers SOURCE over build output: `main`
+// usually points into gitignored `dist/`, which the scan never contains, so
+// resolving there would create a dangling edge. `probeWithExtensions()` is the
+// final gate in every branch — a candidate missing from the scanned file set
+// resolves to null and falls through to the next candidate.
+// ---------------------------------------------------------------------------
+
+// Condition keys honored inside `exports` objects, in resolution-priority
+// order. `source` is a bundler convention; `default`/`types` come last so a
+// real source target wins whenever a package declares one.
+const WORKSPACE_EXPORT_CONDITIONS = ['source', 'import', 'module', 'default', 'types'];
+
+/**
+ * Flatten an `exports` target (string | condition object | array) into the
+ * candidate strings to probe, ordered by condition priority. Unknown
+ * conditions are ignored, and nested condition objects are flattened
+ * recursively so `{ "import": { "types": ..., "default": ... } }` works.
+ */
+function workspaceExportTargets(value) {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) {
+    const out = [];
+    for (const entry of value) out.push(...workspaceExportTargets(entry));
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    const out = [];
+    for (const condition of WORKSPACE_EXPORT_CONDITIONS) {
+      if (!Object.prototype.hasOwnProperty.call(value, condition)) continue;
+      out.push(...workspaceExportTargets(value[condition]));
+    }
+    return out;
+  }
+  return [];
+}
+
+/**
+ * Probe one package-relative target string against the scanned file set.
+ * Returns null when the target escapes the package directory or is not a
+ * scanned file (e.g. `main: "dist/index.js"` in a build-output-only tree).
+ */
+function probeWorkspaceTarget(dir, target, ctx) {
+  if (typeof target !== 'string' || target.length === 0) return null;
+  const candidate = posix.normalize(posix.join(dir, target));
+  // Defensive: exports/main targets must stay inside the package directory.
+  if (!candidate.startsWith(dir + '/')) return null;
+  return probeWithExtensions(candidate, ctx.fileSet);
+}
+
+/**
+ * Resolve the package-root specifier (`@acme/shared`) to a source file.
+ * Order: `exports["."]` → `package.json#source/module/main` → conventional
+ * `src/index` / `index`, each probed against the scanned inventory.
+ */
+function resolveWorkspaceEntry(pkg, ctx) {
+  const rootTargets = typeof pkg.exports === 'string'
+    ? [pkg.exports]
+    : (pkg.exports && typeof pkg.exports === 'object' && !Array.isArray(pkg.exports) &&
+       Object.prototype.hasOwnProperty.call(pkg.exports, '.')
+      ? workspaceExportTargets(pkg.exports['.'])
+      : []);
+  for (const target of rootTargets) {
+    const probed = probeWorkspaceTarget(pkg.dir, target, ctx);
+    if (probed) return probed;
+  }
+  for (const field of ['source', 'module', 'main']) {
+    const probed = probeWorkspaceTarget(pkg.dir, pkg[field], ctx);
+    if (probed) return probed;
+  }
+  for (const fallback of ['src/index', 'index']) {
+    const probed = probeWithExtensions(posix.join(pkg.dir, fallback), ctx.fileSet);
+    if (probed) return probed;
+  }
+  return null;
+}
+
+/**
+ * Split a bare specifier into its package name and subpath. Scoped packages
+ * consume two segments (`@acme/shared/utils` → name `@acme/shared`, subpath
+ * `utils`); unscoped packages consume one (`utils/x` → name `utils`, subpath
+ * `x`). Returns null for malformed scoped specifiers / trailing slashes.
+ */
+function splitWorkspaceSpecifier(specifier) {
+  if (specifier.endsWith('/')) return null;
+  const parts = specifier.split('/');
+  if (specifier.startsWith('@')) {
+    if (parts.length < 2 || parts[1].length === 0) return null;
+    return { name: parts[0] + '/' + parts[1], subpath: parts.slice(2).join('/') };
+  }
+  return { name: parts[0], subpath: parts.slice(1).join('/') };
+}
+
+/**
+ * Resolve a bare specifier against the workspace package index. Returns the
+ * resolved project-relative path, or null when the specifier is external or
+ * the workspace target is not in the scanned file set.
+ *
+ * Deep imports consult the matched package's `exports` map first — a subpath
+ * can point anywhere inside the package, so joining the subpath onto the
+ * package directory would miss targets like `./sub: ./src/features/sub.ts` —
+ * then fall back to `dir/<subpath>` and `dir/src/<subpath>` probes.
+ */
+function resolveWorkspaceImport(specifier, ctx) {
+  if (!ctx.workspacePackages || ctx.workspacePackages.size === 0) return null;
+  const split = splitWorkspaceSpecifier(specifier);
+  if (!split) return null;
+  const pkg = ctx.workspacePackages.get(split.name);
+  if (!pkg) return null;
+  if (split.subpath === '') return resolveWorkspaceEntry(pkg, ctx);
+
+  if (pkg.exports && typeof pkg.exports === 'object' && !Array.isArray(pkg.exports)) {
+    const key = './' + split.subpath;
+    if (Object.prototype.hasOwnProperty.call(pkg.exports, key)) {
+      for (const target of workspaceExportTargets(pkg.exports[key])) {
+        const probed = probeWorkspaceTarget(pkg.dir, target, ctx);
+        if (probed) return probed;
+      }
+    }
+  }
+
+  for (const base of [
+    posix.join(pkg.dir, split.subpath),
+    posix.join(pkg.dir, 'src', split.subpath),
+  ]) {
+    const normalized = posix.normalize(base);
+    // Defensive: a subpath containing `..` must not escape the package.
+    if (!normalized.startsWith(pkg.dir + '/')) continue;
+    const probed = probeWithExtensions(normalized, ctx.fileSet);
+    if (probed) return probed;
+  }
+  return null;
+}
+
 /**
  * Resolve a TypeScript / JavaScript import. Returns project-relative resolved
  * path or null. External packages return null.
@@ -806,6 +1216,12 @@ export function resolveTsJsImport(rawImport, file, ctx) {
       }
     }
   }
+
+  // Workspace monorepo packages: a bare specifier is not external when the
+  // root manifest declares it as a workspace member. Consult the workspace
+  // index before giving up; non-workspace bare specifiers still return null.
+  const workspaceResolved = resolveWorkspaceImport(src, ctx);
+  if (workspaceResolved) return workspaceResolved;
 
   // Bare specifier with no leading `./`, no alias match -> external package.
   return null;
