@@ -97,6 +97,23 @@ describe("JavaExtractor", () => {
       parser.delete();
     });
 
+    it("preserves overloaded methods as distinct structural entries", () => {
+      const { tree, parser, root } = parse(`public class Loader {
+    public void load(String value) {}
+    public void load(int value) {}
+}
+`);
+      const result = extractor.extractStructure(root);
+      const overloads = result.functions.filter((fn) => fn.name === "load");
+
+      expect(overloads).toHaveLength(2);
+      expect(overloads.map((fn) => fn.params)).toEqual([["value"], ["value"]]);
+      expect(overloads[0].lineRange).not.toEqual(overloads[1].lineRange);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts methods with generic return types", () => {
       const { tree, parser, root } = parse(`public class Foo {
     public List<String> getItems() {

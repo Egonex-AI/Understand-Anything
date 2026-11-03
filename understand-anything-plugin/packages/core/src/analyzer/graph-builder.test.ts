@@ -134,6 +134,54 @@ describe("GraphBuilder", () => {
     });
   });
 
+  it("skips duplicate structural node IDs and their contains edges", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const builder = new GraphBuilder("test-project", "abc123");
+    const analysis: StructuralAnalysis = {
+      functions: [
+        { name: "load", lineRange: [10, 12], params: ["value"], returnType: "void" },
+        { name: "load", lineRange: [14, 16], params: ["value"], returnType: "void" },
+      ],
+      classes: [
+        { name: "Loader", lineRange: [1, 20], methods: ["load"], properties: [] },
+        { name: "Loader", lineRange: [22, 40], methods: ["load"], properties: [] },
+      ],
+      imports: [],
+      exports: [],
+    };
+
+    builder.addFileWithAnalysis("src/Loader.java", analysis, {
+      summary: "Loader source",
+      tags: [],
+      complexity: "moderate",
+      fileSummary: "Contains overloaded load methods",
+      summaries: {
+        load: "Loads a value",
+        Loader: "Loads values",
+      },
+    });
+
+    const graph = builder.build();
+    const nodeIds = graph.nodes.map((node) => node.id);
+    const containsEdges = graph.edges.filter((edge) => edge.type === "contains");
+
+    expect(new Set(nodeIds).size).toBe(nodeIds.length);
+    expect(graph.nodes.filter((node) => node.type === "function")).toHaveLength(1);
+    expect(graph.nodes.filter((node) => node.type === "class")).toHaveLength(1);
+    expect(graph.nodes.find((node) => node.type === "function")?.lineRange).toEqual([10, 12]);
+    expect(graph.nodes.find((node) => node.type === "class")?.lineRange).toEqual([1, 20]);
+    expect(containsEdges).toHaveLength(2);
+    expect(warnSpy).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Duplicate node ID "function:src/Loader.java:load"'),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Duplicate node ID "class:src/Loader.java:Loader"'),
+    );
+
+    warnSpy.mockRestore();
+  });
+
   it("should create import edges between files", () => {
     const builder = new GraphBuilder("test-project", "abc123");
 
