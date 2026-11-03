@@ -32,6 +32,7 @@ function parseShPlatforms(source) {
 /**
  * Parse the $Platforms ordered hashtable in install.ps1:
  *   id = @{ Target = (Join-Path $HOME 'target\dir'); Style = 'style' }
+ * Platform ids may be quoted (e.g. 'trae-cn').
  */
 function parsePs1Platforms(source) {
   const block = source.match(/\$Platforms\s*=\s*\[ordered\]@\{\r?\n([\s\S]*?)\r?\n\}/);
@@ -39,9 +40,9 @@ function parsePs1Platforms(source) {
   const rows = [];
   for (const line of block[1].split('\n')) {
     const m = line.match(
-      /^\s*([a-z0-9][a-z0-9-]*)\s*=\s*@\{\s*Target\s*=\s*\(Join-Path \$HOME '([^']+)'\);\s*Style\s*=\s*'(per-skill|folder)'\s*\}/,
+      /^\s*(['"]?)([a-z0-9][a-z0-9-]*)\1\s*=\s*@\{\s*Target\s*=\s*\(Join-Path \$HOME '([^']+)'\);\s*Style\s*=\s*'(per-skill|folder)'\s*\}/,
     );
-    if (m) rows.push({ id: m[1], target: m[2], style: m[3] });
+    if (m) rows.push({ id: m[2], target: m[3], style: m[4] });
   }
   return rows;
 }
