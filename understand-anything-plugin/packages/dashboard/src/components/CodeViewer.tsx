@@ -298,6 +298,22 @@ export default function CodeViewer({
       ?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
 
+  // Nullable-safe derived view state — must stay above the `if (!node)`
+  // early return so the component's hook order cannot change when the
+  // selected node appears or disappears (review: hook-order crash).
+  const source = state.source;
+  const language = source?.language ?? fallbackLanguage(node?.filePath);
+  const isMarkdown = language === "markdown";
+  const showRendered = isMarkdown && mdView === "rendered";
+
+  // Scroll to the selected lesson range after the source lines mount
+  // following a Rendered → Source switch (review #4). Only reacts to
+  // view-mode switches; direct selection scrolls synchronously in
+  // toggleSection, so the deps intentionally cover showRendered only.
+  useEffect(() => {
+    if (!showRendered && lessonHighlight) scrollToLine(lessonHighlight.start);
+  }, [showRendered]);
+
   if (!node) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-surface">
@@ -306,10 +322,6 @@ export default function CodeViewer({
     );
   }
 
-  const source = state.source;
-  const language = source?.language ?? fallbackLanguage(node.filePath);
-  const isMarkdown = language === "markdown";
-  const showRendered = isMarkdown && mdView === "rendered";
   const lineInfo = highlightedRange
     ? `${t.codeViewer.lines} ${highlightedRange.start}-${highlightedRange.end}`
     : t.codeViewer.fullFile;
@@ -332,14 +344,6 @@ export default function CodeViewer({
       scrollToLine(start);
     }
   };
-
-  // Scroll to the selected lesson range after the source lines mount
-  // following a Rendered → Source switch (review #4). Only reacts to
-  // view-mode switches; direct selection scrolls synchronously in
-  // toggleSection, so the deps intentionally cover showRendered only.
-  useEffect(() => {
-    if (!showRendered && lessonHighlight) scrollToLine(lessonHighlight.start);
-  }, [showRendered]);
 
   return (
     <div className="h-full w-full flex flex-col bg-surface overflow-hidden">

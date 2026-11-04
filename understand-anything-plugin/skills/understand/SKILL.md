@@ -676,11 +676,12 @@ node "<SKILL_DIR>/finalize-incremental.mjs" "$PROJECT_ROOT"
 
 This helper validates/deduplicates nodes and edges, reconciles layers/tour, and independently reruns the shared symbol validator on the exact graph to be saved. It then atomically saves the graph, patches only changed fingerprints while preserving all others, removes deleted fingerprints, and only then advances `meta.json`. A cached successful merge report cannot bypass the save check. If symbol loss is first detected here, use the same one-retry procedure above, rerun merge and any required architecture/tour phases, then finalize again; if the retry was already used or remains unresolved, **STOP** with the old graph and baselines intact.
 
-**Lesson publication.** `$UA_DIR/code-lessons.json` is only ever written after the graph/tour it describes is saved:
+**Lesson publication.** `$UA_DIR/code-lessons.json` is only ever written after the graph/tour it describes is saved, and only from lessons staged by the current invocation:
 
-- If the finalizer exits successfully and `$UA_DIR/intermediate/code-lessons.normalized.json` exists, atomically move it over `$UA_DIR/code-lessons.json`.
+- If this run attempted lessons, the finalizer exited successfully, and this run's staged `$UA_DIR/intermediate/code-lessons.normalized.json` exists, atomically move it over `$UA_DIR/code-lessons.json`.
 - If this run attempted lessons and they were skipped or failed (no staged document) while `$UA_DIR/code-lessons.json` exists, delete it — stale lessons with `tourOrder` badges for a rebuilt tour must not survive.
 - If the finalizer fails (**STOP**), touch nothing: the previous `$UA_DIR/code-lessons.json` stays beside the previous graph and tour.
+- If this run never attempted lessons — review-only `--review` reruns that skip Phase 5 and scratch cleanup, for example — leave `$UA_DIR/code-lessons.json` untouched, even when a staged document left behind by an earlier interrupted run is present; abandoned staged lessons must not be published beside a saved tour.
 - `PARTIAL_UPDATE` never attempts lessons (it keeps the existing file untouched — see the Code Lessons section above), so with no staged document the served sidecar stays as-is.
 
 - Without `--review`, report the incremental summary and **STOP**. Do not run Phase 6 or the full-save Phase 7; this is what prevents the ordinary local update from paying for whole-graph review.
@@ -858,7 +859,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 1. Write the final knowledge graph to `$UA_DIR/knowledge-graph.json`.
 
-   Then publish lessons under the same rules as **Lesson publication** in the incremental save gate: if `$UA_DIR/intermediate/code-lessons.normalized.json` exists, atomically move it over `$UA_DIR/code-lessons.json`; if lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead so no stale sidecar survives beside the new graph and tour.
+   Then publish lessons under the same rules as **Lesson publication** in the incremental save gate — only when this run executed the Code Lessons step: if this run staged `$UA_DIR/intermediate/code-lessons.normalized.json`, atomically move it over `$UA_DIR/code-lessons.json`; if lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead so no stale sidecar survives beside the new graph and tour. On runs that skipped Phase 5 (e.g. `--review` reruns on the same commit), leave `$UA_DIR/code-lessons.json` untouched — an abandoned staged document from an earlier interrupted run must not be published.
 
 2. **Generate structural fingerprints baseline.** This creates the basis for future automatic incremental updates and **must succeed before `meta.json` is written** — otherwise auto-update sees a fresh commit hash with no fingerprints to compare against, classifies every file as STRUCTURAL, and escalates to `FULL_UPDATE` on every subsequent commit (issue #152).
 
