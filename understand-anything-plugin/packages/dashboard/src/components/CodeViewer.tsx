@@ -494,7 +494,7 @@ export default function CodeViewer({
 
         {lesson && (
           <aside
-            className={`${lessonPanelOpen ? "block" : "hidden"} xl:block w-full xl:w-80 shrink-0 border-t xl:border-t-0 xl:border-l border-border-subtle bg-surface overflow-y-auto max-h-[45vh] xl:max-h-none`}
+            className={`${lessonPanelOpen ? "block" : "hidden"} xl:block w-full xl:w-80 shrink-0 border-t xl:border-t-0 xl:border-l border-border-subtle bg-surface overflow-y-auto max-h-[45%] xl:max-h-none`}
           >
             <div className="sticky top-0 z-10 px-4 py-2.5 bg-surface border-b border-border-subtle">
               <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider">
