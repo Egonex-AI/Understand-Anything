@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FrameworkRegistry } from "../languages/framework-registry.js";
 import { djangoConfig } from "../languages/frameworks/django.js";
 import { reactConfig } from "../languages/frameworks/react.js";
+import { vueConfig } from "../languages/frameworks/vue.js";
 
 describe("FrameworkRegistry", () => {
   it("registers and retrieves a framework config by id", () => {
@@ -44,6 +45,26 @@ describe("FrameworkRegistry", () => {
       });
       expect(detected).toHaveLength(1);
       expect(detected[0].id).toBe("react");
+    });
+
+    it("does not detect React for a Preact-only project", () => {
+      // Regression: the bare "react" keyword matched the substring inside
+      // "preact", so a Preact dependency was misdetected as React.
+      const registry = new FrameworkRegistry();
+      registry.register(reactConfig);
+      const detected = registry.detectFrameworks({
+        "package.json": '{"dependencies": {"preact": "^10.19.0"}}',
+      });
+      expect(detected).toEqual([]);
+    });
+
+    it("still detects Vue after the quoted-keyword change", () => {
+      const registry = new FrameworkRegistry();
+      registry.register(vueConfig);
+      const detected = registry.detectFrameworks({
+        "package.json": '{"dependencies": {"vue": "^3.4.0"}}',
+      });
+      expect(detected.map((f) => f.id)).toContain("vue");
     });
 
     it("detection is case-insensitive", () => {
