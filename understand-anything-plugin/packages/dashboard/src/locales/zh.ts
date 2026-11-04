@@ -186,6 +186,8 @@ export const zh = {
     lesson: "讲解",
     tourStep: "导览",
     overviewOnly: "该文件仅有概览讲解，暂无分段讲解。",
+    showLesson: "显示课程",
+    hideLesson: "隐藏课程",
   },
   customNode: {
     tested: "已测试",

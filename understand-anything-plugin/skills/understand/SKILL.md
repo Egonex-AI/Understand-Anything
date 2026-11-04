@@ -656,7 +656,7 @@ Report to the user: `[Phase 5/7] Writing code lessons...`
 >
 > $LANGUAGE_DIRECTIVE
 
-3. **Normalize** `$UA_DIR/intermediate/code-lessons.json` into the final `$UA_DIR/code-lessons.json`. Apply these steps **in order**:
+3. **Normalize** `$UA_DIR/intermediate/code-lessons.json` into a **staged** document at `$UA_DIR/intermediate/code-lessons.normalized.json`. Do NOT write `$UA_DIR/code-lessons.json` here — publication happens only after the graph/tour this run describes is actually saved (see **Lesson publication** under the incremental save gate below, and Phase 7 step 1 for full runs). Apply these steps **in order**:
    1. **Unwrap envelope:** Accept both `{ "files": {...} }` and a bare files object at the top level.
    2. **Drop unknown files:** Remove entries whose key does not exactly match a file-level node's `filePath` (relative, forward slashes).
    3. **Validate sections:** `lineRange` must be two integers `[start, end]` with `1 <= start <= end`; drop invalid sections, then enforce a maximum of 10 sections per file (truncate beyond that).
@@ -664,7 +664,7 @@ Report to the user: `[Phase 5/7] Writing code lessons...`
    5. **Fallback overview:** If `overview` is missing or empty, substitute the matching node's `summary`.
    6. **Stamp metadata:** Ensure `version: 1` and `generatedAt` (current ISO 8601 timestamp) are present.
 
-4. **On failure:** retry the dispatch once (see Error Handling); if it still fails, skip lessons entirely — do not write a partial `$UA_DIR/code-lessons.json`, record the failure in `$PHASE_WARNINGS`, and continue. The dashboard degrades gracefully when the file is absent.
+4. **On failure:** retry the dispatch once (see Error Handling); if it still fails, skip lessons entirely — leave no staged document, record the failure in `$PHASE_WARNINGS`, and continue. At publication time the previously served `$UA_DIR/code-lessons.json` is removed in that case, so stale lessons never sit beside a rebuilt tour (see **Lesson publication** below). The dashboard degrades gracefully when the file is absent.
 
 ### Incremental deterministic save gate
 
@@ -675,6 +675,13 @@ node "<SKILL_DIR>/finalize-incremental.mjs" "$PROJECT_ROOT"
 ```
 
 This helper validates/deduplicates nodes and edges, reconciles layers/tour, and independently reruns the shared symbol validator on the exact graph to be saved. It then atomically saves the graph, patches only changed fingerprints while preserving all others, removes deleted fingerprints, and only then advances `meta.json`. A cached successful merge report cannot bypass the save check. If symbol loss is first detected here, use the same one-retry procedure above, rerun merge and any required architecture/tour phases, then finalize again; if the retry was already used or remains unresolved, **STOP** with the old graph and baselines intact.
+
+**Lesson publication.** `$UA_DIR/code-lessons.json` is only ever written after the graph/tour it describes is saved:
+
+- If the finalizer exits successfully and `$UA_DIR/intermediate/code-lessons.normalized.json` exists, atomically move it over `$UA_DIR/code-lessons.json`.
+- If this run attempted lessons and they were skipped or failed (no staged document) while `$UA_DIR/code-lessons.json` exists, delete it — stale lessons with `tourOrder` badges for a rebuilt tour must not survive.
+- If the finalizer fails (**STOP**), touch nothing: the previous `$UA_DIR/code-lessons.json` stays beside the previous graph and tour.
+- `PARTIAL_UPDATE` never attempts lessons (it keeps the existing file untouched — see the Code Lessons section above), so with no staged document the served sidecar stays as-is.
 
 - Without `--review`, report the incremental summary and **STOP**. Do not run Phase 6 or the full-save Phase 7; this is what prevents the ordinary local update from paying for whole-graph review.
 - With `--review`, copy the newly saved `$UA_DIR/knowledge-graph.json` to `$UA_DIR/intermediate/assembled-graph.json`, then continue to the full graph-reviewer path in Phase 6. Do not run the inline default reviewer.
@@ -850,6 +857,8 @@ Pass these parameters in the dispatch prompt:
 Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 1. Write the final knowledge graph to `$UA_DIR/knowledge-graph.json`.
+
+   Then publish lessons under the same rules as **Lesson publication** in the incremental save gate: if `$UA_DIR/intermediate/code-lessons.normalized.json` exists, atomically move it over `$UA_DIR/code-lessons.json`; if lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead so no stale sidecar survives beside the new graph and tour.
 
 2. **Generate structural fingerprints baseline.** This creates the basis for future automatic incremental updates and **must succeed before `meta.json` is written** — otherwise auto-update sees a fresh commit hash with no fingerprints to compare against, classifies every file as STRUCTURAL, and escalates to `FULL_UPDATE` on every subsequent commit (issue #152).
 

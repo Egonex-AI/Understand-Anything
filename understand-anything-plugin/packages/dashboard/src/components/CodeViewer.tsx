@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import type { CodeLessonSection, CodeLessons } from "@understand-anything/core/types";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { normalizeCodeLessons } from "../utils/codeLessons";
 
 interface CodeViewerProps {
   accessToken: string;
@@ -39,10 +40,13 @@ function fetchCodeLessons(token: string): Promise<CodeLessons | null> {
     lessonsPromise = fetch(`/code-lessons.json?token=${encodeURIComponent(token)}`)
       .then(async (res) => {
         if (!res.ok) return null;
-        const data = (await res.json()) as CodeLessons;
-        if (data && typeof data === "object" && data.files && typeof data.files === "object") {
-          lessonsCache = data;
-          return data;
+        // Lessons are agent-generated — validate/drop malformed shapes before
+        // caching so one bad entry can neither crash the viewer nor discard
+        // the remaining valid entries (review #1).
+        const normalized = normalizeCodeLessons(await res.json());
+        if (normalized) {
+          lessonsCache = normalized;
+          return normalized;
         }
         return null;
       })
@@ -209,10 +213,23 @@ export default function CodeViewer({
   // (.ua/code-lessons.json), aligned with the guided tour.
   const [lessons, setLessons] = useState<CodeLessons | null>(null);
   // Line range selected from a lesson section — takes precedence over the
-  // node's own lineRange highlight until deselected or the file changes.
+  // node's own lineRange highlight until deselected or another node is opened.
   const [lessonHighlight, setLessonHighlight] = useState<{ start: number; end: number } | null>(null);
+  // Narrow screens stack the lesson panel below the source and keep it
+  // collapsed by default so the source stays readable (review #5); desktop
+  // keeps the side-by-side panel always visible.
+  const [lessonPanelOpen, setLessonPanelOpen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches,
+  );
   const codeScrollRef = useRef<HTMLDivElement | null>(null);
   const { t } = useI18n();
+
+  // A lesson-section selection is scoped to the node it was chosen from —
+  // clear it whenever another node is opened so the node's own lineRange
+  // highlight and header range take over again (review #2).
+  useEffect(() => {
+    setLessonHighlight(null);
+  }, [codeViewerNodeId]);
 
   useEffect(() => {
     if (accessToken === "__demo__") return;
@@ -223,7 +240,10 @@ export default function CodeViewer({
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+    // Re-run when the file path changes so lessons generated after an
+    // earlier 404 appear on the next file open (review #3). Successful
+    // loads are served from the shared cache.
+  }, [accessToken, node?.filePath]);
 
   useEffect(() => {
     if (!node?.filePath) {
@@ -303,8 +323,23 @@ export default function CodeViewer({
       return;
     }
     setLessonHighlight({ start, end });
-    if (!showRendered) scrollToLine(start);
+    if (showRendered) {
+      // Rendered markdown has no source-line elements to highlight — switch
+      // to the source view first; the effect below scrolls once lines mount
+      // (review #4).
+      setMdView("source");
+    } else {
+      scrollToLine(start);
+    }
   };
+
+  // Scroll to the selected lesson range after the source lines mount
+  // following a Rendered → Source switch (review #4). Only reacts to
+  // view-mode switches; direct selection scrolls synchronously in
+  // toggleSection, so the deps intentionally cover showRendered only.
+  useEffect(() => {
+    if (!showRendered && lessonHighlight) scrollToLine(lessonHighlight.start);
+  }, [showRendered]);
 
   return (
     <div className="h-full w-full flex flex-col bg-surface overflow-hidden">
@@ -360,7 +395,7 @@ export default function CodeViewer({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex overflow-hidden bg-root">
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row overflow-hidden bg-root">
         <div ref={codeScrollRef} className="flex-1 min-w-0 overflow-auto">
           {state.status === "loading" && (
             <div className="p-5 text-sm text-text-muted">{t.codeViewer.loading}</div>
@@ -380,6 +415,16 @@ export default function CodeViewer({
               <div className="px-4 py-2 border-b border-border-subtle bg-surface text-[11px] text-text-muted flex items-center justify-between">
                 <span>{source.lineCount} {t.codeViewer.linesLabel}</span>
                 <div className="flex items-center gap-3">
+                  {lesson && (
+                    <button
+                      type="button"
+                      onClick={() => setLessonPanelOpen((open) => !open)}
+                      className="xl:hidden text-[10px] uppercase tracking-wider text-accent hover:text-accent/80 transition-colors"
+                      aria-expanded={lessonPanelOpen}
+                    >
+                      {lessonPanelOpen ? t.codeViewer.hideLesson : t.codeViewer.showLesson}
+                    </button>
+                  )}
                   {isMarkdown && (
                     <div className="flex items-center rounded border border-border-subtle overflow-hidden" role="group">
                       {(["rendered", "source"] as const).map((view) => (
@@ -448,7 +493,9 @@ export default function CodeViewer({
         </div>
 
         {lesson && (
-          <aside className="w-72 xl:w-80 shrink-0 border-l border-border-subtle bg-surface overflow-y-auto">
+          <aside
+            className={`${lessonPanelOpen ? "block" : "hidden"} xl:block w-full xl:w-80 shrink-0 border-t xl:border-t-0 xl:border-l border-border-subtle bg-surface overflow-y-auto max-h-[45vh] xl:max-h-none`}
+          >
             <div className="sticky top-0 z-10 px-4 py-2.5 bg-surface border-b border-border-subtle">
               <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider">
                 {t.codeViewer.lesson}

@@ -186,6 +186,8 @@ export const ko = {
     lesson: "해설",
     tourStep: "투어",
     overviewOnly: "이 파일에는 개요만 있고 구간별 해설이 없습니다.",
+    showLesson: "레슨 보기",
+    hideLesson: "레슨 숨기기",
   },
   customNode: {
     tested: "테스트됨",

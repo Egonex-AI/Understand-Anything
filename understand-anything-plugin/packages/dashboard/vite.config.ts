@@ -282,6 +282,156 @@ export function createDashboardDataMiddleware(
   };
 }
 
+/**
+ * All data endpoints except /staleness.json. Exported so the test harness
+ * exercises exactly what the dev server serves (review #6).
+ */
+export function createDataEndpointsMiddleware(
+  accessToken: string,
+): DashboardDataMiddleware {
+  return (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
+    const pathname = url.pathname;
+    const isProtectedEndpoint =
+      pathname === "/knowledge-graph.json" ||
+      pathname === "/domain-graph.json" ||
+      pathname === "/diff-overlay.json" ||
+      pathname === "/meta.json" ||
+      pathname === "/config.json" ||
+      pathname === "/code-lessons.json" ||
+      pathname === "/file-content.json";
+
+    if (!isProtectedEndpoint) {
+      next();
+      return;
+    }
+
+    // FIX 3 — require the one-time token on all data endpoints.
+    // Requests without a matching ?token= get a 403.
+    if (url.searchParams.get("token") !== accessToken) {
+      sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
+      return;
+    }
+
+    if (pathname === "/file-content.json") {
+      const result = readSourceFile(url);
+      sendJson(res, result.statusCode, result.payload);
+      return;
+    }
+
+    if (pathname === "/config.json") {
+      const configCandidates = graphFileCandidates("config.json");
+      for (const candidate of configCandidates) {
+        if (fs.existsSync(candidate)) {
+          try {
+            const raw = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+            sendJson(res, 200, raw);
+            return;
+          } catch {
+            sendJson(res, 500, { error: "Failed to read config file" });
+            return;
+          }
+        }
+      }
+      sendJson(res, 200, { autoUpdate: false, outputLanguage: "en" });
+      return;
+    }
+
+    if (pathname === "/code-lessons.json") {
+      // Lessons belong to the selected project: resolve beside the graph this
+      // server actually selected (single candidate, matching viewer.mjs).
+      // Walking the fallback roots here served another project's sidecar for
+      // matching file paths when the selected project had no lessons of its
+      // own (review #6).
+      const graphFile = findGraphFile("knowledge-graph.json");
+      const lessonsCandidates = graphFile
+        ? [path.join(path.dirname(graphFile), "code-lessons.json")]
+        : [];
+      for (const candidate of lessonsCandidates) {
+        if (!fs.existsSync(candidate)) continue;
+        try {
+          const raw = fs.readFileSync(candidate, "utf-8");
+          res.setHeader("Content-Type", "application/json");
+          res.end(raw);
+        } catch {
+          sendJson(res, 500, { error: "Failed to read code lessons file" });
+        }
+        return;
+      }
+      // Code lessons are optional — absent file means the dashboard
+      // renders the code viewer without the lesson panel.
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+
+    const fileName =
+      pathname === "/diff-overlay.json"
+        ? "diff-overlay.json"
+        : pathname === "/meta.json"
+        ? "meta.json"
+        : pathname === "/domain-graph.json"
+        ? "domain-graph.json"
+        : "knowledge-graph.json";
+
+    const candidates = graphFileCandidates(fileName);
+
+    for (const candidate of candidates) {
+      if (!fs.existsSync(candidate)) continue;
+
+      // FIX 2 — sanitise absolute file paths before sending the JSON.
+      // Nodes can contain filePath values like /Users/alice/company/src/auth.ts.
+      // We convert those to relative paths (src/auth.ts) so the developer's
+      // home directory and company directory layout are not leaked.
+      try {
+        const raw = JSON.parse(fs.readFileSync(candidate, "utf-8")) as {
+          nodes?: Array<Record<string, unknown>>;
+          [key: string]: unknown;
+        };
+
+        // Derive the project root from the candidate path so we can
+        // make file paths relative to it.
+        const projectRoot = projectRootFromGraphFile(candidate);
+
+        if (Array.isArray(raw.nodes)) {
+          raw.nodes = raw.nodes.map((node) => {
+            if (typeof node.filePath !== "string") return node;
+            const abs = node.filePath;
+            // Only relativise paths that actually sit inside projectRoot.
+            // Leave external or already-relative paths untouched.
+            const rel = abs.startsWith(projectRoot)
+              ? abs.slice(projectRoot.length).replace(/^[\\/]/, "")
+              : path.isAbsolute(abs)
+              ? path.basename(abs) // absolute but outside root — use filename only
+              : abs;              // already relative — keep as-is
+            return { ...node, filePath: rel };
+          });
+        }
+
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(raw));
+      } catch (err) {
+        // If we cannot parse or sanitise the file, refuse to serve it
+        // rather than accidentally leaking raw content.
+        console.error("[understand-anything] Failed to sanitise graph file:", err);
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: "Failed to read graph file" }));
+      }
+      return;
+    }
+
+    // No matching file found on disk.
+    res.statusCode = 404;
+    if (pathname === "/knowledge-graph.json") {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: "No knowledge graph found. Run /understand first." }));
+    } else {
+      res.end();
+    }
+  };
+}
+
 type DashboardViteConfig = UserConfig & {
   test: {
     environment: "node";
@@ -358,140 +508,7 @@ const config: DashboardViteConfig = {
         });
 
         server.middlewares.use(createDashboardDataMiddleware(ACCESS_TOKEN));
-
-        server.middlewares.use((req, res, next) => {
-          const url = new URL(req.url ?? "/", "http://127.0.0.1:5173");
-          const pathname = url.pathname;
-          const isProtectedEndpoint =
-            pathname === "/knowledge-graph.json" ||
-            pathname === "/domain-graph.json" ||
-            pathname === "/diff-overlay.json" ||
-            pathname === "/meta.json" ||
-            pathname === "/config.json" ||
-            pathname === "/code-lessons.json" ||
-            pathname === "/file-content.json";
-
-          if (!isProtectedEndpoint) {
-            next();
-            return;
-          }
-
-          // FIX 3 — require the one-time token on all data endpoints.
-          // Requests without a matching ?token= get a 403.
-          if (url.searchParams.get("token") !== ACCESS_TOKEN) {
-            sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
-            return;
-          }
-
-          if (pathname === "/file-content.json") {
-            const result = readSourceFile(url);
-            sendJson(res, result.statusCode, result.payload);
-            return;
-          }
-
-          if (pathname === "/config.json") {
-            const configCandidates = graphFileCandidates("config.json");
-            for (const candidate of configCandidates) {
-              if (fs.existsSync(candidate)) {
-                try {
-                  const raw = JSON.parse(fs.readFileSync(candidate, "utf-8"));
-                  sendJson(res, 200, raw);
-                  return;
-                } catch {
-                  sendJson(res, 500, { error: "Failed to read config file" });
-                  return;
-                }
-              }
-            }
-            sendJson(res, 200, { autoUpdate: false, outputLanguage: "en" });
-            return;
-          }
-
-          if (pathname === "/code-lessons.json") {
-            const lessonsCandidates = graphFileCandidates("code-lessons.json");
-            for (const candidate of lessonsCandidates) {
-              if (!fs.existsSync(candidate)) continue;
-              try {
-                const raw = fs.readFileSync(candidate, "utf-8");
-                res.setHeader("Content-Type", "application/json");
-                res.end(raw);
-              } catch {
-                sendJson(res, 500, { error: "Failed to read code lessons file" });
-              }
-              return;
-            }
-            // Code lessons are optional — absent file means the dashboard
-            // renders the code viewer without the lesson panel.
-            res.statusCode = 404;
-            res.end();
-            return;
-          }
-
-          const fileName =
-            pathname === "/diff-overlay.json"
-              ? "diff-overlay.json"
-              : pathname === "/meta.json"
-              ? "meta.json"
-              : pathname === "/domain-graph.json"
-              ? "domain-graph.json"
-              : "knowledge-graph.json";
-
-          const candidates = graphFileCandidates(fileName);
-
-          for (const candidate of candidates) {
-            if (!fs.existsSync(candidate)) continue;
-
-            // FIX 2 — sanitise absolute file paths before sending the JSON.
-            // Nodes can contain filePath values like /Users/alice/company/src/auth.ts.
-            // We convert those to relative paths (src/auth.ts) so the developer's
-            // home directory and company directory layout are not leaked.
-            try {
-              const raw = JSON.parse(fs.readFileSync(candidate, "utf-8")) as {
-                nodes?: Array<Record<string, unknown>>;
-                [key: string]: unknown;
-              };
-
-              // Derive the project root from the candidate path so we can
-              // make file paths relative to it.
-              const projectRoot = projectRootFromGraphFile(candidate);
-
-              if (Array.isArray(raw.nodes)) {
-                raw.nodes = raw.nodes.map((node) => {
-                  if (typeof node.filePath !== "string") return node;
-                  const abs = node.filePath;
-                  // Only relativise paths that actually sit inside projectRoot.
-                  // Leave external or already-relative paths untouched.
-                  const rel = abs.startsWith(projectRoot)
-                    ? abs.slice(projectRoot.length).replace(/^[\\/]/, "")
-                    : path.isAbsolute(abs)
-                    ? path.basename(abs) // absolute but outside root — use filename only
-                    : abs;              // already relative — keep as-is
-                  return { ...node, filePath: rel };
-                });
-              }
-
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify(raw));
-            } catch (err) {
-              // If we cannot parse or sanitise the file, refuse to serve it
-              // rather than accidentally leaking raw content.
-              console.error("[understand-anything] Failed to sanitise graph file:", err);
-              res.statusCode = 500;
-              res.setHeader("Content-Type", "application/json");
-              res.end(JSON.stringify({ error: "Failed to read graph file" }));
-            }
-            return;
-          }
-
-          // No matching file found on disk.
-          res.statusCode = 404;
-          if (pathname === "/knowledge-graph.json") {
-            res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify({ error: "No knowledge graph found. Run /understand first." }));
-          } else {
-            res.end();
-          }
-        });
+        server.middlewares.use(createDataEndpointsMiddleware(ACCESS_TOKEN));
       },
     },
   ],

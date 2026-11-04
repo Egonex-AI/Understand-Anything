@@ -186,6 +186,8 @@ export const ru = {
     lesson: "Конспект",
     tourStep: "Обзор",
     overviewOnly: "Для этого файла доступен только обзор — без разбора по секциям.",
+    showLesson: "Показать урок",
+    hideLesson: "Скрыть урок",
   },
   customNode: {
     tested: "Покрыт тестами",

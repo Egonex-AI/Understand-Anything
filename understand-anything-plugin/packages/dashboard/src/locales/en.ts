@@ -186,6 +186,8 @@ export const en = {
     lesson: "Lesson",
     tourStep: "Tour",
     overviewOnly: "Overview only — no section breakdown for this file.",
+    showLesson: "Show lesson",
+    hideLesson: "Hide lesson",
   },
   customNode: {
     tested: "Tested",

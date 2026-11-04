@@ -124,6 +124,7 @@ function clearIncrementalScratch(intermediateDir) {
     'layers.json',
     'tour.json',
     'code-lessons.json',
+    'code-lessons.normalized.json',
     'incremental-symbol-report.json',
     'incremental-edge-candidates.json',
   ]);

@@ -186,6 +186,8 @@ export const ja = {
     lesson: "解説",
     tourStep: "ツアー",
     overviewOnly: "このファイルには概要のみあり、セクションごとの解説はありません。",
+    showLesson: "レッスンを表示",
+    hideLesson: "レッスンを隠す",
   },
   customNode: {
     tested: "テスト済み",
