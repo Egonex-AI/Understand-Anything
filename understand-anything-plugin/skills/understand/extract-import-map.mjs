@@ -604,11 +604,12 @@ async function buildResolutionContext(projectRoot, files) {
   // flaky. Drain the buffers in canonical order *after* Promise.all, so
   // a fixture with `(malformed tsconfig.json, malformed composer.json)`
   // always emits `tsconfig…\ncomposer…\n`, never the reverse.
-  const [tsResult, goResult, phpResult, swiftResult] = await Promise.all([
+  const [tsResult, goResult, phpResult, swiftResult, csTypes] = await Promise.all([
     loadTsConfigs(projectRoot, files),
     loadGoModules(projectRoot, files),
     loadPhpAutoloads(projectRoot, files),
     loadSwiftPackageTargets(projectRoot, files),
+    loadCSharpTypes(projectRoot, files),
   ]);
   for (const w of tsResult.warnings) process.stderr.write(w);
   for (const w of goResult.warnings) process.stderr.write(w);
@@ -653,6 +654,7 @@ async function buildResolutionContext(projectRoot, files) {
     scalaIndex,
     scalaPackageIndex,
     csIndex,
+    csTypes,
     swiftModuleIndex,
     failures: [
       ...tsResult.failures,
@@ -1431,6 +1433,99 @@ export function resolveCSharpImport(rawImport, _file, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// C# type-reference resolver (issues #635, #645)
+//
+// The dotted rule above almost never fires: a `using` names a NAMESPACE, which
+// spans many files, and files in the same namespace need no `using` at all.
+// Measured on a 33-file C# repo: 112 usings, 0 resolved edges.
+//
+// Instead: index every type declared in the project (class, struct, interface,
+// enum, record, delegate) with its file and namespace, then link a file to every
+// file declaring a type it names, when that type's namespace is visible from it:
+//   - the global namespace, the file's own namespace or one of its parents,
+//   - a `using` / `global using` (anywhere in the project) of that namespace,
+//   - a `using static` / alias of the type itself.
+// `[Foo]` also matches `FooAttribute`. Comments and string literals are
+// stripped first. Known limits: a type name that also appears as a member
+// name of an unrelated type still matches (false hit), and extension methods
+// used without naming their static class are missed. The file-analyzer's
+// import review flags both (see agents/file-analyzer.md, "Import review").
+// ---------------------------------------------------------------------------
+
+function stripCSharpNoise(content) {
+  return content
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, ' ')
+    .replace(/"""[\s\S]*?"""/g, '""')
+    .replace(/[$@]*"(?:[^"\\\n]|\\.|"")*"/g, '""')
+    .replace(/'(?:[^'\\\n]|\\.)'/g, "''");
+}
+
+const CS_USING_RE = /^\s*(global\s+)?using\s+(static\s+)?(?:(\w+)\s*=\s*)?([\w.]+)\s*;/gm;
+const CS_NAMESPACE_RE = /^\s*namespace\s+([\w.]+)/gm;
+const CS_TYPE_DECL_RE =
+  /\b(?:class|struct|interface|enum|record(?:\s+(?:class|struct))?|delegate\s+[\w.<>,\s?[\]]+?)\s+([A-Za-z_]\w*)\s*(?=[<({:;\s]|where\b)/g;
+
+function parseCSharpFile(content) {
+  const src = stripCSharpNoise(content);
+  const usings = [];
+  const globalUsings = [];
+  for (const m of src.matchAll(CS_USING_RE)) (m[1] ? globalUsings : usings).push(m[4]);
+  const namespaces = [...src.matchAll(CS_NAMESPACE_RE)].map(m => m[1]);
+  const types = [...new Set([...src.matchAll(CS_TYPE_DECL_RE)].map(m => m[1]))];
+  const idents = new Set(src.match(/\b[A-Za-z_]\w*\b/g) ?? []);
+  return { usings, globalUsings, namespace: namespaces[0] ?? '', types, idents };
+}
+
+/** Project-wide C# index: file facts plus type name -> declaring files. */
+async function loadCSharpTypes(projectRoot, files) {
+  const csFiles = files.map(f => toPosix(f.path)).filter(p => p.endsWith('.cs'));
+  const reads = await readFilesParallel(csFiles.map(p => ({ key: p, absPath: join(projectRoot, p) })));
+  const facts = new Map();
+  const typeIndex = new Map();
+  const globalUsings = new Set();
+  for (const { key, raw } of reads) {
+    if (raw === null) continue;
+    const f = parseCSharpFile(raw);
+    facts.set(key, f);
+    for (const u of f.globalUsings) globalUsings.add(u);
+    for (const t of f.types) {
+      if (!typeIndex.has(t)) typeIndex.set(t, []);
+      typeIndex.get(t).push(key);
+    }
+  }
+  for (const arr of typeIndex.values()) arr.sort((a, b) => a.localeCompare(b));
+  return { facts, typeIndex, globalUsings };
+}
+
+function csNamespaceVisible(importer, ns, typeName, cs) {
+  if (ns === '') return true;
+  const own = importer.namespace;
+  if (own === ns || own.startsWith(ns + '.')) return true;
+  const usings = [...importer.usings, ...cs.globalUsings];
+  return usings.includes(ns) || usings.includes(`${ns}.${typeName}`);
+}
+
+export function resolveCSharpTypeRefs(file, ctx) {
+  const cs = ctx.csTypes;
+  const path = toPosix(file.path);
+  const me = cs?.facts.get(path);
+  if (!me) return [];
+  const out = new Set();
+  for (const id of me.idents) {
+    const candidates = [id, `${id}Attribute`];
+    for (const typeName of candidates) {
+      for (const target of cs.typeIndex.get(typeName) ?? []) {
+        if (target === path) continue;
+        const declaring = cs.facts.get(target);
+        if (csNamespaceVisible(me, declaring.namespace, typeName, cs)) out.add(target);
+      }
+    }
+  }
+  return [...out].sort((a, b) => a.localeCompare(b));
+}
+
+// ---------------------------------------------------------------------------
 // Swift resolver
 //
 // Swift imports modules, not files. `SwiftExtractor` reports the module part
@@ -2094,6 +2189,12 @@ async function main() {
             if (out && ctx.fileSet.has(out)) {
               resolvedSet.add(out);
             }
+          }
+        }
+        // C#: namespace usings rarely name a file; link by type references.
+        if (file.language === 'csharp') {
+          for (const out of resolveCSharpTypeRefs(file, ctx)) {
+            if (ctx.fileSet.has(out)) resolvedSet.add(out);
           }
         }
         // Supplemental pass for sources tree-sitter doesn't capture (e.g.
