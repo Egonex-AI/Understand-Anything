@@ -1,6 +1,7 @@
 import type {
   GraphNode,
   GraphEdge,
+  ContainerLabel,
 } from "@understand-anything/core/types";
 import { detectCommunities } from "./louvain";
 
@@ -88,9 +89,51 @@ function shouldFallbackToCommunity(
   return false;
 }
 
+// A label applies to a container when at least this share of their combined
+// members is shared (Jaccard index). Below this, the label describes a
+// different group and the container keeps its fallback name.
+const MIN_LABEL_OVERLAP = 0.5;
+
+/**
+ * Replaces the fallback "Cluster X" names of community containers with
+ * names from `labels`. Matching uses member overlap, not ids: community ids
+ * are numbered by the detection run and can shift when the graph changes.
+ * Each label names at most one container (best overlap first).
+ */
+function applyLabels(
+  containers: DerivedContainer[],
+  labels: ContainerLabel[],
+): DerivedContainer[] {
+  const pairs: { ci: number; li: number; score: number }[] = [];
+  containers.forEach((c, ci) => {
+    if (c.strategy !== "community") return;
+    const members = new Set(c.nodeIds);
+    labels.forEach((l, li) => {
+      const labelIds = new Set(l.nodeIds);
+      let shared = 0;
+      for (const id of labelIds) if (members.has(id)) shared++;
+      const union = members.size + labelIds.size - shared;
+      const score = union === 0 ? 0 : shared / union;
+      if (score >= MIN_LABEL_OVERLAP) pairs.push({ ci, li, score });
+    });
+  });
+  pairs.sort((a, b) => b.score - a.score);
+  const names = new Map<number, string>();
+  const usedLabels = new Set<number>();
+  for (const { ci, li } of pairs) {
+    if (names.has(ci) || usedLabels.has(li)) continue;
+    names.set(ci, labels[li].name);
+    usedLabels.add(li);
+  }
+  return containers.map((c, ci) =>
+    names.has(ci) ? { ...c, name: names.get(ci)! } : c,
+  );
+}
+
 export function deriveContainers(
   nodes: GraphNode[],
   edges: GraphEdge[],
+  labels: ContainerLabel[] = [],
 ): DeriveResult {
   if (nodes.length === 0) {
     return { containers: [], ungrouped: [] };
@@ -121,6 +164,7 @@ export function deriveContainers(
       nodeIds: ids,
       strategy: "community" as const,
     }));
+    if (labels.length > 0) containers = applyLabels(containers, labels);
   } else {
     containers = [...groups.entries()].map(([seg, ids]) => ({
       id: `container:${seg}`,

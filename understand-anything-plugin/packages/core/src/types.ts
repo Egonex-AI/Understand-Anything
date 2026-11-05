@@ -76,12 +76,21 @@ export interface GraphEdge {
   weight: number; // 0-1
 }
 
+// A human-readable name for a group of nodes inside a layer. The dashboard
+// matches it to the container it derives (by member overlap, not by id), so
+// the name survives small changes in the derived grouping.
+export interface ContainerLabel {
+  name: string;
+  nodeIds: string[];
+}
+
 // Layer (logical grouping)
 export interface Layer {
   id: string;
   name: string;
   description: string;
   nodeIds: string[];
+  containerLabels?: ContainerLabel[];
 }
 
 // TourStep (for learn mode)

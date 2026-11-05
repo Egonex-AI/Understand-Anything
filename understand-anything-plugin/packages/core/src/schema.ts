@@ -448,11 +448,17 @@ export const GraphEdgeSchema = z.object({
   weight: z.number().min(0).max(1),
 });
 
+export const ContainerLabelSchema = z.object({
+  name: z.string().min(1),
+  nodeIds: z.array(z.string()),
+});
+
 export const LayerSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
   nodeIds: z.array(z.string()),
+  containerLabels: z.array(ContainerLabelSchema).optional(),
 });
 
 export const TourStepSchema = z.object({
@@ -681,6 +687,14 @@ export function validateGraph(data: unknown): ValidationResult {
         validLayers.push({
           ...result.data,
           nodeIds: result.data.nodeIds.filter((id) => nodeIds.has(id)),
+          ...(result.data.containerLabels && {
+            containerLabels: result.data.containerLabels
+              .map((l) => ({
+                name: l.name,
+                nodeIds: l.nodeIds.filter((id) => nodeIds.has(id)),
+              }))
+              .filter((l) => l.nodeIds.length > 0),
+          }),
         });
       } else {
         issues.push({

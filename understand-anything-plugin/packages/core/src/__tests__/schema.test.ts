@@ -579,6 +579,26 @@ describe("permissive validation", () => {
     expect(result.data!.layers[0].nodeIds).toEqual(["node-1"]);
   });
 
+  it("keeps container labels and filters dangling nodeIds from them", () => {
+    const graph = structuredClone(validGraph);
+    (graph.layers[0] as any).containerLabels = [
+      { name: "Billing", nodeIds: ["node-1", "non-existent-node"] },
+      { name: "Gone", nodeIds: ["non-existent-node"] },
+    ];
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.layers[0].containerLabels).toEqual([
+      { name: "Billing", nodeIds: ["node-1"] },
+    ]);
+  });
+
+  it("accepts layers without container labels", () => {
+    const result = validateGraph(structuredClone(validGraph));
+    expect(result.success).toBe(true);
+    expect(result.data!.layers[0].containerLabels).toBeUndefined();
+  });
+
   it("filters dangling nodeIds from tour steps", () => {
     const graph = structuredClone(validGraph);
     graph.tour[0].nodeIds.push("non-existent-node");
