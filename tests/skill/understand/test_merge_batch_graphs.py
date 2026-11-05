@@ -1613,5 +1613,66 @@ class TestIncrementalEdgeCandidates(unittest.TestCase):
         }])
 
 
+# ── fileCategory-prefixed IDs ─────────────────────────────────────────────
+
+class FileCategoryPrefixTests(unittest.TestCase):
+    """`fileCategory` values are not node ID prefixes and must not be treated
+    as project-name prefixes.
+
+    Regression: a file-analyzer emitting `script:<path>` for a shell script
+    used to hit the project-prefix stripper, which rewrote the ID to
+    `script:<path>`, and the missing-prefix step then produced the permanently
+    broken `file:script:<path>`. Normalization must also be idempotent — a
+    second pass over an already-corrected ID must be a no-op, otherwise graphs
+    re-merged (or layers/architectures built from them) inherit stale IDs.
+    """
+
+    def _normalize(self, nid: str, node_type: str = "file", path: str = "scripts/x.sh") -> str:
+        return mbg.normalize_node_id(
+            nid, {"type": node_type, "filePath": path, "name": path.rsplit("/", 1)[-1]}
+        )
+
+    def test_bare_category_prefix_becomes_file_prefix(self) -> None:
+        self.assertEqual(self._normalize("script:auto-heal-playbook.sh", path="auto-heal-playbook.sh"),
+                         "file:auto-heal-playbook.sh")
+
+    def test_already_corrupted_double_prefix_is_repaired(self) -> None:
+        self.assertEqual(self._normalize("file:script:scripts/foo.sh"), "file:scripts/foo.sh")
+
+    def test_correction_is_idempotent(self) -> None:
+        cases = ["script:scripts/foo.sh", "file:script:scripts/foo.sh", "data:x/y.py"]
+        for nid in cases:
+            with self.subTest(nid=nid):
+                once = self._normalize(nid)
+                twice = self._normalize(once)
+                self.assertEqual(once, twice, f"{nid!r} not idempotent: {once!r} -> {twice!r}")
+
+    def test_prefix_is_rederived_from_node_type(self) -> None:
+        # "file:config:x.json" is a config node: the leading prefix is wrong and
+        # keeping it would mislabel the node type.
+        self.assertEqual(
+            self._normalize("file:config:cfg.json", node_type="config", path="cfg.json"),
+            "config:cfg.json",
+        )
+
+    def test_real_project_prefix_still_stripped(self) -> None:
+        self.assertEqual(self._normalize("myproj:file:a.ts", path="a.ts"), "file:a.ts")
+
+    def test_double_valid_prefix_still_stripped(self) -> None:
+        self.assertEqual(self._normalize("file:file:a.ts", path="a.ts"), "file:a.ts")
+
+    def test_path_containing_colon_is_preserved(self) -> None:
+        self.assertEqual(self._normalize("file:scripts/a:b.py", path="scripts/a:b.py"),
+                         "file:scripts/a:b.py")
+
+    def test_clean_ids_are_untouched(self) -> None:
+        for nid, typ, path in [
+            ("file:scripts/ok.py", "file", "scripts/ok.py"),
+            ("function:scripts/f.py:go", "function", "scripts/f.py"),
+        ]:
+            with self.subTest(nid=nid):
+                self.assertEqual(self._normalize(nid, typ, path), nid)
+
+
 if __name__ == "__main__":
     unittest.main()
