@@ -39,6 +39,33 @@ def resolve_ua_dir(root: Path) -> Path:
 STRUCTURAL_EDGE_TYPES = {"contains_flow", "flow_step", "cross_domain"}
 
 
+# Mirrors the owning contract in packages/core/src/schema.ts
+# (DIRECTION_ALIASES + sanitizeGraph/validateGraph): direction strings are
+# lowercased, known aliases map to enum members, missing/non-string values
+# default to "forward", and unknown strings are preserved so downstream
+# validateGraph still flags them as invalid instead of the merge silently
+# accepting them as "forward". Note merge-batch-graphs.py only carries
+# both/mutual and force-defaults unknowns — do not copy that gap:
+# from/inbound mean "backward" in the schema and flipping them to
+# "forward" would reverse the edge's semantic direction.
+_DIRECTION_ALIASES: dict[str, str] = {
+    "to": "forward",
+    "outbound": "forward",
+    "from": "backward",
+    "inbound": "backward",
+    "both": "bidirectional",
+    "mutual": "bidirectional",
+}
+
+
+def normalize_direction(value: Any) -> str:
+    """Canonicalize an edge `direction` value per the owning schema contract."""
+    if not isinstance(value, str) or not value:
+        return "forward"
+    candidate = value.lower()
+    return _DIRECTION_ALIASES.get(candidate, candidate)
+
+
 def _num(v: Any) -> float:
     """Coerce a value to float for safe comparison (handles string weights)."""
     try:
@@ -93,12 +120,18 @@ def merge_graphs(graphs: list[dict[str, Any]]) -> tuple[dict[str, Any], list[str
                 node_dedup_by_type[node_type] += 1
             nodes_by_id[nid] = node
 
-    # ── Edges: deduplicate by (source, target, type), higher weight wins
+    # ── Edges: deduplicate by (source, target, type, direction), higher weight wins
+    # Direction is part of the dedup key so a `forward` edge does not silently
+    # overwrite a `bidirectional` one (or vice versa); they're different
+    # semantic relationships that the dashboard renders distinctly. Mirrors
+    # the batch merge's dedup invariant in merge-batch-graphs.py.
     edge_dedup_count = 0
-    edges_by_key: dict[tuple[str, str, str], dict] = {}
+    edges_by_key: dict[tuple[str, str, str, str], dict] = {}
     for g in graphs:
         for edge in g.get("edges", []):
-            key = (edge.get("source", ""), edge.get("target", ""), edge.get("type", ""))
+            direction = normalize_direction(edge.get("direction"))
+            edge["direction"] = direction
+            key = (edge.get("source", ""), edge.get("target", ""), edge.get("type", ""), direction)
             existing = edges_by_key.get(key)
             if existing is None:
                 edges_by_key[key] = edge
