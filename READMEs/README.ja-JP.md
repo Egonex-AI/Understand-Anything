@@ -221,6 +221,11 @@ Cursorはこのリポジトリをクローンすると `.cursor-plugin/plugin.js
 
 ### VS Code + GitHub Copilot
 
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything@understand-anything
+```
+
 GitHub Copilot拡張機能（v1.108+）をインストールしたVS Codeは、`.copilot-plugin/plugin.json` 経由でプラグインを自動検出します。クローンしてVS Codeで開くだけで、手動インストールは不要です。
 
 全プロジェクトで使用するパーソナルスキルとして導入したい場合は、上記の `install.sh` を `vscode` プラットフォームで実行してください。

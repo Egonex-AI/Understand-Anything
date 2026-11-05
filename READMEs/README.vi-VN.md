@@ -227,6 +227,11 @@ Nếu tự động phát hiện không hoạt động, hãy cài đặt thủ c�
 
 ### VS Code + GitHub Copilot
 
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything@understand-anything
+```
+
 VS Code với GitHub Copilot (v1.108+) tự động phát hiện plugin qua `.copilot-plugin/plugin.json` khi repo này được clone. Không cần cài đặt thủ công — chỉ cần clone và mở trong VS Code.
 
 Để sử dụng skill cá nhân (khả dụng trên mọi dự án), chạy `install.sh` ở trên với nền tảng `vscode`.

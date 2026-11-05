@@ -219,6 +219,11 @@ Otomatik keşif çalışmazsa manuel kur: **Cursor Settings → Plugins**'i aç,
 
 ### VS Code + GitHub Copilot
 
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything@understand-anything
+```
+
 GitHub Copilot uzantısı (v1.108+) yüklü VS Code, `.copilot-plugin/plugin.json` aracılığıyla eklentiyi otomatik keşfeder. Manuel kurulum gerekmez — sadece klonla ve VS Code'da aç.
 
 Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıdaki `install.sh`'ı `vscode` platformuyla çalıştır.
