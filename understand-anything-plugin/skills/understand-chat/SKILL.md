@@ -31,7 +31,21 @@ The knowledge graph JSON has this structure:
 
 ## Instructions
 
-1. **Resolve the data directory `$UA_DIR`.** Run `UA_DIR=$([ -d .understand-anything ] && echo .understand-anything || echo .ua)` — this is the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Check that `$UA_DIR/knowledge-graph.json` exists in the current project root. If not, tell the user to run `/understand` first.
+1. **Resolve the data directory `$UA_DIR`.** Use the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Inside a git worktree with no graph of its own, fall back to the main checkout's graph, since `/understand` redirects its output there (worktrees are ephemeral):
+   ```bash
+   ua_dir_for() { [ -d "$1/.understand-anything" ] && echo "$1/.understand-anything" || echo "$1/.ua"; }
+   UA_DIR=$(ua_dir_for "$(pwd -P)")
+   if [ ! -f "$UA_DIR/knowledge-graph.json" ] && [ "${UNDERSTAND_NO_WORKTREE_REDIRECT:-0}" != "1" ]; then
+     COMMON_ABS=$(cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)
+     GIT_ABS=$(cd "$(git rev-parse --git-dir 2>/dev/null)" 2>/dev/null && pwd -P)
+     if [ -n "$COMMON_ABS" ] && [ "$COMMON_ABS" != "$GIT_ABS" ]; then
+       PREFIX=$(git rev-parse --show-prefix); MAIN_UA=$(ua_dir_for "$(dirname "$COMMON_ABS")${PREFIX:+/${PREFIX%/}}")
+       [ -f "$MAIN_UA/knowledge-graph.json" ] && UA_DIR="$MAIN_UA" && echo "[understand] Worktree has no graph; using main checkout graph at $UA_DIR"
+     fi
+   fi
+   echo "UA_DIR=$UA_DIR"
+   ```
+   Do not create a data directory here, and never start a new `/understand` run when a graph was found. Check that `$UA_DIR/knowledge-graph.json` exists in the current project root. If not, tell the user to run `/understand` first.
 
 2. **Check graph freshness before using graph-derived context**:
    - Read `project.gitCommitHash` from the graph metadata as `GRAPH_COMMIT_RAW`. Resolve it as a commit before using it in any Git diff, then compare it with `git rev-parse HEAD` and inspect project-scoped committed and working-tree changes from the project root:
