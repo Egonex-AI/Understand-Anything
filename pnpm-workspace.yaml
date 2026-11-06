@@ -2,6 +2,7 @@ packages:
   - 'understand-anything-plugin/packages/*'
   - 'understand-anything-plugin'
   - 'homepage'
+  - '.openclaw-plugin'
 allowBuilds:
   '@tree-sitter-grammars/tree-sitter-kotlin': true
   esbuild: true
