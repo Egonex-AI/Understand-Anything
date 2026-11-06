@@ -600,6 +600,189 @@ namespace utils {
     });
   });
 
+  describe("extractStructure - declarations without a body", () => {
+    const names = (code: string) => {
+      const { tree, parser, root } = parse(code);
+      const result = extractor.extractStructure(root);
+      tree.delete();
+      parser.delete();
+      return result;
+    };
+
+    it("extracts prototypes with params, return type and line", () => {
+      const { functions, exports } = names(`
+int add(int a, int b);
+void noop(void);
+`);
+      expect(functions.map(f => [f.name, f.owner, f.lineRange, f.returnType])).toEqual([
+        ["add", "", [2, 2], "int"],
+        ["noop", "", [3, 3], "void"],
+      ]);
+      expect(functions[0].params).toEqual(["a", "b"]);
+      expect(exports.map(e => e.name)).toEqual(["add", "noop"]);
+    });
+
+    it("unwraps pointer and reference return types", () => {
+      const { functions } = names(`char *dup(const char *s);
+char **split(char *s);
+int &ref(void);
+`);
+      expect(functions.map(f => f.name)).toEqual(["dup", "split", "ref"]);
+    });
+
+    it("extracts every declarator of a single declaration", () => {
+      const { functions } = names("int first(void), second(void);\n");
+      expect(functions.map(f => f.name)).toEqual(["first", "second"]);
+    });
+
+    it("does not treat variables or function pointers as functions", () => {
+      const { functions } = names(`int count;
+int *ptr;
+int (*callback)(int);
+`);
+      expect(functions).toEqual([]);
+    });
+
+    it("does not export static prototypes", () => {
+      const { functions, exports } = names("static int hidden(void);\n");
+      expect(functions.map(f => f.name)).toEqual(["hidden"]);
+      expect(exports).toEqual([]);
+    });
+
+    it("prefers the definition when a prototype is in the same file", () => {
+      const { functions, exports } = names(`int helper(void);
+int main(void) { return helper(); }
+int helper(void) {
+  return 1;
+}
+`);
+      expect(functions.map(f => [f.name, f.lineRange])).toEqual([
+        ["main", [2, 2]],
+        ["helper", [3, 5]],
+      ]);
+      expect(exports.map(e => e.name)).toEqual(["main", "helper"]);
+    });
+
+    it("keeps one entry for a prototype repeated across #if branches", () => {
+      const { functions } = names(`#ifdef A
+int shared(int a);
+#else
+int shared(long a);
+#endif
+`);
+      expect(functions.map(f => f.name)).toEqual(["shared"]);
+    });
+
+    it("reads declarations inside include guards and extern C blocks", () => {
+      const { functions, classes, imports } = names(`#ifndef API_H
+#define API_H
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct Point { int x; };
+int plain(void);
+extern int ext_fn(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#if defined(X)
+int in_if(void);
+#elif defined(Y)
+int in_elif(void);
+#else
+int in_else(void);
+#endif
+
+#endif
+`);
+      expect(functions.map(f => f.name).sort()).toEqual(
+        ["ext_fn", "in_elif", "in_else", "in_if", "plain"],
+      );
+      expect(classes.map(c => c.name)).toEqual(["Point"]);
+      expect(imports.map(i => i.source)).toEqual(["stddef.h"]);
+    });
+
+    it("reads a single-line extern C declaration", () => {
+      const { functions } = names('extern "C" int c_api(void);\n');
+      expect(functions.map(f => f.name)).toEqual(["c_api"]);
+    });
+
+    it("extracts export-macro decorated prototypes", () => {
+      const { functions } = names("API_EXPORT int decorated(int a);\n");
+      expect(functions.map(f => f.name)).toEqual(["decorated"]);
+    });
+  });
+
+  describe("definitions returning pointers or references", () => {
+    const analyze = (code: string) => {
+      const { tree, parser, root } = parse(code);
+      const structure = extractor.extractStructure(root);
+      const calls = extractor.extractCallGraph(root);
+      tree.delete();
+      parser.delete();
+      return { ...structure, calls };
+    };
+
+    it("extracts free functions with params and return type", () => {
+      const { functions, exports } = analyze(`char *dup(const char *s) { return 0; }
+char **split(char *s) {
+  return 0;
+}
+int &ref(void) { static int x; return x; }
+`);
+      expect(functions.map(f => [f.name, f.owner, f.lineRange])).toEqual([
+        ["dup", "", [1, 1]],
+        ["split", "", [2, 4]],
+        ["ref", "", [5, 5]],
+      ]);
+      expect(functions[0].params).toEqual(["s"]);
+      expect(functions[0].returnType).toBe("char");
+      expect(exports.map(e => e.name)).toEqual(["dup", "split", "ref"]);
+    });
+
+    it("attributes calls to the enclosing function", () => {
+      const { calls } = analyze(`char *outer(void) {
+  return inner();
+}
+`);
+      expect(calls.map(c => [c.caller, c.callee])).toEqual([["outer", "inner"]]);
+    });
+
+    it("extracts inline and out-of-class methods", () => {
+      const { functions, classes } = analyze(`class Server {
+public:
+  char *name() { return 0; }
+};
+char *Server::path() { return 0; }
+`);
+      expect(functions.map(f => [f.name, f.owner])).toEqual([
+        ["name", "Server"],
+        ["path", "Server"],
+      ]);
+      expect(classes[0].methods).toEqual(["name", "path"]);
+    });
+
+    it("keeps the definition over its prototype", () => {
+      const { functions } = analyze(`char *dup(const char *s);
+char *dup(const char *s) {
+  return 0;
+}
+`);
+      expect(functions.map(f => [f.name, f.lineRange])).toEqual([["dup", [2, 4]]]);
+    });
+
+    it("does not export static definitions", () => {
+      const { functions, exports } = analyze("static char *hidden(void) { return 0; }\n");
+      expect(functions.map(f => f.name)).toEqual(["hidden"]);
+      expect(exports).toEqual([]);
+    });
+  });
+
   // ---- Comprehensive pure C test ----
 
   describe("comprehensive pure C file", () => {
