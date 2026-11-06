@@ -8,6 +8,17 @@ import { findChild, findChildren } from "./base-extractor.js";
  * Handles: identifier (plain), typed_parameter, default_parameter,
  * typed_default_parameter, list_splat_pattern (*args),
  * dictionary_splat_pattern (**kwargs).
+ *
+ * Typed variadics (`*args: T`, `**kwargs: T`) are resolved inside the
+ * typed_parameter case via the nested list_splat_pattern /
+ * dictionary_splat_pattern, so they emit `*args` / `**kwargs` just like
+ * the untyped standalone splat arms below.
+ *
+ * Intentionally NOT emitted as params (they are syntactic markers, not
+ * named parameters): the bare `*` / bare `/` separators that mark
+ * keyword-only / positional-only boundaries. PEP 695 type-parameter lists
+ * (`def f[T](x: T)`) live on `function_definition`, not on this
+ * `parameters` node, so they are out of scope here as well.
  */
 function extractParams(paramsNode: TreeSitterNode | null): string[] {
   if (!paramsNode) return [];
@@ -26,6 +37,25 @@ function extractParams(paramsNode: TreeSitterNode | null): string[] {
         break;
 
       case "typed_parameter": {
+        // Grammar assumption (tree-sitter-python ^0.25.0): for a typed
+        // variadic, the list_splat_pattern / dictionary_splat_pattern is a
+        // DIRECT child of typed_parameter, so the shallow findChild below
+        // finds it. If a future grammar revision wraps the splat in an
+        // intermediate node this returns null and the typed variadic would
+        // be silently dropped again — the "extracts type-annotated *args and
+        // **kwargs" test would catch that regression.
+        const splat = findChild(child, "list_splat_pattern");
+        if (splat) {
+          const sid = findChild(splat, "identifier");
+          if (sid) params.push("*" + sid.text);
+          break;
+        }
+        const dsplat = findChild(child, "dictionary_splat_pattern");
+        if (dsplat) {
+          const did = findChild(dsplat, "identifier");
+          if (did) params.push("**" + did.text);
+          break;
+        }
         const ident = findChild(child, "identifier");
         if (ident && ident.text !== "self" && ident.text !== "cls") {
           params.push(ident.text);
