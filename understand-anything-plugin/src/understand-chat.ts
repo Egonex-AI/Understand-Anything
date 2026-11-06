@@ -11,6 +11,10 @@ export function buildChatPrompt(
 ): string {
   const context = buildChatContext(graph, query);
   const formattedContext = formatContextForPrompt(context);
+  const MAX_CONTEXT_CHARS = 2000;
+  const truncatedContext = formattedContext.length > MAX_CONTEXT_CHARS
+    ? formattedContext.slice(0, MAX_CONTEXT_CHARS) + "\n...[truncated]"
+    : formattedContext;
 
   return [
     "You are a knowledgeable assistant that answers questions about a software codebase.",
@@ -21,7 +25,7 @@ export function buildChatPrompt(
     "",
     "---",
     "",
-    formattedContext,
+    truncatedContext,
     "---",
     "",
     `**User question:** ${query}`,
