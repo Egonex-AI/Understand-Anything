@@ -9,13 +9,23 @@ export interface LanguageLessonResult {
 /**
  * Base concept patterns that apply across all languages.
  * These are merged with language-specific concepts from LanguageConfig.
+ *
+ * NOTE: Detection uses unbounded substring matching (`text.includes(keyword)`),
+ * so very short or symbol-only keywords over-match prose. Examples that were
+ * removed for this reason: "@" (matched every JSDoc `@param`/`@returns` and any
+ * email in a summary) and "di" (matched "audio", "edit", "directory",
+ * "modifies", "loading", "reading"). Keep keywords specific enough that a plain
+ * substring hit is a strong signal. A word-boundary matcher would let us safely
+ * reintroduce short tokens — see follow-up issue. Until then, prefer adding a
+ * longer distinctive keyword over a 1-2 char fragment. (`"pipe"` still matches
+ * "pipeline" for "middleware pattern"/"streams" — noted for the same follow-up.)
  */
 const BASE_CONCEPT_PATTERNS: Record<string, string[]> = {
   "async/await": ["async", "await", "promise", "asynchronous"],
   "middleware pattern": ["middleware", "interceptor", "pipe"],
   "generics": ["generic", "type parameter", "template"],
-  "decorators": ["decorator", "@", "annotation"],
-  "dependency injection": ["inject", "provider", "container", "di"],
+  "decorators": ["decorator", "annotation"],
+  "dependency injection": ["inject", "provider", "container"],
   "observer pattern": [
     "subscribe",
     "publish",
@@ -24,7 +34,7 @@ const BASE_CONCEPT_PATTERNS: Record<string, string[]> = {
     "listener",
   ],
   "singleton": ["singleton", "instance", "shared client"],
-  "type guards": ["type guard", "is", "narrowing", "discriminated union"],
+  "type guards": ["type guard", "narrowing", "discriminated union"],
   "higher-order functions": [
     "callback",
     "factory",
