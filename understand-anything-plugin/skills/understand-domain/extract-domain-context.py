@@ -28,7 +28,7 @@ def resolve_ua_dir(root: Path) -> Path:
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-MAX_FILE_TREE_DEPTH = 6
+MAX_FILE_TREE_DEPTH = int(os.environ.get("UA_MAX_FILE_TREE_DEPTH", "6"))
 MAX_FILES_PER_DIR = 50
 MAX_FILES_TOTAL = 5000
 MAX_SAMPLED_FILES = 40
