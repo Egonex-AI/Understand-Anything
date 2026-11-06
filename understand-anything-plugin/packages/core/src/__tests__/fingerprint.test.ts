@@ -383,6 +383,43 @@ describe("compareFingerprints", () => {
     expect(result.changeLevel).toBe("STRUCTURAL");
     expect(result.details).toContain("no structural analysis available — conservative classification");
   });
+
+  describe("same-named functions on different owners", () => {
+    const rustFp = (
+      hash: string,
+      aParams: string[],
+      bParams: string[],
+    ): FileFingerprint => ({
+      filePath: "src/lib.rs",
+      contentHash: hash,
+      functions: [
+        { name: "new", owner: "A", params: aParams, exported: true, lineCount: 3 },
+        { name: "new", owner: "B", params: bParams, exported: true, lineCount: 3 },
+      ],
+      classes: [],
+      imports: [],
+      exports: [],
+      totalLines: 10,
+      hasStructuralAnalysis: true,
+    });
+
+    it("stays COSMETIC when neither method's signature changed", () => {
+      const result = compareFingerprints(
+        rustFp("old", ["x: i32"], ["y: String"]),
+        rustFp("new", ["x: i32"], ["y: String"]),
+      );
+      expect(result.changeLevel).toBe("COSMETIC");
+    });
+
+    it("detects a param change that makes one method match another", () => {
+      const result = compareFingerprints(
+        rustFp("old", ["x: i32"], []),
+        rustFp("new", ["x: i32"], ["x: i32"]),
+      );
+      expect(result.changeLevel).toBe("STRUCTURAL");
+      expect(result.details).toEqual(["params changed: B.new"]);
+    });
+  });
 });
 
 describe("analyzeChanges", () => {
