@@ -58,10 +58,11 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 `packages/viewer` serves a committed graph without Claude Code, via `npx <release-asset-url>`. Update it when (a) the dashboard UI changes — the tarball embeds the built `dist/` — or (b) the `vite.config.ts` dev-server middleware changes, which `bin/viewer.mjs` deliberately mirrors. On every release, repack (`pack:release` script) and re-upload the tarball to the GitHub release as `understand-anything-viewer.tgz` — exactly that name, the READMEs' `releases/latest/download/` URL depends on it.
 
 ## Versioning
-When pushing to remote, bump the version in **all six** of these files (keep them in sync):
+When pushing to remote, bump the version in **all seven** of these files (keep them in sync):
 - `understand-anything-plugin/package.json` → `"version"` field
 - `understand-anything-plugin/.claude-plugin/plugin.json` → `"version"` field
 - `understand-anything-plugin/packages/viewer/package.json` → `"version"` field
+- `understand-anything-plugin/dsh/package.json` → `"version"` field
 - `.claude-plugin/plugin.json` → `"version"` field
 - `.cursor-plugin/plugin.json` → `"version"` field
 - `.copilot-plugin/plugin.json` → `"version"` field

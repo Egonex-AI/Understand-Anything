@@ -1,0 +1,45 @@
+{
+  "name": "@understand-anything/dsh",
+  "version": "2.9.4",
+  "description": "DeepSeek Harness (DSH) bundle for Understand Anything — register the /understand skill set and agents inside a DSH profile",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "skills",
+    "agents",
+    "packages",
+    "vendor",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "sync:skills": "node scripts/sync-skills.mjs",
+    "build": "node scripts/sync-skills.mjs",
+    "prepack": "node scripts/sync-skills.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "fuse.js": "^7.1.0",
+    "graphology": "~0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
+    "ignore": "^7.0.5",
+    "web-tree-sitter": "^0.26.6",
+    "yaml": "^2.8.3",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-skill": "^0.1.0-rc.6"
+  },
+  "license": "MIT"
+}
