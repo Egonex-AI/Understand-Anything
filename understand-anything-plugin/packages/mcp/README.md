@@ -314,7 +314,8 @@ Run: `node client.mjs`
 
 - **One server process per client session.** The dashboard tool keeps the
   spawned viewer alive across calls within that session (URL reuse keyed by
-  project + port).
+  project + port) and stops it when the client disconnects or the server is
+  signalled.
 - **stdout is sacred.** The server never writes anything but JSON-RPC to
   stdout; diagnostics go to stderr (`[understand-anything-mcp] …`).
 - **Dashboard security** mirrors the viewer: binds to `127.0.0.1`, requires

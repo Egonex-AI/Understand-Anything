@@ -57,8 +57,8 @@ function resolveProjectRoot(projectPath) {
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
     throw new Error(`Project directory not found: ${resolved}`);
   }
-  // Canonicalise symlinks (e.g. macOS /tmp → /private/tmp) so paths line up
-  // with git's physical --show-toplevel when stripping repo prefixes.
+  // Canonicalise symlinks (e.g. macOS /tmp → /private/tmp) so the root is
+  // stable as a dashboard session key and in reported paths.
   return fs.realpathSync(resolved);
 }
 
@@ -142,6 +142,18 @@ async function stalenessWarning(root, graph) {
 
 /** @type {Map<string, { url: string, child: import("node:child_process").ChildProcess }>} */
 const dashboards = new Map();
+/** Every viewer we spawned, including ones still starting up. */
+const viewers = new Set();
+
+// Viewers are tied to this server's lifetime: stop them when the MCP client
+// disconnects (stdin closes) or the server is signalled.
+process.on("exit", () => {
+  for (const child of viewers) child.kill();
+});
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => process.exit(0));
+}
+process.stdin.on("close", () => process.exit(0));
 
 function startDashboard(root, port) {
   const key = `${root}::${port ?? "auto"}`;
@@ -154,8 +166,9 @@ function startDashboard(root, port) {
     const child = spawn(
       process.execPath,
       [VIEWER_BIN, root, "--port", String(port ?? 0), "--no-open"],
-      { detached: true, stdio: ["ignore", "pipe", "pipe"] },
+      { stdio: ["ignore", "pipe", "pipe"] },
     );
+    viewers.add(child);
 
     let stdout = "";
     let stderr = "";
@@ -173,19 +186,21 @@ function startDashboard(root, port) {
       );
     }, DASHBOARD_TIMEOUT_MS);
 
+    // Keep draining both pipes after startup so the viewer never blocks on a
+    // full pipe, but stop buffering once the URL has been reported.
     child.stdout.on("data", (chunk) => {
+      if (settled) return;
       stdout += chunk.toString();
       const match = stdout.match(/Dashboard URL:\s*(\S+)/);
-      if (match && !settled) {
+      if (match) {
         settled = true;
         clearTimeout(timer);
-        child.unref();
         dashboards.set(key, { url: match[1], child });
         resolvePromise(match[1]);
       }
     });
     child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
+      if (!settled) stderr += chunk.toString();
     });
     child.on("error", (err) => {
       if (settled) return;
@@ -194,7 +209,8 @@ function startDashboard(root, port) {
       rejectPromise(err);
     });
     child.on("exit", (code) => {
-      dashboards.delete(key);
+      viewers.delete(child);
+      if (dashboards.get(key)?.child === child) dashboards.delete(key);
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -358,7 +374,7 @@ server.registerTool(
     description:
       "Map the current git changes onto the knowledge graph: which components " +
       "changed, what they affect downstream, impacted layers, and a risk " +
-      "assessment. Defaults to working tree + staged changes; pass staged=true " +
+      "assessment. Defaults to working tree + staged + untracked changes; pass staged=true " +
       "for the index only, or base='<ref>' to diff a ref against HEAD.",
     inputSchema: {
       projectPath: projectPathParam,
@@ -388,9 +404,12 @@ server.registerTool(
         );
       }
       if (files.length === 0) {
-        return textResult(
-          "No changed files found. The working tree matches the compared revision.",
-        );
+        const scope = base
+          ? `between ${base} and HEAD`
+          : staged
+            ? "in the index"
+            : "in the working tree, index, or untracked files";
+        return textResult(`No changed files found ${scope} for this project.`);
       }
 
       const context = buildDiffContext(graph, files);
