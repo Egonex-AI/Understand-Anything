@@ -419,6 +419,20 @@ describe("compareFingerprints", () => {
       expect(result.changeLevel).toBe("STRUCTURAL");
       expect(result.details).toEqual(["params changed: B.new"]);
     });
+
+    it("pairs same-owner overloads in declaration order", () => {
+      const overloads = (hash: string, second: string[]): FileFingerprint => ({
+        ...rustFp(hash, [], []),
+        functions: [
+          { name: "add", owner: "Calc", params: ["a: int"], exported: true, lineCount: 3 },
+          { name: "add", owner: "Calc", params: second, exported: true, lineCount: 3 },
+        ],
+      });
+      expect(compareFingerprints(overloads("old", ["a: int", "b: int"]), overloads("new", ["a: int", "b: int"])).changeLevel)
+        .toBe("COSMETIC");
+      expect(compareFingerprints(overloads("old", ["a: int", "b: int"]), overloads("new", ["a: long", "b: int"])).details)
+        .toEqual(["params changed: Calc.add"]);
+    });
   });
 });
 
