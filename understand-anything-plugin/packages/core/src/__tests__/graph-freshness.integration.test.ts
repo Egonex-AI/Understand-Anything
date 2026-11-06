@@ -44,12 +44,11 @@ function commitAll(repoDir: string, message: string): string {
   return git(repoDir, "rev-parse", "HEAD");
 }
 
-function createRepository(
-  initialFiles: Record<string, string> = {
-    "src/index.ts": "export const value = 1;\n",
-  },
-): { repoDir: string; baseline: string } {
-  const repoDir = createTemporaryDirectory();
+function initRepositoryAt(
+  repoDir: string,
+  initialFiles: Record<string, string>,
+): string {
+  mkdirSync(repoDir, { recursive: true });
   git(repoDir, "init");
   git(repoDir, "config", "user.email", "freshness-tests@example.com");
   git(repoDir, "config", "user.name", "Freshness Tests");
@@ -58,9 +57,19 @@ function createRepository(
     writeProjectFile(repoDir, relativePath, contents);
   }
 
+  return commitAll(repoDir, "baseline");
+}
+
+function createRepository(
+  initialFiles: Record<string, string> = {
+    "src/index.ts": "export const value = 1;\n",
+  },
+): { repoDir: string; baseline: string } {
+  const repoDir = createTemporaryDirectory();
+
   return {
     repoDir,
-    baseline: commitAll(repoDir, "baseline"),
+    baseline: initRepositoryAt(repoDir, initialFiles),
   };
 }
 
@@ -481,5 +490,94 @@ describe(
       headCommitHash: baseline,
     });
   });
+  },
+);
+
+describe(
+  "getGraphFreshness with repositories nested under the project root",
+  { timeout: 20_000 },
+  () => {
+    it("falls back to the nested repository that owns the graph commit", async () => {
+      const projectDir = createTemporaryDirectory("ua-freshness-parent-");
+      const baseline = initRepositoryAt(join(projectDir, "api"), {
+        "src/index.ts": "export const value = 1;\n",
+      });
+
+      await expect(
+        getGraphFreshness(projectDir, {
+          graphCommitHash: baseline,
+          lastAnalyzedAt: "2026-07-10T00:00:00.000Z",
+        }),
+      ).resolves.toEqual({
+        status: "fresh",
+        graphCommitHash: baseline,
+        headCommitHash: baseline,
+        changedFileCount: 0,
+        changedFiles: [],
+        commitsBehind: 0,
+        commitsAhead: 0,
+        lastAnalyzedAt: "2026-07-10T00:00:00.000Z",
+      });
+    });
+
+    it("selects the owning sibling when several repositories are nested", async () => {
+      const projectDir = createTemporaryDirectory("ua-freshness-parent-");
+      initRepositoryAt(join(projectDir, "api"), {
+        "src/api.ts": "export const api = 1;\n",
+      });
+      const webDir = join(projectDir, "web");
+      const webBaseline = initRepositoryAt(webDir, {
+        "src/web.ts": "export const web = 1;\n",
+      });
+
+      writeProjectFile(webDir, "src/web.ts", "export const web = 2;\n");
+      const webHead = commitAll(webDir, "update web");
+
+      await expect(
+        getGraphFreshness(projectDir, { graphCommitHash: webBaseline }),
+      ).resolves.toMatchObject({
+        status: "stale",
+        relation: "behind",
+        graphCommitHash: webBaseline,
+        headCommitHash: webHead,
+        commitsBehind: 1,
+        changedFiles: ["src/web.ts"],
+      });
+    });
+
+    it("resolves each graph against its own nested repository", async () => {
+      const projectDir = createTemporaryDirectory("ua-freshness-parent-");
+      const apiBaseline = initRepositoryAt(join(projectDir, "api"), {
+        "src/api.ts": "export const api = 1;\n",
+      });
+      const webBaseline = initRepositoryAt(join(projectDir, "web"), {
+        "src/web.ts": "export const web = 1;\n",
+      });
+
+      await expect(
+        getGraphFreshnessBatch(projectDir, {
+          knowledge: { graphCommitHash: apiBaseline },
+          domain: { graphCommitHash: webBaseline },
+        }),
+      ).resolves.toMatchObject({
+        knowledge: { status: "fresh", headCommitHash: apiBaseline },
+        domain: { status: "fresh", headCommitHash: webBaseline },
+      });
+    });
+
+    it("returns graph-commit-unavailable when no nested repository owns the commit", async () => {
+      const projectDir = createTemporaryDirectory("ua-freshness-parent-");
+      initRepositoryAt(join(projectDir, "api"), {
+        "src/api.ts": "export const api = 1;\n",
+      });
+
+      await expect(
+        getGraphFreshness(projectDir, { graphCommitHash: "deadbeef" }),
+      ).resolves.toEqual({
+        status: "unknown",
+        reason: "graph-commit-unavailable",
+        graphCommitHash: "deadbeef",
+      });
+    });
   },
 );
