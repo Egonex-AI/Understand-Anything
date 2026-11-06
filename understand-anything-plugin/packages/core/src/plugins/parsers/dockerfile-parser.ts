@@ -39,7 +39,8 @@ export class DockerfileParser implements AnalyzerPlugin {
       const stageStartLine = fromLines[s];
       const stageEndLine = s + 1 < fromLines.length ? fromLines[s + 1] - 1 : lines.length - 1;
 
-      const fromMatch = lines[stageStartLine].match(/^FROM\s+(\S+)(?:\s+[Aa][Ss]\s+(\S+))?/i);
+      // Skip flags such as `--platform=$BUILDPLATFORM` that precede the image
+      const fromMatch = lines[stageStartLine].match(/^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+[Aa][Ss]\s+(\S+))?/i);
       if (!fromMatch) continue;
 
       const image = fromMatch[1];
