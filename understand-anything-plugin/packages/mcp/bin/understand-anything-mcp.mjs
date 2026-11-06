@@ -13,7 +13,7 @@
  *
  * stdout is the JSON-RPC channel — diagnostics go to stderr only.
  */
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +35,7 @@ import {
   formatExplainPrompt,
   buildOnboardingGuide,
 } from "@understand-anything/skill";
+import { changedFiles } from "../lib/changed-files.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const VIEWER_BIN = path.resolve(__dirname, "../../viewer/bin/viewer.mjs");
@@ -135,68 +136,6 @@ async function stalenessWarning(root, graph) {
     "Graph-derived context may omit recent changes. " +
     "Re-run /understand to refresh.\n\n"
   );
-}
-
-function git(root, args) {
-  return execFileSync("git", args, {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    maxBuffer: 32 * 1024 * 1024,
-  }).trim();
-}
-
-/**
- * Changed files relative to the project root (handles projects that live in
- * a subdirectory of a larger git worktree).
- */
-function changedFiles(root, { staged, base }) {
-  const gitRoot = git(root, ["rev-parse", "--show-toplevel"]);
-  const prefix = path.relative(gitRoot, root); // "" when project is the repo root
-
-  // Reject option-shaped refs: a leading "-" would make git parse the value
-  // as a flag (e.g. --output=<file> writes the diff somewhere unexpected).
-  // --end-of-options additionally stops revision parsing of flag-like input.
-  if (base && (base.startsWith("-") || base.includes(".."))) {
-    throw new Error(
-      `Invalid base ref "${base}" — must be a plain ref like 'main' or 'HEAD~3' (no leading '-', and '...' is added by the tool).`,
-    );
-  }
-
-  const diffArgs = base
-    ? ["diff", "--name-only", "--end-of-options", `${base}...HEAD`]
-    : staged
-      ? ["diff", "--cached", "--name-only"]
-      : ["diff", "HEAD", "--name-only"];
-
-  let files = git(root, diffArgs).split("\n").filter(Boolean);
-  if (!base && !staged) {
-    const untracked = git(root, [
-      "ls-files",
-      "--others",
-      "--exclude-standard",
-    ])
-      .split("\n")
-      .filter(Boolean);
-    files = [...files, ...untracked];
-  }
-
-  // Generated analysis artifacts are not project source drift (mirrors
-  // core's PROJECT_PATHSPEC exclusions in staleness.ts).
-  const isArtifact = (f) =>
-    f === ".ua" ||
-    f.startsWith(".ua/") ||
-    f === ".understand-anything" ||
-    f.startsWith(".understand-anything/");
-
-  return [
-    ...new Set(
-      files
-        .filter((f) => !prefix || f.startsWith(`${prefix}/`))
-        .map((f) => (prefix ? f.slice(prefix.length + 1) : f))
-        .filter((f) => !isArtifact(f)),
-    ),
-  ];
 }
 
 // ── Dashboard session management ──────────────────────────────────────────

@@ -320,5 +320,8 @@ Run: `node client.mjs`
 - **Dashboard security** mirrors the viewer: binds to `127.0.0.1`, requires
   the one-time `?token=`, and only serves source files listed in the graph
   (≤ 1 MB, no binaries).
-- **Monorepos**: pass the subdirectory as `projectPath`; git diff paths are
-  automatically re-rooted from the repository toplevel to the project dir.
+- **Monorepos**: pass the subdirectory as `projectPath`; `understand_diff`
+  scopes git to that directory and reports tracked and untracked changes
+  relative to it, ignoring changes elsewhere in the repository.
+- **Non-ASCII paths** are read from NUL-delimited git output (`-z`), so they
+  match graph nodes verbatim regardless of `core.quotePath`.
