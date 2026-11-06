@@ -178,17 +178,20 @@ export function compareFingerprints(
   if (JSON.stringify(ownership(oldFp.functions)) !== JSON.stringify(ownership(newFp.functions))) {
     details.push("function ownership changed");
   }
-  const oldFuncNames = new Set(oldFp.functions.map((f) => f.name));
-  const newFuncNames = new Set(newFp.functions.map((f) => f.name));
+  // Functions are identified by (owner, name), not name alone: Go/Rust/C++
+  // methods on different receivers routinely share a name (`A::new` and
+  // `B::new`).
+  const oldFuncs = groupFunctions(oldFp.functions);
+  const newFuncs = groupFunctions(newFp.functions);
 
-  for (const name of newFuncNames) {
-    if (!oldFuncNames.has(name)) {
-      details.push(`new function: ${name}`);
+  for (const [key, fns] of newFuncs) {
+    if (!oldFuncs.has(key)) {
+      details.push(`new function: ${functionLabel(fns[0])}`);
     }
   }
-  for (const name of oldFuncNames) {
-    if (!newFuncNames.has(name)) {
-      details.push(`removed function: ${name}`);
+  for (const [key, fns] of oldFuncs) {
+    if (!newFuncs.has(key)) {
+      details.push(`removed function: ${functionLabel(fns[0])}`);
     }
   }
 
@@ -271,6 +274,24 @@ export function compareFingerprints(
     changeLevel: "COSMETIC",
     details: ["internal logic changed (no structural impact)"],
   };
+}
+
+/** Group functions by (owner, name), preserving declaration order. */
+function groupFunctions(
+  functions: FunctionFingerprint[],
+): Map<string, FunctionFingerprint[]> {
+  const groups = new Map<string, FunctionFingerprint[]>();
+  for (const fn of functions) {
+    const key = JSON.stringify([fn.owner ?? null, fn.name]);
+    const group = groups.get(key);
+    if (group) group.push(fn);
+    else groups.set(key, [fn]);
+  }
+  return groups;
+}
+
+function functionLabel(fn: FunctionFingerprint): string {
+  return fn.owner ? `${fn.owner}.${fn.name}` : fn.name;
 }
 
 /**
