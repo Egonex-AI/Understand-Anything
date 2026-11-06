@@ -11,7 +11,25 @@ export interface SearchOptions {
   limit?: number;
 }
 
+/**
+ * Folds the Turkish dotted/dotless I pair before Fuse's own lowercasing.
+ *
+ * Locale-independent `toLowerCase()` maps "I" → "i" (not "ı") and "İ" → "i̇"
+ * (i + combining dot, two code points), so a Turkish summary containing "IŞIK"
+ * never matches a typed "ışık", and "İstek" matches "istek" only weakly.
+ * "ı" and "İ" occur only in Turkic languages, so this is a no-op elsewhere.
+ */
+export function foldDottedI(value: string): string {
+  return value.replace(/ı/g, "i").replace(/İ/g, "I");
+}
+
 const FUSE_OPTIONS: IFuseOptions<GraphNode> = {
+  getFn: (node, path) => {
+    const value = Fuse.config.getFn(node, path);
+    if (typeof value === "string") return foldDottedI(value);
+    if (Array.isArray(value)) return value.map(foldDottedI);
+    return value;
+  },
   keys: [
     { name: "name", weight: 0.4 },
     { name: "tags", weight: 0.3 },
@@ -34,7 +52,7 @@ export class SearchEngine {
   }
 
   search(query: string, options?: SearchOptions): SearchResult[] {
-    const trimmed = query.trim();
+    const trimmed = foldDottedI(query.trim());
     if (!trimmed) {
       return [];
     }
