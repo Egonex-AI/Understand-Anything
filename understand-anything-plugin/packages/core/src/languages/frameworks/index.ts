@@ -7,6 +7,7 @@ import { reactConfig } from "./react.js";
 import { nextjsConfig } from "./nextjs.js";
 import { expressConfig } from "./express.js";
 import { vueConfig } from "./vue.js";
+import { angularConfig } from "./angular.js";
 import { springConfig } from "./spring.js";
 import { railsConfig } from "./rails.js";
 import { ginConfig } from "./gin.js";
@@ -19,6 +20,7 @@ export const builtinFrameworkConfigs: FrameworkConfig[] = [
   nextjsConfig,
   expressConfig,
   vueConfig,
+  angularConfig,
   springConfig,
   railsConfig,
   ginConfig,
@@ -32,6 +34,7 @@ export {
   nextjsConfig,
   expressConfig,
   vueConfig,
+  angularConfig,
   springConfig,
   railsConfig,
   ginConfig,
