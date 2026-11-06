@@ -227,6 +227,11 @@ If auto-discovery doesn't pick it up, install it manually: open **Cursor Setting
 
 ### VS Code + GitHub Copilot
 
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything@understand-anything
+```
+
 VS Code with GitHub Copilot (v1.108+) auto-discovers the plugin via `.copilot-plugin/plugin.json` when this repo is cloned. No manual installation needed — just clone and open in VS Code.
 
 For personal skills (available across all projects), run the `install.sh` above with the `vscode` platform.

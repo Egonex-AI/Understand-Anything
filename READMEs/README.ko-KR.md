@@ -218,6 +218,11 @@ iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/i
 
 ### VS Code + GitHub Copilot
 
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything@understand-anything
+```
+
 GitHub Copilot(v1.108+)이 설치된 VS Code는 `.copilot-plugin/plugin.json`을 통해 플러그인을 자동으로 인식합니다. 수동 설치가 필요 없습니다. 클론 후 VS Code에서 열기만 하면 됩니다.
 
 모든 프로젝트에서 사용하는 개인 스킬로 설치하려면 위 `install.sh`를 `vscode` 플랫폼으로 실행하세요.

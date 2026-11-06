@@ -219,6 +219,11 @@ Cursor автоматически обнаруживает плагин чере
 
 ### VS Code + GitHub Copilot
 
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything@understand-anything
+```
+
 VS Code с GitHub Copilot (v1.108+) автоматически обнаруживает плагин через `.copilot-plugin/plugin.json` при клонировании этого репозитория. Ручная установка не требуется — просто склонируйте и откройте в VS Code.
 
 Для персональных skills (доступных во всех проектах) запустите `install.sh` выше с платформой `vscode`.
