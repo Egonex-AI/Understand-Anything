@@ -86,7 +86,7 @@ Do not dispatch assemble-reviewer or graph-reviewer for automatic updates.
 ## Phase 3 — Conditional architecture and tour
 
 - For `PARTIAL_UPDATE`, dispatch neither agent. The finalizer preserves existing layer assignments and tour prose, removes dangling references/empty layers, and assigns new nodes deterministically by directory depth, graph connectivity, then prior layer order.
-- For `ARCHITECTURE_UPDATE`, dispatch architecture-analyzer on the full merged node/edge set, including previous layers for naming stability, and write `$UA_DIR/intermediate/layers.json`. Then dispatch tour-builder and write `$UA_DIR/intermediate/tour.json`.
+- For `ARCHITECTURE_UPDATE`, dispatch architecture-analyzer on the full merged node/edge set, including previous layers for naming stability, and write `$UA_DIR/intermediate/layers.json`. Then dispatch tour-builder and write `$UA_DIR/intermediate/tour.json`. Then dispatch `code-lesson-writer` (same dispatch shape as SKILL.md §Code Lessons: rebuilt tour, node summaries, language directive) and write `$UA_DIR/intermediate/code-lessons.json`, normalized into `$UA_DIR/intermediate/code-lessons.normalized.json` per the SKILL.md Phase 5 rules. Lessons are best-effort here: retry the dispatch once, and if it still fails leave no staged document, record the warning, and continue — publication (Phase 4) then removes the stale served sidecar instead of leaving lessons for the previous tour.
 
 Retry either required agent once. If it still fails, **STOP** without advancing the baseline.
 
@@ -99,6 +99,8 @@ node "$PLUGIN_ROOT/skills/understand/finalize-incremental.mjs" "$PROJECT_ROOT"
 ```
 
 The finalizer performs deterministic graph/layer/tour validation and independently reruns the shared symbol check on the exact graph before writing. It atomically saves `knowledge-graph.json`, patches changed fingerprints while preserving untouched entries, removes deleted fingerprints, and only then writes `meta.json`. A graph-save failure must never advance the fingerprint or commit baseline. If symbol loss is first detected here, follow the same one-retry procedure, rerun merge and any required architecture/tour phases, then finalize; an already-used or unsuccessful repair must stop with the old graph and baselines intact.
+
+After the finalizer exits successfully, publish lessons with the same rules as **Lesson publication** in SKILL.md's incremental save gate — only lessons staged by the current invocation: atomically move `$UA_DIR/intermediate/code-lessons.normalized.json` over `$UA_DIR/code-lessons.json` when this run staged it; when lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead; when the finalizer failed, touch nothing so the previous graph and lessons stay consistent. `PARTIAL_UPDATE` never attempts lessons and leaves the served sidecar untouched.
 
 Report:
 

@@ -559,7 +559,7 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 
 ## Phase 5 — TOUR
 
-Run this phase for full analysis and for incremental plans where `rerunTour === true`. For `PARTIAL_UPDATE`, dispatch no tour agent and do not rewrite the narrative; finalization only removes dangling node IDs from the existing steps.
+Run this phase for full analysis and for incremental plans where `rerunTour === true`. For `PARTIAL_UPDATE`, dispatch no tour agent and do not rewrite the narrative; finalization only removes dangling node IDs from the existing steps. The code-lessons step below runs under the same condition.
 
 Report to the user: `[Phase 5/7] Building guided tour...`
 
@@ -630,6 +630,47 @@ Each element of the final `tour` array MUST have this shape:
 
 Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `languageLesson` when present.
 
+### Code Lessons — per-file learning explanations
+
+Run this step whenever the tour is (re)built — full analysis and incremental plans with `rerunTour === true`. For `PARTIAL_UPDATE`, keep the existing `$UA_DIR/code-lessons.json` untouched (line ranges may drift slightly; the next `rerunTour` rebuild refreshes them).
+
+Report to the user: `[Phase 5/7] Writing code lessons...`
+
+1. **Resolve tour-covered files.** For each normalized tour step, resolve every `nodeIds` entry to its file-level node and collect the node's `filePath`. Record for each covered file the smallest referencing step `order` as its primary tour anchor.
+
+2. **Dispatch a subagent** using the `code-lesson-writer` agent definition (at `agents/code-lesson-writer.md`). Pass these parameters in the dispatch prompt:
+
+> Write per-file code lessons for this codebase.
+> Project root: `$PROJECT_ROOT`
+> Write output to: `$UA_DIR/intermediate/code-lessons.json`
+>
+> Tour steps:
+> ```json
+> [<the normalized tour array>]
+> ```
+>
+> Detailed files (read source from disk; produce overview + sections):
+> ```json
+> [{"filePath": "src/main.tsx", "tourOrder": 2}, ...]
+> ```
+>
+> All other file-level nodes (overview only — do NOT read these files):
+> ```json
+> [list of {filePath, summary} for every file-level node NOT in the detailed list]
+> ```
+>
+> $LANGUAGE_DIRECTIVE
+
+3. **Normalize** `$UA_DIR/intermediate/code-lessons.json` into a **staged** document at `$UA_DIR/intermediate/code-lessons.normalized.json`. Do NOT write `$UA_DIR/code-lessons.json` here — publication happens only after the graph/tour this run describes is actually saved (see **Lesson publication** under the incremental save gate below, and Phase 7 step 1 for full runs). Apply these steps **in order**:
+   1. **Unwrap envelope:** Accept both `{ "files": {...} }` and a bare files object at the top level.
+   2. **Drop unknown files:** Remove entries whose key does not exactly match a file-level node's `filePath` (relative, forward slashes).
+   3. **Validate sections:** `lineRange` must be two integers `[start, end]` with `1 <= start <= end`; drop invalid sections, then enforce a maximum of 10 sections per file (truncate beyond that).
+   4. **Validate tour anchors:** Drop any `tourOrder` that does not match a tour step's `order`.
+   5. **Fallback overview:** If `overview` is missing or empty, substitute the matching node's `summary`.
+   6. **Stamp metadata:** Ensure `version: 1` and `generatedAt` (current ISO 8601 timestamp) are present.
+
+4. **On failure:** retry the dispatch once (see Error Handling); if it still fails, skip lessons entirely — leave no staged document, record the failure in `$PHASE_WARNINGS`, and continue. At publication time the previously served `$UA_DIR/code-lessons.json` is removed in that case, so stale lessons never sit beside a rebuilt tour (see **Lesson publication** below). The dashboard degrades gracefully when the file is absent.
+
 ### Incremental deterministic save gate
 
 After the applicable Phase 4/5 work is complete, finalize either incremental action:
@@ -639,6 +680,14 @@ node "<SKILL_DIR>/finalize-incremental.mjs" "$PROJECT_ROOT"
 ```
 
 This helper validates/deduplicates nodes and edges, reconciles layers/tour, and independently reruns the shared symbol validator on the exact graph to be saved. It then atomically saves the graph, patches only changed fingerprints while preserving all others, removes deleted fingerprints, and only then advances `meta.json`. A cached successful merge report cannot bypass the save check. If symbol loss is first detected here, use the same one-retry procedure above, rerun merge and any required architecture/tour phases, then finalize again; if the retry was already used or remains unresolved, **STOP** with the old graph and baselines intact.
+
+**Lesson publication.** `$UA_DIR/code-lessons.json` is only ever written after the graph/tour it describes is saved, and only from lessons staged by the current invocation:
+
+- If this run attempted lessons, the finalizer exited successfully, and this run's staged `$UA_DIR/intermediate/code-lessons.normalized.json` exists, atomically move it over `$UA_DIR/code-lessons.json`.
+- If this run attempted lessons and they were skipped or failed (no staged document) while `$UA_DIR/code-lessons.json` exists, delete it — stale lessons with `tourOrder` badges for a rebuilt tour must not survive.
+- If the finalizer fails (**STOP**), touch nothing: the previous `$UA_DIR/code-lessons.json` stays beside the previous graph and tour.
+- If this run never attempted lessons — review-only `--review` reruns that skip Phase 5 and scratch cleanup, for example — leave `$UA_DIR/code-lessons.json` untouched, even when a staged document left behind by an earlier interrupted run is present; abandoned staged lessons must not be published beside a saved tour.
+- `PARTIAL_UPDATE` never attempts lessons (it keeps the existing file untouched — see the Code Lessons section above), so with no staged document the served sidecar stays as-is.
 
 - Without `--review`, report the incremental summary and **STOP**. Do not run Phase 6 or the full-save Phase 7; this is what prevents the ordinary local update from paying for whole-graph review.
 - With `--review`, copy the newly saved `$UA_DIR/knowledge-graph.json` to `$UA_DIR/intermediate/assembled-graph.json`, then continue to the full graph-reviewer path in Phase 6. Do not run the inline default reviewer.
@@ -815,6 +864,8 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
 
 1. Write the final knowledge graph to `$UA_DIR/knowledge-graph.json`.
 
+   Then publish lessons under the same rules as **Lesson publication** in the incremental save gate — only when this run executed the Code Lessons step: if this run staged `$UA_DIR/intermediate/code-lessons.normalized.json`, atomically move it over `$UA_DIR/code-lessons.json`; if lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead so no stale sidecar survives beside the new graph and tour. On runs that skipped Phase 5 (e.g. `--review` reruns on the same commit), leave `$UA_DIR/code-lessons.json` untouched — an abandoned staged document from an earlier interrupted run must not be published.
+
 2. **Generate structural fingerprints baseline.** This creates the basis for future automatic incremental updates and **must succeed before `meta.json` is written** — otherwise auto-update sees a fresh commit hash with no fingerprints to compare against, classifies every file as STRUCTURAL, and escalates to `FULL_UPDATE` on every subsequent commit (issue #152).
 
    Write the input file:
@@ -875,6 +926,7 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
    - Edges created (broken down by type)
    - Layers identified (with names)
    - Tour steps generated (count)
+   - Code lessons written (detailed / overview-only counts; report when skipped)
    - Any warnings from the reviewer
    - Path to the output file: `$UA_DIR/knowledge-graph.json`
 
