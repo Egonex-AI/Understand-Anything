@@ -1055,6 +1055,34 @@ describe('extract-import-map.mjs — Java resolver', () => {
     // x.Local maps via suffix to src/x/Local.java.
     expect(result.output.importMap['src/x/App.java']).toEqual(['src/x/Local.java']);
   });
+
+  it('resolves static-member and nested-class imports to their enclosing file', () => {
+    projectRoot = setupTree({
+      'src/main/java/com/example/App.java':
+        `package com.example;\n\nimport static com.example.util.Util.helper;\nimport com.example.model.Outer.Inner;\n\npublic class App { }\n`,
+      'src/main/java/com/example/util/Util.java':
+        `package com.example.util;\n\npublic final class Util { public static void helper() {} }\n`,
+      'src/main/java/com/example/model/Outer.java':
+        `package com.example.model;\n\npublic class Outer { public static class Inner {} }\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/main/java/com/example/App.java', language: 'java', fileCategory: 'code' },
+        { path: 'src/main/java/com/example/util/Util.java', language: 'java', fileCategory: 'code' },
+        { path: 'src/main/java/com/example/model/Outer.java', language: 'java', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // `...Util.helper` and `...Outer.Inner` name a member / nested type rather
+    // than a file; the dependency belongs to the enclosing top-level class.
+    expect([...result.output.importMap['src/main/java/com/example/App.java']].sort()).toEqual([
+      'src/main/java/com/example/model/Outer.java',
+      'src/main/java/com/example/util/Util.java',
+    ]);
+  });
 });
 
 describe('extract-import-map.mjs — Kotlin resolver', () => {
