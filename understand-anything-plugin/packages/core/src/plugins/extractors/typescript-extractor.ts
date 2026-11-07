@@ -98,6 +98,37 @@ function extractImportSpecifiers(
 }
 
 /**
+ * Extract the specifiers of a re-export statement: the exported names for
+ * `export { a, b as c } from "..."`, `* as ns` for a namespace re-export and
+ * `*` for `export * from "..."`.
+ */
+function extractReexportSpecifiers(exportStatement: TreeSitterNode): string[] {
+  const specifiers: string[] = [];
+  for (let i = 0; i < exportStatement.childCount; i++) {
+    const child = exportStatement.child(i);
+    if (!child) continue;
+    if (child.type === "export_clause") {
+      for (let j = 0; j < child.childCount; j++) {
+        const spec = child.child(j);
+        if (spec && spec.type === "export_specifier") {
+          const alias = spec.childForFieldName("alias");
+          const name = spec.childForFieldName("name");
+          specifiers.push(alias ? alias.text : name ? name.text : spec.text);
+        }
+      }
+    } else if (child.type === "namespace_export") {
+      const ident = child.children.find(
+        (c) => c.type === "identifier" || c.type === "string",
+      );
+      if (ident) specifiers.push("* as " + ident.text);
+    } else if (child.type === "*") {
+      specifiers.push("*");
+    }
+  }
+  return specifiers;
+}
+
+/**
  * TypeScript/JavaScript extractor.
  *
  * Handles structural analysis and call-graph extraction for
@@ -386,10 +417,23 @@ export class TypeScriptExtractor implements LanguageExtractor {
     node: TreeSitterNode,
     functions: StructuralAnalysis["functions"],
     classes: StructuralAnalysis["classes"],
-    _imports: StructuralAnalysis["imports"],
+    imports: StructuralAnalysis["imports"],
     exports: StructuralAnalysis["exports"],
     exportedNames: Set<string>,
   ): void {
+    // Re-exports (`export * from "./a"`, `export * as ns from "./a"`,
+    // `export { x } from "./a"`) depend on the source module exactly like an
+    // import does. Barrel files consist almost entirely of these, so without
+    // recording them every barrel looks edgeless to the import resolver.
+    const sourceNode = node.childForFieldName("source");
+    if (sourceNode) {
+      imports.push({
+        source: getStringValue(sourceNode),
+        specifiers: extractReexportSpecifiers(node),
+        lineNumber: node.startPosition.row + 1,
+      });
+    }
+
     for (let j = 0; j < node.childCount; j++) {
       const child = node.child(j);
       if (!child) continue;
