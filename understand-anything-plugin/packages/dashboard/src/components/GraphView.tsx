@@ -31,6 +31,8 @@ import type {
   NodeType,
 } from "@understand-anything/core/types";
 import { useTheme } from "../themes/index.ts";
+import { useI18n } from "../contexts/I18nContext";
+import { edgeTypeLabel } from "../utils/i18nLabels";
 import {
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -990,6 +992,7 @@ function useLayerDetailGraph() {
   const affectedNodeIds = useDashboardStore((s) => s.affectedNodeIds);
   const focusNodeId = useDashboardStore((s) => s.focusNodeId);
   const selectNode = useDashboardStore((s) => s.selectNode);
+  const { t } = useI18n();
 
   const handleNodeSelect = useCallback(
     (nodeId: string) => selectNode(nodeId),
@@ -1248,7 +1251,7 @@ function useLayerDetailGraph() {
           id: `inflated-${key}`,
           source: realSrc,
           target: realTgt,
-          label: m.type,
+          label: edgeTypeLabel(t, m.type),
           style: { stroke: "rgba(212,165,116,0.5)", strokeWidth: 1.5 },
           labelStyle: { fill: "#a39787", fontSize: 10 },
         });
@@ -1266,7 +1269,7 @@ function useLayerDetailGraph() {
         id: key,
         source: e.source,
         target: e.target,
-        label: e.type,
+        label: edgeTypeLabel(t, e.type),
         style: { stroke: "rgba(212,165,116,0.5)", strokeWidth: 1.5 },
         labelStyle: { fill: "#a39787", fontSize: 10 },
       });
@@ -1278,6 +1281,7 @@ function useLayerDetailGraph() {
     topo.intraContainer,
     topo.nodeToContainer,
     expandedContainers,
+    t,
   ]);
 
   const edges = useMemo(() => {
@@ -1333,6 +1337,7 @@ function GraphViewInner() {
   const pendingFocusContainer = useDashboardStore((s) => s.pendingFocusContainer);
   const setPendingFocusContainer = useDashboardStore((s) => s.setPendingFocusContainer);
   const tourFitPending = useDashboardStore((s) => s.tourFitPending);
+  const { t } = useI18n();
   const { preset } = useTheme();
 
   const overviewGraph = useOverviewGraph();
@@ -1522,7 +1527,7 @@ function GraphViewInner() {
   if (!graph) {
     return (
       <div className="h-full w-full flex items-center justify-center bg-root rounded-lg">
-        <p className="text-text-muted text-sm">No knowledge graph loaded</p>
+        <p className="text-text-muted text-sm">{t.common.noGraphLoaded}</p>
       </div>
     );
   }
@@ -1536,7 +1541,7 @@ function GraphViewInner() {
             onClick={() => setFocusNode(null)}
             className="px-4 py-2 rounded-full bg-elevated border border-gold/30 text-gold text-xs font-semibold tracking-wider uppercase hover:bg-gold/10 transition-colors flex items-center gap-2 shadow-lg"
           >
-            <span>Showing neighborhood</span>
+            <span>{t.graphView.showingNeighborhood}</span>
             <span className="text-text-muted">&times;</span>
           </button>
         </div>
@@ -1586,7 +1591,7 @@ function GraphViewInner() {
           }}
         >
           <span style={{ color: "#d4a574", fontSize: 14 }}>
-            {tourFitPending ? "Locating tour highlight…" : "Computing layout…"}
+            {tourFitPending ? t.graphView.locatingTourHighlight : t.graphView.computingLayout}
           </span>
         </div>
       )}

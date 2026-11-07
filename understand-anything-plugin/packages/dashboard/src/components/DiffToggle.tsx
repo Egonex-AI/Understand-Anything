@@ -30,7 +30,7 @@ export default function DiffToggle() {
             : t.diffToggle.noData
         }
       >
-        Diff {diffMode && hasDiff ? "ON" : "OFF"}
+        {t.diffToggle.label} {diffMode && hasDiff ? t.diffToggle.on : t.diffToggle.off}
       </button>
 
       {diffMode && hasDiff && (

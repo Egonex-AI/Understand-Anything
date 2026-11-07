@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useDashboardStore } from "../store";
+import { useI18n } from "../contexts/I18nContext";
 
 export interface DomainClusterData extends Record<string, unknown> {
   label: string;
@@ -19,6 +20,7 @@ function DomainClusterNode({ data }: NodeProps<DomainClusterFlowNode>) {
   const selectedNodeId = useDashboardStore((s) => s.selectedNodeId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const isSelected = selectedNodeId === data.domainId;
+  const { t } = useI18n();
 
   return (
     <div
@@ -42,7 +44,7 @@ function DomainClusterNode({ data }: NodeProps<DomainClusterFlowNode>) {
 
       {data.entities && data.entities.length > 0 && (
         <div className="mb-2">
-          <div className="text-[9px] uppercase tracking-wider text-text-muted mb-1">Entities</div>
+          <div className="text-[9px] uppercase tracking-wider text-text-muted mb-1">{t.nodeInfo.entities}</div>
           <div className="flex flex-wrap gap-1">
             {data.entities.slice(0, 5).map((e) => (
               <span key={e} className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-text-secondary">
@@ -57,7 +59,7 @@ function DomainClusterNode({ data }: NodeProps<DomainClusterFlowNode>) {
       )}
 
       <div className="text-[10px] text-text-muted">
-        {data.flowCount} flow{data.flowCount !== 1 ? "s" : ""}
+        {t.graphNodes.flows(data.flowCount)}
       </div>
     </div>
   );

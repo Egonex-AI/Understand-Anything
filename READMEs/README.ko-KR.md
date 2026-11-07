@@ -128,7 +128,7 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 # 한국어로 내용 생성 (지식 그래프 노드 설명과 대시보드 UI)
 /understand --language ko
 
-# 지원 언어: en(기본값), zh, zh-TW, ja, ko, ru, vi
+# 지원 언어: en(기본값), zh, zh-TW, ja, ko, ru, vi, pt-BR
 ```
 
 `--language` 매개변수는 다음에 영향합니다:
