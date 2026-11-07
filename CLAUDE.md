@@ -12,6 +12,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - **understand-anything-plugin/** — Claude Code plugin containing all source code:
   - **packages/core** — Shared analysis engine (types, persistence, tree-sitter, search, schema, tours, plugins)
   - **packages/dashboard** — React + TypeScript web dashboard (React Flow, Zustand, TailwindCSS v4)
+  - **packages/mcp** — Stdio MCP server (`bin/understand-anything-mcp.mjs`) exposing graph status/search/explain/diff/onboard/dashboard tools to MCP clients (e.g. Devin via `.devin/config.json`)
   - **src/** — Skill TypeScript source for `/understand-chat`, `/understand-diff`, `/understand-explain`, `/understand-onboard`
   - **skills/** — Skill definitions (`/understand`, `/understand-dashboard`, etc.)
   - **agents/** — Agent definitions (project-scanner, file-analyzer, architecture-analyzer, tour-builder, graph-reviewer)
@@ -54,14 +55,21 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 ## Scripts
 - `scripts/generate-large-graph.mjs` — Generates a fake knowledge graph for performance testing (e.g. large-graph layout). Writes to the project data directory's `knowledge-graph.json` (`.ua/knowledge-graph.json`, or `.understand-anything/` when that legacy directory is present). Usage: `node scripts/generate-large-graph.mjs [nodeCount]` (default: 3000 nodes). Not part of the production pipeline.
 
+## Devin Integration
+- **Generation**: Devin loads `understand-anything-plugin/` through its Claude-plugin compatibility. It reads `.claude-plugin/plugin.json` and `hooks/hooks.json`, sets `CLAUDE_PLUGIN_ROOT` for hook commands, and loads `agents/` as `understand-anything:<name>` subagents. There is deliberately no `.devin-plugin/plugin.json`, because a native manifest would take precedence over the Claude one.
+- **Hooks**: the PostToolUse matcher `^(Bash|exec)$` covers Claude's `Bash` tool and Devin's `exec` tool. Both hook scripts emit `hookSpecificOutput` JSON, which is the only form Devin injects into context, and they fall back to resolving paths from their own location.
+- **Skills**: Devin's agent shell has no plugin-root variable, so the plugin-root resolution blocks in `skills/understand*/SKILL.md` also try `$DEVIN_PLUGIN_ROOT` and two levels above `<SKILL_DIR>`. Keep those candidates when you edit the blocks.
+- **Consumption**: the `packages/mcp` MCP server (see its README) serves the status/search/explain/diff/onboard/dashboard tools. Don't duplicate those as skills.
+
 ## Viewer Package
 `packages/viewer` serves a committed graph without Claude Code, via `npx <release-asset-url>`. Update it when (a) the dashboard UI changes — the tarball embeds the built `dist/` — or (b) the `vite.config.ts` dev-server middleware changes, which `bin/viewer.mjs` deliberately mirrors. On every release, repack (`pack:release` script) and re-upload the tarball to the GitHub release as `understand-anything-viewer.tgz` — exactly that name, the READMEs' `releases/latest/download/` URL depends on it.
 
 ## Versioning
-When pushing to remote, bump the version in **all six** of these files (keep them in sync):
+When pushing to remote, bump the version in **all seven** of these files (keep them in sync):
 - `understand-anything-plugin/package.json` → `"version"` field
 - `understand-anything-plugin/.claude-plugin/plugin.json` → `"version"` field
 - `understand-anything-plugin/packages/viewer/package.json` → `"version"` field
+- `understand-anything-plugin/packages/mcp/package.json` → `"version"` field
 - `.claude-plugin/plugin.json` → `"version"` field
 - `.cursor-plugin/plugin.json` → `"version"` field
 - `.copilot-plugin/plugin.json` → `"version"` field

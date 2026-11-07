@@ -42,6 +42,7 @@ $Platforms = [ordered]@{
     trae        = @{ Target = (Join-Path $HOME '.trae\skills');               Style = 'per-skill' }
     nanobot     = @{ Target = (Join-Path $HOME '.nanobot\workspace\skills');  Style = 'per-skill' }
     kiro        = @{ Target = (Join-Path $HOME '.kiro\skills');               Style = 'per-skill' }
+    devin       = @{ Target = (Join-Path $HOME '.agents\skills');             Style = 'per-skill' }
 }
 
 function Show-Usage {
@@ -244,6 +245,11 @@ function Cmd-Install([string]$Id) {
     }
     if ($Id -eq 'kiro') {
         Write-Host "`n  Usage: kiro-cli chat --agent understand `"Analyze this project`""
+    }
+    if ($Id -eq 'devin') {
+        Write-Host "`n  Tip: for auto-update hooks and the namespaced /understand-anything:* skills,"
+        Write-Host '       install as a Devin plugin instead:'
+        Write-Host '       devin plugins install Egonex-AI/Understand-Anything#understand-anything-plugin'
     }
 }
 

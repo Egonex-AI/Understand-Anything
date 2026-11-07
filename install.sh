@@ -42,6 +42,7 @@ kimi|$HOME/.kimi-code/skills|folder
 trae|$HOME/.trae/skills|per-skill
 nanobot|$HOME/.nanobot/workspace/skills|per-skill
 kiro|$HOME/.kiro/skills|per-skill
+devin|$HOME/.agents/skills|per-skill
 EOF
 }
 
@@ -231,6 +232,11 @@ KIROEOF
   fi
   if [[ "$id" == "kiro" ]]; then
     printf '\n  Usage: kiro-cli chat --agent understand "Analyze this project"\n'
+  fi
+  if [[ "$id" == "devin" ]]; then
+    printf '\n  Tip: for auto-update hooks and the namespaced /understand-anything:* skills,\n'
+    printf '       install as a Devin plugin instead:\n'
+    printf '       devin plugins install Egonex-AI/Understand-Anything#understand-anything-plugin\n'
   fi
 }
 
