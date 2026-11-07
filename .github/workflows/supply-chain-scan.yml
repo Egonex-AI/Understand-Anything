@@ -1,0 +1,60 @@
+name: Supply-Chain Security Scan
+
+on:
+  pull_request:
+    # Trigger on any PR so we catch supply-chain attacks before review
+    types: [opened, synchronize, reopened, edited]
+    paths-ignore:
+      # Skip docs-only PRs (but NOT build config files)
+      - '**/*.md'
+      - '**/*.png'
+      - '**/*.svg'
+      - '**/*.jpg'
+
+concurrency:
+  group: supply-chain-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  scan-obfuscation:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.fork || github.event_name != 'pull_request_target'
+    # ^ Always runs for forks (highest risk). For non-fork PRs, runs on pull_request too.
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Generate PR diff
+        run: |
+          git diff \
+            ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} \
+            > /tmp/pr-diff.txt
+          echo "Diff size: $(wc -c < /tmp/pr-diff.txt) bytes"
+          echo "Diff lines: $(wc -l < /tmp/pr-diff.txt)"
+
+      - name: Run obfuscation scanner
+        run: bash .github/scripts/scan-obfuscation.sh
+
+      - name: Flag for manual review (non-blocking)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⚠️ **Supply-chain security scan detected suspicious patterns** in this PR.
+
+            The obfuscation scanner found code patterns commonly associated with supply-chain attacks (packed/obfuscated JavaScript, suspicious global assignments, hidden eval calls).
+
+            **Action required:** A maintainer must manually review the diff before merging.
+            See the [scan-obfuscation.sh](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/.github/scripts/scan-obfuscation.sh) script for details.
+
+            If this is a false positive, a maintainer can override this check.
+            For legitimate security concerns, please report via [Security Advisories](https://github.com/${context.repo.owner}/${context.repo.repo}/security/advisories/new).`
+            });
