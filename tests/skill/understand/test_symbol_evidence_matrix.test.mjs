@@ -324,12 +324,22 @@ describe('scoped symbol evidence contract', () => {
   });
 
   it('reports an unextracted declaration as a coverage gap rather than runtime evidence', () => {
-    const state = classify('ts', 'function* run() {} function keep() {}', {
+    // A labeled function declaration is a file-scope callable the structural
+    // extractor does not walk into, so it stays a coverage gap.
+    const state = classify('ts', 'label: function run() {} function keep() {}', {
       beforeSource: 'function run() {}', name: 'run',
     });
     expect(state.after.symbolEvidence.coverage.gaps).toContainEqual(expect.objectContaining({name: 'run'}));
     expect(state.result.missing[0].status).toBe('unknown');
     expect(state.result.missing[0].evidence).toContainEqual(expect.objectContaining({name: 'run', reason: 'Callable declaration is not covered by structural extraction'}));
+  });
+
+  it('treats a generator declaration as structurally extracted, not a coverage gap', () => {
+    const state = classify('ts', 'function* run() {} function keep() {}', {
+      beforeSource: 'function run() {}', name: 'run',
+    });
+    expect(state.after.symbolEvidence.coverage.gaps).not.toContainEqual(expect.objectContaining({name: 'run'}));
+    expect(state.result.missing[0].status).toBe('still-present');
   });
 
   it('requires an audited coverage adapter even when a grammar parses successfully', () => {
