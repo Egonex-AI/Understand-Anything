@@ -1,4 +1,5 @@
 import type { AnalyzerPlugin, StructuralAnalysis, DefinitionInfo, EndpointInfo } from "../../types.js";
+import { findClosingBrace, PROTOBUF_SYNTAX } from "./brace-matcher.js";
 
 /**
  * Parses Protocol Buffer (.proto) files to extract message, enum, and service definitions.
@@ -125,17 +126,6 @@ export class ProtobufParser implements AnalyzerPlugin {
   }
 
   private findClosingBrace(content: string): number {
-    let depth = 0;
-    for (let i = 0; i < content.length; i++) {
-      if (content[i] === "{") depth++;
-      if (content[i] === "}") {
-        depth--;
-        if (depth === 0) return i;
-      }
-    }
-    if (depth !== 0) {
-      console.warn(`[protobuf-parser] Unbalanced braces detected (depth=${depth}), results may be incomplete`);
-    }
-    return content.length;
+    return findClosingBrace(content, PROTOBUF_SYNTAX, "protobuf-parser");
   }
 }
