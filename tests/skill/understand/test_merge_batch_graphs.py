@@ -9,6 +9,7 @@ Run from the repo root:
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -1611,6 +1612,129 @@ class TestIncrementalEdgeCandidates(unittest.TestCase):
         }, {
             "source": "missing", "target": "function:src/a.ts:lost", "type": "calls", "direction": "forward",
         }])
+
+
+class TestNodeTypeNormalization(unittest.TestCase):
+    """#742: a node type decides the ID prefix, so it is checked first."""
+
+    PROSE = "Partial class split by concern; prose layout lives apart."
+
+    def _node(self, node_id: str, node_type: Any, **extra: Any) -> dict[str, Any]:
+        node = {
+            "id": node_id,
+            "name": "Doc.Prose.cs",
+            "filePath": "src/Doc.Prose.cs",
+            "summary": "",
+            "tags": [],
+            "complexity": "simple",
+            **extra,
+        }
+        if node_type is not None:
+            node["type"] = node_type
+        return node
+
+    def test_issue_742_unknown_type_without_prefix_is_dropped_and_named(self) -> None:
+        bad_id = f"{self.PROSE}:src/Doc.Prose.cs"
+        class_ids = [f"class:src/Doc.Prose.cs:C{n}" for n in range(4)]
+        batch = {
+            "nodes": [self._node(bad_id, self.PROSE)]
+            + [self._node(cid, "class", name=cid.rsplit(":", 1)[1]) for cid in class_ids],
+            "edges": [
+                {"source": "file:src/Doc.Prose.cs", "target": cid, "type": "contains"}
+                for cid in class_ids
+            ],
+        }
+
+        assembled, report = mbg.merge_and_normalize([batch])
+
+        self.assertEqual(sorted(n["id"] for n in assembled["nodes"]), class_ids)
+        self.assertFalse(any(self.PROSE in n["id"] for n in assembled["nodes"]))
+        self.assertIn("Could not fix (5 issues — needs agent review):", report)
+        self.assertIn(
+            f"  - Node '{bad_id}' dropped: unknown type \"{self.PROSE}\" and no recognized id prefix",
+            report,
+        )
+
+    def test_unknown_type_is_inferred_from_a_recognized_prefix(self) -> None:
+        nodes = [
+            self._node("file:src/a.cs", self.PROSE),
+            self._node("file:file:src/b.cs", self.PROSE),
+            self._node("my-project:file:src/c.cs", self.PROSE),
+            self._node("func:src/d.cs:run", self.PROSE),
+            self._node("class:src/e.cs:E", self.PROSE),
+        ]
+        assembled, report = mbg.merge_and_normalize([{"nodes": nodes, "edges": []}])
+
+        types = {n["id"]: n["type"] for n in assembled["nodes"]}
+        self.assertEqual(types, {
+            "file:src/a.cs": "file",
+            "file:src/b.cs": "file",
+            "file:src/c.cs": "file",
+            "function:src/d.cs:run": "function",
+            "class:src/e.cs:E": "class",
+        })
+        self.assertIn(f'     3 × type "{self.PROSE}" → "file" (inferred from id prefix)', report)
+        self.assertIn(f'     1 × type "{self.PROSE}" → "function" (inferred from id prefix)', report)
+        self.assertFalse(any(line.startswith("Could not fix") for line in report))
+
+    def test_aliases_and_case_are_canonicalized_before_the_prefix_is_chosen(self) -> None:
+        nodes = [
+            self._node("run", "method", name="run", filePath="src/a.ts"),
+            self._node("class:src/b.ts:B", "Interface"),
+            self._node("function:src/c.ts:c", "func"),
+            self._node("src/d.ts", "File"),
+            self._node("src/e.md", "readme"),
+        ]
+        assembled, report = mbg.merge_and_normalize([{"nodes": nodes, "edges": []}])
+
+        types = {n["id"]: n["type"] for n in assembled["nodes"]}
+        self.assertEqual(types, {
+            "function:src/a.ts:run": "function",
+            "class:src/b.ts:B": "class",
+            "function:src/c.ts:c": "function",
+            "file:src/d.ts": "file",
+            "document:src/e.md": "document",
+        })
+        self.assertIn('     1 × type "method" → "function" (alias)', report)
+        self.assertIn('     1 × type "File" → "file" (alias)', report)
+        self.assertFalse(any(line.startswith("Could not fix") for line in report))
+
+    def test_known_empty_and_missing_types_are_unchanged(self) -> None:
+        nodes = [
+            self._node("src/a.cs", "file"),
+            self._node("src/b.cs", ""),
+            self._node("src/c.cs", None),
+        ]
+        assembled, report = mbg.merge_and_normalize([{"nodes": nodes, "edges": []}])
+
+        self.assertEqual(
+            [(n["id"], n.get("type")) for n in assembled["nodes"]],
+            [("file:src/a.cs", "file"), ("file:src/b.cs", ""), ("file:src/c.cs", None)],
+        )
+        self.assertFalse(any("type" in line for line in report))
+        self.assertFalse(any(line.startswith("Could not fix") for line in report))
+
+    def test_non_string_type_does_not_crash(self) -> None:
+        nodes = [self._node("file:src/a.cs", ["file"]), self._node("src/b.cs", {"k": 1})]
+        assembled, report = mbg.merge_and_normalize([{"nodes": nodes, "edges": []}])
+
+        self.assertEqual([(n["id"], n["type"]) for n in assembled["nodes"]], [("file:src/a.cs", "file")])
+        self.assertIn(
+            "  - Node 'src/b.cs' dropped: unknown type {\"k\": 1} and no recognized id prefix",
+            report,
+        )
+
+    def test_alias_table_matches_core_schema(self) -> None:
+        schema = (
+            _REPO_ROOT / "understand-anything-plugin" / "packages" / "core" / "src" / "schema.ts"
+        ).read_text(encoding="utf-8")
+        expected: dict[str, str] = {}
+        for name in ("NODE_TYPE_ALIASES", "NON_DESIGN_NODE_TYPE_ALIASES"):
+            block = schema.split(f"export const {name}: Record<string, string> = {{", 1)[1]
+            block = block.split("};", 1)[0]
+            expected.update(re.findall(r'^\s*(\w+): "(\w+)",', block, re.M))
+        self.assertTrue(expected)
+        self.assertEqual(mbg.NODE_TYPE_ALIASES, expected)
 
 
 if __name__ == "__main__":
