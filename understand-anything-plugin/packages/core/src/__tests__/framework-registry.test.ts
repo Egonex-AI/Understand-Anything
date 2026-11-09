@@ -70,6 +70,22 @@ describe("FrameworkRegistry", () => {
       expect(registry.detectFrameworks({})).toEqual([]);
     });
 
+    it("detects Puppet from a module metadata.json", () => {
+      const registry = FrameworkRegistry.createDefault();
+      const detected = registry.detectFrameworks({
+        "metadata.json": '{"name": "acme-web", "version": "1.0.0", "requirements": [{"name": "puppet", "version_requirement": ">= 7.0.0"}]}',
+      });
+      expect(detected.some(f => f.id === "puppet")).toBe(true);
+    });
+
+    it("does not detect Puppet from an unrelated metadata.json (VS Code style)", () => {
+      const registry = FrameworkRegistry.createDefault();
+      const detected = registry.detectFrameworks({
+        "metadata.json": '{"name": "my-extension", "displayName": "My Extension", "publisher": "acme"}',
+      });
+      expect(detected.some(f => f.id === "puppet")).toBe(false);
+    });
+
     it("does not duplicate detected frameworks", () => {
       const registry = new FrameworkRegistry();
       registry.register(djangoConfig);
@@ -106,9 +122,9 @@ describe("FrameworkRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 10 built-in framework configs", () => {
+    it("registers all 11 built-in framework configs", () => {
       const registry = FrameworkRegistry.createDefault();
-      expect(registry.getAllFrameworks()).toHaveLength(10);
+      expect(registry.getAllFrameworks()).toHaveLength(11);
     });
 
     it("includes frameworks for multiple languages", () => {
@@ -118,6 +134,7 @@ describe("FrameworkRegistry", () => {
       expect(registry.getForLanguage("java").length).toBeGreaterThanOrEqual(1);
       expect(registry.getForLanguage("ruby").length).toBeGreaterThanOrEqual(1);
       expect(registry.getForLanguage("go").length).toBeGreaterThanOrEqual(1);
+      expect(registry.getForLanguage("puppet").some((f) => f.id === "puppet")).toBe(true);
     });
   });
 });

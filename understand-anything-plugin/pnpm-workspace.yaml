@@ -10,6 +10,10 @@ allowBuilds:
   tree-sitter-java: true
   tree-sitter-javascript: true
   tree-sitter-php: true
+  # Explicitly declined: the npm install script compiles native bindings we
+  # never use (web-tree-sitter loads the bundled .wasm). Declining silences
+  # pnpm 12's strict ignored-builds error without running the native build.
+  'tree-sitter-puppet': false
   tree-sitter-python: true
   tree-sitter-ruby: true
   tree-sitter-rust: true

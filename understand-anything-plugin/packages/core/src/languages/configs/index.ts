@@ -14,6 +14,7 @@ import { cConfig } from "./c.js";
 import { cppConfig } from "./cpp.js";
 import { dartConfig } from "./dart.js";
 import { csharpConfig } from "./csharp.js";
+import { puppetConfig } from "./puppet.js";
 import { luaConfig } from "./lua.js";
 // Non-code language configs
 import { markdownConfig } from "./markdown.js";
@@ -32,6 +33,8 @@ import { makefileConfig } from "./makefile.js";
 import { shellConfig } from "./shell.js";
 import { htmlConfig } from "./html.js";
 import { cssConfig } from "./css.js";
+import { erbConfig } from "./erb.js";
+import { eppConfig } from "./epp.js";
 import { openapiConfig } from "./openapi.js";
 import { kubernetesConfig } from "./kubernetes.js";
 import { dockerComposeConfig } from "./docker-compose.js";
@@ -61,6 +64,7 @@ export const builtinLanguageConfigs: LanguageConfig[] = [
   cppConfig,
   dartConfig,
   csharpConfig,
+  puppetConfig,
   // Non-code languages
   markdownConfig,
   yamlConfig,
@@ -78,6 +82,8 @@ export const builtinLanguageConfigs: LanguageConfig[] = [
   shellConfig,
   htmlConfig,
   cssConfig,
+  erbConfig,
+  eppConfig,
   openapiConfig,
   kubernetesConfig,
   dockerComposeConfig,
@@ -108,6 +114,7 @@ export {
   cppConfig,
   dartConfig,
   csharpConfig,
+  puppetConfig,
   // Non-code languages
   markdownConfig,
   yamlConfig,
@@ -125,6 +132,8 @@ export {
   shellConfig,
   htmlConfig,
   cssConfig,
+  erbConfig,
+  eppConfig,
   openapiConfig,
   kubernetesConfig,
   dockerComposeConfig,

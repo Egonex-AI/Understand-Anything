@@ -140,6 +140,8 @@ const LANGUAGE_BY_EXT = Object.freeze({
   '.rb': 'ruby',
   '.rake': 'ruby',
   '.php': 'php',
+  // Puppet
+  '.pp': 'puppet',
   // C / C++
   '.c': 'c',
   '.h': 'c',
@@ -168,6 +170,8 @@ const LANGUAGE_BY_EXT = Object.freeze({
   '.scss': 'css',
   '.sass': 'css',
   '.less': 'css',
+  '.erb': 'erb',
+  '.epp': 'epp',
   '.md': 'markdown',
   '.mdx': 'markdown',
   '.rst': 'markdown',
@@ -326,6 +330,9 @@ const CATEGORY_BY_EXT = Object.freeze({
   // infra
   '.tf': 'infra',
   '.tfvars': 'infra',
+  // code — explicit even though unmapped extensions default to `code`:
+  // Puppet manifests get full structure + call graph, not infra treatment.
+  '.pp': 'code',
   // data
   '.sql': 'data',
   '.graphql': 'data',
@@ -350,6 +357,10 @@ const CATEGORY_BY_EXT = Object.freeze({
   '.scss': 'markup',
   '.sass': 'markup',
   '.less': 'markup',
+  // ERB/EPP templates have no usable grammar; markup-grade keeps them out of
+  // the "expected structure" accounting for parserless files.
+  '.erb': 'markup',
+  '.epp': 'markup',
 });
 
 /**
