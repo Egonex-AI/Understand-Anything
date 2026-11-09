@@ -3,6 +3,24 @@ import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
+ * Pull type names out of a PHP `base_clause` (the `extends X` part) or
+ * `class_interface_clause` (the `implements I1, I2` part). Each name in
+ * either clause is a `name` node (possibly qualified via `qualified_name`).
+ */
+function extractPhpTypeRefs(node: TreeSitterNode | null): string[] {
+  if (!node) return [];
+  const refs: string[] = [];
+  for (let i = 0; i < node.childCount; i++) {
+    const c = node.child(i);
+    if (!c) continue;
+    if (c.type === "name" || c.type === "qualified_name") {
+      refs.push(c.text);
+    }
+  }
+  return refs;
+}
+
+/**
  * Extract parameter names from a PHP `formal_parameters` node.
  *
  * Each child is a `simple_parameter` containing an optional type hint
@@ -313,6 +331,14 @@ export class PhpExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // PHP `class Foo extends Bar implements I1, I2`
+    //   base_clause            → name (the extended class, single)
+    //   class_interface_clause → multiple name nodes (implemented interfaces)
+    const parents = extractPhpTypeRefs(findChild(node, "base_clause"));
+    const interfaces = extractPhpTypeRefs(
+      findChild(node, "class_interface_clause"),
+    );
+
     const declList = findChild(node, "declaration_list");
     if (declList) {
       this.extractDeclarationList(declList, methods, properties, functions);
@@ -323,6 +349,8 @@ export class PhpExtractor implements LanguageExtractor {
       lineRange: [node.startPosition.row + 1, node.endPosition.row + 1],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
     });
   }
 
@@ -335,6 +363,10 @@ export class PhpExtractor implements LanguageExtractor {
 
     const methods: string[] = [];
     const properties: string[] = [];
+
+    // `interface IExtended extends IBase1, IBase2` — interface inheritance
+    // lands in `parents` (direct inheritance, not implementation).
+    const parents = extractPhpTypeRefs(findChild(node, "base_clause"));
 
     const declList = findChild(node, "declaration_list");
     if (declList) {
@@ -353,6 +385,7 @@ export class PhpExtractor implements LanguageExtractor {
       lineRange: [node.startPosition.row + 1, node.endPosition.row + 1],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
     });
   }
 

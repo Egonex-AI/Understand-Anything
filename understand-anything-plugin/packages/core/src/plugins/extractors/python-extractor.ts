@@ -222,6 +222,27 @@ export class PythonExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // Python `class X(Y, Z, metaclass=Meta):` — base classes live in
+    // `superclasses` (an argument_list). Keyword args like `metaclass=`
+    // are skipped (not real parents). Python doesn't distinguish classes
+    // from protocols/interfaces syntactically, so everything goes in
+    // `parents` and `interfaces` stays unpopulated.
+    const parents: string[] = [];
+    const supers = node.childForFieldName("superclasses");
+    if (supers) {
+      for (let i = 0; i < supers.childCount; i++) {
+        const c = supers.child(i);
+        if (!c) continue;
+        if (
+          c.type === "identifier" ||
+          c.type === "dotted_name" ||
+          c.type === "attribute"
+        ) {
+          parents.push(c.text);
+        }
+      }
+    }
+
     const body = node.childForFieldName("body");
     if (body) {
       for (let i = 0; i < body.childCount; i++) {
@@ -259,6 +280,7 @@ export class PythonExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
     });
   }
 
