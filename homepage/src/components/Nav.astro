@@ -1,6 +1,7 @@
 ---
 const githubUrl = 'https://github.com/Egonex-AI/Understand-Anything';
 const egonexProductUrl = 'https://www.egonex.ai/';
+const egonexShopUrl = 'https://egonex.shop/';
 const configuredMotherSiteUrl = (import.meta.env.PUBLIC_MOTHER_SITE_URL ?? '')
   .trim()
   .replace(/\/+$/, '');
@@ -48,6 +49,10 @@ const navigation = {
           <a href={egonexProductUrl} role="menuitem">
             <strong>Egonex</strong>
             <span>An AI that gets to know you</span>
+          </a>
+          <a href={egonexShopUrl} role="menuitem">
+            <strong>Egonex Shop</strong>
+            <span>Things and services people sell on Egonex</span>
           </a>
           <a href="/" role="menuitem" aria-current="page">
             <strong>Understand Anything</strong>
@@ -100,6 +105,10 @@ const navigation = {
         <a href={egonexProductUrl}>
           <strong>Egonex</strong>
           <span>An AI that gets to know you</span>
+        </a>
+        <a href={egonexShopUrl}>
+          <strong>Egonex Shop</strong>
+          <span>Things and services people sell on Egonex</span>
         </a>
         <a href="/" aria-current="page">
           <strong>Understand Anything</strong>
