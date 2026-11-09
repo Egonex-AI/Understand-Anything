@@ -3,6 +3,56 @@ import type { LanguageExtractor, TreeSitterNode } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
+ * Pull type names out of a C# `base_list` node (the colon-list after a
+ * class or interface declaration). Handles plain `identifier`,
+ * `generic_name` (e.g. `IList<int>`), and `qualified_name`
+ * (`System.IDisposable`).
+ */
+function extractBaseListRefs(node: TreeSitterNode | null): string[] {
+  if (!node) return [];
+  const refs: string[] = [];
+  for (let i = 0; i < node.childCount; i++) {
+    const c = node.child(i);
+    if (!c) continue;
+    if (
+      c.type === "identifier" ||
+      c.type === "qualified_name" ||
+      c.type === "predefined_type"
+    ) {
+      refs.push(c.text);
+    } else if (c.type === "generic_name") {
+      const inner = findChild(c, "identifier");
+      refs.push(inner ? inner.text : c.text);
+    }
+  }
+  return refs;
+}
+
+/**
+ * Apply the C# I-prefix convention to split a base list into class
+ * parent vs implemented interfaces. C# doesn't syntactically distinguish
+ * — the only hint is naming.
+ * - `forceAllParents=true` is passed for interface declarations (every
+ *   base is an interface parent).
+ */
+function splitCSharpBaseRefs(
+  refs: string[],
+  forceAllParents: boolean,
+): { parents: string[]; interfaces: string[] } {
+  if (forceAllParents) return { parents: [...refs], interfaces: [] };
+  if (refs.length === 0) return { parents: [], interfaces: [] };
+  const bareName = (s: string) => s.replace(/<.*$/, "").split(".").pop() ?? "";
+  const looksLikeInterface = (s: string) => /^I[A-Z]/.test(bareName(s));
+  // If the first entry looks like an interface (starts with `I` + capital),
+  // every entry is an interface; otherwise the first is the class parent
+  // and the rest are interfaces.
+  if (looksLikeInterface(refs[0])) {
+    return { parents: [], interfaces: [...refs] };
+  }
+  return { parents: [refs[0]], interfaces: refs.slice(1) };
+}
+
+/**
  * Extract parameter names from a C# `parameter_list` node.
  *
  * Each `parameter` child has a `name` field (identifier) and a `type` field.
@@ -304,6 +354,15 @@ export class CSharpExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // C# `class Foo : Bar, IFoo, IBar` puts class parent + interfaces in
+    // a single `base_list`. The grammar can't distinguish them. Apply the
+    // standard C# convention: the first entry is treated as the class
+    // parent unless its bare type name starts with `I` followed by an
+    // uppercase letter (the I-prefix interface naming convention), in
+    // which case ALL entries are interfaces.
+    const baseRefs = extractBaseListRefs(findChild(node, "base_list"));
+    const { parents, interfaces } = splitCSharpBaseRefs(baseRefs, false);
+
     const body = node.childForFieldName("body");
     if (body) {
       this.extractClassBodyMembers(body, methods, properties, functions, exports);
@@ -317,6 +376,8 @@ export class CSharpExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
     });
 
     if (hasModifier(node, "public")) {
@@ -338,6 +399,12 @@ export class CSharpExtractor implements LanguageExtractor {
 
     const methods: string[] = [];
     const properties: string[] = [];
+
+    // For interface declarations, every entry in the base list is itself
+    // an interface (interface inheritance, not implementation) — landing
+    // in `parents`.
+    const baseRefs = extractBaseListRefs(findChild(node, "base_list"));
+    const { parents } = splitCSharpBaseRefs(baseRefs, true);
 
     const body = node.childForFieldName("body");
     if (body) {
@@ -368,6 +435,7 @@ export class CSharpExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
     });
 
     if (hasModifier(node, "public")) {

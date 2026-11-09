@@ -50,17 +50,12 @@ function extractReceiverType(receiverNode: TreeSitterNode): string | undefined {
   const decl = findChild(receiverNode, "parameter_declaration");
   if (!decl) return undefined;
 
-  // Look for type_identifier directly or inside pointer_type
-  for (let i = 0; i < decl.childCount; i++) {
-    const child = decl.child(i);
-    if (!child) continue;
-    if (child.type === "type_identifier") {
-      return child.text;
-    }
-    if (child.type === "pointer_type") {
-      const typeId = findChild(child, "type_identifier");
-      if (typeId) return typeId.text;
-    }
+  // Follow only the receiver's base type, never its generic type arguments.
+  let type = decl.childForFieldName("type");
+  if (type?.type === "pointer_type") type = type.namedChildren[0] ?? null;
+  if (type?.type === "generic_type") type = type.childForFieldName("type");
+  if (type?.type === "type_identifier") {
+    return type.text;
   }
   return undefined;
 }
@@ -197,6 +192,7 @@ export class GoExtractor implements LanguageExtractor {
 
     functions.push({
       name: nameNode.text,
+      owner: "",
       lineRange: [
         node.startPosition.row + 1,
         node.endPosition.row + 1,
@@ -225,9 +221,12 @@ export class GoExtractor implements LanguageExtractor {
     const paramsNode = node.childForFieldName("parameters");
     const params = extractParams(paramsNode ?? null);
     const returnType = extractResultType(node);
+    const receiverNode = node.childForFieldName("receiver");
+    const receiverType = receiverNode ? extractReceiverType(receiverNode) : undefined;
 
     functions.push({
       name: nameNode.text,
+      owner: receiverType ?? null,
       lineRange: [
         node.startPosition.row + 1,
         node.endPosition.row + 1,
@@ -237,15 +236,11 @@ export class GoExtractor implements LanguageExtractor {
     });
 
     // Track receiver type for struct association
-    const receiverNode = node.childForFieldName("receiver");
-    if (receiverNode) {
-      const receiverType = extractReceiverType(receiverNode);
-      if (receiverType) {
-        if (!methodsByReceiver.has(receiverType)) {
-          methodsByReceiver.set(receiverType, []);
-        }
-        methodsByReceiver.get(receiverType)!.push(nameNode.text);
+    if (receiverType) {
+      if (!methodsByReceiver.has(receiverType)) {
+        methodsByReceiver.set(receiverType, []);
       }
+      methodsByReceiver.get(receiverType)!.push(nameNode.text);
     }
 
     if (isExported(nameNode.text)) {
@@ -283,12 +278,35 @@ export class GoExtractor implements LanguageExtractor {
     exports: StructuralAnalysis["exports"],
   ): void {
     const properties: string[] = [];
+    // Go has no class inheritance, but embedded fields (`type T struct
+    // { Inner }` — a field_declaration with a type_identifier but no
+    // field_identifier) promote the embedded type's methods, which is
+    // the closest Go has to inheritance. Surface those in `parents` so
+    // method-promotion relationships are visible in the graph.
+    const parents: string[] = [];
 
     const fieldList = findChild(structNode, "field_declaration_list");
     if (fieldList) {
       const fields = findChildren(fieldList, "field_declaration");
       for (const field of fields) {
-        // A field_declaration can have multiple names: `X, Y int`
+        // Detect embedded fields first: a field_declaration with no
+        // field_identifier child, where the type itself is the field name.
+        const hasName = findChild(field, "field_identifier") !== null;
+        if (!hasName) {
+          const embeddedType =
+            field.childForFieldName("type") ??
+            findChild(field, "type_identifier") ??
+            findChild(field, "qualified_type") ??
+            findChild(field, "pointer_type");
+          if (embeddedType) {
+            // For pointer_type `*Foo` strip the `*`; for qualified_type
+            // `pkg.Foo` use the full ref.
+            let txt = embeddedType.text;
+            if (embeddedType.type === "pointer_type") txt = txt.replace(/^\*\s*/, "");
+            parents.push(txt);
+          }
+        }
+        // Regular (named) fields contribute to properties.
         for (let i = 0; i < field.childCount; i++) {
           const child = field.child(i);
           if (child && child.type === "field_identifier") {
@@ -306,6 +324,7 @@ export class GoExtractor implements LanguageExtractor {
       ],
       methods: [], // Methods are attached later from methodsByReceiver
       properties,
+      ...(parents.length ? { parents } : {}),
     });
 
     if (isExported(nameNode.text)) {
