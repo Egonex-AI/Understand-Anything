@@ -117,8 +117,131 @@ def extract_frontmatter(text: str) -> dict:
     return fm
 
 
+def _blank_code(text: str) -> str:
+    """Replace code with spaces while preserving line boundaries."""
+    return "".join(char if char in "\r\n" else " " for char in text)
+
+
+def _mask_inline_code_paragraph(text: str) -> str:
+    """Mask matched inline code spans in one paragraph."""
+    masked: list[str] = []
+    cursor = 0
+
+    while cursor < len(text):
+        if text[cursor] != "`":
+            masked.append(text[cursor])
+            cursor += 1
+            continue
+
+        delimiter_end = cursor + 1
+        while delimiter_end < len(text) and text[delimiter_end] == "`":
+            delimiter_end += 1
+        delimiter = text[cursor:delimiter_end]
+
+        backslash_count = 0
+        previous = cursor - 1
+        while previous >= 0 and text[previous] == "\\":
+            backslash_count += 1
+            previous -= 1
+        if backslash_count % 2:
+            masked.append(delimiter)
+            cursor = delimiter_end
+            continue
+
+        search_from = delimiter_end
+        closing_start = -1
+        while search_from < len(text):
+            candidate = text.find(delimiter, search_from)
+            if candidate < 0:
+                break
+            closing_end = candidate + len(delimiter)
+            if (candidate == 0 or text[candidate - 1] != "`") and (
+                closing_end == len(text) or text[closing_end] != "`"
+            ):
+                closing_start = candidate
+                break
+            search_from = closing_end
+
+        if closing_start < 0:
+            masked.append(delimiter)
+            cursor = delimiter_end
+            continue
+
+        closing_end = closing_start + len(delimiter)
+        masked.append(_blank_code(text[cursor:closing_end]))
+        cursor = closing_end
+
+    return "".join(masked)
+
+
+def _mask_inline_code_spans(text: str) -> str:
+    """Mask inline code spans without pairing delimiters across paragraphs."""
+    parts = re.split(r"((?:\r?\n[ \t]*){2,})", text)
+    return "".join(
+        part if index % 2 else _mask_inline_code_paragraph(part)
+        for index, part in enumerate(parts)
+    )
+
+
+def _mask_markdown_code(text: str) -> str:
+    """Mask fenced, indented, and inline code before extracting wikilinks."""
+    visible = []
+    fence_char = ""
+    fence_size = 0
+    fence_quote_depth = 0
+
+    for line in text.splitlines(keepends=True):
+        content = line.rstrip("\r\n")
+        quote_prefix = re.match(r"^(?: {0,3}> ?)+", content)
+        quote_depth = quote_prefix.group(0).count(">") if quote_prefix else 0
+        quoted_content = content[quote_prefix.end():] if quote_prefix else content
+
+        if fence_char:
+            if not fence_quote_depth or quote_depth == fence_quote_depth:
+                fence_content = content if not fence_quote_depth else quoted_content
+                closing = re.match(r"^ {0,3}(`+|~+)[ \t]*$", fence_content)
+                if (
+                    closing
+                    and closing.group(1)[0] == fence_char
+                    and len(closing.group(1)) >= fence_size
+                ):
+                    fence_char = ""
+                    fence_size = 0
+                    fence_quote_depth = 0
+                visible.append(_blank_code(line))
+                continue
+
+            # A blockquote fence ends when the quote container ends.
+            fence_char = ""
+            fence_size = 0
+            fence_quote_depth = 0
+
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", quoted_content)
+        if opening and not (
+            opening.group(1)[0] == "`" and "`" in opening.group(2)
+        ):
+            marker = opening.group(1)
+            fence_char = marker[0]
+            fence_size = len(marker)
+            fence_quote_depth = quote_depth
+            visible.append(_blank_code(line))
+            continue
+
+        indentation = quoted_content[
+            : len(quoted_content) - len(quoted_content.lstrip(" \t"))
+        ]
+        if len(indentation.expandtabs(4)) >= 4:
+            visible.append(_blank_code(line))
+            continue
+
+        visible.append(line)
+
+    return _mask_inline_code_spans("".join(visible))
+
+
 def extract_wikilinks(text: str) -> list[dict]:
     """Extract all [[target]] and [[target|display]] wikilinks."""
+    text = _mask_markdown_code(text)
     links = []
     for m in WIKILINK_RE.finditer(text):
         links.append({
@@ -202,7 +325,7 @@ def parse_index(index_path: Path) -> list[dict]:
     """Parse index.md to extract categories from ## headings and their wikilinks."""
     if not index_path.is_file():
         return []
-    text = index_path.read_text(encoding="utf-8", errors="replace")
+    text = _mask_markdown_code(index_path.read_text(encoding="utf-8", errors="replace"))
     categories = []
     current_category = None
 

@@ -50,6 +50,86 @@ def _fs_is_case_sensitive(tmp: Path) -> bool:
         probe.unlink()
 
 
+class TestWikilinksIgnoreCode(unittest.TestCase):
+    def test_fenced_code_does_not_create_wikilinks(self) -> None:
+        text = (
+            "See [[evaluation-harness]].\n\n"
+            "```bash\n"
+            "grep -E '[[:space:]]+' log.txt\n"
+            "```"
+        )
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["evaluation-harness"])
+
+    def test_inline_code_does_not_create_wikilinks(self) -> None:
+        text = "Use `[[:space:]]` in a regex; see [[evaluation-harness]]."
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["evaluation-harness"])
+
+    def test_blockquoted_fence_does_not_create_wikilinks(self) -> None:
+        text = (
+            "See [[real-link]].\n\n"
+            "> ```md\n"
+            "> [[quoted-example]]\n"
+            "> ```"
+        )
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_variable_length_markdown_code_is_ignored(self) -> None:
+        text = (
+            "See [[real-link]].\n\n"
+            "~~~~markdown\n[[fenced-example]]\n~~~~~\n\n"
+            "Code: `` `[[inline-example]]` ``."
+        )
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_escaped_backtick_does_not_hide_a_real_link(self) -> None:
+        text = r"\`literal [[real-link]]`"
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_unmatched_backticks_do_not_cross_blank_lines(self) -> None:
+        text = "`unmatched\n\n[[real-link]]`"
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_indented_code_does_not_create_wikilinks(self) -> None:
+        text = "    [[code-example]]\nSee [[real-link]]."
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_index_ignores_links_in_code(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ua-index-code-") as tmp:
+            index = Path(tmp) / "index.md"
+            index.write_text(
+                "# Wiki\n\n## Concepts\n\n"
+                "- [[evaluation-harness]]\n"
+                "- `[[inline-example]]`\n\n"
+                "```md\n- [[fenced-example]]\n```\n",
+                encoding="utf-8",
+            )
+
+            categories = pkb.parse_index(index)
+
+        self.assertEqual(categories[0]["articles"], ["evaluation-harness"])
+
+
 class TestFindMarkdownCaseInsensitive(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="ua-pkb-"))
