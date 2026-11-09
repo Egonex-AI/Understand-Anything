@@ -1565,9 +1565,16 @@ function GraphViewInner() {
         <Background variant={BackgroundVariant.Dots} color="var(--color-edge-dot)" gap={20} size={1} />
         <Controls />
         <MiniMap
-          nodeColor="var(--color-elevated)"
-          maskColor="var(--glass-bg)"
-          className="!bg-surface !border !border-border-subtle"
+          nodeColor={(n) => {
+            const type = (n.data as { nodeType?: string } | undefined)?.nodeType;
+            return type ? `var(--color-node-${type})` : "var(--color-accent)";
+          }}
+          nodeStrokeColor="var(--color-border-medium)"
+          nodeStrokeWidth={2}
+          maskColor="rgba(10, 10, 10, 0.6)"
+          pannable
+          zoomable
+          className="ua-minimap"
         />
         <TourFitView />
         <SelectedNodeFitView />

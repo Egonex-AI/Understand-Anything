@@ -263,3 +263,36 @@ body {
 [data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* Minimap legibility.
+   Default node fill was --color-elevated (#1a1a1a) on --color-surface (#111111),
+   roughly 1.1:1 contrast, so the map read as an empty dark square. Give the
+   panel a lighter base and a real border; node fills are set per type in
+   GraphView (var(--color-node-<type>) with --color-accent fallback). */
+.react-flow__minimap {
+  background: var(--color-elevated) !important;
+  border: 1px solid var(--color-border-medium) !important;
+  border-radius: 6px;
+  /* React Flow's attribution sits in the same bottom-right corner; lift the
+     panel clear of it instead of letting the watermark overlap the map. */
+  margin-bottom: 24px !important;
+}
+
+.react-flow__minimap-node {
+  stroke: var(--color-border-medium);
+  stroke-width: 2;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(10, 10, 10, 0.6) !important;
+  /* The mask is one even-odd path: outer rect + viewport cut-out. Stroking it
+     draws the viewport outline, which is otherwise invisible at fitView zoom.
+     xyflow's own sheet sets stroke: none, hence !important. */
+  stroke: #f5f0eb !important;
+  stroke-width: 2;
+  /* The minimap svg scales a large user-space viewBox down to ~200px, so a
+     plain stroke-width is scaled to a fraction of a pixel. Pin the width to
+     screen pixels instead. */
+  vector-effect: non-scaling-stroke;
+}
+
