@@ -262,6 +262,57 @@ import * as path from 'path';
     });
   });
 
+  describe("Vue SFC imports", () => {
+    it.each([
+      ["script", `<script>
+import { useCounter } from "./useCounter";
+</script>`],
+      ["script setup", `<script setup>
+import { useCounter } from "./useCounter";
+</script>`],
+      ["TypeScript script setup", `<script setup lang="ts">
+import { useCounter } from "./useCounter";
+const count: number = 1;
+</script>`],
+    ])("extracts imports from %s blocks", (_name, code) => {
+      const result = plugin.resolveImports("/project/src/App.vue", code);
+
+      expect(result.map((imp) => imp.source)).toEqual(["./useCounter"]);
+    });
+
+    it("extracts imports from both script and script setup blocks", () => {
+      const code = `<script>
+import { helper } from "./helper";
+</script>
+<script setup lang="ts">
+import { useCounter } from "./useCounter";
+</script>`;
+      const result = plugin.resolveImports("/project/src/App.vue", code);
+
+      expect(result.map((imp) => imp.source)).toEqual(["./helper", "./useCounter"]);
+    });
+
+    it("returns no imports for SFCs without script or with an empty script", () => {
+      for (const code of [
+        `<template><div>No imports</div></template>`,
+        `<script setup lang="ts">
+</script><template><div /></template>`,
+      ]) {
+        expect(plugin.resolveImports("/project/src/App.vue", code)).toEqual([]);
+      }
+    });
+
+    it("extracts Vue imports during combined analysis", () => {
+      const code = `<template><div /></template>
+<script setup lang="ts">
+import { useCounter } from "./useCounter";
+</script>`;
+      const result = plugin.analyzeFileFull("/project/src/App.vue", code);
+
+      expect(result.structure.imports.map((imp) => imp.source)).toEqual(["./useCounter"]);
+    });
+  });
+
   describe("extractCallGraph", () => {
     it("should extract function calls within functions", () => {
       const code = `

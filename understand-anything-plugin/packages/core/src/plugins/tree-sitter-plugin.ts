@@ -117,10 +117,20 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
   private languageKeyFromPath(filePath: string): string | null {
     const ext = extname(filePath).toLowerCase();
 
-    // Special case: .tsx needs its own grammar
+    // Special cases: .tsx needs its own grammar; Vue SFC scripts use TypeScript.
     if (ext === ".tsx") return "tsx";
+    if (ext === ".vue") return "typescript";
 
     return this._extensionToLang.get(ext) ?? null;
+  }
+
+  private contentForParser(filePath: string, content: string): string {
+    if (extname(filePath).toLowerCase() !== ".vue") return content;
+
+    return Array.from(
+      content.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi),
+      (match) => match[1],
+    ).join("\n");
   }
 
   /**
@@ -244,7 +254,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return { functions: [], classes: [], imports: [], exports: [] };
     }
 
-    const tree = parser.parse(content);
+    const tree = parser.parse(this.contentForParser(filePath, content));
     if (!tree) {
       return { functions: [], classes: [], imports: [], exports: [] };
     }
@@ -288,7 +298,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       if (!parser || !extractor) {
         return { status: "unsupported", structure: null, symbolEvidence: null };
       }
-      tree = parser.parse(content);
+      tree = parser.parse(this.contentForParser(filePath, content));
       if (!tree || tree.rootNode.hasError) {
         return { status: "failed", structure: null, symbolEvidence: null };
       }
@@ -324,7 +334,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return { structure: TreeSitterPlugin.emptyStructure(), callGraph: [] };
     }
 
-    const tree = parser.parse(content);
+    const tree = parser.parse(this.contentForParser(filePath, content));
     if (!tree) {
       return { structure: TreeSitterPlugin.emptyStructure(), callGraph: [] };
     }
@@ -374,7 +384,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     const parser = this.getParser(filePath);
     if (!parser) return [];
 
-    const tree = parser.parse(content);
+    const tree = parser.parse(this.contentForParser(filePath, content));
     if (!tree) {
       return [];
     }
