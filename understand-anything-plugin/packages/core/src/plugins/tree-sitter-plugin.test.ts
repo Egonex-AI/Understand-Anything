@@ -390,6 +390,15 @@ export class Greeter {
       expect(strict.symbolEvidence?.coverage.gaps.some(gap => gap.name === "keep")).toBe(false);
     });
 
+    it("retains scoped evidence for same-line duplicate declarations", () => {
+      const strict = plugin.analyzeFileStrict("test.js", "function f() {} function f() {}");
+      expect(strict.status).toBe("succeeded");
+      expect(strict.symbolEvidence?.functions.filter(fn => fn.name === "f")).toEqual([
+        { name: "f", scope: { kind: "file" }, lineRange: [1, 1] },
+        { name: "f", scope: { kind: "file" }, lineRange: [1, 1] },
+      ]);
+    });
+
     it.each(["test.js", "test.jsx", "test.ts", "test.tsx"])("exposes unresolved computed and escaped names in %s", (filePath) => {
       for (const code of [
         'class A { ["r" + "un"]() {} keep() {} }',

@@ -130,7 +130,7 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
         && (fn.name === name || node.type === "singleton_method" && fn.name === `self.${name}`)
         && fn.lineRange[0] === structuralNode.startPosition.row + 1
         && fn.lineRange[1] === structuralNode.endPosition.row + 1);
-      if (matches.length === 1) {
+      if (matches.length) {
         let scope = owner;
         if (node.type === "singleton_method") {
           const receiver = node.childForFieldName("object") ?? node.childForFieldName("receiver");
@@ -138,13 +138,13 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
         }
         functions.push({ name: matches[0].fn.name, scope,
           lineRange: [structuralNode.startPosition.row + 1, structuralNode.endPosition.row + 1] });
-        matchedFunctions.add(matches[0].index);
+        for (const { index } of matches) matchedFunctions.add(index);
       }
       const detailed = structure.functions.some(fn => fn.owner !== undefined
         && fn.lineRange[0] === node.startPosition.row + 1 && fn.lineRange[1] === node.endPosition.row + 1);
       const inventoriedMethod = name !== null && owner.kind === "class"
         && structure.classes.some(cls => cls.name === owner.name && cls.methods.includes(name));
-      if ((!valueFunction || name !== null) && matches.length !== 1 && !detailed && !inventoriedMethod) coverage.gaps.push({ kind: "callable", scope: owner, name,
+      if ((!valueFunction || name !== null) && !matches.length && !detailed && !inventoriedMethod) coverage.gaps.push({ kind: "callable", scope: owner, name,
         lineRange: [node.startPosition.row + 1, node.endPosition.row + 1], reason: "Callable declaration is not covered by structural extraction" });
     }
     // Escaped/opaque declaration spellings cannot establish absence. Ordinary
