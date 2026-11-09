@@ -208,6 +208,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
         this.extractFunction(node, functions);
         break;
 
+      case "abstract_class_declaration":
       case "class_declaration":
         this.extractClass(node, classes);
         break;
@@ -276,51 +277,6 @@ export class TypeScriptExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
-    // TypeScript / JavaScript class heritage:
-    //   class X extends Y implements I1, I2 { ... }
-    // tree-sitter-typescript shape:
-    //   class_declaration → class_heritage → extends_clause | implements_clause
-    //                                                ↘ identifier/type_identifier
-    // `parents` gets the extended class (at most one for TS/JS).
-    // `interfaces` gets every implemented interface.
-    const parents: string[] = [];
-    const interfaces: string[] = [];
-    const heritage = node.children.find((c) => c.type === "class_heritage");
-    if (heritage) {
-      for (let i = 0; i < heritage.childCount; i++) {
-        const clause = heritage.child(i);
-        if (!clause) continue;
-        if (clause.type === "extends_clause") {
-          for (let j = 0; j < clause.childCount; j++) {
-            const t = clause.child(j);
-            if (!t) continue;
-            if (
-              t.type === "identifier" ||
-              t.type === "type_identifier" ||
-              t.type === "generic_type" ||
-              t.type === "member_expression" ||
-              t.type === "nested_type_identifier"
-            ) {
-              parents.push(t.text);
-            }
-          }
-        } else if (clause.type === "implements_clause") {
-          for (let j = 0; j < clause.childCount; j++) {
-            const t = clause.child(j);
-            if (!t) continue;
-            if (
-              t.type === "type_identifier" ||
-              t.type === "identifier" ||
-              t.type === "generic_type" ||
-              t.type === "nested_type_identifier"
-            ) {
-              interfaces.push(t.text);
-            }
-          }
-        }
-      }
-    }
-
     const classBody = node.children.find(
       (c) => c.type === "class_body",
     );
@@ -329,7 +285,10 @@ export class TypeScriptExtractor implements LanguageExtractor {
         const member = classBody.child(j);
         if (!member) continue;
 
-        if (member.type === "method_definition") {
+        if (
+          member.type === "method_definition" ||
+          member.type === "abstract_method_signature"
+        ) {
           const methodName = member.children.find(
             (c) => c.type === "property_identifier",
           );
@@ -354,8 +313,6 @@ export class TypeScriptExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
-      ...(parents.length ? { parents } : {}),
-      ...(interfaces.length ? { interfaces } : {}),
     });
   }
 
@@ -463,6 +420,7 @@ export class TypeScriptExtractor implements LanguageExtractor {
           break;
         }
 
+        case "abstract_class_declaration":
         case "class_declaration": {
           this.extractClass(child, classes);
           const nameNode = child.children.find(

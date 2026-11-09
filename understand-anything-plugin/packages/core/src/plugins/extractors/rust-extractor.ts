@@ -100,10 +100,6 @@ export class RustExtractor implements LanguageExtractor {
 
     // Track methods per impl type so we can attach them to structs/enums
     const methodsByType = new Map<string, string[]>();
-    // Track trait implementations per impl target type so we can attach
-    // them as `interfaces` on the corresponding struct/enum. Rust's `impl
-    // Trait for Type` is the closest analog to Java's `implements`.
-    const traitsByType = new Map<string, Set<string>>();
 
     for (let i = 0; i < rootNode.childCount; i++) {
       const node = rootNode.child(i);
@@ -127,7 +123,7 @@ export class RustExtractor implements LanguageExtractor {
           break;
 
         case "impl_item":
-          this.extractImpl(node, functions, exports, methodsByType, traitsByType);
+          this.extractImpl(node, functions, exports, methodsByType);
           break;
 
         case "use_declaration":
@@ -141,11 +137,6 @@ export class RustExtractor implements LanguageExtractor {
       const methods = methodsByType.get(cls.name);
       if (methods) {
         cls.methods.push(...methods);
-      }
-      const traits = traitsByType.get(cls.name);
-      if (traits && traits.size > 0) {
-        const existing = cls.interfaces ?? [];
-        cls.interfaces = [...new Set([...existing, ...traits])];
       }
     }
 
@@ -348,25 +339,6 @@ export class RustExtractor implements LanguageExtractor {
     if (!nameNode) return;
 
     const methods: string[] = [];
-    // Supertraits: `trait Foo: Bar + Baz` — `bounds` field on trait_item
-    // holds a trait_bounds node with the supertrait references. Treat
-    // these as `parents` (direct trait inheritance).
-    const parents: string[] = [];
-    const boundsNode = node.childForFieldName("bounds");
-    if (boundsNode) {
-      for (let i = 0; i < boundsNode.childCount; i++) {
-        const b = boundsNode.child(i);
-        if (!b) continue;
-        if (
-          b.type === "type_identifier" ||
-          b.type === "scoped_type_identifier" ||
-          b.type === "generic_type"
-        ) {
-          parents.push(b.text);
-        }
-      }
-    }
-
     const body = findChild(node, "declaration_list");
     if (body) {
       // Trait bodies contain function_signature_item for method declarations
@@ -395,7 +367,6 @@ export class RustExtractor implements LanguageExtractor {
       ],
       methods,
       properties: [],
-      ...(parents.length ? { parents } : {}),
     });
 
     if (isPublic(node)) {
@@ -411,18 +382,9 @@ export class RustExtractor implements LanguageExtractor {
     functions: StructuralAnalysis["functions"],
     exports: StructuralAnalysis["exports"],
     methodsByType: Map<string, string[]>,
-    traitsByType: Map<string, Set<string>>,
   ): void {
     const typeNode = node.childForFieldName("type");
     const typeName = typeNode ? typeNode.text : null;
-    // `impl Trait for Type` — when the impl has a `trait` field, the
-    // type implements that trait. Surface as a relationship that the
-    // outer loop pins onto the type's `interfaces` array.
-    const traitNode = node.childForFieldName("trait");
-    if (traitNode && typeName) {
-      if (!traitsByType.has(typeName)) traitsByType.set(typeName, new Set());
-      traitsByType.get(typeName)!.add(traitNode.text);
-    }
 
     const body = node.childForFieldName("body");
     if (!body) return;
