@@ -283,6 +283,8 @@ export class CSharpExtractor implements LanguageExtractor {
           break;
 
         case "class_declaration":
+        case "record_declaration":
+        case "struct_declaration":
           this.extractClass(child, functions, classes, exports);
           break;
 
@@ -313,6 +315,8 @@ export class CSharpExtractor implements LanguageExtractor {
 
       switch (child.type) {
         case "class_declaration":
+        case "record_declaration":
+        case "struct_declaration":
           this.extractClass(child, functions, classes, exports);
           break;
 
