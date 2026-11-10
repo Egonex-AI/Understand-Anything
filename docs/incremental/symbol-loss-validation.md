@@ -29,7 +29,7 @@ Each source transition is checked independently from publication mechanics.
 | Identity | stable ID; alternate ID; reused ID; same name across owners; free function versus method; duplicate/overloaded source identities; moved lines |
 | Supplemental names | exact same/different name; unknown name; reader/writer suffix; quoted/symbol spelling; escapes/interpolation |
 | Scope | same class; another class; free scope; unresolved/shadowed/reassigned receiver; unrelated local/import aliases; bound installer alias; arbitrary evaluation |
-| Syntax | JS/TS/JSX/TSX methods/properties/TypeScript parameter properties/class expressions/assignments/property APIs; Ruby accessors/alias declarations/method installers; Python attributes/installers; Go/Rust/C++ receiver extraction |
+| Syntax | JS/TS/JSX/TSX methods/properties/TypeScript parameter properties/class expressions/assignments/property APIs; Ruby accessors/alias declarations/method installers; Python attributes/installers; Go/Rust/C++ receiver extraction; Java records/enums/nested and anonymous classes/record components/Lombok annotations |
 | Negative evidence | unrelated string, parameter, normal read/call; static installer for another symbol; another owner's accessor |
 | Invalid evidence | unsupported parser/coverage adapter, parse recovery/error, empty extraction, missing evidence version/coverage profile, ambiguous old mapping |
 | Publication | 20-to-1 omission; equal counts; merge/direct-finalize refusal; retry success/failure; stable prepare baseline; stale shards; deleted/excluded files; both data directories; current edge endpoint reuse |
@@ -42,7 +42,9 @@ Tests must assert positive and negative outcomes for each recognizer rather than
 
 `symbol-evidence.ts` connects that table to structural declarations and runtime effects. `symbol-coverage.ts` records unhandled named declaration surfaces and opaque expansion constructs. An unextracted callable/class is a coverage gap even after a successful parse; a reference or parameter name is not. Missing or malformed coverage is rejected. The comparator consumes this evidence without walking an AST.
 
-The current declaration-coverage adapters cover JavaScript/JSX, TypeScript/TSX, Ruby, Python, Go, Rust and C++. Other grammars may parse and preserve known graph descriptors, but cannot automatically authorize an omitted symbol's deletion until a coverage adapter is supplied. Unsupported expansion/qualification remains uncertain; this is a conservative deletion gate, not a compiler or runtime equivalence checker.
+The current declaration-coverage adapters cover JavaScript/JSX, TypeScript/TSX, Ruby, Python, Go, Rust, C++ and Java. Other grammars may parse and preserve known graph descriptors, but cannot automatically authorize an omitted symbol's deletion until a coverage adapter is supplied. Unsupported expansion/qualification remains uncertain; this is a conservative deletion gate, not a compiler or runtime equivalence checker.
+
+Java top-level classes, interfaces, records and enums are named class scopes. Nested, local and anonymous classes (including enum constant bodies) are local scopes: their members never preserve or stand in for a top-level type's method, and their own deletions stay unknown because the extractor does not inventory them. Record components, enum constants, compact constructors and annotation elements are coverage gaps for their type. Member-generating Lombok annotations such as `@Getter`, `@Data` or `@Builder` (imported, wildcard-imported or fully qualified) may generate any method on the annotated type or on the type declaring an annotated field, so they block every callable deletion there. Lombok annotations that add no methods, such as `@Slf4j` or `@NonNull`, and same-named non-Lombok annotations such as Spring's `@Value` do not. Other annotation processors that add members to the annotated source type are not modeled.
 
 ## Interpretation limits
 
