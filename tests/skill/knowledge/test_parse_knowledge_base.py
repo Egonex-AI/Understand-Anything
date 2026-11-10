@@ -114,6 +114,78 @@ class TestWikilinksIgnoreCode(unittest.TestCase):
 
         self.assertEqual(targets, ["real-link"])
 
+    def test_nested_lists_and_paragraph_continuations_keep_article_links(self) -> None:
+        text = (
+            "Some text\n    see [[lazy-continuation]].\n\n"
+            "- Parent\n    see [[list-continuation]].\n"
+            "\t- [[tab-child]]\n    - [[space-child]]\n"
+        )
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(
+            targets,
+            ["lazy-continuation", "list-continuation", "tab-child", "space-child"],
+        )
+
+    def test_tabs_after_list_markers_use_the_container_column(self) -> None:
+        text = "-\tParent\n\n    - [[child]]\n"
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["child"])
+
+    def test_frontmatter_list_links_are_not_treated_as_code(self) -> None:
+        text = (
+            "---\nrelated:\n    - [[frontmatter-related]]\n---\n\n"
+            "Article body.\n"
+        )
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["frontmatter-related"])
+
+    def test_indented_code_after_blank_line_is_ignored(self) -> None:
+        text = "Paragraph.\n\n    [[code-example]]\n\nSee [[real-link]]."
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_indented_code_in_blockquote_is_ignored(self) -> None:
+        text = "See [[real-link]].\n\n>     [[quoted-code]]\n> [[quoted-real-link]]"
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link", "quoted-real-link"])
+
+    def test_indented_code_in_list_is_ignored(self) -> None:
+        text = "- Parent\n\n      [[code-example]]\n\n    - [[real-link]]\n"
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, ["real-link"])
+
+    def test_separate_blockquotes_do_not_share_list_state(self) -> None:
+        text = "> - item\n\nOutside paragraph.\n\n>     [[quoted-code]]\n"
+
+        targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+        self.assertEqual(targets, [])
+
+    def test_block_boundaries_end_root_list_indentation(self) -> None:
+        for block in (
+            "```md\n[[fenced-code]]\n```\n",
+            "> Quoted paragraph.\n",
+            "## Heading\n",
+        ):
+            with self.subTest(block=block):
+                text = "- item\n\n" + block + "\n    [[code-example]]\n"
+
+                targets = [link["target"] for link in pkb.extract_wikilinks(text)]
+
+                self.assertEqual(targets, [])
+
     def test_index_ignores_links_in_code(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ua-index-code-") as tmp:
             index = Path(tmp) / "index.md"
@@ -128,6 +200,22 @@ class TestWikilinksIgnoreCode(unittest.TestCase):
             categories = pkb.parse_index(index)
 
         self.assertEqual(categories[0]["articles"], ["evaluation-harness"])
+
+    def test_index_keeps_tab_and_four_space_nested_list_links(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ua-index-nested-list-") as tmp:
+            index = Path(tmp) / "index.md"
+            index.write_text(
+                "# Wiki\n\n## Concepts\n\n"
+                "- Parent\n\t- [[tab-child]]\n    - [[space-child]]\n",
+                encoding="utf-8",
+            )
+
+            categories = pkb.parse_index(index)
+
+        self.assertEqual(
+            categories[0]["articles"],
+            ["tab-child", "space-child"],
+        )
 
 
 class TestFindMarkdownCaseInsensitive(unittest.TestCase):

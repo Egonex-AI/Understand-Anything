@@ -185,16 +185,42 @@ def _mask_inline_code_spans(text: str) -> str:
 
 def _mask_markdown_code(text: str) -> str:
     """Mask fenced, indented, and inline code before extracting wikilinks."""
+    # Frontmatter values are metadata, not Markdown code blocks.
+    frontmatter = FRONTMATTER_RE.match(text)
+    prefix = text[:frontmatter.end()] if frontmatter else ""
+    markdown = text[frontmatter.end():] if frontmatter else text
     visible = []
     fence_char = ""
     fence_size = 0
     fence_quote_depth = 0
+    list_items: dict[int, list[tuple[int, int]]] = {}
+    previous_blank: dict[int, bool] = {}
+    indented_code: dict[int, int] = {}
+    previous_quote_depth = 0
 
-    for line in text.splitlines(keepends=True):
+    def _indent_width(value: str, start: int = 0) -> int:
+        width = start
+        for char in value:
+            width += 4 - width % 4 if char == "\t" else 1
+        return width - start
+
+    for line in markdown.splitlines(keepends=True):
         content = line.rstrip("\r\n")
         quote_prefix = re.match(r"^(?: {0,3}> ?)+", content)
         quote_depth = quote_prefix.group(0).count(">") if quote_prefix else 0
         quoted_content = content[quote_prefix.end():] if quote_prefix else content
+
+        if quote_depth and not previous_quote_depth:
+            parent_stack = list_items.get(0, [])
+            quote_indent = content.index(">")
+            while parent_stack and quote_indent < parent_stack[-1][1]:
+                parent_stack.pop()
+        if quote_depth < previous_quote_depth:
+            for depth in range(quote_depth + 1, previous_quote_depth + 1):
+                list_items.pop(depth, None)
+                previous_blank.pop(depth, None)
+                indented_code.pop(depth, None)
+        previous_quote_depth = quote_depth
 
         if fence_char:
             if not fence_quote_depth or quote_depth == fence_quote_depth:
@@ -208,6 +234,7 @@ def _mask_markdown_code(text: str) -> str:
                     fence_char = ""
                     fence_size = 0
                     fence_quote_depth = 0
+                    previous_blank[quote_depth] = True
                 visible.append(_blank_code(line))
                 continue
 
@@ -220,6 +247,9 @@ def _mask_markdown_code(text: str) -> str:
         if opening and not (
             opening.group(1)[0] == "`" and "`" in opening.group(2)
         ):
+            stack = list_items.get(quote_depth, [])
+            while stack and opening.start(1) < stack[-1][1]:
+                stack.pop()
             marker = opening.group(1)
             fence_char = marker[0]
             fence_size = len(marker)
@@ -227,16 +257,78 @@ def _mask_markdown_code(text: str) -> str:
             visible.append(_blank_code(line))
             continue
 
-        indentation = quoted_content[
-            : len(quoted_content) - len(quoted_content.lstrip(" \t"))
-        ]
-        if len(indentation.expandtabs(4)) >= 4:
+        indentation_length = len(quoted_content) - len(quoted_content.lstrip(" \t"))
+        indentation = quoted_content[:indentation_length]
+        indent_width = _indent_width(indentation)
+        rest = quoted_content[len(indentation):]
+        marker = re.match(r"([-+*]|\d{1,9}[.)])([ \t]+|$)", rest)
+        stack = list_items.setdefault(quote_depth, [])
+        blank_before = previous_blank.get(quote_depth, True)
+        is_blank = not quoted_content.strip()
+        is_heading = bool(re.match(r"^ {0,3}#{1,6}(?:[ \t]+|$)", quoted_content))
+
+        code_indent = indented_code.get(quote_depth)
+        if code_indent is not None:
+            if is_blank:
+                visible.append(line)
+                previous_blank[quote_depth] = True
+                continue
+            if indent_width >= code_indent:
+                visible.append(_blank_code(line))
+                previous_blank[quote_depth] = False
+                continue
+            indented_code.pop(quote_depth, None)
+
+        if not is_blank and (blank_before or is_heading):
+            while stack and indent_width < stack[-1][1]:
+                stack.pop()
+
+        # Code cannot interrupt a paragraph, and list indentation is relative
+        # to its item's content column rather than the start of the document.
+        code_threshold = stack[-1][1] + 4 if stack else 4
+        nested_list_marker = bool(
+            marker
+            and stack
+            and indent_width >= stack[-1][1]
+            and indent_width < stack[-1][1] + 4
+        )
+        root_list_marker = bool(marker and not stack and indent_width <= 3)
+        if (
+            not is_blank
+            and blank_before
+            and indent_width >= code_threshold
+            and not nested_list_marker
+            and not root_list_marker
+        ):
+            indented_code[quote_depth] = code_threshold
             visible.append(_blank_code(line))
+            previous_blank[quote_depth] = False
             continue
+
+        if marker:
+            marker_indent = indent_width
+            while stack and marker_indent <= stack[-1][0]:
+                stack.pop()
+            nested_list_marker = bool(
+                stack
+                and marker_indent >= stack[-1][1]
+                and marker_indent < stack[-1][1] + 4
+            )
+            root_list_marker = not stack and marker_indent <= 3
+            if nested_list_marker or root_list_marker:
+                marker_width = _indent_width(marker.group(1))
+                spacing_width = _indent_width(
+                    marker.group(2), marker_indent + marker_width
+                ) or 1
+                if spacing_width > 4:
+                    spacing_width = 1
+                stack.append((marker_indent, marker_indent + marker_width + spacing_width))
+
+        previous_blank[quote_depth] = is_blank or is_heading
 
         visible.append(line)
 
-    return _mask_inline_code_spans("".join(visible))
+    return prefix + _mask_inline_code_spans("".join(visible))
 
 
 def extract_wikilinks(text: str) -> list[dict]:
