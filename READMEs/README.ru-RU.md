@@ -13,6 +13,12 @@
 </p>
 
 <p align="center">
+  От команды Understand Anything: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>знакомьтесь, Ego</strong></a> — персональный ИИ-агент, который создаёт ваш магазин и продаёт за вас.
+  <br />
+  Вы создаёте, Ego продаёт. Бесплатно.
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 

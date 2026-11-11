@@ -12,6 +12,12 @@
 </p>
 
 <p align="center">
+  Del equipo detrás de Understand Anything: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>conoce a Ego</strong></a>, un agente de IA personal que crea tu tienda y vende por ti.
+  <br />
+  Tú lo creas, Ego lo vende. Uso gratuito.
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
