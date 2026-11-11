@@ -7,12 +7,6 @@
 </p>
 
 <p align="center">
-  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
-  <br />
-  <em>AI should help people, not replace them.</em>
-</p>
-
-<p align="center">
   From the team behind Understand Anything: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>Meet Ego</strong></a>, a personal AI agent that builds your store and sells for you.
   <br />
   Build something. Let Ego sell it. Free to use.

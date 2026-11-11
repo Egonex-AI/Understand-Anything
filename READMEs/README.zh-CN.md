@@ -6,12 +6,6 @@
 </p>
 
 <p align="center">
-  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
-  <br />
-  <em>AI 应该帮助人，而不是取代人。</em>
-</p>
-
-<p align="center">
   来自 Understand Anything 背后的团队：<a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>认识 Ego</strong></a>，一个帮你开好店、替你卖东西的个人 AI Agent。
   <br />
   你负责做出来，Ego 负责卖出去。免费使用。

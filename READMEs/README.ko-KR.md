@@ -6,12 +6,6 @@
 </p>
 
 <p align="center">
-  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
-  <br />
-  <em>AI는 사람을 대체하는 것이 아니라 사람을 도와야 합니다.</em>
-</p>
-
-<p align="center">
   Understand Anything 팀이 소개합니다: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>Ego를 만나 보세요</strong></a>. 스토어를 만들어 주고 당신 대신 팔아 주는 개인 AI 에이전트입니다.
   <br />
   만드는 건 당신, 파는 건 Ego. 무료로 사용할 수 있습니다.

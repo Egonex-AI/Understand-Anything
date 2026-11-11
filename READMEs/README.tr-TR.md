@@ -7,12 +7,6 @@
 </p>
 
 <p align="center">
-  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
-  <br />
-  <em>Yapay zekâ insanların yerini almamalı, onlara yardım etmeli.</em>
-</p>
-
-<p align="center">
   Understand Anything'in arkasındaki ekipten: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>Ego ile tanışın</strong></a> — mağazanızı kuran ve sizin yerinize satan kişisel bir yapay zekâ ajanı.
   <br />
   Siz üretin, Ego satsın. Ücretsiz.

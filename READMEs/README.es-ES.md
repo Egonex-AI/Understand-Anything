@@ -6,12 +6,6 @@
 </p>
 
 <p align="center">
-  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
-  <br />
-  <em>La IA debe ayudar a las personas, no reemplazarlas.</em>
-</p>
-
-<p align="center">
   Del equipo detrás de Understand Anything: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>conoce a Ego</strong></a>, un agente de IA personal que crea tu tienda y vende por ti.
   <br />
   Tú lo creas, Ego lo vende. Uso gratuito.
