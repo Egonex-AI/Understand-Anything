@@ -7,12 +7,6 @@
 </p>
 
 <p align="center">
-  <strong>Understand Anything. <a href="https://egonex.ai">Understand Anyone.</a></strong>
-  <br />
-  <em>AI nên giúp con người, không phải thay thế họ.</em>
-</p>
-
-<p align="center">
   Từ đội ngũ đứng sau Understand Anything: <a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>Gặp gỡ Ego</strong></a>, AI agent cá nhân dựng cửa hàng và bán hàng giúp bạn.
   <br />
   Bạn tạo ra, Ego bán. Miễn phí sử dụng.
