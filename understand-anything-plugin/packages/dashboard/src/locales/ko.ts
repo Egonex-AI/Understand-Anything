@@ -1,5 +1,14 @@
+
+type StalenessGraph = "knowledge" | "domain";
+
+const graphName = (graph: StalenessGraph) =>
+  graph === "knowledge" ? "지식 그래프" : "도메인 그래프";
+const filesChanged = (count: number) => `분석 이후 파일 ${count}개가 변경되었습니다.`;
+
 export const ko = {
   common: {
+    unnamed: "이름 없음",
+    close: "닫기",
     loading: "프로젝트 로딩 중...",
     computingGraphLayout: "그래프 레이아웃을 계산하는 중...",
     forceLayoutFallback: "포스 레이아웃을 사용할 수 없어 대체 그리드를 표시합니다.",
@@ -48,6 +57,7 @@ export const ko = {
     avgConnectionsPerNode: "노드 평균 연결 수",
   },
   nodeInfo: {
+    reverse: "역방향",
     definedInThisFile: "이 파일에 정義",
     languageConcepts: "언어 개념",
     category: "카테고리",
@@ -67,6 +77,7 @@ export const ko = {
     noFilePathsFound: "파일 경로를 찾을 수 없습니다.",
   },
   filterPanel: {
+    title: "그래프 필터 (F)",
     nodeTypes: "노드 타입",
     complexity: "복잡도",
     layers: "레이어",
@@ -125,10 +136,22 @@ export const ko = {
     knowledge: "지식",
   },
   tokenGate: {
+    title: "액세스 토큰 필요",
+    instructionsBefore: "터미널에 표시된 액세스 토큰을 붙여넣으세요.",
+    instructionsAfter: " 표시가 있는 줄을 찾으세요.",
+    keyIcon: "열쇠",
+    placeholder: "여기에 토큰 붙여넣기...",
+    invalidToken: "유효하지 않은 토큰입니다. 확인 후 다시 시도하세요.",
+    unexpectedResponse: (status: number) =>
+      `예상치 못한 응답입니다 (${status}). 대시보드 서버가 실행 중인가요?`,
+    unreachable: (detail: string) => `서버에 연결할 수 없습니다: ${detail}`,
     validating: "검증 중...",
     continue: "계속",
   },
   diffToggle: {
+    label: "차분",
+    on: "켜짐",
+    off: "꺼짐",
     hideOverlay: "차분 오버레이 숨기기",
     showOverlay: "차분 오버레이 표시",
     noData: "차분 데이터가 로드되지 않음",
@@ -136,6 +159,9 @@ export const ko = {
     affected: "영향받음",
   },
   learnPanel: {
+    languageLesson: "언어 레슨",
+    referencedComponents: "참조된 컴포넌트",
+    goToStep: (step: number) => `${step}단계로 이동`,
     finish: "완료",
     next: "다음",
     prev: "이전",
@@ -159,6 +185,18 @@ export const ko = {
     escBack: "Esc로 돌아가기",
   },
   warningBanner: {
+    autoCorrected: "자동 수정됨",
+    fatalErrors: (count: number) => `치명적 오류 ${count}개`,
+    autoCorrections: (count: number) => `자동 수정 ${count}개`,
+    droppedItems: (count: number) => `삭제된 항목 ${count}개`,
+    summaryFatal: (parts: string[]) => `대시보드에서 ${parts.join(", ")} 발생`,
+    summaryLoaded: (parts: string[]) => `지식 그래프 로드됨: ${parts.join(", ")}`,
+    clickToExpand: "클릭하여 펼치기",
+    clickToCollapse: "클릭하여 접기",
+    footerFatal: "이 문제들을 복사해 GitHub에 버그 리포트를 등록하세요",
+    footerFix: "이 문제들을 복사해 에이전트에게 knowledge-graph.json 수정을 요청하세요",
+    copied: "복사됨!",
+    copyIssues: "문제 복사",
     dropped: "삭제됨",
     fatal: "치명적",
   },
@@ -172,6 +210,8 @@ export const ko = {
     mono: "모노",
   },
   codeViewer: {
+    noFilePath: "이 노드에는 파일 경로가 없습니다.",
+    demoUnavailable: "소스 미리보기는 로컬 대시보드 서버가 실행 중일 때만 사용할 수 있습니다.",
     fullFile: "전체 파일",
     lines: "행",
     linesLabel: "행",
@@ -222,9 +262,17 @@ export const ko = {
     placeholder: "노드 이름, 요약, 태그로 검색...",
     fuzzy: "퍼지",
     semantic: "시맨틱",
-    result: "결과",
+    resultCount: (count: number) => `결과 ${count}개`,
   },
   export: {
+    notReady: "그래프를 내보낼 준비가 되지 않았습니다",
+    noNodes: "내보낼 노드가 없습니다",
+    pngRenderFailed: "PNG 내보내기 실패: 그래프를 이미지로 렌더링할 수 없습니다.",
+    canvasFailed: "캔버스 컨텍스트를 만들지 못했습니다",
+    pngEncodingFailed: "PNG 내보내기 실패: 이미지 인코딩에 실패했습니다.",
+    pngFailed: (detail: string) => `PNG 내보내기 실패: ${detail}`,
+    svgFailed: (detail: string) => `SVG 내보내기 실패: ${detail}`,
+    jsonFailed: (detail: string) => `JSON 내보내기 실패: ${detail}`,
     label: "내보내기",
     title: "그래프 내보내기 (E)",
     asPNG: "PNG로 내보내기",
@@ -269,7 +317,114 @@ edgeLabels: {
     authored_by: { forward: "작성자", backward: "작성" },
   },
   pathFinder: {
+    heading: "의존성 경로 찾기",
+    description: "의존성 그래프에서 두 노드 사이의 최단 경로를 찾습니다.",
+    fromNode: "시작 노드",
+    toNode: "도착 노드",
+    selectNode: "노드 선택...",
+    searching: "검색 중...",
+    findPath: "경로 찾기",
+    noPath: "이 노드들 사이에서 경로를 찾지 못했습니다.",
+    pathFound: (count: number) => `경로를 찾았습니다 (노드 ${count}개)`,
     title: "노드 간 경로 찾기 (P)",
+  },
+  graphNodes: {
+    matches: (count: number) => `일치 ${count}개`,
+    files: (count: number) => `파일 ${count}개`,
+    flows: (count: number) => `플로우 ${count}개`,
+    steps: (count: number) => `${count}단계`,
+    connections: (count: number) => `연결 ${count}개`,
+    hits: (count: number) => `${count}건 일치`,
+    clickToExplore: "클릭하여 탐색 →",
+    root: "(루트)",
+    containerAria: (name: string, count: number, expanded: boolean) =>
+      `${name} 컨테이너, 항목 ${count}개, ${expanded ? "펼쳐짐" : "접힘"}`,
+    incoming: (count: number) => `들어옴 ${count}`,
+    outgoing: (count: number) => `나감 ${count}`,
+  },
+  graphView: {
+    showingNeighborhood: "주변 노드 표시 중",
+    locatingTourHighlight: "투어 하이라이트 찾는 중…",
+    computingLayout: "레이아웃 계산 중…",
+    noKnowledgeGraph: "사용 가능한 지식 그래프가 없습니다. /understand-knowledge를 실행해 생성하세요.",
+    noDomainGraph: "사용 가능한 도메인 그래프가 없습니다. /understand-domain을 실행해 생성하세요.",
+  },
+  loadErrors: {
+    invalidGraph: (detail: string) => `유효하지 않은 지식 그래프: ${detail}`,
+    unknownValidation: "유효하지 않은 지식 그래프: 알 수 없는 검증 오류",
+    loadFailed: (detail: string) => `지식 그래프를 불러오지 못했습니다: ${detail}`,
+  },
+  staleness: {
+    subjectKnowledge: "지식 그래프",
+    subjectDomain: "도메인 그래프",
+    subjectBoth: "지식 그래프와 도메인 그래프",
+    titleStale: (subject: string, _multiple: boolean) => `${subject}가 오래되었을 수 있습니다`,
+    titleDirty: (subject: string, _multiple: boolean) => `${subject}에 작업 트리 변경 사항이 있습니다`,
+    titleUnknown: (subject: string, _multiple: boolean) =>
+      `${subject}의 최신 여부를 확인할 수 없습니다`,
+    staleBehind: (graph: StalenessGraph, commits: number, files: number) =>
+      `${graphName(graph)}가 HEAD보다 프로젝트 커밋 ${commits}개 뒤처져 있습니다. ${filesChanged(files)}`,
+    staleAhead: (graph: StalenessGraph, files: number) =>
+      `${graphName(graph)}는 HEAD보다 최신 프로젝트 이력에서 생성되었습니다. ${filesChanged(files)}`,
+    staleDiverged: (graph: StalenessGraph, files: number) =>
+      `${graphName(graph)}와 HEAD는 서로 다른 프로젝트 이력에서 비롯되었습니다. ${filesChanged(files)}`,
+    dirty: (graph: StalenessGraph, files: number) =>
+      `작업 트리 파일 ${files}개가 변경되었으며 ${graphName(graph)}의 커밋 메타데이터에 반영되지 않았습니다.`,
+    unknownMissingGraphCommit: (graph: StalenessGraph) =>
+      `${graphName(graph)}에 HEAD와 비교할 Git 커밋 해시가 없습니다.`,
+    unknownGitHeadUnavailable: (graph: StalenessGraph) =>
+      `대시보드가 Git HEAD를 읽지 못해 ${graphName(graph)}를 비교할 수 없습니다.`,
+    unknownGraphCommitUnavailable: (graph: StalenessGraph) =>
+      `${graphName(graph)}가 참조하는 커밋이 현재 체크아웃에 없습니다.`,
+    unknownGitCommandTimeout: (graph: StalenessGraph) =>
+      `Git 최신성 확인 명령이 시간 초과되어 ${graphName(graph)}를 확인할 수 없습니다.`,
+    unknownRequestFailed: "대시보드가 그래프 최신성 데이터를 갱신하지 못했습니다.",
+    refresh: (commands: string[], _multiple: boolean) =>
+      `영향 분석이나 온보딩 답변에 의존하기 전에 ${commands.join(" 및 ")}을(를) 실행해 갱신하세요.`,
+    retry: "창에 다시 포커스하면 최신성 확인을 재시도합니다.",
+    showFiles: "파일 보기",
+    hideFiles: "파일 숨기기",
+    moreFiles: (count: number) => `+${count}개 더`,
+  },
+  nodeTypeNames: {
+    file: "파일",
+    function: "함수",
+    class: "클래스",
+    module: "모듈",
+    concept: "개념",
+    config: "설정",
+    document: "문서",
+    service: "서비스",
+    table: "테이블",
+    endpoint: "엔드포인트",
+    pipeline: "파이프라인",
+    schema: "스키마",
+    resource: "리소스",
+    domain: "도메인",
+    flow: "플로우",
+    step: "단계",
+    article: "아티클",
+    entity: "엔티티",
+    topic: "토픽",
+    claim: "주장",
+    source: "출처",
+    page: "페이지",
+    screen: "화면",
+    component: "컴포넌트",
+    componentSet: "컴포넌트 세트",
+    instance: "인스턴스",
+    token: "토큰",
+  },
+  edgeCategoryNames: {
+    structural: "구조",
+    behavioral: "동작",
+    "data-flow": "데이터 흐름",
+    dependencies: "의존성",
+    semantic: "의미",
+    infrastructure: "인프라",
+    domain: "도메인",
+    knowledge: "지식",
+    design: "디자인",
   },
   onboarding: {
     header: "UNDERSTAND-ANYTHING · 시작하기",

@@ -1,5 +1,6 @@
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { nodeTypeLabel } from "../utils/i18nLabels";
 
 export default function ProjectOverview() {
   const graph = useDashboardStore((s) => s.graph);
@@ -138,7 +139,7 @@ export default function ProjectOverview() {
               return (
                 <div key={type}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-text-secondary capitalize">{type}</span>
+                    <span className="text-text-secondary capitalize">{nodeTypeLabel(t, type)}</span>
                     <span className="text-text-muted font-mono">{count} ({percentage}%)</span>
                   </div>
                   <div className="w-full h-1.5 bg-elevated rounded-full overflow-hidden">

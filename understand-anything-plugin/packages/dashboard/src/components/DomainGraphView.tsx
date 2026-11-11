@@ -225,7 +225,7 @@ function DomainGraphViewInner() {
   if (!domainGraph) {
     return (
       <div className="h-full flex items-center justify-center text-text-muted text-sm">
-        No domain graph available. Run /understand-domain to generate one.
+        {t.graphView.noDomainGraph}
       </div>
     );
   }

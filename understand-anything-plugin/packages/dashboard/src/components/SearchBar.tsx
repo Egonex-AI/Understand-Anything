@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
+import { nodeTypeLabel } from "../utils/i18nLabels";
 
 const typeBadgeColors: Record<string, string> = {
   file: "text-node-file border border-node-file/30 bg-node-file/10",
@@ -134,8 +135,10 @@ export default function SearchBar() {
         </div>
         {searchQuery.trim() && (
           <span className="hidden sm:inline text-xs text-text-muted shrink-0">
-            {searchResults.length} {t.search.result}{searchResults.length !== 1 ? "s" : ""}{" "}
-            <span className="text-text-muted">({searchMode})</span>
+            {t.search.resultCount(searchResults.length)}{" "}
+            <span className="text-text-muted">
+              ({searchMode === "semantic" ? t.search.semantic : t.search.fuzzy})
+            </span>
           </span>
         )}
       </div>
@@ -161,7 +164,7 @@ export default function SearchBar() {
                 <span
                   className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${badgeColor} shrink-0`}
                 >
-                  {node.type}
+                  {nodeTypeLabel(t, node.type)}
                 </span>
 
                 {/* Node name */}

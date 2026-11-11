@@ -4,6 +4,8 @@ import type {
   GraphFreshnessResult,
   GraphFreshnessUnknownReason,
 } from "../freshness";
+import { useI18n } from "../contexts/I18nContext";
+import { en, type Locale } from "../locales";
 
 interface StalenessBannerProps {
   freshness: DashboardFreshnessReport | null;
@@ -16,10 +18,6 @@ interface FreshnessBannerContent {
   changedFiles: string[];
 }
 
-function plural(count: number, singular: string, pluralForm = `${singular}s`) {
-  return `${count} ${count === 1 ? singular : pluralForm}`;
-}
-
 type GraphName = "knowledge" | "domain";
 type GraphEntry = { name: GraphName; result: GraphFreshnessResult };
 
@@ -30,75 +28,62 @@ const RISK_RANK: Record<GraphFreshnessResult["status"], number> = {
   stale: 3,
 };
 
-const unknownSummary: Record<GraphFreshnessUnknownReason, string> = {
-  "missing-graph-commit": "does not include a Git commit hash to compare with HEAD",
-  "git-head-unavailable": "could not be compared because the dashboard could not read Git HEAD",
-  "graph-commit-unavailable": "references a commit that is not available in this checkout",
-  "git-command-timeout": "could not be checked because Git freshness commands timed out",
-  "freshness-request-failed": "could not be refreshed because the freshness request failed",
-};
-
-function graphLabel(name: GraphName): string {
-  return `${name} graph`;
+function titleSubject(t: Locale, entries: GraphEntry[]): string {
+  if (entries.length === 2) return t.staleness.subjectBoth;
+  return entries[0].name === "knowledge"
+    ? t.staleness.subjectKnowledge
+    : t.staleness.subjectDomain;
 }
 
-function titleSubject(entries: GraphEntry[]): string {
-  if (entries.length === 2) return "Knowledge and domain graphs";
-  return entries[0].name === "knowledge" ? "Knowledge graph" : "Domain graph";
-}
-
-function changedFilesSentence(count: number): string {
-  return `${plural(count, "file")} ${count === 1 ? "has" : "have"} changed since analysis.`;
-}
-
-function staleSummary(entry: GraphEntry): string {
+function staleSummary(t: Locale, entry: GraphEntry): string {
   if (entry.result.status !== "stale") return "";
-  const subject = `The ${graphLabel(entry.name)}`;
-  const fileSummary = changedFilesSentence(entry.result.changedFileCount);
+  const files = entry.result.changedFileCount;
 
   if (entry.result.relation === "behind") {
-    return `${subject} is ${plural(
-      entry.result.commitsBehind,
-      "project commit",
-    )} behind HEAD; ${fileSummary}`;
+    return t.staleness.staleBehind(entry.name, entry.result.commitsBehind, files);
   }
   if (entry.result.relation === "ahead") {
-    return `${subject} comes from a newer project history than HEAD; ${fileSummary}`;
+    return t.staleness.staleAhead(entry.name, files);
   }
-  return `${subject} and HEAD come from different project histories; ${fileSummary}`;
+  return t.staleness.staleDiverged(entry.name, files);
 }
 
-function dirtySummary(entry: GraphEntry): string {
+function dirtySummary(t: Locale, entry: GraphEntry): string {
   if (entry.result.status !== "dirty") return "";
-  const fileCount = entry.result.changedFileCount;
-  return `${plural(fileCount, "working-tree file")} ${
-    fileCount === 1 ? "has" : "have"
-  } changed and ${fileCount === 1 ? "is" : "are"} not represented by the ${graphLabel(
-    entry.name,
-  )}'s commit metadata.`;
+  return t.staleness.dirty(entry.name, entry.result.changedFileCount);
 }
 
-function unknownEntrySummary(entry: GraphEntry): string {
+function unknownEntrySummary(t: Locale, entry: GraphEntry): string {
   if (entry.result.status !== "unknown") return "";
-  if (entry.result.reason === "freshness-request-failed") {
-    return "The dashboard could not refresh graph freshness data.";
+  const reason: GraphFreshnessUnknownReason = entry.result.reason;
+  switch (reason) {
+    case "freshness-request-failed":
+      return t.staleness.unknownRequestFailed;
+    case "missing-graph-commit":
+      return t.staleness.unknownMissingGraphCommit(entry.name);
+    case "git-head-unavailable":
+      return t.staleness.unknownGitHeadUnavailable(entry.name);
+    case "graph-commit-unavailable":
+      return t.staleness.unknownGraphCommitUnavailable(entry.name);
+    case "git-command-timeout":
+      return t.staleness.unknownGitCommandTimeout(entry.name);
   }
-  return `The ${graphLabel(entry.name)} ${unknownSummary[entry.result.reason]}.`;
 }
 
-function refreshAction(entries: GraphEntry[]): string {
+function refreshAction(t: Locale, entries: GraphEntry[]): string {
   const hasKnowledge = entries.some((entry) => entry.name === "knowledge");
   const hasDomain = entries.some((entry) => entry.name === "domain");
   const commands = hasKnowledge && hasDomain
-    ? "/understand and /understand-domain"
+    ? ["/understand", "/understand-domain"]
     : hasDomain
-      ? "/understand-domain"
-      : "/understand";
-  return `Run ${commands} to refresh ${entries.length === 1 ? "it" : "them"} before relying on impact or onboarding answers.`;
+      ? ["/understand-domain"]
+      : ["/understand"];
+  return t.staleness.refresh(commands, entries.length !== 1);
 }
 
 export function buildFreshnessBanner(
   freshness: DashboardFreshnessReport | null,
+  t: Locale = en,
 ): FreshnessBannerContent | null {
   if (!freshness) return null;
   const entries: GraphEntry[] = [
@@ -117,6 +102,8 @@ export function buildFreshnessBanner(
     (entry) => RISK_RANK[entry.result.status] === highestRisk,
   );
   const status = affected[0].result.status;
+  const multiple = affected.length !== 1;
+  const subject = titleSubject(t, affected);
   const changedFiles = [
     ...new Set(
       affected.flatMap((entry) =>
@@ -127,20 +114,18 @@ export function buildFreshnessBanner(
 
   if (status === "stale") {
     return {
-      title: `${titleSubject(affected)} may be stale`,
-      summary: affected.map(staleSummary).join(" "),
-      action: refreshAction(affected),
+      title: t.staleness.titleStale(subject, multiple),
+      summary: affected.map((entry) => staleSummary(t, entry)).join(" "),
+      action: refreshAction(t, affected),
       changedFiles,
     };
   }
 
   if (status === "dirty") {
     return {
-      title: `${titleSubject(affected)} ${
-        affected.length === 1 ? "has" : "have"
-      } working-tree changes`,
-      summary: affected.map(dirtySummary).join(" "),
-      action: refreshAction(affected),
+      title: t.staleness.titleDirty(subject, multiple),
+      summary: affected.map((entry) => dirtySummary(t, entry)).join(" "),
+      action: refreshAction(t, affected),
       changedFiles,
     };
   }
@@ -152,18 +137,17 @@ export function buildFreshnessBanner(
   );
 
   return {
-    title: `${titleSubject(affected)} freshness could not be verified`,
-    summary: [...new Set(affected.map(unknownEntrySummary))].join(" "),
-    action: requestFailed
-      ? "Refocus the window to retry the freshness check."
-      : refreshAction(affected),
+    title: t.staleness.titleUnknown(subject, multiple),
+    summary: [...new Set(affected.map((entry) => unknownEntrySummary(t, entry)))].join(" "),
+    action: requestFailed ? t.staleness.retry : refreshAction(t, affected),
     changedFiles: [],
   };
 }
 
 export default function StalenessBanner({ freshness }: StalenessBannerProps) {
   const [expanded, setExpanded] = useState(false);
-  const content = buildFreshnessBanner(freshness);
+  const { t } = useI18n();
+  const content = buildFreshnessBanner(freshness, t);
 
   if (!content) return null;
 
@@ -199,7 +183,7 @@ export default function StalenessBanner({ freshness }: StalenessBannerProps) {
         </span>
         {hasFiles && (
           <span className="text-xs text-amber-300/70 shrink-0">
-            {expanded ? "hide files" : "show files"}
+            {expanded ? t.staleness.hideFiles : t.staleness.showFiles}
           </span>
         )}
       </button>
@@ -217,7 +201,7 @@ export default function StalenessBanner({ freshness }: StalenessBannerProps) {
             ))}
             {hiddenFileCount > 0 && (
               <span className="text-xs text-amber-200/60">
-                +{hiddenFileCount} more
+                {t.staleness.moreFiles(hiddenFileCount)}
               </span>
             )}
           </div>

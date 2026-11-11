@@ -3,6 +3,7 @@ import { Handle, Position } from "@xyflow/react";
 import type { NodeProps, Node } from "@xyflow/react";
 import type { NodeType } from "@understand-anything/core/types";
 import { useI18n } from "../contexts/I18nContext";
+import { complexityLabel, nodeTypeLabel } from "../utils/i18nLabels";
 
 // Color maps keyed by NodeType — must be kept in sync with core NodeType union.
 const typeColors: Record<NodeType, string> = {
@@ -139,7 +140,7 @@ function CustomNodeComponent({
     extraClass += " ring-1 ring-gold-dim/50";
   }
 
-  const name = data.label ?? "unnamed";
+  const name = data.label ?? t.common.unnamed;
   const truncatedName =
     name.length > 24 ? name.slice(0, 22) + "..." : name;
 
@@ -163,11 +164,11 @@ function CustomNodeComponent({
       <div className="pl-4 pr-3 py-2">
         <div className="flex items-center justify-between mb-1">
           <span className={`text-[10px] font-semibold uppercase tracking-wider ${textColor}`}>
-            {data.nodeType}
+            {nodeTypeLabel(t, data.nodeType)}
           </span>
           <div className="flex items-center gap-1.5">
             <span className={`text-[9px] font-mono ${complexityColor}`}>
-              {data.complexity}
+              {complexityLabel(t, data.complexity)}
             </span>
             {data.tags?.includes("tested") && (
               <span
