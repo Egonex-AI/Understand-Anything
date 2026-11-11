@@ -120,9 +120,16 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
     if (FUNCTION_NODES.has(node.type) && !objectMethod) {
       const valueFunction = ["arrow_function", "function_expression", "generator_function", "lambda"].includes(node.type);
       const name = valueFunction ? identifier(node.parent?.childForFieldName("name")) : declaredName;
+      // The structural extractor reports an exported multiline arrow by its
+      // variable declarator's range, while the arrow starts on a later line.
+      // Only a direct declarator value can inherit that range and file scope.
+      const directArrow = node.type === "arrow_function" && node.parent?.type === "variable_declarator"
+        && node.parent.childForFieldName("value")?.id === node.id;
+      const structuralNode = directArrow ? node.parent! : node;
       const matches = structure.functions.map((fn, index) => ({ fn, index })).filter(({ fn }) => fn.owner === undefined
         && (fn.name === name || node.type === "singleton_method" && fn.name === `self.${name}`)
-        && fn.lineRange[0] === node.startPosition.row + 1 && fn.lineRange[1] === node.endPosition.row + 1);
+        && fn.lineRange[0] === structuralNode.startPosition.row + 1
+        && fn.lineRange[1] === structuralNode.endPosition.row + 1);
       if (matches.length) {
         let scope = owner;
         if (node.type === "singleton_method") {
@@ -130,7 +137,7 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
           scope = receiver?.text === "self" ? owner : targetOwner(receiver, node);
         }
         functions.push({ name: matches[0].fn.name, scope,
-          lineRange: [node.startPosition.row + 1, node.endPosition.row + 1] });
+          lineRange: [structuralNode.startPosition.row + 1, structuralNode.endPosition.row + 1] });
         for (const { index } of matches) matchedFunctions.add(index);
       }
       const detailed = structure.functions.some(fn => fn.owner !== undefined
