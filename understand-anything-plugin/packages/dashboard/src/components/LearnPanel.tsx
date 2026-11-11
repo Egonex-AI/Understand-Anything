@@ -56,7 +56,7 @@ export default function LearnPanel() {
 
         <div className="space-y-2">
           <h3 className="text-[11px] font-semibold text-accent uppercase tracking-wider mb-2">
-            {t.learnPanel.steps}
+            {t.learnPanel.stepsTitle}
           </h3>
           {tourSteps.map((step, i) => (
             <div
