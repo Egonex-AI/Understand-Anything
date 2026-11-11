@@ -23,6 +23,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { validateIncrementalSymbols, formatSymbolReport } from './validate-incremental-symbols.mjs';
+import { refreshGrammarProfile, formatGrammarResult } from './grammar-profile.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(__dirname, '../..');
@@ -483,6 +484,12 @@ async function main() {
   process.stdout.write(
     `Incremental update finalized: ${plan.action}; analyzedFiles=${scan.totalFiles}\n`,
   );
+  try {
+    const grammar = await refreshGrammarProfile(projectRoot, { core });
+    if (grammar) process.stdout.write(`${formatGrammarResult(grammar)}\n`);
+  } catch (error) {
+    process.stderr.write(`Warning: AgentOS grammar report was not refreshed: ${error.message}\n`);
+  }
 }
 
 function isCliEntry() {

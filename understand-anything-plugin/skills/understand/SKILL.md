@@ -1,7 +1,7 @@
 ---
 name: understand
 description: Analyze a codebase to produce an interactive knowledge graph for understanding architecture, components, and relationships
-argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>|--exclude <patterns>]"]
+argument-hint: ["[path] [--full|--auto-update|--no-auto-update|--review|--language <lang>|--exclude <patterns>] [--grammar-profile <agentos|off>] [--grammar-only]"]
 ---
 
 # /understand
@@ -17,7 +17,29 @@ Analyze the current codebase and produce a `knowledge-graph.json` file in the pr
   - `--review` — Run full LLM graph-reviewer instead of inline deterministic validation
   - `--language <lang>` — Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in the specified language. Accepts ISO 639-1 codes (`zh`, `ja`, `ko`, `en`, `es`, `fr`, `de`, etc.) or friendly names (`chinese`, `japanese`, `korean`, `english`, `spanish`, etc.). Locale variants supported: `zh-TW`, `zh-HK`, etc. Defaults to `en` (English). Stores preference in `$UA_DIR/config.json` for consistency across incremental updates.
   - `--exclude <patterns>` — Comma-separated glob patterns for additional files/directories to exclude from analysis (e.g., `--exclude "tests/*,docs/*"`). These patterns take highest priority over built-in defaults and `.understandignore` rules. Supports gitignore syntax including `!` negation.
+  - `--grammar-profile agentos` — Opt this project into the AgentOS grammar. Stores `grammarProfile: "agentos"` in the project's `config.json`. `--grammar-profile off` disables the profile and clears its generated report; used alone it does not analyze files.
+  - `--grammar-only` — Refresh the selected grammar's `semantic-claims.json` using the existing `knowledge-graph.json` and `fingerprints.json`. No graph rebuild, agents, or dashboard launch. Combine with `--grammar-profile agentos` on first use; it cannot be combined with other analysis flags.
   - A directory path (e.g. `/path/to/repo` or `../other-project`) — Analyze the given directory instead of the current working directory
+
+For example, run `/understand /path/to/project --grammar-profile agentos --grammar-only`. The AgentOS profile checks `depends_on` against explicit relative `.mjs` imports, direct JSON reads, and Python script arguments forwarded by the local `boundedProcess` runner. JSON and script paths must resolve through an imported module-relative `ROOT`. The report pins the root definition and, for Python, the runner implementation by hash. It also checks a launcher's `--app-root` when a sibling source wrapper binds it to the app directory and selects `--launcher-only`. The claim applies to that wrapper invocation, with the qualifier, wrapper, and launcher pinned by hash.
+
+For `constrains`, the profile follows a Python `argparse` default through a local JSON read into a `Draft202012Validator` call in the same file. It also checks `defines_schema` candidates against versioned sibling registry wrappers with a matching required `schema_id` constant and a direct `items.$ref`. The report records the item scope as a JSON Pointer to the array and pins the wrapper bytes by hash. Validation results belong to the validator's own report.
+
+The Storage Routing startup evidence follows the guarded entry point's local registry, wrapper, and item schema paths into its validation helper. The helper registers the item schema by `$id`, validates the registry with the wrapper, and exits on validation errors. The profile links this site to the item-scoped claim when the registry path matches the constructor load and the validation call precedes engine and adapter construction.
+
+For `routes_to`, the profile pairs fingerprinted sibling Storage Routing registries. It binds the source and any downstream output to unique storage entries, and named recipients to the routing map's target legend. Downstream declarations must agree with an explicit create or update action. Each report claim retains the route ID, event, conditions, and JSON Pointers to the declarations and endpoint definitions. The claims describe configured routes. `ANY` leaves the global source unbound. A named `threshold_crossed_on_publish` emitter that matches a wildcard threshold route's condition supports a separate claim scoped to that output's publication. `ALL_PODS` is recorded as a named broadcast target.
+
+For `observes`, the profile binds Storage Routing adapter classes to their audit record types. Writes must pass the record ID to the audit table and commit through SQLite or a Psycopg connection context. Postgres writes can delegate to a module-local helper that receives the same record and the adapter's database URL. Reads must select the ID and use it to reconstruct the record type. The report pins both class files and records the SQL operation as evidence. Stub declarations remain withheld.
+
+For `produces`, the profile scopes each Storage Routing engine claim to the method that emits the audit record. The method must construct the imported record or receive it from the typed `StorageAdapter.write_artifact` contract, then pass the same value to its injected adapter's audit method. The report pins the engine and record files and records each emission site. Flat exports also require a fingerprinted package layout that documents the `adapters.base` import.
+
+Reviewed reachability annotations apply to the exact engine, record, and routing registry fingerprints. They can record a reachable input at an emission site and a separate input that an earlier check intercepts. A matching acceptance test fingerprint links the test and the cases it covers to the annotation.
+
+For `consumes`, the proposed profile relation binds a Storage Routing engine constructor to the registry a checked-in acceptance setup loads and passes to it. The report traces the package-relative `json.load` result through the constructor into the engine's registry collection. It pins the test, engine, and registry files. Flat exports also require the fingerprinted package layout.
+
+The runtime `consumes` frame follows the guarded Storage Routing entry point's module-relative path into the constructor's file branch. The constructor must select that branch, decode the file with `json.load`, and store the registry collection through its loader. The report pins the entry point and the flat package mapping alongside the engine and registry.
+
+Reviewed acceptance tests can link to individual evidence sites on supported claims. The report attaches the test and the lines that cover the site when the test and the sources it exercises match their pinned hashes.
 
 ---
 
@@ -45,7 +67,8 @@ Throughout execution, report progress to the user at each phase transition and d
 Determine whether to run a full analysis or incremental update.
 
 1. **Resolve `PROJECT_ROOT`:**
-   - Parse `$ARGUMENTS` for a non-flag token (any argument that does not start with `--`). If found, treat it as the target directory path.
+   - Parse `$ARGUMENTS` respecting quoted values. Consume the value after each `--language`, `--exclude`, and `--grammar-profile` flag; none of these values is a directory argument. Reject missing values, multiple directory arguments, unknown grammar profiles, and `--grammar-only` combined with anything except the directory and `--grammar-profile agentos`.
+   - If a positional token remains, treat it as the target directory path.
      - If the path is relative, resolve it against the current working directory.
      - Verify the resolved path exists and is a directory (run `test -d <path>`). If it does not exist or is not a directory, report an error to the user and **STOP**.
      - Set `PROJECT_ROOT` to the resolved absolute path.
@@ -132,6 +155,14 @@ Determine whether to run a full analysis or incremental update.
    ```
    This keeps the legacy `.understand-anything/` directory when it already exists (existing projects keep working with no migration) and uses the new `.ua/` otherwise. Because each phase may run in a fresh shell, treat `$UA_DIR` — like `$PROJECT_ROOT` — as a value you carry forward and substitute; re-resolve it with the line above if a later command block needs it in a new shell.
 
+1.8. **Select the grammar profile before touching analysis files.** If an explicit `--grammar-profile` was passed, run `node "<SKILL_DIR>/grammar-profile.mjs" "$PROJECT_ROOT" --configure <agentos|off>` with the selected value. Stop on a configuration error. If `off` was the only flag, report that the profile is disabled and stop. Otherwise read the project `config.json`: `grammarProfile: "agentos"` sets `$GRAMMAR_DIRECTIVE` to `Grammar profile: agentos`; absent or `off` leaves it empty. Reject other values; the profile name selects bundled rules, never an executable path or project-authored prompt.
+
+   If `--grammar-only` was passed, run the command below immediately. Report its supported/withheld counts and output path, or its error, then **STOP**. Skip Git, scan, merges, and all graph or fingerprint writes.
+
+   ```bash
+   node "<SKILL_DIR>/grammar-profile.mjs" "$PROJECT_ROOT" --require
+   ```
+
 2. Get the current git commit hash:
    ```bash
    git rev-parse HEAD
@@ -146,8 +177,8 @@ Determine whether to run a full analysis or incremental update.
    find "$UA_DIR/" -maxdepth 1 -type d -name '.trash-*' -mtime +7 -exec rm -rf {} + 2>/dev/null || true
    ```
 3.5. **Auto-update configuration:**
-    - If `--auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": true}` to `$UA_DIR/config.json`
-    - If `--no-auto-update` is in `$ARGUMENTS`: write `{"autoUpdate": false}` to `$UA_DIR/config.json`
+    - If `--auto-update` is in `$ARGUMENTS`: merge `{"autoUpdate": true}` into `$UA_DIR/config.json`, preserving other fields.
+    - If `--no-auto-update` is in `$ARGUMENTS`: merge `{"autoUpdate": false}` into `$UA_DIR/config.json`, preserving other fields.
     - These flags only set the config — analysis proceeds normally regardless.
 
  3.6. **Language configuration:**
@@ -192,6 +223,7 @@ Determine whether to run a full analysis or incremental update.
    | No existing graph or meta | Full analysis (all phases) |
    | Existing graph + explicit `--exclude` | Run deterministic incremental preparation even when the commit hash is unchanged, so the new inventory rules take effect immediately |
    | `--review` flag + existing graph + unchanged commit hash | Skip to Phase 6 (review-only — reuse existing assembled graph) |
+   | Existing graph + unchanged commit hash + explicit `--grammar-profile agentos` | Run the grammar-only command above against the saved graph, report the result, and stop |
    | Existing graph + unchanged commit hash | Ask the user: "The graph is up to date at this commit. Would you like to: **(a)** run a full rebuild (`--full`), **(b)** run the LLM graph reviewer (`--review`), or **(c)** do nothing?" Then follow their choice. If they pick (c), STOP. |
    | Existing graph + changed files | Run deterministic incremental preparation below |
 
@@ -351,6 +383,8 @@ For each batch, dispatch a subagent using the `file-analyzer` agent definition (
 > Languages: `<languages from Phase 1>`
 >
 > $LANGUAGE_DIRECTIVE
+>
+> $GRAMMAR_DIRECTIVE
 
 Dispatch prompt template (fill in batch-specific values from `batches.json[i]`):
 
@@ -851,6 +885,8 @@ Report to the user: `[Phase 7/7] Saving knowledge graph...`
      "analyzedFiles": <number of files analyzed>
    }
    ```
+
+3.5. **Refresh grammar claims if the AgentOS profile is enabled.** Run `node "<SKILL_DIR>/grammar-profile.mjs" "$PROJECT_ROOT" --require` after the graph and fingerprints are saved. Report supported and withheld counts and the output path. A refresh failure is a warning: the stock graph is saved, and any older report remains bound to its original graph hash. The incremental finalizer performs this refresh itself after successful graph and fingerprint updates; generated-artifact-only skips do not refresh.
 
 4. Clean up intermediate files, **preserving `scan-result.json`** so future incremental runs can skip Phase 1 SCAN (see issue #293). We `mv` scratch dirs into a timestamped `.trash-*` instead of `rm -rf`ing them directly — this avoids tripping destructive-action gates on hardened hosts (e.g. freshness-window checks) that flag deleting directories created moments earlier (see issue #301). The delayed-purge step in Phase 0 reclaims the space once the trash is older than 7 days.
    ```bash

@@ -43,6 +43,8 @@ Incrementally update the knowledge graph after a commit. Do not ask the user for
 
 Read `filesToReanalyze` from the plan. It never contains deleted, ignored, cosmetic, or generated-artifact paths.
 
+When the project `config.json` has `grammarProfile: "agentos"`, include `Grammar profile: agentos` in each file-analyzer dispatch, including symbol repairs.
+
 - If the list is empty, dispatch no agent and create no new batch file. Continue directly to merge; `batch-existing.json` already contains the pruned graph. This covers deletion-only updates at zero token cost.
 - Otherwise compute only changed batches:
 
@@ -106,6 +108,7 @@ Report:
 - files structurally analyzed;
 - deleted/ignored/cosmetic/generated counts from the plan;
 - whether architecture/tour ran;
+- for an enabled AgentOS grammar profile, the `semantic-claims.json` counts and path printed by the finalizer, or its refresh warning;
 - output path.
 
 ## Error handling

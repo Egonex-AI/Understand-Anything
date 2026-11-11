@@ -151,6 +151,8 @@ After the script completes, read `$UA_DIR/tmp/ua-file-extract-results-<batchInde
 
 For each file in the script's `results` array, produce `GraphNode` and `GraphEdge` objects by combining the script's structural data with your expert judgment.
 
+**AgentOS grammar (only when the dispatch specifies `Grammar profile: agentos`):** Look for explicit schema bindings in validation source and registry wrappers. When a validator applies a schema to a specific JSON record, propose a forward `defines_schema` edge from the schema to the record and cite the validator path and line. When a registry wrapper requires the record's `schema_id` constant and directly references an entry schema under an array's `items`, propose the edge from the entry schema to the registry file and cite the wrapper path and array field. For a JavaScript module that reads a JSON file with `readFileSync` or passes a Python script to the imported `boundedProcess` runner, propose a forward `depends_on` edge when a literal path resolves through a module-relative `ROOT`. For a `--launcher-only` stdio connection, propose a forward `depends_on` edge to the launcher when a source wrapper binds `--app-root` and the literal command path resolves to that file. Cite the call site and the source wrapper if applicable. Use the standard graph schema. The grammar refresh checks the evidence and records the scope of each supported claim in `semantic-claims.json`.
+
 ### Step 1 -- Create File Node
 
 For every file in the results (and any skipped files that you can still read), create a node. The **node type** depends on the file's category:
