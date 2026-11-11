@@ -80,8 +80,9 @@ export function parseDocument(doc: FigmaDocument, fileKey: string): { nodes: Gra
         }
         break;
       }
-      case "SECTION": {
-        for (const sub of child.children ?? []) handlePageChild(sub, pageId); // flatten sections in v1
+      case "SECTION":
+      case "GROUP": {
+        for (const sub of child.children ?? []) handlePageChild(sub, pageId); // flatten page-level containers in v1
         break;
       }
       default:
