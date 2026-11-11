@@ -12,6 +12,12 @@
 </p>
 
 <p align="center">
+  来自 Understand Anything 背后的团队：<a href="https://www.egonex.ai/invite/UNDERSTAND"><strong>认识 Ego</strong></a>，一个帮你开好店、替你卖东西的个人 AI Agent。
+  <br />
+  你负责做出来，Ego 负责卖出去。免费使用。
+</p>
+
+<p align="center">
   <a href="https://trendshift.io/repositories/23482" target="_blank"><img src="https://trendshift.io/api/badge/repositories/23482" alt="Understand Anything | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 </p>
 
