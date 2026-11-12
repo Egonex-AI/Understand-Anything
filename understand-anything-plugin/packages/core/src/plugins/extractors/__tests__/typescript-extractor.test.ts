@@ -85,4 +85,83 @@ describe("TypeScriptExtractor", () => {
       parser.delete();
     });
   });
+
+  // ---- Generator functions (#746) ----
+
+  describe("generator functions", () => {
+    it("extracts sync and async generator declarations alongside plain functions", () => {
+      const { tree, parser, root } = parse(`function* syncGen(n: number): Generator<number> { yield n; }
+async function* asyncGen(): AsyncGenerator<number> { yield 4; }
+function plain(): number { return 1; }
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.map((f) => f.name)).toEqual([
+        "syncGen",
+        "asyncGen",
+        "plain",
+      ]);
+      const syncGen = result.functions.find((f) => f.name === "syncGen")!;
+      expect(syncGen.params).toEqual(["n"]);
+      expect(syncGen.returnType).toBe("Generator<number>");
+      expect(syncGen.lineRange).toEqual([1, 1]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts and exports exported generator declarations", () => {
+      const { tree, parser, root } = parse(`export function* syncGen(): Generator<number> { yield 3; }
+export async function* asyncGen(): AsyncGenerator<number> { yield 4; }
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.map((f) => f.name)).toEqual([
+        "syncGen",
+        "asyncGen",
+      ]);
+      expect(result.exports).toEqual([
+        { name: "syncGen", lineNumber: 1, isDefault: false },
+        { name: "asyncGen", lineNumber: 2, isDefault: false },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts generator function expressions assigned to variables", () => {
+      const { tree, parser, root } = parse(`const gen = function* (): Generator<number> { yield 1; };
+export const exportedGen = async function* () { yield 2; };
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.map((f) => f.name)).toEqual([
+        "gen",
+        "exportedGen",
+      ]);
+      expect(result.exports.map((e) => e.name)).toEqual(["exportedGen"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("attributes calls inside generators to the generator in the call graph", () => {
+      const { tree, parser, root } = parse(`function* fromDecl() {
+  yield helperA();
+}
+const fromExpr = async function* () {
+  yield await helperB();
+};
+`);
+      const entries = extractor.extractCallGraph(root);
+
+      expect(entries).toEqual([
+        { caller: "fromDecl", callee: "helperA", lineNumber: 2 },
+        { caller: "fromExpr", callee: "helperB", lineNumber: 5 },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });
