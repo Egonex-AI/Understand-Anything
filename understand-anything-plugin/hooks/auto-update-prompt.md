@@ -33,6 +33,8 @@ Incrementally update the knowledge graph after a commit. Do not ask the user for
    | `ARCHITECTURE_UPDATE` | Continue with targeted analysis, then rerun architecture and tour. |
    | `FULL_UPDATE` | Immediately invoke `/understand --full`; do not patch the incremental baseline. |
 
+7. **Resolve the stored output language.** Read `$UA_DIR/config.json`; if it has an `outputLanguage` field, construct `$LANGUAGE_DIRECTIVE` from it using the exact template in `/understand`'s language configuration step (the "Language directive template"). This hook has no user interaction, so the stored preference is the only source — never re-detect. If `config.json` is missing or has no `outputLanguage`, leave `$LANGUAGE_DIRECTIVE` unset and omit it from the lesson dispatch in Phase 3 (the writer treats the directive as optional).
+
    SKIP finalizer:
 
    ```bash
@@ -86,7 +88,7 @@ Do not dispatch assemble-reviewer or graph-reviewer for automatic updates.
 ## Phase 3 — Conditional architecture and tour
 
 - For `PARTIAL_UPDATE`, dispatch neither agent. The finalizer preserves existing layer assignments and tour prose, removes dangling references/empty layers, and assigns new nodes deterministically by directory depth, graph connectivity, then prior layer order.
-- For `ARCHITECTURE_UPDATE`, dispatch architecture-analyzer on the full merged node/edge set, including previous layers for naming stability, and write `$UA_DIR/intermediate/layers.json`. Then dispatch tour-builder and write `$UA_DIR/intermediate/tour.json`. Then dispatch `code-lesson-writer` (same dispatch shape as SKILL.md §Code Lessons: rebuilt tour, node summaries, language directive) and write `$UA_DIR/intermediate/code-lessons.json`, normalized into `$UA_DIR/intermediate/code-lessons.normalized.json` per the SKILL.md Phase 5 rules. Lessons are best-effort here: retry the dispatch once, and if it still fails leave no staged document, record the warning, and continue — publication (Phase 4) then removes the stale served sidecar instead of leaving lessons for the previous tour.
+- For `ARCHITECTURE_UPDATE`, dispatch architecture-analyzer on the full merged node/edge set, including previous layers for naming stability, and write `$UA_DIR/intermediate/layers.json`. Then dispatch tour-builder and write `$UA_DIR/intermediate/tour.json`. Then dispatch `code-lesson-writer` (same dispatch shape as SKILL.md §Code Lessons: rebuilt tour, node summaries, language directive) and write `$UA_DIR/intermediate/code-lessons.json`, normalized into `$UA_DIR/intermediate/code-lessons.normalized.json` per the SKILL.md Phase 5 rules. Append `$LANGUAGE_DIRECTIVE` to the dispatch prompt when Phase 0 resolved one — without it, a project stored with a non-English `outputLanguage` would get its lessons regenerated in English beside the non-English graph and tour. Lessons are best-effort here: retry the dispatch once, and if it still fails leave no staged document, record the warning, and continue — publication (Phase 4) then removes the stale served sidecar instead of leaving lessons for the previous tour.
 
 Retry either required agent once. If it still fails, **STOP** without advancing the baseline.
 
