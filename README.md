@@ -193,7 +193,7 @@ Understand-Anything works across multiple AI coding platforms.
 ```
 
 
-### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro / Devin)
+### One-line install (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Trae CN / Nanobot / Kiro / Devin)
 
 
 **macOS / Linux:**
@@ -212,13 +212,15 @@ The installer clones the repo to `~/.understand-anything/repo` and creates the r
 
 > **Note on invoking skills:** the invocation prefix differs per platform. Most platforms use slash commands (`/understand`), but **Codex uses `$` instead** — type `$understand`, not `/understand`. If neither prefix is recognized on your platform, just ask in plain language: *"Use the understand skill to analyze this project."*
 
-- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`, `devin`
+- Supported `<platform>` values: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `trae-cn`, `nanobot`, `kiro`, `devin`
 - Update later:
   - macOS / Linux: `./install.sh --update`
   - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Update`
 - Uninstall:
   - macOS / Linux: `./install.sh --uninstall <platform>`
   - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Uninstall <platform>`
+
+For Trae CN, choose `trae-cn`. The [official Trae CN Skills documentation](https://docs.trae.cn/ide_skills?lang=zh) lists `~/.trae-cn/skills` (macOS / Linux) and `%USERPROFILE%/.trae-cn/skills` (Windows) as the global skills directories.
 
 ### Cursor
 
@@ -308,6 +310,7 @@ The full tool reference and examples for other clients are in [`understand-anyth
 | Cline | ✅ Supported | `install.sh cline` |
 | KIMI CLI | ✅ Supported | `install.sh kimi` |
 | Trae | ✅ Supported | `install.sh trae` |
+| Trae CN | ✅ Supported | `install.sh trae-cn` |
 | Nanobot | ✅ Supported | `install.sh nanobot` |
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
 | Devin | ✅ Supported | `devin plugins install` or `install.sh devin` |
