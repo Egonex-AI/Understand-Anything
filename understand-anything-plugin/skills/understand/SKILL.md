@@ -631,6 +631,8 @@ Run this step whenever the tour is (re)built — full analysis and incremental p
 
 Report to the user: `[Phase 5/7] Writing code lessons...`
 
+0. **Clear stale lesson scratch files.** An interrupted earlier run can leave `$UA_DIR/intermediate/code-lessons.json` (raw) and `$UA_DIR/intermediate/code-lessons.normalized.json` (staged) behind — full-run initialization only creates the intermediate directory. Delete both files before every lesson attempt, or the next writer's missing output could let those stale scratch files be normalized and published as if they belonged to this run. Never touch the served `$UA_DIR/code-lessons.json` here.
+
 1. **Resolve tour-covered files.** For each normalized tour step, resolve every `nodeIds` entry to its file-level node and collect the node's `filePath`. Record for each covered file the smallest referencing step `order` as its primary tour anchor.
 
 2. **Dispatch a subagent** using the `code-lesson-writer` agent definition (at `agents/code-lesson-writer.md`). Pass these parameters in the dispatch prompt:
