@@ -307,12 +307,16 @@ export default function CodeViewer({
   const showRendered = isMarkdown && mdView === "rendered";
 
   // Scroll to the selected lesson range after the source lines mount
-  // following a Rendered → Source switch (review #4). Only reacts to
-  // view-mode switches; direct selection scrolls synchronously in
-  // toggleSection, so the deps intentionally cover showRendered only.
+  // following a Rendered → Source switch (review #4), and again once source
+  // finishes loading: a section picked while loading scrolled before any
+  // data-line element existed, and non-Markdown files never flip
+  // showRendered, so without reacting to `source` the selected range could
+  // stay offscreen. Direct selections still scroll synchronously in
+  // toggleSection; the deps intentionally exclude lessonHighlight (cleared on
+  // node switch anyway — the effect below only re-runs the CURRENT selection).
   useEffect(() => {
-    if (!showRendered && lessonHighlight) scrollToLine(lessonHighlight.start);
-  }, [showRendered]);
+    if (!showRendered && lessonHighlight && source) scrollToLine(lessonHighlight.start);
+  }, [showRendered, source]);
 
   if (!node) {
     return (
@@ -372,6 +376,20 @@ export default function CodeViewer({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {/* Lesson toggle lives in the shared header, not the source toolbar,
+              so it stays reachable while source is loading or failed (e.g.
+              files over the preview size limit) — the lesson panel itself does
+              not depend on source loading. */}
+          {lesson && (
+            <button
+              type="button"
+              onClick={() => setLessonPanelOpen((open) => !open)}
+              className="xl:hidden text-[10px] uppercase tracking-wider text-accent hover:text-accent/80 transition-colors"
+              aria-expanded={lessonPanelOpen}
+            >
+              {lessonPanelOpen ? t.codeViewer.hideLesson : t.codeViewer.showLesson}
+            </button>
+          )}
           {onExpand && (
             <button
               type="button"
@@ -419,16 +437,6 @@ export default function CodeViewer({
               <div className="px-4 py-2 border-b border-border-subtle bg-surface text-[11px] text-text-muted flex items-center justify-between">
                 <span>{source.lineCount} {t.codeViewer.linesLabel}</span>
                 <div className="flex items-center gap-3">
-                  {lesson && (
-                    <button
-                      type="button"
-                      onClick={() => setLessonPanelOpen((open) => !open)}
-                      className="xl:hidden text-[10px] uppercase tracking-wider text-accent hover:text-accent/80 transition-colors"
-                      aria-expanded={lessonPanelOpen}
-                    >
-                      {lessonPanelOpen ? t.codeViewer.hideLesson : t.codeViewer.showLesson}
-                    </button>
-                  )}
                   {isMarkdown && (
                     <div className="flex items-center rounded border border-border-subtle overflow-hidden" role="group">
                       {(["rendered", "source"] as const).map((view) => (

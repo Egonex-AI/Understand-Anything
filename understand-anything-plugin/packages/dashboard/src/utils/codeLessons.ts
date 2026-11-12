@@ -50,7 +50,10 @@ export function normalizeCodeLessons(data: unknown): CodeLessons | null {
   const files = candidate.files;
   if (!files || typeof files !== "object" || Array.isArray(files)) return null;
 
-  const normalizedFiles: CodeLessons["files"] = {};
+  // Null-prototype dictionary: a lesson keyed "constructor"/"toString" must not
+  // resolve to an inherited function (crashes at lesson.sections.length), and
+  // a "__proto__" key must become an own entry instead of mutating Object.prototype.
+  const normalizedFiles = Object.create(null) as CodeLessons["files"];
   for (const [filePath, entry] of Object.entries(files as Record<string, unknown>)) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       console.warn(`[code-lessons] dropped malformed entry for "${filePath}"`);

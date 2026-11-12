@@ -134,4 +134,49 @@ describe("normalizeCodeLessons", () => {
     expect(result?.version).toBe(1);
     expect(result?.generatedAt).toBe("");
   });
+
+  it("uses a null-prototype dictionary so prototype-key filenames behave like normal keys", () => {
+    // Real payloads come from JSON.parse, where "__proto__" is a plain own
+    // key (an object literal would instead reassign the prototype).
+    const entry = JSON.stringify(validFileEntry());
+    const result = normalizeCodeLessons(
+      JSON.parse(`{
+        "files": {
+          "__proto__": ${entry},
+          "constructor": ${entry},
+          "toString": ${entry},
+          "src/a.ts": ${entry}
+        }
+      }`),
+    );
+    expect(result).not.toBeNull();
+    // The dictionary's prototype chain must be empty.
+    expect(Object.getPrototypeOf(result?.files ?? {})).toBeNull();
+    // Missing prototype-named lessons resolve to undefined (→ null at the
+    // call site), never an inherited function that crashes .sections.length.
+    expect(result?.files["hasOwnProperty"]).toBeUndefined();
+    // Present prototype-named lessons round-trip as own entries, and the
+    // "__proto__" input key stays an own entry instead of mutating Object.prototype.
+    expect(result?.files.constructor).toEqual(validFileEntry());
+    expect(result?.files.toString).toEqual(validFileEntry());
+    expect((result?.files as Record<string, unknown>)["__proto__"]).toEqual(validFileEntry());
+    expect(Object.keys(result?.files ?? {})).toEqual([
+      "__proto__",
+      "constructor",
+      "toString",
+      "src/a.ts",
+    ]);
+  });
+
+  it("survives a lessons document whose files object mixes inherited-looking keys", () => {
+    const result = normalizeCodeLessons({
+      files: Object.assign(Object.create({ valueOf: validFileEntry() }), {
+        "src/a.ts": validFileEntry(),
+      }),
+    });
+    // Object.entries only reads own keys, so the inherited "valueOf" entry is
+    // invisible; the own entry survives.
+    expect(result?.files["src/a.ts"]).toBeDefined();
+    expect(result?.files.valueOf).toBeUndefined();
+  });
 });
