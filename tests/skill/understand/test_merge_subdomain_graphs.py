@@ -69,6 +69,91 @@ def _graph(nodes: list[dict], edges: list[dict]) -> dict[str, Any]:
 
 # ── Tests ─────────────────────────────────────────────────────────────────
 
+class TestDirectionAwareEdgeDedup(unittest.TestCase):
+    """Direction is part of the edge identity, mirroring merge-batch-graphs.py:
+    a forward edge and a bidirectional edge between the same nodes with the
+    same type are different semantic relationships that the dashboard renders
+    distinctly, so dedup must not collapse them.
+    """
+
+    def test_forward_and_bidirectional_edges_both_survive_dedup(self) -> None:
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        g1 = _graph(nodes, [_edge("domain:auth", "domain:billing", "cross_domain")])
+        bidirectional = _edge("domain:auth", "domain:billing", "cross_domain")
+        bidirectional["direction"] = "bidirectional"
+        bidirectional["weight"] = 0.1  # lower weight must not cost the relationship
+        g2 = _graph(nodes, [bidirectional])
+
+        merged, _, _ = msg.merge_graphs([g1, g2])
+
+        directions = sorted(e["direction"] for e in merged["edges"])
+        self.assertEqual(directions, ["bidirectional", "forward"])
+
+    def test_direction_aliases_dedup_together(self) -> None:
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        both = _edge("domain:auth", "domain:billing", "cross_domain")
+        both["direction"] = "both"  # legacy alias for bidirectional
+        bidirectional = _edge("domain:auth", "domain:billing", "cross_domain")
+        bidirectional["direction"] = "bidirectional"
+
+        merged, _, _ = msg.merge_graphs([_graph(nodes, [both]), _graph(nodes, [bidirectional])])
+
+        self.assertEqual(len(merged["edges"]), 1)
+        self.assertEqual(merged["edges"][0]["direction"], "bidirectional")
+
+
+class TestBackwardDirectionAliases(unittest.TestCase):
+    """Owning contract (packages/core/src/schema.ts DIRECTION_ALIASES):
+    from/inbound mean "backward". Normalizing them to "forward" would
+    reverse the edge's semantic direction before dedup."""
+
+    def test_backward_aliases_normalize_to_backward_not_forward(self) -> None:
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        for alias in ("from", "inbound", "INBOUND"):
+            with self.subTest(alias=alias):
+                edge = _edge("domain:auth", "domain:billing", "cross_domain")
+                edge["direction"] = alias
+                merged, _, _ = msg.merge_graphs([_graph(nodes, [edge])])
+                self.assertEqual(merged["edges"][0]["direction"], "backward")
+
+    def test_backward_alias_dedups_with_canonical_backward(self) -> None:
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        alias = _edge("domain:auth", "domain:billing", "cross_domain")
+        alias["direction"] = "from"
+        canonical = _edge("domain:auth", "domain:billing", "cross_domain")
+        canonical["direction"] = "backward"
+        merged, _, _ = msg.merge_graphs([_graph(nodes, [alias, canonical])])
+        self.assertEqual(len(merged["edges"]), 1)
+        self.assertEqual(merged["edges"][0]["direction"], "backward")
+
+    def test_invalid_direction_is_preserved_not_silently_forwarded(self) -> None:
+        """The owning schema flags unknown directions as invalid (zod enum
+        error); the merge must not silently accept them as 'forward'."""
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        edge = _edge("domain:auth", "domain:billing", "cross_domain")
+        edge["direction"] = "bogus"
+        merged, _, _ = msg.merge_graphs([_graph(nodes, [edge])])
+        self.assertEqual(merged["edges"][0]["direction"], "bogus")
+
+    def test_missing_direction_defaults_to_forward(self) -> None:
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        edge = _edge("domain:auth", "domain:billing", "cross_domain")
+        edge.pop("direction", None)
+        merged, _, _ = msg.merge_graphs([_graph(nodes, [edge])])
+        self.assertEqual(merged["edges"][0].get("direction"), "forward")
+
+    def test_from_alias_does_not_collapse_into_forward(self) -> None:
+        nodes = [_node("domain:auth"), _node("domain:billing")]
+        backward = _edge("domain:auth", "domain:billing", "cross_domain")
+        backward["direction"] = "from"
+        forward = _edge("domain:auth", "domain:billing", "cross_domain")
+        merged, _, _ = msg.merge_graphs([_graph(nodes, [backward, forward])])
+        self.assertEqual(
+            sorted(e["direction"] for e in merged["edges"]),
+            ["backward", "forward"],
+        )
+
+
 class TestStructuralEdgeDrops(unittest.TestCase):
     def test_structural_drop_emits_warning_and_is_recorded(self) -> None:
         g = _graph([_node("domain:auth")], [_edge("domain:auth", "flow:login", "contains_flow")])
