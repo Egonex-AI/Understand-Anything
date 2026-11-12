@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createRequire } from "node:module";
+import { kotlinConfig } from "../../../languages/configs/kotlin.js";
+import { TreeSitterPlugin } from "../../tree-sitter-plugin.js";
 import { KotlinExtractor } from "../kotlin-extractor.js";
 
 const require = createRequire(import.meta.url);
@@ -356,6 +358,85 @@ fun caller(): Int {
 `);
       const entries = extractor.extractCallGraph(root);
       expect(entries).toEqual([]);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
+  describe("TreeSitterPlugin integration", () => {
+    // The grammar reads these as annotated expressions whenever another
+    // declaration follows, which is the usual shape of Compose previews.
+    const composeFile = `package app
+
+@Composable
+fun Greeting(name: String) {
+    Text(text = name)
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun GreetingPreview() {
+    Greeting("Android")
+}
+
+@Composable
+@OptIn(ExperimentalPermissionsApi::class)
+internal fun PermissionEffect() {
+    LaunchedEffect(Unit) { request() }
+}
+
+@Preview @Composable private fun DarkPreview() {
+    Greeting("Dark")
+}
+
+fun helper() = 1
+`;
+
+    it("keeps annotated private and internal functions with no parameters", async () => {
+      const plugin = new TreeSitterPlugin([kotlinConfig]);
+      await plugin.init();
+
+      const result = plugin.analyzeFile("Greeting.kt", composeFile);
+
+      expect(result.functions.map((f) => [f.name, f.lineRange])).toEqual([
+        ["Greeting", [3, 6]],
+        ["GreetingPreview", [8, 12]],
+        ["PermissionEffect", [14, 18]],
+        ["DarkPreview", [20, 22]],
+        ["helper", [24, 24]],
+      ]);
+      expect(result.exports.map((e) => e.name)).toEqual(["Greeting", "PermissionEffect", "helper"]);
+    });
+
+    it("attributes calls inside those functions and gives strict evidence for them", async () => {
+      const plugin = new TreeSitterPlugin([kotlinConfig]);
+      await plugin.init();
+
+      const calls = plugin.extractCallGraph("Greeting.kt", composeFile);
+      expect(calls).toContainEqual({ caller: "GreetingPreview", callee: "Greeting", lineNumber: 11 });
+      expect(calls).toContainEqual({ caller: "PermissionEffect", callee: "request", lineNumber: 17 });
+
+      const strict = plugin.analyzeFileStrict("Greeting.kt", composeFile);
+      expect(strict.status).toBe("succeeded");
+      expect(strict.symbolEvidence!.functions.map((f) => [f.name, f.scope.kind])).toEqual(
+        expect.arrayContaining([
+          ["GreetingPreview", "file"],
+          ["PermissionEffect", "file"],
+          ["DarkPreview", "file"],
+        ]),
+      );
+    });
+
+    it("does not rewrite files the grammar already parses", () => {
+      const code = `@Preview
+@Composable
+private fun OnlyPreview() {
+    Greeting("Android")
+}
+`;
+      const { tree, parser, root } = parse(code);
+      expect(extractor.reparseSource(root, code)).toBeNull();
 
       tree.delete();
       parser.delete();

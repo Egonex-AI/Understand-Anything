@@ -235,6 +235,30 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     return { functions: [], classes: [], imports: [], exports: [] };
   }
 
+  /**
+   * Parse `content`, then let the extractor swap in a re-parse of a
+   * position-preserving rewrite when the grammar is known to misread the
+   * source. The rewrite is kept only if it adds no syntax errors.
+   */
+  private parseSource(
+    parser: TreeSitterParser,
+    extractor: LanguageExtractor | null,
+    content: string,
+  ): ReturnType<TreeSitterParser["parse"]> {
+    const tree = parser.parse(content);
+    if (!tree || !extractor?.reparseSource) return tree;
+    const rewritten = extractor.reparseSource(tree.rootNode, content);
+    if (rewritten === null) return tree;
+    const reparsed = parser.parse(rewritten);
+    if (!reparsed) return tree;
+    if (reparsed.rootNode.hasError && !tree.rootNode.hasError) {
+      reparsed.delete();
+      return tree;
+    }
+    tree.delete();
+    return reparsed;
+  }
+
   analyzeFile(
     filePath: string,
     content: string,
@@ -244,13 +268,13 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return { functions: [], classes: [], imports: [], exports: [] };
     }
 
-    const tree = parser.parse(content);
+    const langKey = this.languageKeyFromPath(filePath);
+    const extractor = langKey ? this.getExtractor(langKey) : null;
+
+    const tree = this.parseSource(parser, extractor, content);
     if (!tree) {
       return { functions: [], classes: [], imports: [], exports: [] };
     }
-
-    const langKey = this.languageKeyFromPath(filePath);
-    const extractor = langKey ? this.getExtractor(langKey) : null;
 
     let result: StructuralAnalysis;
     if (extractor) {
@@ -288,7 +312,7 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       if (!parser || !extractor) {
         return { status: "unsupported", structure: null, symbolEvidence: null };
       }
-      tree = parser.parse(content);
+      tree = this.parseSource(parser, extractor, content);
       if (!tree || tree.rootNode.hasError) {
         return { status: "failed", structure: null, symbolEvidence: null };
       }
@@ -324,13 +348,13 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
       return { structure: TreeSitterPlugin.emptyStructure(), callGraph: [] };
     }
 
-    const tree = parser.parse(content);
+    const langKey = this.languageKeyFromPath(filePath);
+    const extractor = langKey ? this.getExtractor(langKey) : null;
+
+    const tree = this.parseSource(parser, extractor, content);
     if (!tree) {
       return { structure: TreeSitterPlugin.emptyStructure(), callGraph: [] };
     }
-
-    const langKey = this.languageKeyFromPath(filePath);
-    const extractor = langKey ? this.getExtractor(langKey) : null;
 
     const structure = extractor
       ? extractor.extractStructure(tree.rootNode)
@@ -374,13 +398,14 @@ export class TreeSitterPlugin implements AnalyzerPlugin {
     const parser = this.getParser(filePath);
     if (!parser) return [];
 
-    const tree = parser.parse(content);
+    const langKey = this.languageKeyFromPath(filePath);
+    const extractor = langKey ? this.getExtractor(langKey) : null;
+
+    const tree = this.parseSource(parser, extractor, content);
     if (!tree) {
       return [];
     }
 
-    const langKey = this.languageKeyFromPath(filePath);
-    const extractor = langKey ? this.getExtractor(langKey) : null;
     const result = extractor ? extractor.extractCallGraph(tree.rootNode) : [];
 
     tree.delete();
