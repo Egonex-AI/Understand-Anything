@@ -194,5 +194,63 @@ class TestLowercaseWikiStillWorks(unittest.TestCase):
         )
 
 
+class TestGitTrackedFilter(unittest.TestCase):
+    """Untracked generated/private-overlay files must never enter the graph."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="ua-pkb-git-"))
+        (self.tmp / "concepts").mkdir(parents=True)
+        (self.tmp / "index.md").write_text(
+            "# Wiki\n\n## Concepts\n\n- [[concepts/attention]]\n", encoding="utf-8"
+        )
+        (self.tmp / "log.md").write_text("# Log\n", encoding="utf-8")
+        (self.tmp / "concepts" / "attention.md").write_text(
+            "# Attention\n\nAll you need.\n", encoding="utf-8"
+        )
+        # Untracked, locally generated vault index referencing private mounts
+        (self.tmp / "000-Home").mkdir()
+        (self.tmp / "000-Home" / "knowledge-graph.md").write_text(
+            "# Cross-Platform Index\n\n→ [[../_private/knowledge-conflicts]]\n",
+            encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _git_init_with_tracked(self) -> None:
+        import subprocess
+
+        env_cmds = [
+            ["git", "init", "-q"],
+            ["git", "config", "user.email", "test@example.com"],
+            ["git", "config", "user.name", "Test"],
+            ["git", "add", "index.md", "log.md", "concepts"],
+            ["git", "commit", "-qm", "init"],
+        ]
+        for cmd in env_cmds:
+            subprocess.run(cmd, cwd=self.tmp, check=True, capture_output=True)
+
+    def test_untracked_files_excluded_when_git_repo(self) -> None:
+        self._git_init_with_tracked()
+        manifest = pkb.parse_wiki(self.tmp)
+        ids = {n["id"] for n in manifest["nodes"]}
+        self.assertIn("article:concepts/attention", ids)
+        self.assertNotIn("article:000-Home/knowledge-graph", ids)
+        # the private-tier link target must not leak via any node metadata
+        serialized = str(manifest)
+        self.assertNotIn("_private/knowledge-conflicts", serialized)
+        self.assertTrue(
+            any("git-filter" in w for w in manifest.get("warnings", [])),
+            "exclusion should be surfaced as a warning",
+        )
+
+    def test_fallback_includes_all_files_without_git(self) -> None:
+        # no git repo in tmp — current behavior must be preserved
+        manifest = pkb.parse_wiki(self.tmp)
+        ids = {n["id"] for n in manifest["nodes"]}
+        self.assertIn("article:concepts/attention", ids)
+        self.assertIn("article:000-Home/knowledge-graph", ids)
+
+
 if __name__ == "__main__":
     unittest.main()
