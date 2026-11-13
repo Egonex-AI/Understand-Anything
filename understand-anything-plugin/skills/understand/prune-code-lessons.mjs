@@ -90,7 +90,11 @@ if (!files || typeof files !== 'object' || Array.isArray(files)) {
   process.exit(0);
 }
 
-const kept = {};
+// Null-prototype dictionary mirrors the dashboard's normalizeCodeLessons
+// defense: a lesson keyed "__proto__" must survive the rewrite as an own
+// entry instead of silently hitting Object.prototype's setter (which would
+// drop the entry without counting it as removed).
+const kept = Object.create(null);
 let removed = 0;
 for (const [filePath, entry] of Object.entries(files)) {
   const normalized = normalizeRelativePath(filePath);
