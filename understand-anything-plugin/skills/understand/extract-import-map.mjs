@@ -662,6 +662,7 @@ async function buildResolutionContext(projectRoot, files) {
     puppetFunctionIndex: puppet.functions,
     puppetTypeIndex: puppet.types,
     puppetTemplatesIndex: puppet.templates,
+    puppetFilesIndex: puppet.moduleFiles,
     failures: [
       ...tsResult.failures,
       ...goResult.failures,
@@ -1905,9 +1906,11 @@ export function resolveCppImport(rawImport, file, ctx) {
 //     compared case-insensitively with `_`/`-` stripped (underscore class
 //     name vs resource spelling).
 //   - templates: `.erb`/`.epp` under `<mod>/templates/`, keyed by
-//     `<mod>/<rel-after-templates>` (the `template('mod/x.erb')` spelling),
-//     `<mod>/templates/<rel>` (the `puppet:///modules/mod/templates/...`
-//     mount-path spelling), and bare basename as a last resort.
+//     `<mod>/<rel-after-templates>` (the `template('mod/x.erb')` spelling)
+//     and bare basename as a last resort.
+//   - file mounts: `puppet:///modules/<mod>/<path>` is served from
+//     `<mod>/files/<path>` — not templates/ — so those sources go through
+//     their own index keyed `<mod>/<rel-after-files>` for any file type.
 //
 // Everything is path-derived (zero content reads) and every result passes the
 // ctx.fileSet filter in main(), so builtin resource types (`file`, `package`)
@@ -1920,19 +1923,12 @@ function normalizePuppetTypeName(name) {
   return name.toLowerCase().replace(/[_-]/g, '');
 }
 
-/** The `<mod>` segment for a manifest path = directory preceding `manifests`
- *  (`modules/profile/manifests/app.pp` -> `profile`); null at env root. */
-function puppetOwningModule(path) {
-  const segs = path.split('/');
-  const i = segs.lastIndexOf('manifests');
-  return i > 0 ? segs[i - 1] : null;
-}
-
 function buildPuppetIndexes(files) {
   const classes = new Map();
   const functions = new Map();
   const types = new Map();
   const templates = new Map();
+  const moduleFiles = new Map();
   const addTo = (map, key, p) => {
     if (!key) return;
     if (!map.has(key)) map.set(key, []);
@@ -1942,6 +1938,10 @@ function buildPuppetIndexes(files) {
 
   for (const f of files) {
     const p = toPosix(f.path);
+    // `<mod>/files/<path>` — the directory puppet:///modules/<mod>/<path>
+    // mounts. Indexed for every extension before the type-specific branches.
+    const fm = /(?:^|\/)([^/]+)\/files\/(.+)$/.exec(p);
+    if (fm) addTo(moduleFiles, `${fm[1]}/${fm[2]}`, p);
     if (p.endsWith('.pp')) {
       const m = /(?:^|\/)([^/]+)\/manifests\/([^/]+)\.pp$/.exec(p);
       if (m) {
@@ -1969,7 +1969,6 @@ function buildPuppetIndexes(files) {
       const tm = /(?:^|\/)([^/]+)\/templates\/(.+)$/.exec(p);
       if (tm) {
         addTo(templates, `${tm[1]}/${tm[2]}`, p);
-        addTo(templates, `${tm[1]}/templates/${tm[2]}`, p);
         const base = tm[2].split('/').pop();
         addTo(templates, base, p);
       }
@@ -1979,7 +1978,8 @@ function buildPuppetIndexes(files) {
   for (const arr of functions.values()) arr.sort(comparePaths);
   for (const arr of types.values()) arr.sort(comparePaths);
   for (const arr of templates.values()) arr.sort(comparePaths);
-  return { classes, functions, types, templates };
+  for (const arr of moduleFiles.values()) arr.sort(comparePaths);
+  return { classes, functions, types, templates, moduleFiles };
 }
 
 /**
@@ -1991,10 +1991,14 @@ export function resolvePuppetImport(rawSource, file, ctx) {
   let src = rawSource.trim();
   if (!src) return [];
 
-  // Template branch first: `.erb`/`.epp` sources (mount-path form stripped to
-  // `mod/x.erb`) resolve against the templates index.
+  // `puppet:///modules/<mod>/<path>` is served from `<mod>/files/<path>` —
+  // resolving it through the templates index would link to a file that
+  // exists under a different directory (or invent a missing one).
   if (src.startsWith('puppet:///modules/')) {
-    src = src.slice('puppet:///modules/'.length);
+    const hits = ctx.puppetFilesIndex.get(
+      src.slice('puppet:///modules/'.length),
+    );
+    return hits ? hits.filter((h) => h !== toPosix(file.path)) : [];
   }
   if (/\.(erb|epp)$/.test(src)) {
     const hits = ctx.puppetTemplatesIndex.get(src);
@@ -2012,13 +2016,12 @@ export function resolvePuppetImport(rawSource, file, ctx) {
     if (hits) for (const h of hits) out.add(h);
   };
 
-  // (a) classes / defined types; unqualified names also try the owning
-  // module (Puppet's relative-name autoloading).
+  // (a) classes / defined types. Unqualified names resolve at top scope
+  // only — Puppet 4 removed relative-name lookup, so `service` inside
+  // `nginx` never resolves to `nginx::service` (and a builtin `package`
+  // never resolves to `<mod>::package`). Target: Puppet 8; the same rule
+  // holds for 7 and 9.
   addHits(ctx.puppetIndex, name);
-  const owner = puppetOwningModule(toPosix(file.path));
-  if (!name.includes('::') && owner) {
-    addHits(ctx.puppetIndex, `${owner}::${name}`);
-  }
   // (b) custom functions (global namespace, exact qualified name).
   addHits(ctx.puppetFunctionIndex, name);
   // (c) custom resource types (spelling-normalized).

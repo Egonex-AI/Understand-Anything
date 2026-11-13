@@ -1,5 +1,9 @@
 # Puppet Language Prompt Snippet
 
+Targets **Puppet 8** semantics — the same autoload, name-resolution (top scope
+only, no relative lookup), and `puppet:///` mount rules apply to **Puppet 7
+and 9**.
+
 ## Key Concepts
 
 - **Declarative Configuration**: Describe desired system state; Puppet compiles manifests into a catalog the agent applies and reconciles

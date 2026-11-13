@@ -2334,6 +2334,9 @@ describe('extract-import-map.mjs — Puppet resolver', () => {
       "  file { '/etc/c':",
       "    source => 'puppet:///modules/profile/banner.erb',",
       '  }',
+      "  file { '/etc/d':",
+      "    source => 'puppet:///modules/profile/data/thing',",
+      '  }',
       '}',
       '',
     ].join('\n'),
@@ -2345,10 +2348,16 @@ describe('extract-import-map.mjs — Puppet resolver', () => {
       "Puppet::Type.newtype(:mytype) do\n  newparam(:name)\nend\n",
     'modules/profile/templates/banner.erb': 'banner for <%= @facts["hostname"] %>\n',
     'modules/profile/templates/index.epp': '<%- | String $name | -%>\nindex: <%= $name %>\n',
-    // Relative-name autoloading: `include helper` inside module `other`
-    // resolves to `other::helper`, not to any other module's helper.
+    // Served via `source => 'puppet:///modules/profile/data/thing'` — the
+    // puppet:///modules/<mod>/<path> mount maps to <mod>/files/<path>.
+    'modules/profile/files/data/thing': 'static payload\n',
+    'modules/profile/files/templates/conf.erb': 'conf for <%= @name %>\n',
+    // Puppet ≥4 resolves unqualified names at top scope only: `helper`
+    // inside module `other` is `::helper` (module `helper`), never
+    // `other::helper` — helper.pp under `other` must NOT match.
+    'modules/helper/manifests/init.pp': 'class helper {\n}\n',
     'modules/other/manifests/init.pp': 'class other {\n  include helper\n}\n',
-    'modules/other/manifests/helper.pp': 'class helper {\n}\n',
+    'modules/other/manifests/helper.pp': 'class other::helper {\n}\n',
     'manifests/site.pp': [
       'include profile',
       '',
@@ -2392,6 +2401,7 @@ describe('extract-import-map.mjs — Puppet resolver', () => {
     expect(result.output.importMap['modules/profile/manifests/app.pp']).toEqual([
       'modules/base/manifests/init.pp',
       'modules/extra/manifests/init.pp',
+      'modules/profile/files/data/thing',
       'modules/profile/lib/puppet/functions/myfunc.rb',
       'modules/profile/lib/puppet/parser/functions/legacy.rb',
       'modules/profile/lib/puppet/type/mytype.rb',
@@ -2412,14 +2422,65 @@ describe('extract-import-map.mjs — Puppet resolver', () => {
     ]);
   });
 
-  it('resolves unqualified names against the owning module', () => {
+  it('resolves unqualified names at top scope only (Puppet ≥4)', () => {
     projectRoot = setupTree(MODULE_TREE);
     const result = runScript(projectRoot, puppetInput(MODULE_TREE));
 
     expect(result.status, result.stderr).toBe(0);
+    // `include helper` in module `other` is ::helper — the `helper` module —
+    // never `other::helper`, whose file exists and must not match.
     expect(result.output.importMap['modules/other/manifests/init.pp']).toEqual([
-      'modules/other/manifests/helper.pp',
+      'modules/helper/manifests/init.pp',
     ]);
+  });
+
+  it('does not link resource types to same-named manifests in the owning module', () => {
+    const tree = {
+      'modules/nginx/manifests/init.pp': [
+        'class nginx {',
+        "  service { 'nginx': }",
+        "  package { 'nginx': }",
+        '}',
+      ].join('\n'),
+      // Would be spurious targets under Puppet 3 relative-name lookup.
+      'modules/nginx/manifests/service.pp': 'class nginx::service {\n}\n',
+      'modules/nginx/manifests/package.pp': 'class nginx::package {\n}\n',
+    };
+    projectRoot = setupTree(tree);
+    const result = runScript(projectRoot, puppetInput(tree));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['modules/nginx/manifests/init.pp']).toEqual([]);
+  });
+
+  it("maps puppet:///modules/<mod>/<path> to <mod>/files/<path>, not templates/", () => {
+    const tree = {
+      'modules/profile/manifests/app.pp': [
+        'class profile::app {',
+        "  file { '/etc/conf':",
+        "    source => 'puppet:///modules/profile/templates/conf.erb',",
+        '  }',
+        "  file { '/etc/data':",
+        "    source => 'puppet:///modules/profile/data/thing',",
+        '  }',
+        '}',
+      ].join('\n'),
+      // Real targets live under files/, including files/templates/.
+      'modules/profile/files/templates/conf.erb': 'conf for <%= @name %>\n',
+      'modules/profile/files/data/thing': 'static payload\n',
+      // A same-named template must not absorb the mount-path reference.
+      'modules/profile/templates/conf.erb': 'wrong target\n',
+    };
+    projectRoot = setupTree(tree);
+    const result = runScript(projectRoot, puppetInput(tree));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['modules/profile/manifests/app.pp'].sort()).toEqual(
+      [
+        'modules/profile/files/data/thing',
+        'modules/profile/files/templates/conf.erb',
+      ],
+    );
   });
 
   it('drops builtin resource types and names that miss every index', () => {
