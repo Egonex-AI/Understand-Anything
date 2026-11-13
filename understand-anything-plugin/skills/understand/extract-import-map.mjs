@@ -2178,6 +2178,8 @@ if (isCliEntry()) {
     await main();
   } catch (err) {
     process.stderr.write(`extract-import-map.mjs failed: ${err.message}\n${err.stack}\n`);
-    process.exit(1);
+    // Not process.exit(): on Windows, exiting while V8 still compiles the
+    // tree-sitter WASM in the background aborts Node (libuv assertion).
+    process.exitCode = 1;
   }
 }
