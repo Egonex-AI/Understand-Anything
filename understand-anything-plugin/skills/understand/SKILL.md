@@ -627,7 +627,13 @@ Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `
 
 ### Code Lessons — per-file learning explanations
 
-Run this step whenever the tour is (re)built — full analysis and incremental plans with `rerunTour === true`. For `PARTIAL_UPDATE`, keep the existing `$UA_DIR/code-lessons.json` untouched (line ranges may drift slightly; the next `rerunTour` rebuild refreshes them).
+Run this step whenever the tour is (re)built — full analysis and incremental plans with `rerunTour === true`. For `PARTIAL_UPDATE`, keep the existing `$UA_DIR/code-lessons.json` untouched (line ranges may drift slightly; the next `rerunTour` rebuild refreshes them) — but once the incremental save gate finalizes successfully, prune entries for files the saved graph no longer contains:
+
+```bash
+node "<SKILL_DIR>/prune-code-lessons.mjs" "$PROJECT_ROOT"
+```
+
+The helper removes only orphaned entries (paths with no node in the saved graph) and leaves every surviving lesson byte-identical. A `PARTIAL_UPDATE` can delete or newly ignore files while their source-derived lessons survive, and the viewer would keep serving lessons the graph no longer knows about.
 
 Report to the user: `[Phase 5/7] Writing code lessons...`
 
