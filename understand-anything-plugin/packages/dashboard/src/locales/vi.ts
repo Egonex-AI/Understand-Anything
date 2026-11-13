@@ -183,6 +183,11 @@ export const vi = {
     sourceUnavailable: "Không có mã nguồn",
     rendered: "Đã kết xuất",
     source: "Mã nguồn",
+    lesson: "Bài giảng",
+    tourStep: "Tham quan",
+    overviewOnly: "Tệp này chỉ có tổng quan, chưa có giải thích theo từng phần.",
+    showLesson: "Hiện bài học",
+    hideLesson: "Ẩn bài học",
   },
   customNode: {
     tested: "Đã kiểm thử",

@@ -178,6 +178,37 @@ describe.skipIf(!existsSync(VIEWER_DIST))("understand-anything-viewer", () => {
     expect([403, 404]).toContain(res.status);
   });
 
+  it("serves code lessons from the data directory", async () => {
+    // Absent file → 404; the dashboard renders the viewer without lessons.
+    const missing = await fetch(`${base()}/code-lessons.json?token=${viewer.token}`);
+    expect(missing.status).toBe(404);
+
+    const lessons = {
+      version: 1,
+      generatedAt: "2026-10-22T00:00:00.000Z",
+      files: {
+        "src/a.ts": {
+          overview: "Entry fixture.",
+          sections: [
+            { title: "The export", lineRange: [1, 1], explanation: "Declares a.", tourOrder: 1 },
+          ],
+        },
+      },
+    };
+    writeFileSync(join(root, ".ua", "code-lessons.json"), JSON.stringify(lessons));
+
+    const denied = await fetch(`${base()}/code-lessons.json`);
+    expect(denied.status).toBe(403);
+
+    const res = await fetch(`${base()}/code-lessons.json?token=${viewer.token}`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.files["src/a.ts"].overview).toBe("Entry fixture.");
+    expect(body.files["src/a.ts"].sections[0].lineRange).toEqual([1, 1]);
+
+    rmSync(join(root, ".ua", "code-lessons.json"));
+  });
+
   it("falls back to legacy .understand-anything/ projects", async () => {
     const legacyRoot = setupProject(".understand-anything");
     const legacyViewer = await startViewer(legacyRoot);

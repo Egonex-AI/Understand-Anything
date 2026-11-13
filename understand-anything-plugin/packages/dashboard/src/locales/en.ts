@@ -183,6 +183,11 @@ export const en = {
     sourceUnavailable: "Source unavailable",
     rendered: "Rendered",
     source: "Source",
+    lesson: "Lesson",
+    tourStep: "Tour",
+    overviewOnly: "Overview only — no section breakdown for this file.",
+    showLesson: "Show lesson",
+    hideLesson: "Hide lesson",
   },
   customNode: {
     tested: "Tested",

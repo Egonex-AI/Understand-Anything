@@ -33,6 +33,8 @@ Incrementally update the knowledge graph after a commit. Do not ask the user for
    | `ARCHITECTURE_UPDATE` | Continue with targeted analysis, then rerun architecture and tour. |
    | `FULL_UPDATE` | Immediately invoke `/understand --full`; do not patch the incremental baseline. |
 
+7. **Resolve the stored output language.** Read `$UA_DIR/config.json`; if it has an `outputLanguage` field, construct `$LANGUAGE_DIRECTIVE` from it using the exact template in `/understand`'s language configuration step (the "Language directive template"). This hook has no user interaction, so the stored preference is the only source — never re-detect. If `config.json` is missing or has no `outputLanguage`, leave `$LANGUAGE_DIRECTIVE` unset and omit it from the lesson dispatch in Phase 3 (the writer treats the directive as optional).
+
    SKIP finalizer:
 
    ```bash
@@ -86,7 +88,7 @@ Do not dispatch assemble-reviewer or graph-reviewer for automatic updates.
 ## Phase 3 — Conditional architecture and tour
 
 - For `PARTIAL_UPDATE`, dispatch neither agent. The finalizer preserves existing layer assignments and tour prose, removes dangling references/empty layers, and assigns new nodes deterministically by directory depth, graph connectivity, then prior layer order.
-- For `ARCHITECTURE_UPDATE`, dispatch architecture-analyzer on the full merged node/edge set, including previous layers for naming stability, and write `$UA_DIR/intermediate/layers.json`. Then dispatch tour-builder and write `$UA_DIR/intermediate/tour.json`.
+- For `ARCHITECTURE_UPDATE`, dispatch architecture-analyzer on the full merged node/edge set, including previous layers for naming stability, and write `$UA_DIR/intermediate/layers.json`. Then dispatch tour-builder and write `$UA_DIR/intermediate/tour.json`. Then normalize the tour deterministically — run `node "$PLUGIN_ROOT/skills/understand/normalize-tour.mjs" "$PROJECT_ROOT"` and use the resulting `$UA_DIR/intermediate/tour.normalized.json` for the lesson dispatch (the finalizer applies the same normalization at save time; hand-written conversion disagrees with it). Before dispatching the lesson writer, delete any stale lesson scratch files left by an interrupted earlier run — `$UA_DIR/intermediate/code-lessons.json`, `code-lessons.detailed.<N>.json`, and `code-lessons.normalized.json` (never touch the served `$UA_DIR/code-lessons.json`). Then dispatch `code-lesson-writer` following the SKILL.md §Code Lessons contract (rebuilt tour, detailed files in bounded batches, language directive) and write the batch outputs, normalized into `$UA_DIR/intermediate/code-lessons.normalized.json` per the SKILL.md Phase 5 rules. Append `$LANGUAGE_DIRECTIVE` to each dispatch prompt when Phase 0 resolved one — without it, a project stored with a non-English `outputLanguage` would get its lessons regenerated in English beside the non-English graph and tour. Lessons are best-effort here: retry a failed batch once, and if any batch still fails leave no staged document, record the warning, and continue — publication (Phase 4) then removes the stale served sidecar instead of leaving lessons for the previous tour.
 
 Retry either required agent once. If it still fails, **STOP** without advancing the baseline.
 
@@ -99,6 +101,14 @@ node "$PLUGIN_ROOT/skills/understand/finalize-incremental.mjs" "$PROJECT_ROOT"
 ```
 
 The finalizer performs deterministic graph/layer/tour validation and independently reruns the shared symbol check on the exact graph before writing. It atomically saves `knowledge-graph.json`, patches changed fingerprints while preserving untouched entries, removes deleted fingerprints, and only then writes `meta.json`. A graph-save failure must never advance the fingerprint or commit baseline. If symbol loss is first detected here, follow the same one-retry procedure, rerun merge and any required architecture/tour phases, then finalize; an already-used or unsuccessful repair must stop with the old graph and baselines intact.
+
+After the finalizer exits successfully, publish lessons with the same rules as **Lesson publication** in SKILL.md's incremental save gate — only lessons staged by the current invocation: atomically move `$UA_DIR/intermediate/code-lessons.normalized.json` over `$UA_DIR/code-lessons.json` when this run staged it; when lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead; when the finalizer failed, touch nothing so the previous graph and lessons stay consistent. `PARTIAL_UPDATE` never attempts lessons, but incremental updates can still delete or newly ignore files from the graph while their source-derived lessons survive — so for every action except `SKIP` (and `PARTIAL_UPDATE` in particular), after the finalizer succeeds and the publication rules above have been applied, run:
+
+```bash
+node "$PLUGIN_ROOT/skills/understand/prune-code-lessons.mjs" "$PROJECT_ROOT"
+```
+
+The helper removes only entries whose file path has no node in the saved graph and leaves every surviving lesson's content untouched (the file is rewritten as normalized 2-space JSON). If the prune itself fails, report the warning and continue — the saved graph is already final and the idempotent helper can prune the orphans again on the next run; never roll the graph back for it.
 
 Report:
 
