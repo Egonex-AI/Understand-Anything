@@ -631,15 +631,15 @@ Run this step whenever the tour is (re)built — full analysis and incremental p
 
 Report to the user: `[Phase 5/7] Writing code lessons...`
 
-0. **Clear stale lesson scratch files.** An interrupted earlier run can leave `$UA_DIR/intermediate/code-lessons.json` (raw) and `$UA_DIR/intermediate/code-lessons.normalized.json` (staged) behind — full-run initialization only creates the intermediate directory. Delete both files before every lesson attempt, or the next writer's missing output could let those stale scratch files be normalized and published as if they belonged to this run. Never touch the served `$UA_DIR/code-lessons.json` here.
+0. **Clear stale lesson scratch files.** An interrupted earlier run can leave lesson scratch files behind — `$UA_DIR/intermediate/code-lessons.json` (single-batch raw), `code-lessons.detailed.<N>.json` (batch raws), and `code-lessons.normalized.json` (staged) — full-run initialization only creates the intermediate directory. Delete all of them before every lesson attempt, or the next writer's missing output could let those stale scratch files be normalized and published as if they belonged to this run. Never touch the served `$UA_DIR/code-lessons.json` here.
 
 1. **Resolve tour-covered files.** Read the normalized tour from `$UA_DIR/intermediate/tour.normalized.json` (written by the deterministic tour normalization above). For each normalized tour step, resolve every `nodeIds` entry to its file-level node and collect the node's `filePath`. Record for each covered file the smallest referencing step `order` as its primary tour anchor.
 
-2. **Dispatch a subagent** using the `code-lesson-writer` agent definition (at `agents/code-lesson-writer.md`). Pass these parameters in the dispatch prompt:
+2. **Dispatch the lesson writer in bounded batches.** A single dispatch carrying every file-level summary overflows one agent's context/output limits on large projects and loses ALL lessons when it fails, so the detailed files are dispatched in batches of at most 12, and overview-only entries are never dispatched at all (the normalization step derives them deterministically from node summaries). Use the `code-lesson-writer` agent definition (at `agents/code-lesson-writer.md`) and pass these parameters in each batch's dispatch prompt:
 
 > Write per-file code lessons for this codebase.
 > Project root: `$PROJECT_ROOT`
-> Write output to: `$UA_DIR/intermediate/code-lessons.json`
+> Write output to: `$UA_DIR/intermediate/code-lessons.detailed.<batchIndex>.json` (use `code-lessons.json` as the filename only when there is exactly one batch)
 >
 > Tour steps (from `$UA_DIR/intermediate/tour.normalized.json`):
 > ```json
@@ -648,25 +648,24 @@ Report to the user: `[Phase 5/7] Writing code lessons...`
 >
 > Detailed files (read source from disk; produce overview + sections):
 > ```json
-> [{"filePath": "src/main.tsx", "tourOrder": 2}, ...]
-> ```
->
-> All other file-level nodes (overview only — do NOT read these files):
-> ```json
-> [list of {filePath, summary} for every file-level node NOT in the detailed list]
+> [{"filePath": "src/main.tsx", "tourOrder": 2}, ...]  (only this batch's files)
 > ```
 >
 > $LANGUAGE_DIRECTIVE
 
-3. **Normalize** `$UA_DIR/intermediate/code-lessons.json` into a **staged** document at `$UA_DIR/intermediate/code-lessons.normalized.json`. Do NOT write `$UA_DIR/code-lessons.json` here — publication happens only after the graph/tour this run describes is actually saved (see **Lesson publication** under the incremental save gate below, and Phase 7 step 1 for full runs). Apply these steps **in order**:
-   1. **Unwrap envelope:** Accept both `{ "files": {...} }` and a bare files object at the top level.
-   2. **Drop unknown files:** Remove entries whose key does not exactly match a file-level node's `filePath` (relative, forward slashes).
-   3. **Validate sections:** `lineRange` must be two integers `[start, end]` with `1 <= start <= end`; drop invalid sections, then enforce a maximum of 10 sections per file (truncate beyond that).
-   4. **Validate tour anchors:** Drop any `tourOrder` that does not match a tour step's `order`.
-   5. **Fallback overview:** If `overview` is missing or empty, substitute the matching node's `summary`.
-   6. **Stamp metadata:** Ensure `version: 1` and `generatedAt` (current ISO 8601 timestamp) are present.
+Retry a failed batch once (see Error Handling). If any batch still fails, the whole lesson attempt counts as failed — see step 4.
 
-4. **On failure:** retry the dispatch once (see Error Handling); if it still fails, skip lessons entirely — leave no staged document, record the failure in `$PHASE_WARNINGS`, and continue. At publication time the previously served `$UA_DIR/code-lessons.json` is removed in that case, so stale lessons never sit beside a rebuilt tour (see **Lesson publication** below). The dashboard degrades gracefully when the file is absent.
+3. **Normalize** the batch output(s) into a **staged** document at `$UA_DIR/intermediate/code-lessons.normalized.json`. Do NOT write `$UA_DIR/code-lessons.json` here — publication happens only after the graph/tour this run describes is actually saved (see **Lesson publication** under the incremental save gate below, and Phase 7 step 1 for full runs). Apply these steps **in order**:
+   1. **Unwrap envelope:** Accept both `{ "files": {...} }` and a bare files object at the top level of each batch document.
+   2. **Merge batches:** Combine all `code-lessons.detailed.<N>.json` documents (and the single-batch `code-lessons.json`) into one files object. Batches cover disjoint file sets; if the same key nonetheless appears twice, keep the first occurrence and record a `$PHASE_WARNINGS` entry.
+   3. **Drop unknown files:** Remove entries whose key does not exactly match a file-level node's `filePath` (relative, forward slashes).
+   4. **Add deterministic overview-only entries:** For every file-level node that is NOT in the detailed files list, add an entry `{ "overview": <the node's summary>, "sections": [] }` when no entry exists yet — derived mechanically from the graph, never from an LLM.
+   5. **Validate sections:** `lineRange` must be two integers `[start, end]` with `1 <= start <= end`; drop invalid sections, then enforce a maximum of 10 sections per file (truncate beyond that).
+   6. **Validate tour anchors:** Drop any `tourOrder` that does not match a tour step's `order`.
+   7. **Fallback overview:** If `overview` is missing or empty, substitute the matching node's `summary`.
+   8. **Stamp metadata:** Ensure `version: 1` and `generatedAt` (current ISO 8601 timestamp) are present.
+
+4. **On failure:** if any batch failed after its one retry, skip lessons entirely — delete every scratch file this attempt produced (including per-batch outputs), leave no staged document, record the failure in `$PHASE_WARNINGS`, and continue. At publication time the previously served `$UA_DIR/code-lessons.json` is removed in that case, so stale lessons never sit beside a rebuilt tour (see **Lesson publication** below). The dashboard degrades gracefully when the file is absent.
 
 ### Incremental deterministic save gate
 
