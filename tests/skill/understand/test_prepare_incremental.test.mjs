@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -1531,5 +1532,90 @@ describe('finalize-incremental.mjs', { timeout: 30_000 }, () => {
     expect(readFileSync(graphPath, 'utf-8')).toBe(graphBefore);
     expect(readFileSync(fingerprintPath, 'utf-8')).toBe(fingerprintsBefore);
     expect(readFileSync(metaPath, 'utf-8')).toBe(metaBefore);
+  });
+});
+
+describe('finalize rollback after the graph is saved', { timeout: 30_000 }, () => {
+  function setupSkipRun() {
+    const { root, baseCommit } = setupRepository({
+      'src/index.js': "const value = require('./a');\nmodule.exports = value;\n",
+      'src/a.js': 'module.exports = 1;\n',
+      'src/b.js': 'module.exports = 2;\n',
+    });
+    writeProjectFile(
+      root,
+      'src/index.js',
+      "const value = require('./b');\nmodule.exports = value;\n",
+    );
+    commit(root, 'cosmetic require change');
+    const { plan } = prepare(root, baseCommit);
+    expect(plan.action).toBe('SKIP');
+    const dataDir = join(root, '.ua');
+    const graphPath = join(dataDir, 'knowledge-graph.json');
+    const fingerprintPath = join(dataDir, 'fingerprints.json');
+    const metaPath = join(dataDir, 'meta.json');
+    // Replace meta.json with a directory so the rename in advanceMeta's
+    // atomic write fails with EISDIR AFTER the graph and fingerprints were
+    // already written — exactly the late-failure window the rollback covers.
+    const breakMeta = () => {
+      if (existsSync(metaPath)) rmSync(metaPath);
+      mkdirSync(metaPath);
+    };
+    return { root, baseCommit, plan, graphPath, fingerprintPath, metaPath, breakMeta };
+  }
+
+  it('restores the previous graph and fingerprints when the meta patch fails after the graph is saved', () => {
+    const f = setupSkipRun();
+    // Compare parsed contents: the rollback rewrites via atomicWriteJson
+    // (pretty-printed), so byte identity with the compact baseline is not
+    // expected — content identity is the contract.
+    const graphBefore = JSON.parse(readFileSync(f.graphPath, 'utf-8'));
+    const fingerprintsBefore = JSON.parse(readFileSync(f.fingerprintPath, 'utf-8'));
+    f.breakMeta();
+    const result = spawnSync(process.execPath, [finalizeScript, f.root], {
+      cwd: f.root,
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Rolled back knowledge-graph.json and fingerprints.json');
+    expect(JSON.parse(readFileSync(f.graphPath, 'utf-8'))).toEqual(graphBefore);
+    expect(JSON.parse(readFileSync(f.fingerprintPath, 'utf-8'))).toEqual(fingerprintsBefore);
+  });
+
+  it('deletes a fingerprint store the failed patch created when none existed before', () => {
+    const f = setupSkipRun();
+    const graphBefore = JSON.parse(readFileSync(f.graphPath, 'utf-8'));
+    rmSync(f.fingerprintPath);
+    f.breakMeta();
+    const result = spawnSync(process.execPath, [finalizeScript, f.root], {
+      cwd: f.root,
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Rolled back knowledge-graph.json and fingerprints.json');
+    expect(JSON.parse(readFileSync(f.graphPath, 'utf-8'))).toEqual(graphBefore);
+    // patchFingerprints created the store before advanceMeta failed; the
+    // rollback must remove it — fresh fingerprints beside a restored old
+    // graph would make the next run misclassify every change.
+    expect(existsSync(f.fingerprintPath)).toBe(false);
+  });
+
+  it('still rolls the graph back when the fingerprint snapshot read fails on a corrupted store', () => {
+    const f = setupSkipRun();
+    const graphBefore = JSON.parse(readFileSync(f.graphPath, 'utf-8'));
+    const corrupted = 'this is not json{';
+    writeFileSync(f.fingerprintPath, corrupted, 'utf-8');
+    f.breakMeta();
+    const result = spawnSync(process.execPath, [finalizeScript, f.root], {
+      cwd: f.root,
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    // The snapshot read happens inside the try, so even a corrupted store
+    // (nothing to restore fingerprints from) must not escape with the new
+    // graph published; the graph still goes back to its previous state.
+    expect(result.stderr).toContain('Rolled back knowledge-graph.json and fingerprints.json');
+    expect(JSON.parse(readFileSync(f.graphPath, 'utf-8'))).toEqual(graphBefore);
+    expect(readFileSync(f.fingerprintPath, 'utf-8')).toBe(corrupted);
   });
 });
