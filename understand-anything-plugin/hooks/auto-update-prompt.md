@@ -102,13 +102,13 @@ node "$PLUGIN_ROOT/skills/understand/finalize-incremental.mjs" "$PROJECT_ROOT"
 
 The finalizer performs deterministic graph/layer/tour validation and independently reruns the shared symbol check on the exact graph before writing. It atomically saves `knowledge-graph.json`, patches changed fingerprints while preserving untouched entries, removes deleted fingerprints, and only then writes `meta.json`. A graph-save failure must never advance the fingerprint or commit baseline. If symbol loss is first detected here, follow the same one-retry procedure, rerun merge and any required architecture/tour phases, then finalize; an already-used or unsuccessful repair must stop with the old graph and baselines intact.
 
-After the finalizer exits successfully, publish lessons with the same rules as **Lesson publication** in SKILL.md's incremental save gate — only lessons staged by the current invocation: atomically move `$UA_DIR/intermediate/code-lessons.normalized.json` over `$UA_DIR/code-lessons.json` when this run staged it; when lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead; when the finalizer failed, touch nothing so the previous graph and lessons stay consistent. `PARTIAL_UPDATE` never attempts lessons, but it can still delete or newly ignore files from the graph while their source-derived lessons survive — so for every action except `SKIP` (and `PARTIAL_UPDATE` in particular), after the finalizer succeeds and the publication rules above have been applied, run:
+After the finalizer exits successfully, publish lessons with the same rules as **Lesson publication** in SKILL.md's incremental save gate — only lessons staged by the current invocation: atomically move `$UA_DIR/intermediate/code-lessons.normalized.json` over `$UA_DIR/code-lessons.json` when this run staged it; when lessons were attempted but skipped or failed, delete a served `$UA_DIR/code-lessons.json` instead; when the finalizer failed, touch nothing so the previous graph and lessons stay consistent. `PARTIAL_UPDATE` never attempts lessons, but incremental updates can still delete or newly ignore files from the graph while their source-derived lessons survive — so for every action except `SKIP` (and `PARTIAL_UPDATE` in particular), after the finalizer succeeds and the publication rules above have been applied, run:
 
 ```bash
 node "$PLUGIN_ROOT/skills/understand/prune-code-lessons.mjs" "$PROJECT_ROOT"
 ```
 
-The helper removes only entries whose file path has no node in the saved graph and leaves every surviving lesson byte-identical.
+The helper removes only entries whose file path has no node in the saved graph and leaves every surviving lesson's content untouched (the file is rewritten as normalized 2-space JSON). If the prune itself fails, report the warning and continue — the saved graph is already final and the idempotent helper can prune the orphans again on the next run; never roll the graph back for it.
 
 Report:
 

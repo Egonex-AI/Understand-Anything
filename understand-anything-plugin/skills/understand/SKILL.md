@@ -627,13 +627,13 @@ Required fields: `order`, `title`, `description`, `nodeIds`. Preserve optional `
 
 ### Code Lessons — per-file learning explanations
 
-Run this step whenever the tour is (re)built — full analysis and incremental plans with `rerunTour === true`. For `PARTIAL_UPDATE`, keep the existing `$UA_DIR/code-lessons.json` untouched (line ranges may drift slightly; the next `rerunTour` rebuild refreshes them) — but once the incremental save gate finalizes successfully, prune entries for files the saved graph no longer contains:
+Run this step whenever the tour is (re)built — full analysis and incremental plans with `rerunTour === true`. For `PARTIAL_UPDATE`, keep the existing `$UA_DIR/code-lessons.json` untouched (line ranges may drift slightly; the next `rerunTour` rebuild refreshes them). After ANY successful incremental save (every action except `SKIP` — `PARTIAL_UPDATE` in particular), prune entries for files the saved graph no longer contains:
 
 ```bash
 node "<SKILL_DIR>/prune-code-lessons.mjs" "$PROJECT_ROOT"
 ```
 
-The helper removes only orphaned entries (paths with no node in the saved graph) and leaves every surviving lesson byte-identical. A `PARTIAL_UPDATE` can delete or newly ignore files while their source-derived lessons survive, and the viewer would keep serving lessons the graph no longer knows about.
+The helper removes only orphaned entries (paths with no node in the saved graph) and leaves every surviving lesson's content untouched (the file is rewritten as normalized 2-space JSON). Incremental updates can delete or newly ignore files while their source-derived lessons survive, and the viewer would keep serving lessons the graph no longer knows about. If the prune itself fails, record the failure in `$PHASE_WARNINGS` and continue — the saved graph is already final, orphaned entries are a soft inconsistency the next run can prune again (the helper is idempotent); never roll the graph back for it.
 
 Report to the user: `[Phase 5/7] Writing code lessons...`
 
@@ -718,7 +718,7 @@ Assemble the full KnowledgeGraph JSON object:
   "nodes": [<all nodes from assembled-graph.json after Phase 3 review>],
   "edges": [<all edges from assembled-graph.json after Phase 3 review>],
   "layers": [<layers from Phase 4>],
-  "tour": [<steps from `$UA_DIR/intermediate/tour.normalized.json` (Phase 5)>]
+  "tour": [<steps from `$UA_DIR/intermediate/tour.normalized.json` (Phase 5 — full runs; incremental `--review` reruns skip this assembly and keep the tour embedded in the graph the save gate copied)>]
 }
 ```
 
