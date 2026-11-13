@@ -596,13 +596,13 @@ Pass these parameters in the dispatch prompt:
 > [list of ALL edges — include all edge types for complete graph topology analysis]
 > ```
 
-After the subagent completes, read `$UA_DIR/intermediate/tour.json` and normalize it into a final `tour` array. Apply these steps **in order**:
+After the subagent completes, normalize the tour **deterministically** — do NOT apply the normalization by hand. Hand-written conversion (`file:<relative-path>` for every raw path) disagrees with the resolver the finalizer uses at save time (a raw `README.md` reference must resolve to `document:README.md`, not become a dangling `file:README.md`), which would leave lesson `tourOrder` anchors describing a tour that was never saved. Instead run:
 
-1. **Unwrap envelope:** If the file contains `{ "steps": [...] }` instead of a plain array, extract the inner array. (The prompt requests a plain array, but LLMs may still produce an envelope.)
-2. **Rename legacy fields:** If any step has `nodesToInspect` instead of `nodeIds`, rename it → `nodeIds`. If any step has `whyItMatters` instead of `description`, rename it → `description`.
-3. **Convert file paths:** If `nodeIds` entries are raw file paths without a known prefix (`file:`, `config:`, `document:`, `service:`, `pipeline:`, `table:`, `schema:`, `resource:`, `endpoint:`), convert them to `file:<relative-path>`.
-4. **Drop dangling refs:** Remove any `nodeIds` entries that do not exist in the merged node set.
-5. **Sort** by `order` before saving.
+```bash
+node "<SKILL_DIR>/normalize-tour.mjs" "$PROJECT_ROOT"
+```
+
+The helper reads `$UA_DIR/intermediate/assembled-graph.json` and `$UA_DIR/intermediate/tour.json`, applies the finalizer's exact normalization (envelope unwrap, legacy-field rename, pathIndex-based reference resolution, dangling-ref removal, sort by `order`), and writes `$UA_DIR/intermediate/tour.normalized.json`. Use that file's content as the final `tour` array for every downstream step in this run — the Code Lessons dispatch below, graph assembly, and Phase 7 all reference `tour.normalized.json`, never the raw `tour.json`.
 
 Each element of the final `tour` array MUST have this shape:
 
@@ -633,7 +633,7 @@ Report to the user: `[Phase 5/7] Writing code lessons...`
 
 0. **Clear stale lesson scratch files.** An interrupted earlier run can leave `$UA_DIR/intermediate/code-lessons.json` (raw) and `$UA_DIR/intermediate/code-lessons.normalized.json` (staged) behind — full-run initialization only creates the intermediate directory. Delete both files before every lesson attempt, or the next writer's missing output could let those stale scratch files be normalized and published as if they belonged to this run. Never touch the served `$UA_DIR/code-lessons.json` here.
 
-1. **Resolve tour-covered files.** For each normalized tour step, resolve every `nodeIds` entry to its file-level node and collect the node's `filePath`. Record for each covered file the smallest referencing step `order` as its primary tour anchor.
+1. **Resolve tour-covered files.** Read the normalized tour from `$UA_DIR/intermediate/tour.normalized.json` (written by the deterministic tour normalization above). For each normalized tour step, resolve every `nodeIds` entry to its file-level node and collect the node's `filePath`. Record for each covered file the smallest referencing step `order` as its primary tour anchor.
 
 2. **Dispatch a subagent** using the `code-lesson-writer` agent definition (at `agents/code-lesson-writer.md`). Pass these parameters in the dispatch prompt:
 
@@ -641,9 +641,9 @@ Report to the user: `[Phase 5/7] Writing code lessons...`
 > Project root: `$PROJECT_ROOT`
 > Write output to: `$UA_DIR/intermediate/code-lessons.json`
 >
-> Tour steps:
+> Tour steps (from `$UA_DIR/intermediate/tour.normalized.json`):
 > ```json
-> [<the normalized tour array>]
+> [<the normalized tour array from tour.normalized.json>]
 > ```
 >
 > Detailed files (read source from disk; produce overview + sections):
@@ -713,7 +713,7 @@ Assemble the full KnowledgeGraph JSON object:
   "nodes": [<all nodes from assembled-graph.json after Phase 3 review>],
   "edges": [<all edges from assembled-graph.json after Phase 3 review>],
   "layers": [<layers from Phase 4>],
-  "tour": [<steps from Phase 5>]
+  "tour": [<steps from `$UA_DIR/intermediate/tour.normalized.json` (Phase 5)>]
 }
 ```
 

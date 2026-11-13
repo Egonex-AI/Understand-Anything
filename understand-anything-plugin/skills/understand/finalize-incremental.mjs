@@ -505,8 +505,10 @@ if (isCliEntry()) {
 
 export {
   assignLayers,
+  buildPathIndex,
   commonParentDepth,
   hasAnalyzedFileCoverage,
+  normalizeAssembled,
   normalizeTour,
   refreshGraphImports,
 };
