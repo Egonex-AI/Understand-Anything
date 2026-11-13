@@ -15,6 +15,7 @@ export const puppetFrameworkConfig = {
     functions: "utility",
     lib: "service",
     templates: "config",
+    files: "config",
     data: "data",
     spec: "test",
   },

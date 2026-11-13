@@ -34,7 +34,7 @@ import { traverse, getStringValue, findChild, findChildren } from "./base-extrac
  *    names, `template()`/`epp()` string arguments, and `source => 'puppet:///...'`
  *    attribute values all become `imports[]` entries; the skill-layer
  *    import-map resolver maps them onto `.pp`, `lib/puppet/functions/*.rb`,
- *    `lib/puppet/type/*.rb` and `templates/*.erb|epp` files. Anything that
+ *    `lib/puppet/type/*.rb`, `templates/*.erb|epp`, and `files/` mount files. Anything that
  *    misses the file set is dropped there, so builtin types and stdlib names
  *    are safe to emit here.
  *  - `resource_declaration` → `resources[]` with composite `kind[title]`

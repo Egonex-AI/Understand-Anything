@@ -18,6 +18,7 @@ When analyzing a Puppet module (or control repo), apply these additional convent
 | `lib/puppet/type/*.rb` | Custom resource types — Ruby property/parameter declarations | `service` |
 | `lib/puppet/provider/**/*.rb` | Type providers — the actual system manipulation per platform | `service` |
 | `templates/*.epp`, `templates/*.erb` | Rendered file bodies referenced by `epp()` / `template()` | `config` |
+| `files/**` | Static payloads mounted by `source => 'puppet:///modules/<mod>/<path>'` — the mount maps to `files/<path>`, not `templates/` | `config` |
 | `hiera.yaml`, `data/**/*.yaml` | Hiera bindings and configuration data | `data`, `config` |
 | `metadata.json` | Module identity, version, dependencies, supported platforms | `config` |
 | `Puppetfile` | r10k/g10k module pinning in a control repo | `config` |

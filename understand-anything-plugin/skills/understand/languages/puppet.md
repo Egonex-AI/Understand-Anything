@@ -35,7 +35,8 @@ and 9**.
 
 - A manifest `depends_on` the classes it `include`s, `require`s, `contain`s, or `inherits` from — already resolved to the defining `.pp` file by the import map's module-layout conventions
 - A manifest `depends_on` the Ruby file implementing a custom function or resource type it calls (`lib/puppet/functions/**.rb`, `lib/puppet/type/*.rb`) — also pre-resolved in the import map; do not duplicate these edges
-- `template('mod/x.erb')`, `epp('mod/x.epp')`, and `source => 'puppet:///modules/...'` references `depends_on` the `templates/` file — pre-resolved likewise
+- `template('mod/x.erb')` and `epp('mod/x.epp')` references `depends_on` the `templates/` file — pre-resolved likewise
+- `source => 'puppet:///modules/mod/path'` mounts `<mod>/files/<path>` (any file type, not just templates) — also pre-resolved
 - Class nodes `configure` the system behavior their resources declare; prefer one summary-worthy edge per real dependency, not one per resource
 - Known extractor gap: legacy bareword `contain foo` (no parentheses) parses as loose identifiers and yields no edge. Only if you are certain of the target class from the source may you add the `depends_on` edge yourself — never guess an unresolvable name
 
