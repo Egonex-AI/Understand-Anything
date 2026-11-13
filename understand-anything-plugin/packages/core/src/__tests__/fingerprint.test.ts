@@ -383,6 +383,57 @@ describe("compareFingerprints", () => {
     expect(result.changeLevel).toBe("STRUCTURAL");
     expect(result.details).toContain("no structural analysis available — conservative classification");
   });
+
+  describe("same-named functions on different owners", () => {
+    const rustFp = (
+      hash: string,
+      aParams: string[],
+      bParams: string[],
+    ): FileFingerprint => ({
+      filePath: "src/lib.rs",
+      contentHash: hash,
+      functions: [
+        { name: "new", owner: "A", params: aParams, exported: true, lineCount: 3 },
+        { name: "new", owner: "B", params: bParams, exported: true, lineCount: 3 },
+      ],
+      classes: [],
+      imports: [],
+      exports: [],
+      totalLines: 10,
+      hasStructuralAnalysis: true,
+    });
+
+    it("stays COSMETIC when neither method's signature changed", () => {
+      const result = compareFingerprints(
+        rustFp("old", ["x: i32"], ["y: String"]),
+        rustFp("new", ["x: i32"], ["y: String"]),
+      );
+      expect(result.changeLevel).toBe("COSMETIC");
+    });
+
+    it("detects a param change that makes one method match another", () => {
+      const result = compareFingerprints(
+        rustFp("old", ["x: i32"], []),
+        rustFp("new", ["x: i32"], ["x: i32"]),
+      );
+      expect(result.changeLevel).toBe("STRUCTURAL");
+      expect(result.details).toEqual(["params changed: B.new"]);
+    });
+
+    it("pairs same-owner overloads in declaration order", () => {
+      const overloads = (hash: string, second: string[]): FileFingerprint => ({
+        ...rustFp(hash, [], []),
+        functions: [
+          { name: "add", owner: "Calc", params: ["a: int"], exported: true, lineCount: 3 },
+          { name: "add", owner: "Calc", params: second, exported: true, lineCount: 3 },
+        ],
+      });
+      expect(compareFingerprints(overloads("old", ["a: int", "b: int"]), overloads("new", ["a: int", "b: int"])).changeLevel)
+        .toBe("COSMETIC");
+      expect(compareFingerprints(overloads("old", ["a: int", "b: int"]), overloads("new", ["a: long", "b: int"])).details)
+        .toEqual(["params changed: Calc.add"]);
+    });
+  });
 });
 
 describe("analyzeChanges", () => {

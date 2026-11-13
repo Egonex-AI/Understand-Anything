@@ -178,39 +178,50 @@ export function compareFingerprints(
   if (JSON.stringify(ownership(oldFp.functions)) !== JSON.stringify(ownership(newFp.functions))) {
     details.push("function ownership changed");
   }
-  const oldFuncNames = new Set(oldFp.functions.map((f) => f.name));
-  const newFuncNames = new Set(newFp.functions.map((f) => f.name));
+  // Functions are identified by (owner, name), not name alone: Go/Rust/C++
+  // methods on different receivers routinely share a name (`A::new` and
+  // `B::new`), and matching by name paired each one with the wrong
+  // counterpart. Same-key overloads are paired in declaration order.
+  const oldFuncs = groupFunctions(oldFp.functions);
+  const newFuncs = groupFunctions(newFp.functions);
 
-  for (const name of newFuncNames) {
-    if (!oldFuncNames.has(name)) {
-      details.push(`new function: ${name}`);
+  for (const [key, fns] of newFuncs) {
+    if (!oldFuncs.has(key)) {
+      details.push(`new function: ${functionLabel(fns[0])}`);
     }
   }
-  for (const name of oldFuncNames) {
-    if (!newFuncNames.has(name)) {
-      details.push(`removed function: ${name}`);
+  for (const [key, fns] of oldFuncs) {
+    if (!newFuncs.has(key)) {
+      details.push(`removed function: ${functionLabel(fns[0])}`);
     }
   }
 
   // Compare shared functions for signature changes
-  for (const newFn of newFp.functions) {
-    const oldFn = oldFp.functions.find((f) => f.name === newFn.name);
-    if (!oldFn) continue;
+  for (const [key, newGroup] of newFuncs) {
+    const oldGroup = oldFuncs.get(key);
+    if (!oldGroup) continue;
 
-    if (JSON.stringify(oldFn.params) !== JSON.stringify(newFn.params)) {
-      details.push(`params changed: ${newFn.name}`);
-    }
-    if (oldFn.returnType !== newFn.returnType) {
-      details.push(`return type changed: ${newFn.name}`);
-    }
-    if (oldFn.exported !== newFn.exported) {
-      details.push(`export status changed: ${newFn.name}`);
-    }
-    // Flag large line count changes (>50% growth or shrink)
-    if (oldFn.lineCount > 0) {
-      const ratio = newFn.lineCount / oldFn.lineCount;
-      if (ratio > 1.5 || ratio < 0.5) {
-        details.push(`significant size change: ${newFn.name} (${oldFn.lineCount} → ${newFn.lineCount} lines)`);
+    const pairs = Math.min(oldGroup.length, newGroup.length);
+    for (let i = 0; i < pairs; i++) {
+      const oldFn = oldGroup[i];
+      const newFn = newGroup[i];
+      const label = functionLabel(newFn);
+
+      if (JSON.stringify(oldFn.params) !== JSON.stringify(newFn.params)) {
+        details.push(`params changed: ${label}`);
+      }
+      if (oldFn.returnType !== newFn.returnType) {
+        details.push(`return type changed: ${label}`);
+      }
+      if (oldFn.exported !== newFn.exported) {
+        details.push(`export status changed: ${label}`);
+      }
+      // Flag large line count changes (>50% growth or shrink)
+      if (oldFn.lineCount > 0) {
+        const ratio = newFn.lineCount / oldFn.lineCount;
+        if (ratio > 1.5 || ratio < 0.5) {
+          details.push(`significant size change: ${label} (${oldFn.lineCount} → ${newFn.lineCount} lines)`);
+        }
       }
     }
   }
@@ -271,6 +282,24 @@ export function compareFingerprints(
     changeLevel: "COSMETIC",
     details: ["internal logic changed (no structural impact)"],
   };
+}
+
+/** Group functions by (owner, name), preserving declaration order. */
+function groupFunctions(
+  functions: FunctionFingerprint[],
+): Map<string, FunctionFingerprint[]> {
+  const groups = new Map<string, FunctionFingerprint[]>();
+  for (const fn of functions) {
+    const key = JSON.stringify([fn.owner ?? null, fn.name]);
+    const group = groups.get(key);
+    if (group) group.push(fn);
+    else groups.set(key, [fn]);
+  }
+  return groups;
+}
+
+function functionLabel(fn: FunctionFingerprint): string {
+  return fn.owner ? `${fn.owner}.${fn.name}` : fn.name;
 }
 
 /**
