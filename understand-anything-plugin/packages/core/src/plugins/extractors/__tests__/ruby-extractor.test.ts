@@ -299,6 +299,233 @@ end
 
   // ---- Imports ----
 
+  // ---- Nested definitions ----
+
+  describe("extractStructure - nested definitions", () => {
+    const NESTED_SOURCE = `
+module Gitlab
+  module Outer
+    class Inner
+      def run(a, b)
+        helper(a)
+      end
+
+      def self.build
+        new
+      end
+    end
+  end
+end
+`;
+
+    it("qualifies nested modules and classes outer-first", () => {
+      const { tree, parser, root } = parse(NESTED_SOURCE);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => [c.name, c.lineRange])).toEqual([
+        ["Gitlab", [2, 14]],
+        ["Gitlab::Outer", [3, 13]],
+        ["Gitlab::Outer::Inner", [4, 12]],
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("attaches nested methods to the innermost class and functions", () => {
+      const { tree, parser, root } = parse(NESTED_SOURCE);
+      const result = extractor.extractStructure(root);
+
+      const inner = result.classes.find((c) => c.name === "Gitlab::Outer::Inner");
+      expect(inner!.methods).toEqual(["run", "self.build"]);
+      expect(result.classes.find((c) => c.name === "Gitlab")!.methods).toEqual([]);
+      expect(result.functions).toEqual([
+        { name: "run", lineRange: [5, 7], params: ["a", "b"] },
+        { name: "self.build", lineRange: [9, 11], params: [] },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("only exports top-level definitions", () => {
+      const { tree, parser, root } = parse(NESTED_SOURCE);
+      const result = extractor.extractStructure(root);
+
+      expect(result.exports.map((e) => e.name)).toEqual(["Gitlab"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("qualifies deeply nested classes", () => {
+      const { tree, parser, root } = parse(`
+module A
+  module B
+    class C
+      class D
+        def go; end
+      end
+    end
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toEqual(["A", "A::B", "A::B::C", "A::B::C::D"]);
+      expect(result.classes[3].methods).toEqual(["go"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("prefixes scope-resolution class names with the enclosing scope", () => {
+      const { tree, parser, root } = parse(`
+module A
+  class Foo::Bar
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map((c) => c.name)).toEqual(["A", "A::Foo::Bar"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("keeps modules that only hold constants", () => {
+      const { tree, parser, root } = parse(`
+module Foo
+  BAR = 1
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes).toEqual([
+        { name: "Foo", lineRange: [2, 4], methods: [], properties: [] },
+      ]);
+      expect(result.functions).toEqual([]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("returns empty results for empty and comment-only files", () => {
+      for (const source of ["", "# just a comment\n"]) {
+        const { tree, parser, root } = parse(source);
+        const result = extractor.extractStructure(root);
+
+        expect(result).toEqual({ functions: [], classes: [], imports: [], exports: [] });
+
+        tree.delete();
+        parser.delete();
+      }
+    });
+  });
+
+  // ---- Singleton contexts ----
+
+  describe("extractStructure - singleton contexts", () => {
+    it("treats methods inside class << self as class methods", () => {
+      const { tree, parser, root } = parse(`
+class Top
+  class << self
+    def helper(x)
+      1
+    end
+  end
+
+  def run
+    2
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual(["self.helper", "run"]);
+      expect(result.functions).toEqual([
+        { name: "self.helper", lineRange: [4, 6], params: ["x"] },
+        { name: "run", lineRange: [9, 11], params: [] },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("ignores class << other_object blocks", () => {
+      const { tree, parser, root } = parse(`
+class Top
+  class << obj
+    def helper; end
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual([]);
+      expect(result.functions).toEqual([]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts methods from ActiveSupport::Concern blocks", () => {
+      const { tree, parser, root } = parse(`
+module Foo
+  extend ActiveSupport::Concern
+
+  included do
+    def from_included(a)
+    end
+  end
+
+  class_methods do
+    def from_class_methods
+    end
+  end
+
+  private
+
+  def priv
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual([
+        "from_included",
+        "self.from_class_methods",
+        "priv",
+      ]);
+      expect(result.functions.map((f) => [f.name, f.lineRange, f.params])).toEqual([
+        ["from_included", [6, 7], ["a"]],
+        ["self.from_class_methods", [11, 12], []],
+        ["priv", [17, 18], []],
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("ignores defs inside other blocks", () => {
+      const { tree, parser, root } = parse(`
+class Foo
+  scope :bar do
+    def baz; end
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual([]);
+      expect(result.functions).toEqual([]);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
   describe("extractStructure - imports", () => {
     it("extracts require statements", () => {
       const { tree, parser, root } = parse(`
@@ -580,6 +807,42 @@ end
 
       const createCalls = result.filter((e) => e.caller === "self.create");
       expect(createCalls.some((e) => e.callee === "new")).toBe(true);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("names callers in class << self and class_methods blocks with self. prefix", () => {
+      const { tree, parser, root } = parse(`
+class Top
+  class << self
+    def helper
+      compute(1)
+    end
+  end
+end
+
+module Foo
+  class_methods do
+    def build
+      prepare(2)
+    end
+  end
+
+  included do
+    def run
+      execute(3)
+    end
+  end
+end
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toEqual([
+        { caller: "self.helper", callee: "compute", lineNumber: 5 },
+        { caller: "self.build", callee: "prepare", lineNumber: 13 },
+        { caller: "run", callee: "execute", lineNumber: 19 },
+      ]);
 
       tree.delete();
       parser.delete();
