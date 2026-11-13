@@ -312,9 +312,44 @@ export class RubyExtractor implements LanguageExtractor {
     const methods: string[] = [];
     const properties: string[] = [];
 
+    // Ruby `class Foo < Bar` — the `superclass` child holds the parent.
+    // Module mixins (`include Mod1`, `prepend Mod2`) inside the body act
+    // like interfaces — they contribute methods at runtime — and land in
+    // `interfaces`. (`extend Mod` mixes class methods; we lump it here
+    // too since it's the same dispatch semantics from a graph viewpoint.)
+    const parents: string[] = [];
+    const interfaces: string[] = [];
+    const superclassNode = node.childForFieldName("superclass");
+    if (superclassNode) {
+      // superclass node wraps the actual reference; the constant child is the name
+      const ref =
+        findChild(superclassNode, "constant") ??
+        findChild(superclassNode, "scope_resolution") ??
+        superclassNode;
+      if (ref.text && ref.text !== "<") parents.push(ref.text.replace(/^<\s*/, ""));
+    }
+
     const body = node.childForFieldName("body");
     if (body) {
       this.extractClassBody(body, methods, properties, functions);
+      // Look for `include X`, `prepend X`, `extend X` calls at class body top level
+      for (let i = 0; i < body.childCount; i++) {
+        const stmt = body.child(i);
+        if (!stmt) continue;
+        if (stmt.type !== "call" && stmt.type !== "method_call") continue;
+        const receiver = stmt.childForFieldName("method");
+        const name = receiver?.text;
+        if (name !== "include" && name !== "prepend" && name !== "extend") continue;
+        const args = stmt.childForFieldName("arguments");
+        if (!args) continue;
+        for (let j = 0; j < args.childCount; j++) {
+          const a = args.child(j);
+          if (!a) continue;
+          if (a.type === "constant" || a.type === "scope_resolution") {
+            interfaces.push(a.text);
+          }
+        }
+      }
     }
 
     classes.push({
@@ -325,6 +360,8 @@ export class RubyExtractor implements LanguageExtractor {
       ],
       methods,
       properties,
+      ...(parents.length ? { parents } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
     });
   }
 
