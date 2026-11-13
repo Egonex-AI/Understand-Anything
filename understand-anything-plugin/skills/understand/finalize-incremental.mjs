@@ -20,6 +20,7 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { validateIncrementalSymbols, formatSymbolReport } from './validate-incremental-symbols.mjs';
@@ -491,8 +492,12 @@ async function main() {
   // restore both the old graph and the old fingerprint baseline. Restoring
   // fingerprints matters as much as restoring the graph: a stale graph with
   // fresh fingerprints would make the next run misclassify every change.
-  const fingerprintBackup = readJson(fingerprintPath, null);
+  // The snapshot read happens INSIDE the try: a corrupted store must also
+  // roll the graph back instead of escaping with the new graph published.
+  const fingerprintsExisted = existsSync(fingerprintPath);
+  let fingerprintBackup = null;
   try {
+    if (fingerprintsExisted) fingerprintBackup = readJson(fingerprintPath);
     patchFingerprints(uaDir, plan, patch);
     advanceMeta(uaDir, plan, scan.totalFiles);
   } catch (error) {
@@ -500,8 +505,12 @@ async function main() {
       if (previousGraph && Array.isArray(previousGraph.nodes)) {
         atomicWriteJson(graphPath, previousGraph);
       }
-      if (fingerprintBackup && typeof fingerprintBackup === 'object' && !Array.isArray(fingerprintBackup)) {
+      if (fingerprintsExisted && fingerprintBackup && typeof fingerprintBackup === 'object' && !Array.isArray(fingerprintBackup)) {
         atomicWriteJson(fingerprintPath, fingerprintBackup);
+      } else if (!fingerprintsExisted && existsSync(fingerprintPath)) {
+        // The patch created the store after the graph was written; a failed
+        // run must not leave fresh fingerprints beside a rolled-back graph.
+        rmSync(fingerprintPath);
       }
       process.stderr.write('Rolled back knowledge-graph.json and fingerprints.json to their previous state\n');
     }
