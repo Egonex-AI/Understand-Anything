@@ -49,10 +49,10 @@ describe("LanguageRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 42 built-in language configs", () => {
+    it("registers all 45 built-in language configs", () => {
       const registry = LanguageRegistry.createDefault();
       const all = registry.getAllLanguages();
-      expect(all.length).toBe(42);
+      expect(all.length).toBe(45);
     });
 
     it("maps all expected extensions", () => {
@@ -73,6 +73,23 @@ describe("LanguageRegistry", () => {
       expect(registry.getByExtension(".h")?.id).toBe("c");
       expect(registry.getByExtension(".lua")?.id).toBe("lua");
       expect(registry.getByExtension(".js")?.id).toBe("javascript");
+      expect(registry.getByExtension(".pp")?.id).toBe("puppet");
+      expect(registry.getByExtension(".erb")?.id).toBe("erb");
+      expect(registry.getByExtension(".epp")?.id).toBe("epp");
+    });
+
+    it("registers Puppet with tree-sitter grammar metadata", () => {
+      const registry = LanguageRegistry.createDefault();
+      expect(registry.getById("puppet")?.treeSitter).toEqual({
+        wasmPackage: "tree-sitter-puppet",
+        wasmFile: "tree-sitter-puppet.wasm",
+      });
+    });
+
+    it("ERB and EPP are markup-grade (no tree-sitter grammar attempted)", () => {
+      const registry = LanguageRegistry.createDefault();
+      expect(registry.getById("erb")?.treeSitter).toBeUndefined();
+      expect(registry.getById("epp")?.treeSitter).toBeUndefined();
     });
 
     it("registers Swift with tree-sitter grammar metadata", () => {
