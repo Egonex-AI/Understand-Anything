@@ -535,7 +535,9 @@ if (isCliEntry()) {
     await main();
   } catch (error) {
     process.stderr.write(`finalize-incremental.mjs failed: ${error.message}\n${error.stack}\n`);
-    process.exit(1);
+    // Not process.exit(): on Windows, exiting while V8 still compiles the
+    // tree-sitter WASM in the background aborts Node (libuv assertion).
+    process.exitCode = 1;
   }
 }
 
