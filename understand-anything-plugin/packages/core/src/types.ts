@@ -152,10 +152,11 @@ export interface AnalysisMeta {
   theme?: ThemeConfig;
 }
 
-// Project config (for auto-update opt-in and language preference)
+// Project config
 export interface ProjectConfig {
   autoUpdate: boolean;
   outputLanguage?: string;
+  grammarProfile?: "agentos" | "off";
 }
 
 // Non-code structural sub-interfaces

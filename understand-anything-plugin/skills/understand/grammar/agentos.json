@@ -1,0 +1,596 @@
+{
+  "id": "agentos",
+  "version": "0.14.1",
+  "ontology": {
+    "archive": "AgentOS_Operational_Grammar_Codex_v0.1.0.zip",
+    "member": "agentos-operational-grammar/ontology/relations.json",
+    "sha256": "3ea38a88ff25c9ad50f243a78a4fbc8d8c00978f9a6be6ce34b5b3fb6625e4a4",
+    "status": "proposed"
+  },
+  "reviewedTests": [
+    {
+      "testBinding": {
+        "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/test_runtime_acceptance.py",
+        "sha256": "dd54df85ef7525eb961a316b9e957a1443a17f8ad96378ae198754a3d315664e",
+        "line": 44,
+        "test": "TestRuntimeAcceptance.test_r018_completed_artifact_publish_persists_audit_ids",
+        "scope": {
+          "routeId": "R-018",
+          "sourceOutputId": "O-4.1.1-001",
+          "sourceEvent": "published",
+          "onEvent": "threshold_crossed",
+          "cases": [
+            {
+              "confidentiality_level": "C3",
+              "risk_severity": "RS-1"
+            },
+            {
+              "confidentiality_level": "C1",
+              "risk_severity": "RS-4"
+            }
+          ]
+        }
+      },
+      "sources": [
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/__init__.py",
+          "sha256": "63498d140168576b4a9720f547ecc795a43a709fd2e9dda3e0b31a8a81ec83ec"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/adapters/__init__.py",
+          "sha256": "4fe27f78236941c1ebacaad78c1b9d5cf5aae1f5ede6c0ec2c4a9e5483d9522c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/base.py",
+          "sha256": "514ef7fa13e630b0cbf84c72a47558feb4ee4116d8c36f3c33198e03c68ef19f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/path_resolver.py",
+          "sha256": "e8ac48893ed49c3daf53b8dfe11d1f22727685b7f3d418c423585f7586fcd218"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_engine.py",
+          "sha256": "886a2a4cc7ef1d5e48e9884be20f0f2cae98b4b5633edbb1429ef756cc116da0"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_engine.py",
+          "sha256": "2535297da21e03b856fa42cd5fc62c1019abf0a24c0dc40c160f9f70b215af40"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_storage_adapter.py",
+          "sha256": "1022464068c4d61d4e1dc9555dba41471b2d8e2dca134687c529348121b7a28e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_routing_adapter.py",
+          "sha256": "6dbf9fb43933a2e4c84594025832cc588dd45bfddb777503f85f407fec1e7d7d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions.v1.json",
+          "sha256": "77ac3b307a4c268ed005900a0e7cb18537de2d5c9f712067b46c9a43092a8e1e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps.v1.json",
+          "sha256": "f9a4f8f856eb683f723587f1bc0c72fd9afd36ae149d971258357a4a77282c42"
+        }
+      ],
+      "links": [
+        {
+          "claimId": "claim:bd1f5882426ffa2bbc4b1749de3d03e03d231fa29f89483bba3be0440dba8aee",
+          "kind": "python_runtime_registry_load",
+          "coverageLines": [
+            37,
+            63,
+            65
+          ],
+          "covers": "StorageEngine loads the storage conventions by path for the publish setup."
+        },
+        {
+          "claimId": "claim:ce0f59505218185dc87e9fe359c4ce06018abc877c5eb69d4d94289e30135800",
+          "kind": "python_runtime_registry_load",
+          "coverageLines": [
+            41,
+            70,
+            83
+          ],
+          "covers": "RoutingEngine loads the routing map by path for the publish setup."
+        },
+        {
+          "claimId": "claim:d09477afcb6a669634c281ab2039554ae47167425222ae7604cba8eb9a336ac1",
+          "kind": "storage_routing_publish_emitter",
+          "coverageLines": [
+            81,
+            82,
+            84,
+            93
+          ],
+          "covers": "R-018 records an escalation notification for P-INTEGRITY after the Completed Artifact is published."
+        },
+        {
+          "claimId": "claim:32b50ea505315c114871bf9957c123afc94d4c96fa67e63110120c05edbbd9fb",
+          "kind": "storage_routing_publish_emitter",
+          "coverageLines": [
+            81,
+            82,
+            84,
+            94
+          ],
+          "covers": "R-018 creates the stabilize task for T-SELF after the Completed Artifact is published."
+        },
+        {
+          "claimId": "claim:3bc3f696ca17088b131913dff6bcc5773062e31160ad824f4bcbb88e005dd7ec",
+          "kind": "audit_record_emission",
+          "line": 150,
+          "coverageLines": [
+            63,
+            64,
+            65,
+            66
+          ],
+          "covers": "The successful publish returns a StorageActionRecord with an action ID."
+        },
+        {
+          "claimId": "claim:4b8d6d591bd2d5f3cdc66b18091c1d16cde14b46cbc85a56333bdeab4a056b1b",
+          "kind": "audit_record_emission",
+          "line": 256,
+          "coverageLines": [
+            79,
+            80,
+            81,
+            83
+          ],
+          "covers": "The successful R-018 threshold crossing returns a RoutingEventRecord with an event ID."
+        },
+        {
+          "claimId": "claim:987fa4578f551353c7032ddb2f92c3b312468d63447096db891ac45322a78ea8",
+          "kind": "sqlite_audit_write",
+          "coverageLines": [
+            98,
+            105
+          ],
+          "covers": "The emitted storage action ID matches the SQLite storage_actions row for the artifact instance."
+        },
+        {
+          "claimId": "claim:82e2f3db4dc163e78034abe6ea684d08a0555aafc71169ef9081064fea66cdd9",
+          "kind": "sqlite_audit_write",
+          "coverageLines": [
+            102,
+            106
+          ],
+          "covers": "The emitted R-018 event ID matches the SQLite routing_events row for the artifact instance."
+        }
+      ]
+    },
+    {
+      "testBinding": {
+        "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/test_runtime_registry_validation.py",
+        "sha256": "77a86504eeec826f093e1a312d0b09ca6de2253fd99c263e9c9481b5cebe4f9f",
+        "line": 45,
+        "test": "TestRuntimeRegistryValidation.test_valid_registries_initialize_local_state"
+      },
+      "sources": [
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/base.py",
+          "sha256": "514ef7fa13e630b0cbf84c72a47558feb4ee4116d8c36f3c33198e03c68ef19f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/__init__.py",
+          "sha256": "63498d140168576b4a9720f547ecc795a43a709fd2e9dda3e0b31a8a81ec83ec"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/adapters/__init__.py",
+          "sha256": "4fe27f78236941c1ebacaad78c1b9d5cf5aae1f5ede6c0ec2c4a9e5483d9522c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_routing_adapter.py",
+          "sha256": "6dbf9fb43933a2e4c84594025832cc588dd45bfddb777503f85f407fec1e7d7d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_storage_adapter.py",
+          "sha256": "1022464068c4d61d4e1dc9555dba41471b2d8e2dca134687c529348121b7a28e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/path_resolver.py",
+          "sha256": "e8ac48893ed49c3daf53b8dfe11d1f22727685b7f3d418c423585f7586fcd218"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/requirements.txt",
+          "sha256": "cc6c7bc71c88a83b63934623574edce21502a03db0a17af9600ecef01d0cc084"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_engine.py",
+          "sha256": "2535297da21e03b856fa42cd5fc62c1019abf0a24c0dc40c160f9f70b215af40"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps.v1.json",
+          "sha256": "f9a4f8f856eb683f723587f1bc0c72fd9afd36ae149d971258357a4a77282c42"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps_registry.schema.v1.json",
+          "sha256": "d82172e0ec86018566c66df59ba041a711cf819db3c4890b27e9f98927f4b15b"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_rule.schema.v1.json",
+          "sha256": "8206226faee6d3494a5f146cf065c008f2dbff71ea512f022eb5370e09ab5f3c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/run_storage_routing.py",
+          "sha256": "1898a3062e0f1e595e978b93d8869ad9a977c93ef13422516b66739af0d70b4f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_convention.schema.v1.json",
+          "sha256": "7f321b4bd36231b29dd99d03a88b9cf56156f229758f0daef40cee8b42557176"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions.v1.json",
+          "sha256": "77ac3b307a4c268ed005900a0e7cb18537de2d5c9f712067b46c9a43092a8e1e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions_registry.schema.v1.json",
+          "sha256": "6678d14ecbb83177a246b76dc83bfe11921aa8814085746eef0a5bf38f61a77d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_engine.py",
+          "sha256": "886a2a4cc7ef1d5e48e9884be20f0f2cae98b4b5633edbb1429ef756cc116da0"
+        }
+      ],
+      "links": [
+        {
+          "claimId": "claim:393ca49f31265aca3082fcba5361d0832c8bc90560566dcd240d7f001a8b32c3",
+          "kind": "python_startup_registry_validation",
+          "line": 25,
+          "coverageLines": [
+            30,
+            47,
+            48,
+            49
+          ],
+          "covers": "Startup accepts the bundled storage conventions, loads 29 entries, and creates the SQLite database."
+        },
+        {
+          "claimId": "claim:196e6335f1998c2fdea060eb010c16bb665b88a7e0e9c4e6a5da2021d3e3e853",
+          "kind": "python_startup_registry_validation",
+          "line": 25,
+          "coverageLines": [
+            30,
+            47,
+            48,
+            49
+          ],
+          "covers": "Startup accepts the bundled routing map, loads 18 rules, and creates the SQLite database."
+        }
+      ]
+    },
+    {
+      "testBinding": {
+        "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/test_runtime_registry_validation.py",
+        "sha256": "77a86504eeec826f093e1a312d0b09ca6de2253fd99c263e9c9481b5cebe4f9f",
+        "line": 51,
+        "test": "TestRuntimeRegistryValidation.test_swapped_registries_fail_before_initialization"
+      },
+      "sources": [
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/base.py",
+          "sha256": "514ef7fa13e630b0cbf84c72a47558feb4ee4116d8c36f3c33198e03c68ef19f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/__init__.py",
+          "sha256": "63498d140168576b4a9720f547ecc795a43a709fd2e9dda3e0b31a8a81ec83ec"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/adapters/__init__.py",
+          "sha256": "4fe27f78236941c1ebacaad78c1b9d5cf5aae1f5ede6c0ec2c4a9e5483d9522c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_routing_adapter.py",
+          "sha256": "6dbf9fb43933a2e4c84594025832cc588dd45bfddb777503f85f407fec1e7d7d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_storage_adapter.py",
+          "sha256": "1022464068c4d61d4e1dc9555dba41471b2d8e2dca134687c529348121b7a28e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/path_resolver.py",
+          "sha256": "e8ac48893ed49c3daf53b8dfe11d1f22727685b7f3d418c423585f7586fcd218"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/requirements.txt",
+          "sha256": "cc6c7bc71c88a83b63934623574edce21502a03db0a17af9600ecef01d0cc084"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_engine.py",
+          "sha256": "2535297da21e03b856fa42cd5fc62c1019abf0a24c0dc40c160f9f70b215af40"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps.v1.json",
+          "sha256": "f9a4f8f856eb683f723587f1bc0c72fd9afd36ae149d971258357a4a77282c42"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps_registry.schema.v1.json",
+          "sha256": "d82172e0ec86018566c66df59ba041a711cf819db3c4890b27e9f98927f4b15b"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_rule.schema.v1.json",
+          "sha256": "8206226faee6d3494a5f146cf065c008f2dbff71ea512f022eb5370e09ab5f3c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/run_storage_routing.py",
+          "sha256": "1898a3062e0f1e595e978b93d8869ad9a977c93ef13422516b66739af0d70b4f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_convention.schema.v1.json",
+          "sha256": "7f321b4bd36231b29dd99d03a88b9cf56156f229758f0daef40cee8b42557176"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions.v1.json",
+          "sha256": "77ac3b307a4c268ed005900a0e7cb18537de2d5c9f712067b46c9a43092a8e1e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions_registry.schema.v1.json",
+          "sha256": "6678d14ecbb83177a246b76dc83bfe11921aa8814085746eef0a5bf38f61a77d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_engine.py",
+          "sha256": "886a2a4cc7ef1d5e48e9884be20f0f2cae98b4b5633edbb1429ef756cc116da0"
+        }
+      ],
+      "links": [
+        {
+          "claimId": "claim:393ca49f31265aca3082fcba5361d0832c8bc90560566dcd240d7f001a8b32c3",
+          "kind": "python_startup_registry_validation",
+          "line": 25,
+          "coverageLines": [
+            40,
+            41,
+            42,
+            43,
+            54
+          ],
+          "covers": "With both files swapped, the storage wrapper rejects the routing map at the storage registry path before startup creates the state directory."
+        },
+        {
+          "claimId": "claim:196e6335f1998c2fdea060eb010c16bb665b88a7e0e9c4e6a5da2021d3e3e853",
+          "kind": "python_startup_registry_validation",
+          "line": 25,
+          "coverageLines": [
+            40,
+            41,
+            42,
+            43,
+            56
+          ],
+          "covers": "With valid storage conventions, the routing wrapper rejects the storage conventions at the routing registry path before startup creates the state directory."
+        }
+      ]
+    },
+    {
+      "testBinding": {
+        "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/test_runtime_registry_validation.py",
+        "sha256": "77a86504eeec826f093e1a312d0b09ca6de2253fd99c263e9c9481b5cebe4f9f",
+        "line": 58,
+        "test": "TestRuntimeRegistryValidation.test_invalid_items_fail_before_initialization"
+      },
+      "sources": [
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/base.py",
+          "sha256": "514ef7fa13e630b0cbf84c72a47558feb4ee4116d8c36f3c33198e03c68ef19f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/__init__.py",
+          "sha256": "63498d140168576b4a9720f547ecc795a43a709fd2e9dda3e0b31a8a81ec83ec"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/engine/adapters/__init__.py",
+          "sha256": "4fe27f78236941c1ebacaad78c1b9d5cf5aae1f5ede6c0ec2c4a9e5483d9522c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_routing_adapter.py",
+          "sha256": "6dbf9fb43933a2e4c84594025832cc588dd45bfddb777503f85f407fec1e7d7d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/local_storage_adapter.py",
+          "sha256": "1022464068c4d61d4e1dc9555dba41471b2d8e2dca134687c529348121b7a28e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/path_resolver.py",
+          "sha256": "e8ac48893ed49c3daf53b8dfe11d1f22727685b7f3d418c423585f7586fcd218"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/requirements.txt",
+          "sha256": "cc6c7bc71c88a83b63934623574edce21502a03db0a17af9600ecef01d0cc084"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_engine.py",
+          "sha256": "2535297da21e03b856fa42cd5fc62c1019abf0a24c0dc40c160f9f70b215af40"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps.v1.json",
+          "sha256": "f9a4f8f856eb683f723587f1bc0c72fd9afd36ae149d971258357a4a77282c42"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_maps_registry.schema.v1.json",
+          "sha256": "d82172e0ec86018566c66df59ba041a711cf819db3c4890b27e9f98927f4b15b"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/routing_rule.schema.v1.json",
+          "sha256": "8206226faee6d3494a5f146cf065c008f2dbff71ea512f022eb5370e09ab5f3c"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/run_storage_routing.py",
+          "sha256": "1898a3062e0f1e595e978b93d8869ad9a977c93ef13422516b66739af0d70b4f"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_convention.schema.v1.json",
+          "sha256": "7f321b4bd36231b29dd99d03a88b9cf56156f229758f0daef40cee8b42557176"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions.v1.json",
+          "sha256": "77ac3b307a4c268ed005900a0e7cb18537de2d5c9f712067b46c9a43092a8e1e"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_conventions_registry.schema.v1.json",
+          "sha256": "6678d14ecbb83177a246b76dc83bfe11921aa8814085746eef0a5bf38f61a77d"
+        },
+        {
+          "filePath": "agentOS-OCT-oc/Storage-Routing_Agent/storage_engine.py",
+          "sha256": "886a2a4cc7ef1d5e48e9884be20f0f2cae98b4b5633edbb1429ef756cc116da0"
+        }
+      ],
+      "links": [
+        {
+          "claimId": "claim:393ca49f31265aca3082fcba5361d0832c8bc90560566dcd240d7f001a8b32c3",
+          "kind": "python_startup_registry_validation",
+          "line": 25,
+          "coverageLines": [
+            40,
+            41,
+            42,
+            43,
+            60,
+            65,
+            67
+          ],
+          "covers": "Removing output_id from entries[0] fails validation through the storage wrapper's item reference before startup creates the state directory."
+        },
+        {
+          "claimId": "claim:196e6335f1998c2fdea060eb010c16bb665b88a7e0e9c4e6a5da2021d3e3e853",
+          "kind": "python_startup_registry_validation",
+          "line": 25,
+          "coverageLines": [
+            40,
+            41,
+            42,
+            43,
+            61,
+            65,
+            67
+          ],
+          "covers": "Removing route_id from routes[0] fails validation through the routing wrapper's item reference before startup creates the state directory."
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "predicate": "depends_on",
+      "domain": "Unit",
+      "range": "Unit",
+      "frame": "static-es-module-import",
+      "evidenceFrames": {
+        "static_json_read": "module-relative-json-read",
+        "python_helper_invocation": "static-python-helper",
+        "source_launcher_invocation": "source-launcher-invocation"
+      },
+      "evidence": "A direct relative .mjs import, a literal JSON path passed to node:fs.readFileSync, or a literal Python script path at the start of the argument array passed to the imported boundedProcess runner. JSON reads and Python invocations require pinned source and target bytes and an imported ROOT defined by resolving '..' from the directory of its defining module. The runner must forward the script argument to Python in both direct and sandboxed routes. A source launcher claim requires an explicit sibling shell wrapper that supplies a source-relative --app-root and --launcher-only before forwarding arguments, plus a guarded stdio connection to the literal launcher path. The evidence applies to that invocation."
+    },
+    {
+      "predicate": "constrains",
+      "domain": "UnitOrField",
+      "range": "Unit",
+      "subjectSort": "Unit",
+      "frame": "json-schema-validation",
+      "evidence": "A module-level Python jsonschema call, a literal schema and record table with a resolved validator catalog, or an argparse default whose JSON record is passed to a validator in the same source file. A versioned registry can also bind a sibling wrapper through its required schema_id constant. A direct items.$ref to the entry schema supports a claim scoped to the items at the recorded JSON Pointer. A guarded Storage Routing entry point adds runtime evidence when it validates the same registry path with that wrapper and a locally registered item schema before the engine and adapter constructors."
+    },
+    {
+      "predicate": "routes_to",
+      "domain": "Unit",
+      "range": "Unit",
+      "frame": "storage-routing-declaration",
+      "evidenceFrames": {
+        "storage_routing_publish_emitter": "storage-routing-publish-emitter"
+      },
+      "evidence": "A fingerprinted routing_maps.v1.json rule identifies its source by a unique output_id in the sibling storage_conventions.v1.json. A destination must appear in targets and resolve in target_legend, or appear in downstream_outputs with a unique storage output_id and a matching create or update action. Each claim retains its route ID, event, and declared conditions. ANY leaves the global source unbound. For a wildcard threshold_crossed rule, a named threshold_crossed_on_publish emitter with the same condition supports a separate claim scoped to that output's publication. ALL_PODS is one named broadcast target."
+    },
+    {
+      "predicate": "observes",
+      "domain": "ActorOrInstrument",
+      "range": "Unit",
+      "subjectSort": "Instrument",
+      "frame": "storage-routing-audit",
+      "evidence": "A graph-bound Storage Routing adapter imports the audit record type from its sibling base module. A write must bind the record ID to the audit table and commit it through SQLite or a Psycopg connection context. A Postgres write may delegate to a module-local helper that receives the adapter's database URL and the same record. A read must query the audit table and use the selected ID to construct the record type. Stub declarations remain withheld."
+    },
+    {
+      "predicate": "produces",
+      "domain": "Action",
+      "range": "Output",
+      "frame": "storage-routing-audit-emission",
+      "evidence": "A Storage Routing engine method must bind the audit record through an imported constructor or the declared StorageAdapter.write_artifact return type, then pass the same record to its injected adapter's audit method. Each claim is scoped to the emitting method and retains the emission sites and record origin. In a flat export, the fingerprinted package layout must bind the engine's adapters.base import to the exported base module. Reviewed reachability annotations apply to matching engine, record, and registry fingerprints.",
+      "reachabilityAnnotations": [
+        {
+          "method": "_evaluate_and_execute_route",
+          "line": 196,
+          "engineSha256": "2535297da21e03b856fa42cd5fc62c1019abf0a24c0dc40c160f9f70b215af40",
+          "recordSha256": "514ef7fa13e630b0cbf84c72a47558feb4ee4116d8c36f3c33198e03c68ef19f",
+          "registryBinding": {
+            "sha256": "f9a4f8f856eb683f723587f1bc0c72fd9afd36ae149d971258357a4a77282c42",
+            "pointer": "/routes/0/qa_gate",
+            "line": 86
+          },
+          "testBinding": {
+            "fileName": "test_acceptance.py",
+            "sha256": "ee102a3d0bd2707d367655ebc33fb2fa43af8ff1b9035ed7291f81c26ce0e03a",
+            "line": 421,
+            "test": "TestRoutingEngine.test_r001_raw_capture_validation_and_qa_failure",
+            "covers": [
+              "witness",
+              "preempted"
+            ]
+          },
+          "reachability": {
+            "status": "reachable",
+            "entryPoint": "RoutingEngine.on_lifecycle_event",
+            "result": "blocked_qa",
+            "witness": {
+              "routeId": "R-001",
+              "sourceOutputId": "O-1.1.1-001",
+              "onEvent": "created",
+              "qaGate": "required_except_raw_capture",
+              "instanceData": {
+                "status": "published",
+                "qa_result": "pass",
+                "confidentiality_level": "C1",
+                "is_raw_capture": true,
+                "required_fields_valid": false,
+                "signal_type": "SIG-RISK"
+              },
+              "gateGuardLines": [
+                317,
+                319
+              ],
+              "gateReturnLine": 320
+            },
+            "preempted": {
+              "input": {
+                "qa_result": "fail"
+              },
+              "result": "suppressed",
+              "globalCheckLine": 148,
+              "globalReturnLine": 162,
+              "qaSuppressor": {
+                "id": "SUP-2",
+                "matchLine": 273,
+                "returnLine": 274
+              },
+              "requiredGateRejectLine": 326
+            }
+          }
+        }
+      ]
+    },
+    {
+      "predicate": "consumes",
+      "domain": "Action",
+      "range": "Unit",
+      "status": "proposed_extension",
+      "relationSource": {
+        "filePath": "universal-model/source-evidence/foundations/ainia-codex/AINIA_Metamodel_Codex_v0_1/model/integration/relations.json",
+        "pointer": "/5",
+        "sha256": "17379d3c1aa2afcdd609f47272b6ff087997e0aae8ef23230819a50a9ef0cee6"
+      },
+      "frame": "storage-routing-acceptance-registry-load",
+      "evidenceFrames": {
+        "python_runtime_registry_load": "storage-routing-runtime-registry-load"
+      },
+      "evidence": "An acceptance setup must import the Storage Routing engine, read the named registry with json.load from a package-relative path, and pass that value unchanged to the engine constructor. A guarded runtime entry point can pass the module-relative registry path directly. For runtime loads the constructor must select the path branch, decode that file with json.load, and forward the result to the loader. Both forms require the loader to store the registry collection on the engine. The report pins the layout or package mapping that binds the caller to the flat export."
+    }
+  ]
+}
