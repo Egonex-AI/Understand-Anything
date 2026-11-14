@@ -1276,6 +1276,56 @@ describe('extract-import-map.mjs — C# resolver', () => {
       'MyApp/Util/Helper.cs',
     ]);
   });
+
+  // Real C#: `using` names a namespace (many files), and files in the same
+  // namespace need no `using` at all (#635, #645).
+  const csFiles = (paths) => paths.map(p => ({ path: p, language: 'csharp', fileCategory: 'code' }));
+
+  it('resolves c# type references through namespace usings and the own namespace', () => {
+    projectRoot = setupTree({
+      'App/Program.cs':
+        `using Acme.Geometry;\nnamespace Acme.App;\nclass Program { Polygon p; Runner r; }\n`,
+      'App/Runner.cs': `namespace Acme.App { public class Runner { } }\n`,
+      'Geo/Polygon.cs': `namespace Acme.Geometry { public sealed record Polygon(double A); }\n`,
+      'Geo/Unused.cs': `namespace Acme.Geometry { public class Unused { } }\n`,
+    });
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: csFiles(['App/Program.cs', 'App/Runner.cs', 'Geo/Polygon.cs', 'Geo/Unused.cs']),
+    });
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['App/Program.cs']).toEqual(['App/Runner.cs', 'Geo/Polygon.cs']);
+    expect(result.output.importMap['Geo/Polygon.cs']).toEqual([]);
+  });
+
+  it('does not link c# types whose namespace is not visible, or names in comments and strings', () => {
+    projectRoot = setupTree({
+      'A.cs': `namespace One { class A { // Widget\n string s = "Widget"; } }\n`,
+      'B.cs': `namespace Two { public class Widget { } }\n`,
+    });
+    const result = runScript(projectRoot, { projectRoot, files: csFiles(['A.cs', 'B.cs']) });
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['A.cs']).toEqual([]);
+  });
+
+  it('resolves c# parent namespaces, global usings, using static and attributes', () => {
+    projectRoot = setupTree({
+      'Usings.cs': `global using Acme.Shared;\n`,
+      'Inner.cs': `namespace Acme.Core.Inner { [Audited] class Inner { Base b; Shared s; } }\n`,
+      'Base.cs': `namespace Acme.Core { public abstract class Base { } }\n`,
+      'Shared.cs': `namespace Acme.Shared { public class Shared { } }\n`,
+      'Audit.cs': `namespace Acme.Core { public class AuditedAttribute : System.Attribute { } }\n`,
+      'Calc.cs': `using static Acme.Maths.Calc;\nnamespace Other { class UsesCalc { } }\n`,
+      'Maths.cs': `namespace Acme.Maths { public static class Calc { } }\n`,
+    });
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: csFiles(['Usings.cs', 'Inner.cs', 'Base.cs', 'Shared.cs', 'Audit.cs', 'Calc.cs', 'Maths.cs']),
+    });
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['Inner.cs']).toEqual(['Audit.cs', 'Base.cs', 'Shared.cs']);
+    expect(result.output.importMap['Calc.cs']).toEqual(['Maths.cs']);
+  });
 });
 
 describe('extract-import-map.mjs — Ruby resolver', () => {
