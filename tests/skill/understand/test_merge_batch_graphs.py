@@ -110,6 +110,10 @@ class IsTestPathTests(unittest.TestCase):
             "src/foo.spec.tsx",
             "src/foo.spec.js",
             "src/Component.spec.vue",
+            "src/foo.test-d.ts",
+            "src/foo.test-d.tsx",
+            "src/foo.spec-d.ts",
+            "src/foo.spec-d.tsx",
         ]:
             with self.subTest(path=path):
                 self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
@@ -233,6 +237,16 @@ class ProductionCandidatesTests(unittest.TestCase):
 
     def test_js_ts_spec_sibling(self) -> None:
         cands = mbg.production_candidates("src/foo/X.spec.tsx")
+        self.assertIn("src/foo/X.tsx", cands)
+        self.assertIn("src/foo/X.ts", cands)
+
+    def test_js_ts_type_test_sibling(self) -> None:
+        cands = mbg.production_candidates("src/foo/X.test-d.ts")
+        self.assertIn("src/foo/X.ts", cands)
+        self.assertIn("src/foo/X.tsx", cands)
+
+    def test_js_ts_spec_d_sibling(self) -> None:
+        cands = mbg.production_candidates("src/foo/X.spec-d.tsx")
         self.assertIn("src/foo/X.tsx", cands)
         self.assertIn("src/foo/X.ts", cands)
 
@@ -583,6 +597,66 @@ class LinkTestsTests(unittest.TestCase):
         tested_by_edges = [e for e in edges if e["type"] == "tested_by"]
         self.assertEqual(len(tested_by_edges), 1)
         self.assertEqual(tested_by_edges[0]["description"], "original")
+
+    def test_type_test_canonical_llm_edges_preserved(self) -> None:
+        # Pre-existing tested_by edges pointing to Vitest type-test files
+        # (*.test-d.ts, *.spec-d.ts) must be classified as production -> test
+        # and kept unchanged, not dropped as prod <-> prod pairs.
+        nodes_by_id = {
+            "file:src/schema.ts": _file_node("src/schema.ts"),
+            "file:src/schema.test-d.ts": _file_node("src/schema.test-d.ts"),
+            "file:src/schema.spec-d.ts": _file_node("src/schema.spec-d.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:src/schema.ts",
+                "target": "file:src/schema.test-d.ts",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+                "description": "type-test",
+            },
+            {
+                "source": "file:src/schema.ts",
+                "target": "file:src/schema.spec-d.ts",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+                "description": "spec-d-test",
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, swapped), (0, 0, 0))
+        self.assertEqual(tagged, 1)
+        tested_by_edges = [e for e in edges if e["type"] == "tested_by"]
+        self.assertEqual(len(tested_by_edges), 2)
+        self.assertIn("tested", nodes_by_id["file:src/schema.ts"]["tags"])
+        self.assertNotIn("tested", nodes_by_id["file:src/schema.test-d.ts"]["tags"])
+        self.assertNotIn("tested", nodes_by_id["file:src/schema.spec-d.ts"]["tags"])
+
+    def test_type_test_inverted_llm_edge_is_swapped_and_tagged(self) -> None:
+        nodes_by_id = {
+            "file:src/schema.ts": _file_node("src/schema.ts"),
+            "file:src/schema.test-d.ts": _file_node("src/schema.test-d.ts"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:src/schema.test-d.ts",
+                "target": "file:src/schema.ts",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, swapped), (0, 0, 1))
+        self.assertEqual(tagged, 1)
+        self.assertEqual(edges[0]["source"], "file:src/schema.ts")
+        self.assertEqual(edges[0]["target"], "file:src/schema.test-d.ts")
 
     def test_drops_test_to_test_edge(self) -> None:
         # An LLM edge between two test files has no recoverable meaning.
