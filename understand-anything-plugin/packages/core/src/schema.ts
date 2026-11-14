@@ -117,7 +117,6 @@ export const EDGE_TYPE_ALIASES: Record<string, string> = {
   subscribe: "subscribes",
   // Non-code aliases
   describes: "documents",
-  documented_by: "documents",
   creates: "provisions",
   exposes: "serves",
   listens: "serves",
@@ -144,9 +143,9 @@ export const EDGE_TYPE_ALIASES: Record<string, string> = {
   tagged_with: "categorized_under",
   written_by: "authored_by",
   created_by: "authored_by",
-  // Note: "implemented_by" is intentionally NOT aliased to "implements" —
-  // it inverts edge direction (see commit fd0df15). The LLM should use
-  // "implements" with correct source/target instead.
+  // Note: "implemented_by" and "documented_by" are intentionally NOT aliased
+  // to "implements" and "documents": changing the type alone inverts their
+  // meaning. The LLM should use canonical types with correct source/target.
 };
 
 // Design edge aliases — applied only when the graph's kind is "design".
