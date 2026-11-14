@@ -1,4 +1,4 @@
-import { SearchEngine } from "@understand-anything/core";
+import { HybridSearchEngine } from "@understand-anything/core";
 import type {
   KnowledgeGraph,
   GraphNode,
@@ -29,8 +29,9 @@ export function buildChatContext(
 ): ChatContext {
   const limit = maxNodes ?? 15;
 
-  // 1. Use SearchEngine to find relevant nodes
-  const engine = new SearchEngine(graph.nodes);
+  // 1. Hybrid search (BM25 + semantic concepts + fuzzy, graph-aware) finds the
+  //    nodes relevant to the question even when it shares no literal words with them.
+  const engine = new HybridSearchEngine(graph.nodes, graph.edges);
   const searchResults = engine.search(query, { limit });
 
   // Build a set of matched node IDs

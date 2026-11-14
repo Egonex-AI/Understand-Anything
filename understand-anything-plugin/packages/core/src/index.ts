@@ -30,6 +30,7 @@ export {
   type NormalizeBatchResult,
 } from "./analyzer/normalize-graph.js";
 export { SearchEngine, type SearchResult, type SearchOptions } from "./search.js";
+export * from "./semantic/index.js";
 export {
   getChangedFiles,
   getGraphFreshness,
