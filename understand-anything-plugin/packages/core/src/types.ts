@@ -204,6 +204,17 @@ export interface ReferenceResolution {
   line?: number;
 }
 
+export interface TypedParameter {
+  name: string;
+  type: string;
+}
+
+export interface TypedField {
+  name: string;
+  type: string;
+  isStatic?: boolean;
+}
+
 // Plugin interfaces
 export interface StructuralAnalysis {
   functions: Array<{
@@ -214,9 +225,30 @@ export interface StructuralAnalysis {
     /** Declaring type/scope; empty means free function, null means unresolved.
      * Omitted by extractors that only represent methods in classes[].methods. */
     owner?: string | null;
+    typedParams?: TypedParameter[];
+    kind?: "method" | "constructor";
   }>;
-  classes: Array<{ name: string; lineRange: [number, number]; methods: string[]; properties: string[] }>;
-  imports: Array<{ source: string; specifiers: string[]; lineNumber: number }>;
+  classes: Array<{
+    name: string;
+    lineRange: [number, number];
+    methods: string[];
+    properties: string[];
+    kind?: "class" | "interface" | "struct" | "record";
+    namespace?: string;
+    fullName?: string;
+    baseTypes?: string[];
+    primaryConstructorParams?: TypedParameter[];
+    fields?: TypedField[];
+  }>;
+  imports: Array<{
+    source: string;
+    specifiers: string[];
+    lineNumber: number;
+    kind?: "namespace" | "alias" | "static";
+    alias?: string;
+    isGlobal?: boolean;
+    namespace?: string;
+  }>;
   exports: Array<{ name: string; lineNumber: number; isDefault?: boolean }>;
   // Non-code structural data (all optional for backward compat)
   sections?: SectionInfo[];
