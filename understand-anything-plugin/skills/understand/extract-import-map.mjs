@@ -1324,7 +1324,17 @@ function resolveDottedFqn(fqn, ext, suffixIndex) {
 // ---------------------------------------------------------------------------
 
 export function resolveJavaImport(rawImport, _file, ctx) {
-  return resolveDottedFqn(rawImport, '.java', ctx.javaIndex);
+  const direct = resolveDottedFqn(rawImport, '.java', ctx.javaIndex);
+  if (direct.length > 0 || typeof rawImport !== 'string') return direct;
+  // `import static a.b.C.member` and nested-type imports like
+  // `a.b.Outer.Inner` name a member or nested type, not a file. Probe the
+  // enclosing top-level classes by dropping trailing dotted segments.
+  const segments = rawImport.replace(/\.\*$/, '').split('.');
+  for (let end = segments.length - 1; end > 0; end--) {
+    const matches = resolveDottedFqn(segments.slice(0, end).join('.'), '.java', ctx.javaIndex);
+    if (matches.length > 0) return matches;
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------
