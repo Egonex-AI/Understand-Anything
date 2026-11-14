@@ -347,7 +347,7 @@ describe("GraphBuilder", () => {
         tags: [],
         complexity: "simple",
         definitions: [
-          { name: "doStuff", kind: "procedure", lineRange: [1, 10] as [number, number], fields: [] },
+          { name: "doStuff", kind: "mystery", lineRange: [1, 10] as [number, number], fields: [] },
         ],
       });
       const graph = builder.build();
@@ -355,9 +355,27 @@ describe("GraphBuilder", () => {
       expect(childNode).toBeDefined();
       expect(childNode!.type).toBe("concept");
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown definition kind "procedure"'),
+        expect.stringContaining('Unknown definition kind "mystery"'),
       );
       warnSpy.mockRestore();
+    });
+
+    it("maps SQL routines to function nodes", () => {
+      const builder = new GraphBuilder("test", "abc123");
+      builder.addNonCodeFileWithAnalysis("routines.sql", {
+        nodeType: "file",
+        summary: "Routines",
+        tags: [],
+        complexity: "simple",
+        definitions: [
+          { name: "p", kind: "procedure", lineRange: [1, 2] as [number, number], fields: [] },
+          { name: "f", kind: "function", lineRange: [3, 4] as [number, number], fields: [] },
+          { name: "t", kind: "trigger", lineRange: [5, 6] as [number, number], fields: [] },
+        ],
+      });
+      const graph = builder.build();
+      const types = ["p", "f", "t"].map(name => graph.nodes.find(n => n.name === name)?.type);
+      expect(types).toEqual(["function", "function", "function"]);
     });
 
     it("skips duplicate node IDs in addNonCodeFileWithAnalysis and warns", () => {
