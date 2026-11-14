@@ -203,8 +203,9 @@ export class CSharpExtractor implements LanguageExtractor {
   // ---- Private helpers ----
 
   /**
-   * Walk the top-level nodes of a compilation_unit, recursing into
-   * namespace bodies to find declarations.
+   * Discover declarations through namespace and preprocessor wrappers.
+   * This is a syntactic walk of all branches, not evaluation of #if symbols.
+   * Stop at type declarations: their members are visited by their extractor.
    */
   private walkTopLevel(
     node: TreeSitterNode,
@@ -222,48 +223,6 @@ export class CSharpExtractor implements LanguageExtractor {
           this.extractUsing(child, imports);
           break;
 
-        case "namespace_declaration":
-          // Recurse into namespace body (declaration_list)
-          this.walkNamespaceBody(child, functions, classes, imports, exports);
-          break;
-
-        case "file_scoped_namespace_declaration":
-          // File-scoped namespace: declarations are siblings at the root,
-          // not children of this node. Nothing to recurse into.
-          break;
-
-        case "class_declaration":
-        case "record_declaration":
-        case "struct_declaration":
-          this.extractClass(child, functions, classes, exports);
-          break;
-
-        case "interface_declaration":
-          this.extractInterface(child, functions, classes, exports);
-          break;
-      }
-    }
-  }
-
-  /**
-   * Walk into a namespace_declaration's body (declaration_list) to find
-   * classes, interfaces, and nested namespaces.
-   */
-  private walkNamespaceBody(
-    nsNode: TreeSitterNode,
-    functions: StructuralAnalysis["functions"],
-    classes: StructuralAnalysis["classes"],
-    imports: StructuralAnalysis["imports"],
-    exports: StructuralAnalysis["exports"],
-  ): void {
-    const body = nsNode.childForFieldName("body");
-    if (!body) return;
-
-    for (let i = 0; i < body.childCount; i++) {
-      const child = body.child(i);
-      if (!child) continue;
-
-      switch (child.type) {
         case "class_declaration":
         case "record_declaration":
         case "struct_declaration":
@@ -274,9 +233,8 @@ export class CSharpExtractor implements LanguageExtractor {
           this.extractInterface(child, functions, classes, exports);
           break;
 
-        case "namespace_declaration":
-          // Nested namespaces
-          this.walkNamespaceBody(child, functions, classes, imports, exports);
+        default:
+          this.walkTopLevel(child, functions, classes, imports, exports);
           break;
       }
     }
@@ -310,7 +268,7 @@ export class CSharpExtractor implements LanguageExtractor {
 
     const body = node.childForFieldName("body");
     if (body) {
-      this.extractClassBodyMembers(body, methods, properties, functions, exports);
+      this.extractClassBodyMembers(body, methods, properties, functions, classes, exports);
     }
 
     classes.push({
@@ -391,6 +349,7 @@ export class CSharpExtractor implements LanguageExtractor {
     methods: string[],
     properties: string[],
     functions: StructuralAnalysis["functions"],
+    classes: StructuralAnalysis["classes"],
     exports: StructuralAnalysis["exports"],
   ): void {
     for (let i = 0; i < body.childCount; i++) {
@@ -412,6 +371,23 @@ export class CSharpExtractor implements LanguageExtractor {
 
         case "field_declaration":
           this.extractField(child, properties, exports);
+          break;
+
+        case "class_declaration":
+        case "record_declaration":
+        case "struct_declaration":
+          this.extractClass(child, functions, classes, exports);
+          break;
+
+        case "interface_declaration":
+          this.extractInterface(child, functions, classes, exports);
+          break;
+
+        case "preproc_if":
+        case "preproc_elif":
+        case "preproc_else":
+        case "preproc_region":
+          this.extractClassBodyMembers(child, methods, properties, functions, classes, exports);
           break;
       }
     }
