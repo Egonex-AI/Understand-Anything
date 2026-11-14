@@ -302,6 +302,72 @@ namespace App {
       tree.delete();
       parser.delete();
     });
+
+    it("extracts aliased using with a simple-identifier target", () => {
+      const { tree, parser, root } = parse(`using Alias = System;
+namespace App { public class C {} }
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        { source: "System", specifiers: ["System"], lineNumber: 1 },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a global using directive", () => {
+      const { tree, parser, root } = parse(`global using System.Collections.Generic;
+namespace App { public class C {} }
+`);
+      const result = extractor.extractStructure(root);
+
+      // tree-sitter-c-sharp parses `global using` as a `using_directive`
+      // carrying a `global` modifier child, so the existing handler applies.
+      expect(result.imports).toEqual([
+        {
+          source: "System.Collections.Generic",
+          specifiers: ["Generic"],
+          lineNumber: 1,
+        },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a global using with a simple-identifier alias target", () => {
+      const { tree, parser, root } = parse(`global using Alias = System;
+namespace App { public class C {} }
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        { source: "System", specifiers: ["System"], lineNumber: 1 },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a global using with a qualified alias target", () => {
+      const { tree, parser, root } = parse(`global using Alias = System.Collections.Generic;
+namespace App { public class C {} }
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        {
+          source: "System.Collections.Generic",
+          specifiers: ["Generic"],
+          lineNumber: 1,
+        },
+      ]);
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Exports ----
@@ -447,6 +513,52 @@ namespace App {
       expect(result).toHaveLength(1);
       expect(result[0].caller).toBe("Create");
       expect(result[0].callee).toBe("new Bar");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts object creation of a qualified type", () => {
+      const { tree, parser, root } = parse(`namespace App { public class C { public void M() { var x = new System.Text.StringBuilder(); } } }`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({
+        caller: "M",
+        callee: "new System.Text.StringBuilder",
+        lineNumber: 1,
+      });
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts object creation of a generic type", () => {
+      const { tree, parser, root } = parse(`namespace App { public class C { public void M() { var x = new List<int>(); } } }`);
+      const result = extractor.extractCallGraph(root);
+
+      // The type node is a `generic_name`; its text includes the type arguments.
+      expect(result).toContainEqual({
+        caller: "M",
+        callee: "new List<int>",
+        lineNumber: 1,
+      });
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts object creation of a qualified generic type", () => {
+      const { tree, parser, root } = parse(`namespace App { public class C { public void M() { var x = new System.Collections.Generic.List<int>(); } } }`);
+      const result = extractor.extractCallGraph(root);
+
+      // tree-sitter-c-sharp shapes this as a single `qualified_name` whose
+      // trailing segment is a `generic_name`, so the node text carries the
+      // full dotted path including the type arguments.
+      expect(result).toContainEqual({
+        caller: "M",
+        callee: "new System.Collections.Generic.List<int>",
+        lineNumber: 1,
+      });
 
       tree.delete();
       parser.delete();
