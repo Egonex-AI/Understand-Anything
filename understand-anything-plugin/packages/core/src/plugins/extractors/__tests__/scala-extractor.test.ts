@@ -516,6 +516,38 @@ def caller(): Unit = {
       parser.delete();
     });
 
+    it("never reports an infix operand as the callee", () => {
+      const { tree, parser, root } = parse(`def sum(a: Int, b: Int): Int = a + b
+
+def inc(count: Int): Int = count + 1
+
+def prepend(x: Int, xs: List[Int]): List[Int] = x :: xs
+
+def show(o: Order): Unit = {
+  o.items map println
+}
+`);
+      const entries = extractor.extractCallGraph(root);
+      const callees = entries.map((e) => e.callee);
+
+      // Symbolic operators (`+`, `::`) are `operator_identifier` nodes; the
+      // operands around them must not be mistaken for the callee.
+      expect(callees).not.toContain("a");
+      expect(callees).not.toContain("b");
+      expect(callees).not.toContain("count");
+      expect(callees).not.toContain("x");
+      expect(callees).not.toContain("xs");
+      // An alphanumeric operator is still the callee when the left operand is
+      // not a bare identifier.
+      expect(entries).toContainEqual(
+        expect.objectContaining({ caller: "show", callee: "map" }),
+      );
+      expect(callees).not.toContain("println");
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("tracks nested for-comprehension style calls (Cats Effect)", () => {
       const { tree, parser, root } = parse(`import cats.effect.IO
 
