@@ -252,11 +252,12 @@ export function userSchema() {
 }
 ```
 
-1. Ask the client: “Check `understand_status`, then use `understand_explain`
-   with `path: "src/schema.ts:userSchema"` to explain line 4. Read that line
-   and the dependency pin locally and cite both as file:line.” If the graph
-   is missing or out of date, commit any fixture changes and run
-   `/understand --full` before using its line ranges.
+1. Check `understand_status`. If the graph is missing or out of date, commit
+   any fixture changes, run `/understand --full`, then check the status again.
+   Once the graph is fresh, ask the client: “Use `understand_explain` with
+   `path: "src/schema.ts:userSchema"` to locate and explain the `z.toJSONSchema`
+   call. Read the source and the dependency pin locally and cite both as
+   file:line.”
 2. When you want to verify the version claim, configure a public search tool
    separately in the MCP client, such as [Parallel MCP](https://docs.parallel.ai/integrations/mcp/installation)
    (`web_search` works without an API key). Use a separate session outside
@@ -264,9 +265,10 @@ export function userSchema() {
    for whether Zod 4.6.7 supports built-in JSON Schema conversion. Cite the
    official docs.” Keep repo paths, file contents, and graph output in the
    local session.
-3. In the answer, cite `src/schema.ts:4` for the call and `package.json:4`
-   for the version pin. Cite the [Zod 4 release notes](https://zod.dev/v4#json-schema-conversion)
-   separately for Zod 4's built-in JSON Schema conversion. If the lookup
+3. In the answer, cite the call and pin at their current lines
+   (`src/schema.ts:4` and `package.json:4` for the files above).
+   If the lookup succeeds, cite the official source separately, such as the
+   [Zod 4 release notes](https://zod.dev/v4#json-schema-conversion). If the lookup
    fails, report the local explanation and leave the version claim unverified.
 
 ### 6.3 Raw JSON-RPC over stdio
