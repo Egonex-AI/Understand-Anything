@@ -2298,3 +2298,207 @@ describe('extract-import-map.mjs — deterministic stderr ordering across loader
     expect(tsLineIdx).toBeLessThan(composerLineIdx);
   });
 });
+
+describe('extract-import-map.mjs — Puppet resolver', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  const MODULE_TREE = {
+    'modules/base/manifests/init.pp': 'class base {\n}\n',
+    'modules/test/manifests/init.pp': 'class test {\n}\n',
+    'modules/extra/manifests/init.pp': 'class extra {\n}\n',
+    'modules/profile/manifests/init.pp': 'class profile {\n}\n',
+    'modules/profile/manifests/app.pp': [
+      "class profile::app (String $x = 'a') inherits base {",
+      '  include test',
+      // Parenthesized spelling: tree-sitter-puppet 1.x does not parse the
+      // legacy bareword `contain extra` as a call (see puppet-extractor notes).
+      "  contain('extra')",
+      '  myfunc()',
+      '  legacy()',
+      '',
+      "  mytype { 'x': }",
+      '',
+      "  file { '/etc/a':",
+      "    content => epp('index.epp'),",
+      '  }',
+      "  file { '/etc/b':",
+      "    content => template('banner.erb'),",
+      '  }',
+      "  file { '/etc/c':",
+      "    source => 'puppet:///modules/profile/banner.erb',",
+      '  }',
+      "  file { '/etc/d':",
+      "    source => 'puppet:///modules/profile/data/thing',",
+      '  }',
+      '}',
+      '',
+    ].join('\n'),
+    'modules/profile/lib/puppet/functions/myfunc.rb':
+      "Puppet::Functions.create_function(:myfunc) do\n  dispatch() { } # rubocop:disable\nend\n",
+    'modules/profile/lib/puppet/parser/functions/legacy.rb':
+      "module Puppet::Parser::Functions\n  newfunction(:legacy) do |args|\n  end\nend\n",
+    'modules/profile/lib/puppet/type/mytype.rb':
+      "Puppet::Type.newtype(:mytype) do\n  newparam(:name)\nend\n",
+    'modules/profile/templates/banner.erb': 'banner for <%= @facts["hostname"] %>\n',
+    'modules/profile/templates/index.epp': '<%- | String $name | -%>\nindex: <%= $name %>\n',
+    // Served via `source => 'puppet:///modules/profile/data/thing'` — the
+    // puppet:///modules/<mod>/<path> mount maps to <mod>/files/<path>.
+    'modules/profile/files/data/thing': 'static payload\n',
+    'modules/profile/files/templates/conf.erb': 'conf for <%= @name %>\n',
+    // Puppet ≥4 resolves unqualified names at top scope only: `helper`
+    // inside module `other` is `::helper` (module `helper`), never
+    // `other::helper` — helper.pp under `other` must NOT match.
+    'modules/helper/manifests/init.pp': 'class helper {\n}\n',
+    'modules/other/manifests/init.pp': 'class other {\n  include helper\n}\n',
+    'modules/other/manifests/helper.pp': 'class other::helper {\n}\n',
+    'manifests/site.pp': [
+      'include profile',
+      '',
+      "node 'web01.example.com' {",
+      '  include profile::app',
+      '}',
+      '',
+    ].join('\n'),
+    'modules/profile/metadata.json': '{"name": "acme-profile"}\n',
+  };
+
+  function puppetInput(files) {
+    return {
+      projectRoot,
+      files: Object.entries(files).map(([path, _contents]) => ({
+        path,
+        language: path.endsWith('.pp')
+          ? 'puppet'
+          : path.endsWith('.rb')
+            ? 'ruby'
+            : path.endsWith('.erb')
+              ? 'erb'
+              : path.endsWith('.epp')
+                ? 'epp'
+                : 'json',
+        fileCategory:
+          path.endsWith('.pp') || path.endsWith('.rb')
+            ? 'code'
+            : path.endsWith('.erb') || path.endsWith('.epp')
+              ? 'markup'
+              : 'config',
+      })),
+    };
+  }
+
+  it('resolves inherits/include/contain, custom functions/types, and templates', () => {
+    projectRoot = setupTree(MODULE_TREE);
+    const result = runScript(projectRoot, puppetInput(MODULE_TREE));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['modules/profile/manifests/app.pp']).toEqual([
+      'modules/base/manifests/init.pp',
+      'modules/extra/manifests/init.pp',
+      'modules/profile/files/data/thing',
+      'modules/profile/lib/puppet/functions/myfunc.rb',
+      'modules/profile/lib/puppet/parser/functions/legacy.rb',
+      'modules/profile/lib/puppet/type/mytype.rb',
+      'modules/profile/templates/banner.erb',
+      'modules/profile/templates/index.epp',
+      'modules/test/manifests/init.pp',
+    ]);
+  });
+
+  it('resolves site.pp includes through the class index, incl. node blocks', () => {
+    projectRoot = setupTree(MODULE_TREE);
+    const result = runScript(projectRoot, puppetInput(MODULE_TREE));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['manifests/site.pp']).toEqual([
+      'modules/profile/manifests/app.pp',
+      'modules/profile/manifests/init.pp',
+    ]);
+  });
+
+  it('resolves unqualified names at top scope only (Puppet ≥4)', () => {
+    projectRoot = setupTree(MODULE_TREE);
+    const result = runScript(projectRoot, puppetInput(MODULE_TREE));
+
+    expect(result.status, result.stderr).toBe(0);
+    // `include helper` in module `other` is ::helper — the `helper` module —
+    // never `other::helper`, whose file exists and must not match.
+    expect(result.output.importMap['modules/other/manifests/init.pp']).toEqual([
+      'modules/helper/manifests/init.pp',
+    ]);
+  });
+
+  it('does not link resource types to same-named manifests in the owning module', () => {
+    const tree = {
+      'modules/nginx/manifests/init.pp': [
+        'class nginx {',
+        "  service { 'nginx': }",
+        "  package { 'nginx': }",
+        '}',
+      ].join('\n'),
+      // Would be spurious targets under Puppet 3 relative-name lookup.
+      'modules/nginx/manifests/service.pp': 'class nginx::service {\n}\n',
+      'modules/nginx/manifests/package.pp': 'class nginx::package {\n}\n',
+    };
+    projectRoot = setupTree(tree);
+    const result = runScript(projectRoot, puppetInput(tree));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['modules/nginx/manifests/init.pp']).toEqual([]);
+  });
+
+  it("maps puppet:///modules/<mod>/<path> to <mod>/files/<path>, not templates/", () => {
+    const tree = {
+      'modules/profile/manifests/app.pp': [
+        'class profile::app {',
+        "  file { '/etc/conf':",
+        "    source => 'puppet:///modules/profile/templates/conf.erb',",
+        '  }',
+        "  file { '/etc/data':",
+        "    source => 'puppet:///modules/profile/data/thing',",
+        '  }',
+        '}',
+      ].join('\n'),
+      // Real targets live under files/, including files/templates/.
+      'modules/profile/files/templates/conf.erb': 'conf for <%= @name %>\n',
+      'modules/profile/files/data/thing': 'static payload\n',
+      // A same-named template must not absorb the mount-path reference.
+      'modules/profile/templates/conf.erb': 'wrong target\n',
+    };
+    projectRoot = setupTree(tree);
+    const result = runScript(projectRoot, puppetInput(tree));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['modules/profile/manifests/app.pp'].sort()).toEqual(
+      [
+        'modules/profile/files/data/thing',
+        'modules/profile/files/templates/conf.erb',
+      ],
+    );
+  });
+
+  it('drops builtin resource types and names that miss every index', () => {
+    const tree = {
+      'modules/solo/manifests/init.pp': [
+        'class solo {',
+        '  include nowhere',
+        '  resolveme()',
+        "  bogus_thing { 'z': }",
+        "  file { '/etc/x': }",
+        '}',
+      ].join('\n'),
+    };
+    projectRoot = setupTree(tree);
+    const result = runScript(projectRoot, puppetInput(tree));
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.output.importMap['modules/solo/manifests/init.pp']).toEqual([]);
+    expect(result.output.stats.totalEdges).toBe(0);
+  });
+});

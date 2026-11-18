@@ -642,6 +642,10 @@ async function buildResolutionContext(projectRoot, files) {
   const csIndex = buildSuffixIndex(files, p => p.endsWith('.cs'));
   const swiftModuleIndex = buildSwiftModuleIndex(files, swiftResult.targets);
 
+  // Path-convention indexes for the Puppet resolver (classes, custom
+  // functions/types, templates) — derived from paths only, no content reads.
+  const puppet = buildPuppetIndexes(files);
+
   return {
     projectRoot,
     fileSet,
@@ -654,6 +658,11 @@ async function buildResolutionContext(projectRoot, files) {
     scalaPackageIndex,
     csIndex,
     swiftModuleIndex,
+    puppetIndex: puppet.classes,
+    puppetFunctionIndex: puppet.functions,
+    puppetTypeIndex: puppet.types,
+    puppetTemplatesIndex: puppet.templates,
+    puppetFilesIndex: puppet.moduleFiles,
     failures: [
       ...tsResult.failures,
       ...goResult.failures,
@@ -1880,6 +1889,149 @@ export function resolveCppImport(rawImport, file, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Puppet resolver
+//
+// Puppet autoloads by naming convention, and the manifest -> implementation
+// links are name-based, not path-based:
+//
+//   - classes / defined types: `modules/<mod>/manifests/<base>.pp` autoloads
+//     as `<mod>::<base>` (`init.pp` -> `<mod>`); environment-root
+//     `manifests/<base>.pp` -> `<base>`. Nested manifests/<x>/<y>.pp is not
+//     autoloadable and is skipped.
+//   - custom functions: `lib/puppet/functions/<a>/<b>.rb` declares `a::b`
+//     (legacy: `lib/puppet/parser/functions/`). Namespace files that declare
+//     extra functions inline are intentionally missed — path convention only
+//     ever produces right edges, never wrong ones.
+//   - custom resource types: `lib/puppet/type/<t>.rb` declares type `<t>`;
+//     compared case-insensitively with `_`/`-` stripped (underscore class
+//     name vs resource spelling).
+//   - templates: `.erb`/`.epp` under `<mod>/templates/`, keyed by
+//     `<mod>/<rel-after-templates>` (the `template('mod/x.erb')` spelling)
+//     and bare basename as a last resort.
+//   - file mounts: `puppet:///modules/<mod>/<path>` is served from
+//     `<mod>/files/<path>` — not templates/ — so those sources go through
+//     their own index keyed `<mod>/<rel-after-files>` for any file type.
+//
+// Everything is path-derived (zero content reads) and every result passes the
+// ctx.fileSet filter in main(), so builtin resource types (`file`, `package`)
+// and stdlib names simply miss and produce no edge. Multi-module name
+// collisions return all candidates, consistent with the Java/Kotlin resolvers.
+// ---------------------------------------------------------------------------
+
+/** Normalize a resource type name for comparison: lowercase, no `_`/`-`. */
+function normalizePuppetTypeName(name) {
+  return name.toLowerCase().replace(/[_-]/g, '');
+}
+
+function buildPuppetIndexes(files) {
+  const classes = new Map();
+  const functions = new Map();
+  const types = new Map();
+  const templates = new Map();
+  const moduleFiles = new Map();
+  const addTo = (map, key, p) => {
+    if (!key) return;
+    if (!map.has(key)) map.set(key, []);
+    const arr = map.get(key);
+    if (!arr.includes(p)) arr.push(p);
+  };
+
+  for (const f of files) {
+    const p = toPosix(f.path);
+    // `<mod>/files/<path>` — the directory puppet:///modules/<mod>/<path>
+    // mounts. Indexed for every extension before the type-specific branches.
+    const fm = /(?:^|\/)([^/]+)\/files\/(.+)$/.exec(p);
+    if (fm) addTo(moduleFiles, `${fm[1]}/${fm[2]}`, p);
+    if (p.endsWith('.pp')) {
+      const m = /(?:^|\/)([^/]+)\/manifests\/([^/]+)\.pp$/.exec(p);
+      if (m) {
+        // init.pp is the module class itself; nested dirs are not autoloadable.
+        if (m[2] !== 'init') addTo(classes, `${m[1]}::${m[2]}`, p);
+        else addTo(classes, m[1], p);
+        continue;
+      }
+      const rm = /^manifests\/([^/]+)\.pp$/.exec(p);
+      if (rm && rm[1] !== 'init') addTo(classes, rm[1], p);
+      continue;
+    }
+    if (p.endsWith('.rb')) {
+      const fm = /(?:^|\/)lib\/puppet\/(?:parser\/)?functions\/(.+)\.rb$/.exec(p);
+      if (fm) {
+        const segs = fm[1].split('/');
+        addTo(functions, segs.join('::'), p);
+        continue;
+      }
+      const tm = /(?:^|\/)lib\/puppet\/type\/([^/]+)\.rb$/.exec(p);
+      if (tm) addTo(types, normalizePuppetTypeName(tm[1]), p);
+      continue;
+    }
+    if (p.endsWith('.erb') || p.endsWith('.epp')) {
+      const tm = /(?:^|\/)([^/]+)\/templates\/(.+)$/.exec(p);
+      if (tm) {
+        addTo(templates, `${tm[1]}/${tm[2]}`, p);
+        const base = tm[2].split('/').pop();
+        addTo(templates, base, p);
+      }
+    }
+  }
+  for (const arr of classes.values()) arr.sort(comparePaths);
+  for (const arr of functions.values()) arr.sort(comparePaths);
+  for (const arr of types.values()) arr.sort(comparePaths);
+  for (const arr of templates.values()) arr.sort(comparePaths);
+  for (const arr of moduleFiles.values()) arr.sort(comparePaths);
+  return { classes, functions, types, templates, moduleFiles };
+}
+
+/**
+ * Resolve one Puppet import/reference source. Returns 0..n project paths.
+ * The caller filters against ctx.fileSet; self-references are removed here.
+ */
+export function resolvePuppetImport(rawSource, file, ctx) {
+  if (!rawSource || typeof rawSource !== 'string') return [];
+  let src = rawSource.trim();
+  if (!src) return [];
+
+  // `puppet:///modules/<mod>/<path>` is served from `<mod>/files/<path>` —
+  // resolving it through the templates index would link to a file that
+  // exists under a different directory (or invent a missing one).
+  if (src.startsWith('puppet:///modules/')) {
+    const hits = ctx.puppetFilesIndex.get(
+      src.slice('puppet:///modules/'.length),
+    );
+    return hits ? hits.filter((h) => h !== toPosix(file.path)) : [];
+  }
+  if (/\.(erb|epp)$/.test(src)) {
+    const hits = ctx.puppetTemplatesIndex.get(src);
+    return hits ? [...hits] : [];
+  }
+
+  // Class / function / type names: strip virtual-prefixes (`@@`/`@` can only
+  // appear on a callGraph resource-type callee) and the top-scope `::`.
+  const name = src.replace(/^@+/, '').replace(/^::/, '');
+  if (!/^[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*$/.test(name)) return [];
+
+  const out = new Set();
+  const addHits = (map, key) => {
+    const hits = map.get(key);
+    if (hits) for (const h of hits) out.add(h);
+  };
+
+  // (a) classes / defined types. Unqualified names resolve at top scope
+  // only — Puppet 4 removed relative-name lookup, so `service` inside
+  // `nginx` never resolves to `nginx::service` (and a builtin `package`
+  // never resolves to `<mod>::package`). Target: Puppet 8; the same rule
+  // holds for 7 and 9.
+  addHits(ctx.puppetIndex, name);
+  // (b) custom functions (global namespace, exact qualified name).
+  addHits(ctx.puppetFunctionIndex, name);
+  // (c) custom resource types (spelling-normalized).
+  addHits(ctx.puppetTypeIndex, normalizePuppetTypeName(name));
+
+  out.delete(toPosix(file.path));
+  return [...out].sort(comparePaths);
+}
+
+// ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
 
@@ -1937,6 +2089,9 @@ function resolveImport(imp, file, ctx) {
   }
   if (lang === 'c' || lang === 'cpp') {
     return resolveCppImport(src, file, ctx);
+  }
+  if (lang === 'puppet') {
+    return resolvePuppetImport(src, file, ctx);
   }
   // Ruby is handled via a dedicated pathway because its tree-sitter
   // extractor flattens require vs require_relative into a single field,
@@ -2103,6 +2258,23 @@ async function main() {
           for (const out of outs) {
             if (out && ctx.fileSet.has(out)) {
               resolvedSet.add(out);
+            }
+          }
+        }
+        // Puppet interop: custom function/type names surface as callGraph
+        // callees (function-call names + resource type names), not imports[].
+        // Feed the distinct callees through the same resolver + fileSet
+        // filter — AST-derived, no regex, same shape as the CJS/Kotlin pass.
+        if (file.language === 'puppet') {
+          const seenCallees = new Set();
+          for (const entry of registry.extractCallGraph(file.path, content) ?? []) {
+            if (!entry?.callee || seenCallees.has(entry.callee)) continue;
+            seenCallees.add(entry.callee);
+            const outs = resolveImport({ source: entry.callee, specifiers: [] }, file, ctx);
+            for (const out of outs) {
+              if (out && ctx.fileSet.has(out)) {
+                resolvedSet.add(out);
+              }
             }
           }
         }
