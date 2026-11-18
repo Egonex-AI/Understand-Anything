@@ -120,17 +120,19 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
     if (FUNCTION_NODES.has(node.type) && !objectMethod) {
       const valueFunction = ["arrow_function", "function_expression", "generator_function", "lambda"].includes(node.type);
       const name = valueFunction ? identifier(node.parent?.childForFieldName("name")) : declaredName;
+      // The extractor reports the whole declaration, which starts before a
+      // value function wrapped onto the line after `=`.
+      const extracted = valueFunction && node.parent?.type === "variable_declarator" ? node.parent.parent ?? node : node;
       const matches = structure.functions.map((fn, index) => ({ fn, index })).filter(({ fn }) => fn.owner === undefined
         && (fn.name === name || node.type === "singleton_method" && fn.name === `self.${name}`)
-        && fn.lineRange[0] === node.startPosition.row + 1 && fn.lineRange[1] === node.endPosition.row + 1);
+        && fn.lineRange[0] === extracted.startPosition.row + 1 && fn.lineRange[1] === extracted.endPosition.row + 1);
       if (matches.length) {
         let scope = owner;
         if (node.type === "singleton_method") {
           const receiver = node.childForFieldName("object") ?? node.childForFieldName("receiver");
           scope = receiver?.text === "self" ? owner : targetOwner(receiver, node);
         }
-        functions.push({ name: matches[0].fn.name, scope,
-          lineRange: [node.startPosition.row + 1, node.endPosition.row + 1] });
+        functions.push({ name: matches[0].fn.name, scope, lineRange: matches[0].fn.lineRange });
         for (const { index } of matches) matchedFunctions.add(index);
       }
       const detailed = structure.functions.some(fn => fn.owner !== undefined

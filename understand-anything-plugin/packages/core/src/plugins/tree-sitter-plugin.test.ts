@@ -369,6 +369,18 @@ export class Greeter {
       expect(empty.structure?.functions).toEqual([]);
     });
 
+    it.each([
+      ["an arrow chain", "export const make =\n    (a: string) =>\n    (b: string) => {\n        return a + b;\n    };\n", [1, 5]],
+      ["a function expression", "export const make =\n    function (a: string) {\n        return a;\n    };\n", [1, 4]],
+    ])("keeps file scope when %s starts on the line after `=`", (_name, code, lineRange) => {
+      const result = plugin.analyzeFileStrict("test.ts", code);
+      expect(result.status).toBe("succeeded");
+      expect(result.symbolEvidence?.functions).toEqual([
+        { name: "make", scope: { kind: "file" }, lineRange },
+      ]);
+      expect(result.symbolEvidence?.coverage.gaps).toEqual([]);
+    });
+
     it("uses the same extractor and preserves evidence of unextracted members", () => {
       const code = "class A { run() {} callback = () => {}; }";
       const strict = plugin.analyzeFileStrict("test.ts", code);
