@@ -95,10 +95,18 @@ function isGeneratedArtifact(path) {
 
 function isImportResolverConfig(path) {
   const name = path.split('/').at(-1);
+  // Editing any of these can change import resolution for files that did not
+  // change themselves. tsconfig/go/composer/SwiftPM manifests define module
+  // and alias mapping; workspace manifests (root package.json#workspaces,
+  // member package.json name/exports/main, root pnpm-workspace.yaml) feed the
+  // workspace package index. Recompute the whole import map when one moves.
   return name === 'tsconfig.json'
     || name === 'go.mod'
     || name === 'composer.json'
-    || name === 'Package.swift';
+    || name === 'Package.swift'
+    || name === 'package.json'
+    || name === 'pnpm-workspace.yaml'
+    || name === 'pnpm-workspace.yml';
 }
 
 function readJson(path, fallback = null) {
