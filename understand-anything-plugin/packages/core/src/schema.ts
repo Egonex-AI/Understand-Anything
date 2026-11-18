@@ -458,7 +458,7 @@ export const LayerSchema = z.object({
   name: z.string(),
   description: z.string(),
   nodeIds: z.array(z.string()),
-  containerLabels: z.array(ContainerLabelSchema).optional(),
+  containerLabels: z.array(ContainerLabelSchema).catch([]).optional(),
 });
 
 export const TourStepSchema = z.object({
