@@ -595,6 +595,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   setFilters: (newFilters) => set((state) => ({
     filters: { ...state.filters, ...newFilters },
+    // A filter change can alter container membership and child positions.
+    containerLayoutCache: new Map(),
+    containerSizeMemory: new Map(),
+    expandedContainers: new Set(),
+    pendingFocusContainer: null,
   })),
 
   resetFilters: () => set({
@@ -604,6 +609,10 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       layerIds: new Set<string>(),
       edgeCategories: new Set<EdgeCategory>(ALL_EDGE_CATEGORIES),
     },
+    containerLayoutCache: new Map(),
+    containerSizeMemory: new Map(),
+    expandedContainers: new Set(),
+    pendingFocusContainer: null,
   }),
 
   hasActiveFilters: () => {
