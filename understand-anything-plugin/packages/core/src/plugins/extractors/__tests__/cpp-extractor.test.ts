@@ -531,6 +531,99 @@ void process() {
       tree.delete();
       parser.delete();
     });
+
+    it("qualifies out-of-class method callers with their class (issue #732)", () => {
+      const { tree, parser, root } = parse(`
+void first() {}
+void second() {}
+
+void Alpha::run() {
+    first();
+}
+
+void Beta::run() {
+    second();
+}
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result.filter((e) => e.caller === "Alpha::run").map((e) => e.callee)).toEqual(["first"]);
+      expect(result.filter((e) => e.caller === "Beta::run").map((e) => e.callee)).toEqual(["second"]);
+      expect(result.some((e) => e.caller === "run")).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("qualifies inline class method callers with their class", () => {
+      const { tree, parser, root } = parse(`
+struct Store {
+    void refresh() {
+        helper();
+    }
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "Store::refresh", callee: "helper", lineNumber: 4 });
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not inherit the enclosing class for methods of an unnamed nested struct", () => {
+      const { tree, parser, root } = parse(`
+struct Outer {
+    struct {
+        void refresh() {
+            helper();
+        }
+    } inner;
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "refresh", callee: "helper", lineNumber: 5 });
+      expect(result.some((e) => e.caller === "Outer::refresh")).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("still qualifies methods of a named nested class with their class", () => {
+      const { tree, parser, root } = parse(`
+struct Outer {
+    struct Inner {
+        void refresh() {
+            helper();
+        }
+    };
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "Inner::refresh", callee: "helper", lineNumber: 5 });
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not qualify inline friend functions with the enclosing class", () => {
+      const { tree, parser, root } = parse(`
+struct Store {
+    friend void refresh(Store) {
+        helper();
+    }
+};
+`);
+      const result = extractor.extractCallGraph(root);
+
+      expect(result).toContainEqual({ caller: "refresh", callee: "helper", lineNumber: 4 });
+      expect(result.some((e) => e.caller === "Store::refresh")).toBe(false);
+
+      tree.delete();
+      parser.delete();
+    });
   });
 
   // ---- Comprehensive C++ test ----

@@ -60,6 +60,23 @@ function extractFuncDeclName(
 }
 
 /**
+ * Check whether a function_definition is an inline friend definition.
+ *
+ * `struct Store { friend void refresh(Store) { ... } };` declares a namespace
+ * function, not a member of Store, even though its body sits inside the class.
+ * The nearest class/struct ancestor decides: a friend_declaration hit first
+ * means the definition is a friend (non-member), a class/struct hit first
+ * means it is a member whose body is nested in the class body.
+ */
+function isInlineFriendFunction(node: TreeSitterNode): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type === "friend_declaration") return true;
+    if (parent.type === "class_specifier" || parent.type === "struct_specifier") return false;
+  }
+  return false;
+}
+
+/**
  * Extract parameter names from a parameter_list node.
  *
  * Each parameter_declaration has a `declarator` field which may be an identifier,
@@ -153,15 +170,31 @@ export class CppExtractor implements LanguageExtractor {
   extractCallGraph(rootNode: TreeSitterNode): CallGraphEntry[] {
     const entries: CallGraphEntry[] = [];
     const functionStack: string[] = [];
+    const classStack: string[] = [];
 
     const walkForCalls = (node: TreeSitterNode) => {
       let pushedName = false;
+      let pushedClass = false;
 
-      // Track entering function_definition
+      // Track the enclosing class/struct so method callers carry their owner.
+      if (node.type === "class_specifier" || node.type === "struct_specifier") {
+        const className = node.childForFieldName("name");
+        classStack.push(className?.text ?? "");
+        pushedClass = true;
+      }
+
+      // Track entering function_definition. C++ method identity is
+      // `Class::method`: an out-of-class definition carries the qualifier in
+      // its declarator, an in-class definition inherits the enclosing class.
+      // Inline friend definitions are namespace functions, not members, so
+      // they must not inherit the enclosing class (Codex P2 on #749).
       if (node.type === "function_definition") {
-        const name = this.extractFunctionName(node);
-        if (name) {
-          functionStack.push(name);
+        const info = this.extractFunctionInfo(node);
+        if (info) {
+          const enclosingClass =
+            isInlineFriendFunction(node) ? "" : classStack.at(-1) ?? "";
+          const owner = info.qualifier ?? enclosingClass;
+          functionStack.push(owner ? `${owner}::${info.name}` : info.name);
           pushedName = true;
         }
       }
@@ -187,6 +220,9 @@ export class CppExtractor implements LanguageExtractor {
 
       if (pushedName) {
         functionStack.pop();
+      }
+      if (pushedClass) {
+        classStack.pop();
       }
     };
 
@@ -258,15 +294,14 @@ export class CppExtractor implements LanguageExtractor {
   }
 
   /**
-   * Extract the simple function name from a function_definition.
-   * For qualified names (e.g., Server::start), returns just the method name.
+   * Resolve the function/method name and its class/namespace qualifier from a
+   * function_definition. Out-of-class definitions (`void Server::start()`) keep
+   * their qualifier so callers are reported as `Server::start`.
    */
-  private extractFunctionName(node: TreeSitterNode): string | null {
+  private extractFunctionInfo(node: TreeSitterNode): { name: string; qualifier: string | null } | null {
     const declNode = node.childForFieldName("declarator");
     if (!declNode || declNode.type !== "function_declarator") return null;
-
-    const info = extractFuncDeclName(declNode);
-    return info ? info.name : null;
+    return extractFuncDeclName(declNode);
   }
 
   /**
