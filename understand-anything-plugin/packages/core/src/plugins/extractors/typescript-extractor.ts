@@ -326,34 +326,76 @@ export class TypeScriptExtractor implements LanguageExtractor {
 
       const nameNode = child.childForFieldName("name");
       const valueNode = child.childForFieldName("value");
+      if (!nameNode || !valueNode) continue;
 
-      if (
-        nameNode &&
-        valueNode &&
-        (valueNode.type === "arrow_function" ||
-          valueNode.type === "function_expression" ||
-          valueNode.type === "function")
-      ) {
-        const params = extractParams(
-          valueNode.childForFieldName("parameters") ??
-            valueNode.children.find(
-              (c) => c.type === "formal_parameters",
-            ) ??
-            null,
-        );
-        const returnType = extractReturnType(valueNode);
+      const fnNode = this.resolveFunctionValue(valueNode);
+      if (!fnNode) continue;
 
-        functions.push({
-          name: nameNode.text,
-          lineRange: [
-            node.startPosition.row + 1,
-            node.endPosition.row + 1,
-          ],
-          params,
-          returnType,
-        });
-      }
+      const params = extractParams(
+        fnNode.childForFieldName("parameters") ??
+          fnNode.children.find((c) => c.type === "formal_parameters") ??
+          null,
+      );
+      const returnType = extractReturnType(fnNode);
+
+      functions.push({
+        name: nameNode.text,
+        lineRange: [
+          node.startPosition.row + 1,
+          node.endPosition.row + 1,
+        ],
+        params,
+        returnType,
+      });
     }
+  }
+
+  /**
+   * Tra ve node ham dai dien cho gia tri cua mot declarator, ke ca khi ham bi
+   * boc trong loi goi hoac nam trong mang/object literal.
+   */
+  private resolveFunctionValue(
+    valueNode: TreeSitterNode | null,
+  ): TreeSitterNode | null {
+    if (!valueNode) return null;
+    const isFn = (t: string): boolean =>
+      t === "arrow_function" ||
+      t === "function_expression" ||
+      t === "function";
+
+    if (isFn(valueNode.type)) return valueNode;
+
+    if (
+      valueNode.type !== "call_expression" &&
+      valueNode.type !== "new_expression" &&
+      valueNode.type !== "array" &&
+      valueNode.type !== "object"
+    ) {
+      return null;
+    }
+
+    // Co chan: literal cau hinh (theme, i18n, route table) co the rat lon, va
+    // ham nay chay cho MOI declarator cua MOI file.
+    const MAX_DEPTH = 8;
+    const MAX_NODES = 2000;
+    let seen = 0;
+
+    const walk = (
+      n: TreeSitterNode,
+      depth: number,
+    ): TreeSitterNode | null => {
+      if (depth > MAX_DEPTH || ++seen > MAX_NODES) return null;
+      for (let i = 0; i < n.childCount; i++) {
+        const c = n.child(i);
+        if (!c) continue;
+        if (isFn(c.type)) return c;
+        const found = walk(c, depth + 1);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    return walk(valueNode, 0);
   }
 
   private extractImport(
