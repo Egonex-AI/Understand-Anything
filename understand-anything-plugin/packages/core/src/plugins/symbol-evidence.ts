@@ -1,5 +1,5 @@
 import type { StructuralAnalysis } from "../types.js";
-import { COVERAGE_LANGUAGES, declarationGap } from "./symbol-coverage.js";
+import { COVERAGE_LANGUAGES, declarationGap, structuralLineCoverage, type StructuralLineCoverage } from "./symbol-coverage.js";
 import type { TreeSitterNode as Node } from "./extractors/types.js";
 import { classExpression, declarationKey, declarationName, identifier, literal, unescaped, unwrap } from "./symbol-ast.js";
 import { buildSymbolScopes, CLASS_NODES, FUNCTION_NODES, FILE_SCOPE, UNKNOWN_SCOPE, namedScope,
@@ -19,7 +19,7 @@ export interface SymbolEvidence {
   effects: SymbolEvidenceEntry[];
   functions: Array<{ name: string; scope: SymbolScope; lineRange: [number, number] }>;
   classes: Array<{ name: string; scope: SymbolScope; lineRange: [number, number] }>;
-  coverage: { profile: "structural-declarations-v1"; gaps: SymbolEvidenceEntry[] };
+  coverage: { profile: "structural-declarations-v1"; gaps: SymbolEvidenceEntry[]; lines?: StructuralLineCoverage };
 }
 
 const ACCESSORS = new Set(["attr", "attr_reader", "attr_writer", "attr_accessor"]);
@@ -286,5 +286,8 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
     coverage.gaps.push({ kind: null, scope: UNKNOWN_SCOPE, name: null, lineRange: [1, root.endPosition.row + 1],
       reason: "This language has no verified declaration-coverage adapter" });
   }
+  // Trailing newline yields an empty final row; don't count it.
+  const totalLines = root.endPosition.column === 0 ? root.endPosition.row : root.endPosition.row + 1;
+  coverage.lines = structuralLineCoverage(structure, totalLines);
   return { version: 2, effects, functions, classes, coverage };
 }

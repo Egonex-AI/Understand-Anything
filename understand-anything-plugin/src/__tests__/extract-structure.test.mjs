@@ -31,6 +31,25 @@ describe("extract-structure buildResult", () => {
     });
   });
 
+  describe("topLevel pass-through", () => {
+    it("maps top-level segments to startLine/endLine and keeps calls and text", () => {
+      const result = buildResult(file(), 10, 8, analysis({
+        topLevel: [
+          { kind: "guard", lineRange: [8, 10], calls: ["main"], text: "if __name__ == \"__main__\":" },
+          { kind: "config", lineRange: [2, 3], calls: [] },
+        ],
+      }), null, {});
+      expect(result.topLevel).toEqual([
+        { kind: "guard", startLine: 8, endLine: 10, calls: ["main"], text: "if __name__ == \"__main__\":" },
+        { kind: "config", startLine: 2, endLine: 3, calls: [] },
+      ]);
+    });
+
+    it("omits topLevel when the analysis has none", () => {
+      expect(buildResult(file(), 10, 8, analysis(), null, {})).not.toHaveProperty("topLevel");
+    });
+  });
+
   describe("importCount fallback", () => {
     // Only relative imports count toward the fallback metric — external
     // package imports would never produce edges so counting them would be
