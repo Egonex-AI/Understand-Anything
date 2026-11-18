@@ -136,6 +136,10 @@ _EXACT_TEST_STEMS: dict[str, frozenset[str]] = {
     ".rb": frozenset({"spec_helper"}),
 }
 
+_RUBY_TEST_ROOTS: frozenset[str] = frozenset({"test", "spec"})
+_RUBY_PRODUCTION_ROOTS: tuple[str, ...] = ("app", "lib", "")
+_RUBY_SUPPORT_STEMS: frozenset[str] = frozenset({"test_helper", "spec_helper", "rails_helper"})
+
 
 # Mirrors packages/core/src/schema.ts so the dashboard validator has nothing
 # left to auto-correct for the `direction` field on merged graphs.
@@ -381,6 +385,17 @@ def _strip_test_infix(stem: str) -> str | None:
     return None
 
 
+def _strip_ruby_test_marker(stem: str) -> str | None:
+    if stem in _RUBY_SUPPORT_STEMS:
+        return None
+    for suffix in ("_test", "_spec"):
+        if stem.endswith(suffix):
+            return stem[: -len(suffix)]
+    if stem.startswith("test_"):
+        return stem[len("test_"):]
+    return None
+
+
 def _join(dir_path: str, name: str) -> str:
     """Join a (possibly empty) directory path to a basename with a single
     slash, dropping the slash entirely when there is no directory."""
@@ -575,6 +590,24 @@ def production_candidates(test_path: str) -> list[str]:
                                 _join(mirror_dir, f"{base_stem}.cs"),
                             )
                 break
+
+    elif ext == ".rb":
+        base_stem = _strip_ruby_test_marker(stem)
+        if base_stem:
+            test_root_idx = next(
+                (i for i, seg in enumerate(dir_segs) if seg in _RUBY_TEST_ROOTS),
+                None,
+            )
+            if test_root_idx is None:
+                _add_unique(candidates, _join(dir_path, f"{base_stem}.rb"))
+            else:
+                prefix_segs = dir_segs[:test_root_idx]
+                tail_segs = dir_segs[test_root_idx + 1 :]
+                for root in _RUBY_PRODUCTION_ROOTS:
+                    new_dir = "/".join(
+                        seg for seg in (*prefix_segs, root, *tail_segs) if seg
+                    )
+                    _add_unique(candidates, _join(new_dir, f"{base_stem}.rb"))
 
     # ── C/C++ ─────────────────────────────────────────────────────────
     elif ext in {".c", ".cpp", ".cc"}:

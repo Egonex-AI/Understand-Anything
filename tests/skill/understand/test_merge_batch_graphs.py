@@ -286,6 +286,46 @@ class ProductionCandidatesTests(unittest.TestCase):
         cands = mbg.production_candidates("modules/core/src/test/scala/com/foo/BarSpec.scala")
         self.assertIn("modules/core/src/main/scala/com/foo/Bar.scala", cands)
 
+    def test_ruby_rails_minitest_layout(self) -> None:
+        cands = mbg.production_candidates("test/models/user_test.rb")
+        self.assertEqual(cands[0], "app/models/user.rb")
+        self.assertIn("lib/models/user.rb", cands)
+        self.assertIn("models/user.rb", cands)
+
+    def test_ruby_rails_rspec_layout(self) -> None:
+        cands = mbg.production_candidates("spec/services/billing/charge_spec.rb")
+        self.assertEqual(cands[0], "app/services/billing/charge.rb")
+
+    def test_ruby_lib_under_test_root(self) -> None:
+        self.assertIn("lib/tasks/cleanup.rb", mbg.production_candidates("test/lib/tasks/cleanup_test.rb"))
+        self.assertIn("lib/tasks/cleanup.rb", mbg.production_candidates("spec/lib/tasks/cleanup_spec.rb"))
+
+    def test_ruby_gem_layout(self) -> None:
+        self.assertIn("lib/my_gem/parser.rb", mbg.production_candidates("spec/my_gem/parser_spec.rb"))
+        self.assertIn("lib/my_gem/parser.rb", mbg.production_candidates("test/my_gem/parser_test.rb"))
+        self.assertIn("lib/parser.rb", mbg.production_candidates("test/test_parser.rb"))
+
+    def test_ruby_engine_prefix_is_preserved(self) -> None:
+        cands = mbg.production_candidates("engines/billing/spec/models/invoice_spec.rb")
+        self.assertEqual(cands[0], "engines/billing/app/models/invoice.rb")
+        self.assertIn("engines/billing/lib/models/invoice.rb", cands)
+
+    def test_ruby_sibling_outside_test_root(self) -> None:
+        self.assertEqual(mbg.production_candidates("lib/parser_test.rb"), ["lib/parser.rb"])
+
+    def test_ruby_test_root_skips_sibling(self) -> None:
+        self.assertNotIn("test/models/user.rb", mbg.production_candidates("test/models/user_test.rb"))
+
+    def test_ruby_non_test_files_have_no_candidates(self) -> None:
+        for path in [
+            "spec/spec_helper.rb",
+            "spec/rails_helper.rb",
+            "test/test_helper.rb",
+            "app/models/user.rb",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(mbg.production_candidates(path), [])
+
     def test_js_ts_test_subdir_walkout(self) -> None:
         # Some JS/TS projects use `<dir>/test/` or `<dir>/spec/` instead of
         # the more idiomatic `__tests__/`. Walk out of either.
@@ -426,6 +466,45 @@ class LinkTestsTests(unittest.TestCase):
             edges[0]["target"],
             "file:modules/core/src/test/scala/com/foo/BarSpec.scala",
         )
+
+    def test_ruby_rails_pairing_emits_forward_edges(self) -> None:
+        nodes_by_id = {
+            f"file:{path}": _file_node(path)
+            for path in [
+                "app/models/user.rb",
+                "test/models/user_test.rb",
+                "app/controllers/api/users_controller.rb",
+                "spec/controllers/api/users_controller_spec.rb",
+            ]
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual((added, dropped, tagged, swapped), (2, 0, 2, 0))
+        self.assertEqual(
+            {(e["source"], e["target"]) for e in edges},
+            {
+                ("file:app/models/user.rb", "file:test/models/user_test.rb"),
+                (
+                    "file:app/controllers/api/users_controller.rb",
+                    "file:spec/controllers/api/users_controller_spec.rb",
+                ),
+            },
+        )
+        self.assertTrue(all(e["direction"] == "forward" for e in edges))
+
+    def test_ruby_support_file_in_test_tree_is_not_paired(self) -> None:
+        nodes_by_id = {
+            f"file:{path}": _file_node(path)
+            for path in ["test/support/user.rb", "test/support/user_test.rb"]
+        }
+        edges: list[dict[str, Any]] = []
+
+        added, _dropped, _tagged, _swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual(added, 0)
+        self.assertEqual(edges, [])
 
     def test_swift_canonical_llm_edge_is_preserved(self) -> None:
         # Regression for #646: a production → test edge must not be treated
