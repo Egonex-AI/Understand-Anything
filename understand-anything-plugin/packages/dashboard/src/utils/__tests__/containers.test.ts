@@ -129,3 +129,66 @@ describe("deriveContainers — community fallback", () => {
     expect(ungrouped.length).toBe(10);
   });
 });
+
+describe("deriveContainers — container labels", () => {
+  // Two dense groups of 5 nodes in one folder, so the community path runs.
+  const nodes = Array.from({ length: 10 }, (_, i) =>
+    node(`n${i}`, `services/n${i}.go`),
+  );
+  const edges: GraphEdge[] = [];
+  for (const group of [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]) {
+    for (const i of group) {
+      for (const j of group) {
+        if (i !== j) edges.push({ source: `n${i}`, target: `n${j}`, type: "calls" } as GraphEdge);
+      }
+    }
+  }
+  const idsOf = (from: number) =>
+    [0, 1, 2, 3, 4].map((k) => `n${from + k}`);
+
+  it("replaces fallback names with matching labels", () => {
+    const { containers } = deriveContainers(nodes, edges, [
+      { name: "Billing", nodeIds: idsOf(0) },
+      { name: "Auth", nodeIds: idsOf(5) },
+    ]);
+    const byMember = (id: string) =>
+      containers.find((c) => c.nodeIds.includes(id))!;
+    expect(byMember("n0").name).toBe("Billing");
+    expect(byMember("n7").name).toBe("Auth");
+  });
+
+  it("still matches when the label lists one node more or less", () => {
+    const { containers } = deriveContainers(nodes, edges, [
+      { name: "Billing", nodeIds: [...idsOf(0).slice(0, 4), "n9"] },
+    ]);
+    const c = containers.find((x) => x.nodeIds.includes("n0"))!;
+    expect(c.name).toBe("Billing");
+  });
+
+  it("keeps the fallback name when overlap is too low", () => {
+    const { containers } = deriveContainers(nodes, edges, [
+      { name: "Other", nodeIds: ["n0", "n5", "x1", "x2", "x3"] },
+    ]);
+    for (const c of containers) expect(c.name).toMatch(/^Cluster [A-Z]$/);
+  });
+
+  it("uses each label for at most one container", () => {
+    const { containers } = deriveContainers(nodes, edges, [
+      { name: "Billing", nodeIds: idsOf(0) },
+    ]);
+    expect(containers.filter((c) => c.name === "Billing")).toHaveLength(1);
+  });
+
+  it("leaves folder containers alone", () => {
+    const folderNodes = [
+      node("a", "src/auth/login.go"),
+      node("b", "src/auth/oauth.go"),
+      node("c", "src/cart/cart.go"),
+      node("d", "src/cart/checkout.go"),
+    ];
+    const { containers } = deriveContainers(folderNodes, [], [
+      { name: "Renamed", nodeIds: ["a", "b"] },
+    ]);
+    expect(containers.map((c) => c.name).sort()).toEqual(["auth", "cart"]);
+  });
+});

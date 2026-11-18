@@ -555,6 +555,35 @@ All four fields (`id`, `name`, `description`, `nodeIds`) are required.
 >
 > Maintain the same layer names and IDs where possible. Only add/remove layers if the file structure has materially changed.
 
+### Phase 4.5 — NAME CONTAINERS
+
+Run this step right after Phase 4, only when Phase 4 ran. Skip it when no layer has at least 8 file-level nodes.
+
+The dashboard groups the files of a layer into boxes. When folders give no useful grouping, it labels the boxes "Cluster A", "Cluster B". This step lets an agent name those groups.
+
+1. Use the `container-namer` agent definition (at `agents/container-namer.md`). Append `$LANGUAGE_DIRECTIVE` to its prompt.
+2. Dispatch it with the layers that have at least 8 file-level nodes:
+
+> Name the file groups of these layers.
+> Write output to: `$UA_DIR/intermediate/container-labels.json`
+>
+> Layers:
+> ```json
+> [list of {id, name, description, nodes: [{id, name, filePath, summary, tags}]} — file-level nodes only]
+> ```
+>
+> Edges between the nodes of the same layer:
+> ```json
+> [list of {source, target, type} — both ends in the same layer]
+> ```
+
+3. Read `$UA_DIR/intermediate/container-labels.json`. For each entry, find the layer with the same `layerId` and set `layer.containerLabels` to its `labels` array. Drop labels whose `nodeIds` are not in the merged node set. Drop labels with an empty name or fewer than two remaining `nodeIds`.
+4. If the file is missing or is not valid JSON, continue without labels. The dashboard then keeps its default "Cluster X" names. This step must never stop the analysis.
+
+`containerLabels` is optional. Each label is `{ "name": string, "nodeIds": string[] }`. The dashboard matches a label to a derived box by member overlap, not by ID, so a label still applies when a few files move.
+
+For incremental updates, existing `containerLabels` stay on their layer. Re-run this step only when Phase 4 re-ran.
+
 ---
 
 ## Phase 5 — TOUR

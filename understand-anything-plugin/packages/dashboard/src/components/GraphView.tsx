@@ -499,6 +499,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     const { containers, ungrouped } = deriveContainers(
       filteredGraphNodes,
       filteredGraphEdges,
+      activeLayer.containerLabels,
     );
     const ungroupedSet = new Set(ungrouped);
     const nodeToContainer = new Map<string, string>();

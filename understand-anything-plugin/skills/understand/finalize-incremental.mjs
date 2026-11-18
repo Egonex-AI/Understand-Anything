@@ -147,8 +147,25 @@ function normalizeLayerShape(rawLayers, nodeIds, pathIndex) {
       nodeIds: refs
         .map(ref => resolveNodeRef(ref, nodeIds, pathIndex))
         .filter(Boolean),
+      ...normalizeContainerLabels(layer?.containerLabels, nodeIds, pathIndex),
     };
   });
+}
+
+// Keeps optional AI-written container names across incremental updates.
+// Labels match derived containers by member overlap, so stale members are
+// dropped here and a label that loses all members is removed.
+function normalizeContainerLabels(rawLabels, nodeIds, pathIndex) {
+  if (!Array.isArray(rawLabels)) return {};
+  const containerLabels = rawLabels
+    .map(label => ({
+      name: typeof label?.name === 'string' ? label.name.trim() : '',
+      nodeIds: (Array.isArray(label?.nodeIds) ? label.nodeIds : [])
+        .map(ref => resolveNodeRef(ref, nodeIds, pathIndex))
+        .filter(Boolean),
+    }))
+    .filter(label => label.name && label.nodeIds.length > 0);
+  return containerLabels.length > 0 ? { containerLabels } : {};
 }
 
 function directorySegments(filePath) {
