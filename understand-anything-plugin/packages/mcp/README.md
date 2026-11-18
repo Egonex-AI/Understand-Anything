@@ -226,6 +226,51 @@ Recommended agent flow (encoded in the server's `instructions`):
 → Dashboard is running at http://127.0.0.1:55291/?token=448e5fe9…
 ```
 
+#### Explain a dependency call and verify its version
+
+Try this in a public scratch repository. Commit these files, then create its
+knowledge graph as described in [section 3](#3-ingesting-a-repository).
+
+`package.json`:
+
+```json
+{
+  "type": "module",
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}
+```
+
+`src/schema.ts`:
+
+```ts
+import * as z from "zod";
+
+export function userSchema() {
+  return z.toJSONSchema(z.object({ name: z.string() }));
+}
+```
+
+1. Check `understand_status`. If the graph is missing or out of date, commit
+   any fixture changes, run `/understand --full`, then check the status again.
+   Once the graph is fresh, ask the client: “Use `understand_explain` with
+   `path: "src/schema.ts:userSchema"` to locate and explain the `z.toJSONSchema`
+   call. Read the source and the dependency pin locally and cite both as
+   file:line.”
+2. When you want to verify the version claim, configure a public search tool
+   separately in the MCP client, such as [Parallel MCP](https://docs.parallel.ai/integrations/mcp/installation)
+   (`web_search` works without an API key). Use a separate session outside
+   the repository with just the search tool enabled. Ask: “Search zod.dev
+   for whether Zod 4.6.7 supports built-in JSON Schema conversion. Cite the
+   official docs.” Keep repo paths, file contents, and graph output in the
+   local session.
+3. In the answer, cite the call and pin at their current lines
+   (`src/schema.ts:4` and `package.json:4` for the files above).
+   If the lookup succeeds, cite the official source separately, such as the
+   [Zod 4 release notes](https://zod.dev/v4#json-schema-conversion). If the lookup
+   fails, report the local explanation and leave the version claim unverified.
+
 ### 6.3 Raw JSON-RPC over stdio
 
 Requests are newline-delimited JSON-RPC 2.0 on the server's stdin:
