@@ -1,5 +1,6 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
+import { FILE_SCOPE_CALLER } from "./types.js";
 import { findChild, findChildren } from "./base-extractor.js";
 
 /**
@@ -164,9 +165,12 @@ export class PythonExtractor implements LanguageExtractor {
             c.type === "identifier" ||
             c.type === "attribute",
         );
-        if (calleeNode && functionStack.length > 0) {
+        if (calleeNode) {
           entries.push({
-            caller: functionStack[functionStack.length - 1],
+            caller:
+              functionStack.length > 0
+                ? functionStack[functionStack.length - 1]
+                : FILE_SCOPE_CALLER,
             callee: calleeNode.text,
             lineNumber: node.startPosition.row + 1,
           });
