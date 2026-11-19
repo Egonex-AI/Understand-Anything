@@ -583,13 +583,16 @@ export class ScalaExtractor implements LanguageExtractor {
     return null;
   }
 
+  /**
+   * `xs map f` is a call to `map`. Read the grammar's `operator` field rather
+   * than counting `identifier` children: symbolic operators (`a + b`,
+   * `x :: xs`) are `operator_identifier` nodes, and a left operand such as
+   * `o.items` is a `field_expression`, so a positional pick lands on an operand.
+   * Symbolic operators are not recorded as calls.
+   */
   private extractInfixName(infixNode: TreeSitterNode): string | null {
-    const identifiers: string[] = [];
-    for (let i = 0; i < infixNode.childCount; i++) {
-      const child = infixNode.child(i);
-      if (child && child.type === "identifier") identifiers.push(child.text);
-    }
-    return identifiers[1] ?? identifiers[0] ?? null;
+    const operator = infixNode.childForFieldName("operator");
+    return operator?.type === "identifier" ? operator.text : null;
   }
 
   private extractConstructorName(instanceNode: TreeSitterNode): string | null {
