@@ -607,6 +607,15 @@ describe("DockerfileParser edge cases", () => {
     expect(result.services![1].lineRange).toBeDefined();
     expect(result.services![1].lineRange![0]).toBe(4);
   });
+
+  it("skips FROM flags such as --platform when reading the image and stage name", () => {
+    const content = "FROM --platform=$BUILDPLATFORM golang:1.22 AS build\nRUN go build ./...\n\nFROM --platform=linux/amd64 alpine:3.20\nCOPY --from=build /out /app";
+    const result = parser.analyzeFile("Dockerfile", content);
+    expect(result.services).toBeDefined();
+    expect(result.services!).toHaveLength(2);
+    expect(result.services![0]).toMatchObject({ name: "build", image: "golang:1.22" });
+    expect(result.services![1]).toMatchObject({ name: "alpine", image: "alpine:3.20" });
+  });
 });
 
 describe("EnvParser edge cases", () => {
