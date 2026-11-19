@@ -760,12 +760,11 @@ async function main() {
 
   const failures = [];
 
-  // 1. Enumerate. Either git ls-files or recursive walk.
-  const candidates = enumerateFiles(projectRoot).filter(
-    rel =>
-      !excludeAnalysisData ||
-      (!rel.startsWith('.ua/') && !rel.startsWith('.understand-anything/')),
-  );
+  // 1. Enumerate. The grammar report must never become evidence for itself.
+  const candidates = enumerateFiles(projectRoot).filter(rel => {
+    if (/^\.(?:ua|understand-anything)\/semantic-claims\.json(?:\.tmp-[^/]+)?$/.test(rel)) return false;
+    return !excludeAnalysisData || (!rel.startsWith('.ua/') && !rel.startsWith('.understand-anything/'));
+  });
 
   // 2. Filter via createIgnoreFilter (defaults + .understandignore + CLI excludes).
   //    Build a defaults-only filter in parallel to count user-driven drops.
