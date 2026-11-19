@@ -492,6 +492,26 @@ describe("SQLParser edge cases", () => {
     expect(result.definitions).toBeDefined();
     expect(result.definitions!.some(d => d.name === "active" && d.kind === "view")).toBe(true);
   });
+
+  it("ends a table at its closing paren when table options follow it", () => {
+    const content = [
+      "CREATE TABLE `users` (",
+      "  `id` int NOT NULL,",
+      "  `email` varchar(255) NOT NULL,",
+      "  PRIMARY KEY (`id`)",
+      ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+      "",
+      "CREATE TABLE `orders` (",
+      "  `id` int NOT NULL,",
+      "  `user_id` int NOT NULL",
+      ");",
+    ].join("\n");
+    const result = parser.analyzeFile("dump.sql", content);
+    expect(result.definitions).toEqual([
+      { name: "users", kind: "table", lineRange: [1, 5], fields: ["id", "email"] },
+      { name: "orders", kind: "table", lineRange: [7, 10], fields: ["id", "user_id"] },
+    ]);
+  });
 });
 
 describe("GraphQLParser edge cases", () => {

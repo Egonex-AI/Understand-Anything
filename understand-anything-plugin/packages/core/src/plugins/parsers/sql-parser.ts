@@ -35,9 +35,9 @@ export class SQLParser implements AnalyzerPlugin {
 
       // Find the end of the CREATE TABLE statement
       const afterMatch = content.slice(match.index);
-      const endParen = afterMatch.indexOf(");");
+      const endParen = this.findClosingParen(afterMatch);
       const endLine = endParen !== -1
-        ? content.slice(0, match.index + endParen + 2).split("\n").length
+        ? content.slice(0, match.index + endParen + 1).split("\n").length
         : startLine + 5;
 
       definitions.push({
@@ -75,13 +75,28 @@ export class SQLParser implements AnalyzerPlugin {
     return definitions;
   }
 
+  /**
+   * Find the `)` that closes the first `(` in `text`, so table options after
+   * the column list (e.g. MySQL `) ENGINE=InnoDB;`) do not hide the end.
+   */
+  private findClosingParen(text: string): number {
+    const openParen = text.indexOf("(");
+    if (openParen === -1) return -1;
+    let depth = 0;
+    for (let i = openParen; i < text.length; i++) {
+      if (text[i] === "(") depth++;
+      else if (text[i] === ")" && --depth === 0) return i;
+    }
+    return -1;
+  }
+
   private extractColumns(content: string, startIdx: number): string[] {
     const fields: string[] = [];
     const afterCreate = content.slice(startIdx);
     const openParen = afterCreate.indexOf("(");
     if (openParen === -1) return fields;
 
-    const closeParen = afterCreate.indexOf(");", openParen);
+    const closeParen = this.findClosingParen(afterCreate);
     if (closeParen === -1) return fields;
 
     const body = afterCreate.slice(openParen + 1, closeParen);
