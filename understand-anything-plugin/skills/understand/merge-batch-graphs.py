@@ -82,6 +82,31 @@ TYPE_TO_PREFIX: dict[str, str] = {
     "source": "source",
 }
 
+# Mirrors NODE_TYPE_ALIASES plus NON_DESIGN_NODE_TYPE_ALIASES in
+# packages/core/src/schema.ts, so a type the dashboard would alias is
+# canonicalized here before it picks an ID prefix.
+NODE_TYPE_ALIASES: dict[str, str] = {
+    "func": "function", "fn": "function", "method": "function",
+    "interface": "class", "struct": "class", "mod": "module",
+    "pkg": "module", "package": "module", "container": "service",
+    "deployment": "service", "pod": "service", "doc": "document",
+    "readme": "document", "docs": "document", "job": "pipeline",
+    "ci": "pipeline", "route": "endpoint", "api": "endpoint",
+    "query": "endpoint", "mutation": "endpoint", "setting": "config",
+    "env": "config", "configuration": "config", "infra": "resource",
+    "infrastructure": "resource", "terraform": "resource",
+    "migration": "table", "database": "table", "db": "table",
+    "view": "table", "proto": "schema", "protobuf": "schema",
+    "definition": "schema", "typedef": "schema",
+    "business_domain": "domain", "business_flow": "flow",
+    "business_process": "flow", "task": "step", "business_step": "step",
+    "note": "article", "wiki_page": "article", "person": "entity",
+    "actor": "entity", "organization": "entity", "tag": "topic",
+    "category": "topic", "theme": "topic", "assertion": "claim",
+    "decision": "claim", "thesis": "claim", "reference": "source",
+    "raw": "source", "paper": "source", "page": "article",
+}
+
 COMPLEXITY_MAP: dict[str, str] = {
     "low": "simple",
     "easy": "simple",
@@ -230,8 +255,8 @@ def classify_id_fix(original: str, corrected: str) -> str:
     return f"{original} → {corrected}"
 
 
-def normalize_node_id(node_id: str, node: dict[str, Any]) -> str:
-    """Normalize a node ID, returning the corrected version."""
+def _strip_id_noise(node_id: str) -> str:
+    """Strip double and project-name prefixes and canonicalize ``func:``."""
     nid = node_id
 
     # Strip double prefix: "file:file:src/foo.ts" → "file:src/foo.ts"
@@ -254,9 +279,39 @@ def normalize_node_id(node_id: str, node: dict[str, Any]) -> str:
     if nid.startswith("func:") and not nid.startswith("function:"):
         nid = "function:" + nid[5:]
 
+    return nid
+
+
+def _known_prefix(node_id: str) -> str | None:
+    """Return the recognized ID prefix of ``node_id``, or None."""
+    prefix = node_id.split(":", 1)[0]
+    return prefix if prefix in VALID_NODE_PREFIXES and ":" in node_id else None
+
+
+def normalize_node_type(node_id: str, node_type: Any) -> tuple[str | None, str]:
+    """Canonicalize a non-empty node type before its ID is normalized.
+
+    Returns (type, status): status is "ok", "alias" (lowercased or aliased like
+    the dashboard does), "inferred" (unknown type, taken from the ID prefix)
+    or "unknown" (no usable type or prefix; type is None).
+    """
+    if isinstance(node_type, str):
+        lowered = node_type.lower()
+        canonical = NODE_TYPE_ALIASES.get(lowered, lowered)
+        if canonical in TYPE_TO_PREFIX:
+            return canonical, "ok" if canonical == node_type else "alias"
+    prefix = _known_prefix(_strip_id_noise(node_id))
+    if prefix is None:
+        return None, "unknown"
+    return TYPE_TO_PREFIX[prefix], "inferred"
+
+
+def normalize_node_id(node_id: str, node: dict[str, Any]) -> str:
+    """Normalize a node ID, returning the corrected version."""
+    nid = _strip_id_noise(node_id)
+
     # Add missing prefix for bare file paths
-    has_prefix = any(nid.startswith(f"{p}:") for p in VALID_NODE_PREFIXES)
-    if not has_prefix:
+    if _known_prefix(nid) is None:
         node_type = node.get("type", "file")
         prefix = TYPE_TO_PREFIX.get(node_type, "file")
         if node_type in ("function", "class"):
@@ -816,6 +871,7 @@ def merge_and_normalize(
     # ── Pattern counters for "Fixed" report ──────────────────────────
     id_fix_patterns: Counter[str] = Counter()
     complexity_fix_patterns: Counter[str] = Counter()
+    type_fix_patterns: Counter[str] = Counter()
 
     # ── Detail lists for "Could not fix" report ──────────────────────
     unfixable: list[str] = []
@@ -833,7 +889,6 @@ def merge_and_normalize(
     # ── Step 2: Normalize node IDs and build ID mapping ──────────────
     id_mapping: dict[str, str] = {}  # original → corrected
     nodes_with_ids: list[dict] = []
-    unknown_node_types: Counter[str] = Counter()
 
     for i, node in enumerate(all_nodes):
         original_id = node.get("id")
@@ -841,10 +896,21 @@ def merge_and_normalize(
             unfixable.append(f"Node[{i}] has no 'id' field (name={node.get('name', '?')}, type={node.get('type', '?')})")
             continue
 
-        # Flag unknown node types
+        # Canonicalize the type before it decides the ID prefix (#742).
+        # A missing or empty type keeps the "file" default below.
         node_type = node.get("type", "")
-        if node_type and node_type not in TYPE_TO_PREFIX:
-            unknown_node_types[node_type] += 1
+        if node_type:
+            canonical, status = normalize_node_type(original_id, node_type)
+            if canonical is None:
+                unfixable.append(
+                    f"Node '{original_id}' dropped: unknown type "
+                    f"{json.dumps(node_type)} and no recognized id prefix"
+                )
+                continue
+            if status != "ok":
+                how = "inferred from id prefix" if status == "inferred" else "alias"
+                type_fix_patterns[f"type {json.dumps(node_type)} → \"{canonical}\" ({how})"] += 1
+                node["type"] = canonical
 
         nodes_with_ids.append(node)
         corrected_id = normalize_node_id(original_id, node)
@@ -950,6 +1016,9 @@ def merge_and_normalize(
     if complexity_fix_patterns:
         for pattern, count in complexity_fix_patterns.most_common():
             fixed_lines.append(f"  {count:>4} × complexity {pattern}")
+    if type_fix_patterns:
+        for pattern, count in type_fix_patterns.most_common():
+            fixed_lines.append(f"  {count:>4} × {pattern}")
     if edges_rewritten:
         fixed_lines.append(f"  {edges_rewritten:>4} × edge references rewritten after ID normalization")
     if duplicate_count:
@@ -964,6 +1033,7 @@ def merge_and_normalize(
         total_fixes = (
             sum(id_fix_patterns.values())
             + sum(complexity_fix_patterns.values())
+            + sum(type_fix_patterns.values())
             + edges_rewritten
             + duplicate_count
             + tested_by_swapped
@@ -984,14 +1054,10 @@ def merge_and_normalize(
     unfixable_total = (
         len(unfixable)
         + sum(complexity_unknown_patterns.values())
-        + sum(unknown_node_types.values())
     )
     if unfixable_total:
         report.append("")
         report.append(f"Could not fix ({unfixable_total} issues — needs agent review):")
-        # Unknown node types (grouped by count)
-        for ntype, count in unknown_node_types.most_common():
-            report.append(f"  {count:>4} × unknown node type \"{ntype}\" (not in schema, kept as-is)")
         # Unknown complexity patterns (grouped by count)
         for pattern, count in complexity_unknown_patterns.most_common():
             report.append(f"  {count:>4} × {pattern}")
