@@ -1,7 +1,7 @@
 import type { TreeSitterNode as Node } from "./extractors/types.js";
 import type { SymbolEvidenceEntry } from "./symbol-evidence.js";
 import { declarationKey, declarationName } from "./symbol-ast.js";
-import { CLASS_NODES, FUNCTION_NODES, UNKNOWN_SCOPE, type SymbolScope } from "./symbol-scopes.js";
+import { CLASS_NODES, FUNCTION_NODES, UNKNOWN_SCOPE, isClassNode, type SymbolScope } from "./symbol-scopes.js";
 
 /** Declaration surfaces handled by the inventory/effect adapters. Everything
  * else exposing a declaration name defaults to an explicit coverage gap. */
@@ -15,10 +15,14 @@ const NON_DECLARATION_NAMES = new Set(["export_specifier", "import_specifier", "
   "typed_default_parameter", "parameter_declaration", "keyword_argument", "keyword_parameter", "block_parameter",
   "hash_splat_parameter", "splat_parameter", "scope_resolution", "variable_reference_pattern", "as_pattern",
   "enum_assignment", "enum_body"]);
+// Java references and statement-local bindings. Record components, enum
+// constants, compact constructors and annotation elements remain gaps.
+const JAVA_NON_DECLARATION_NAMES = new Set(["scoped_identifier", "method_invocation", "marker_annotation", "annotation",
+  "catch_formal_parameter", "enhanced_for_statement", "instanceof_expression", "resource"]);
 const OPAQUE_DECLARATIONS = new Set(["macro_invocation", "preproc_call", "preproc_function_def"]);
-export const COVERAGE_LANGUAGES = new Set(["javascript", "typescript", "tsx", "ruby", "python", "go", "rust", "cpp"]);
+export const COVERAGE_LANGUAGES = new Set(["javascript", "typescript", "tsx", "ruby", "python", "go", "rust", "cpp", "java"]);
 
-export function declarationGap(node: Node, scope: SymbolScope, receiver: SymbolScope): SymbolEvidenceEntry | null {
+export function declarationGap(node: Node, scope: SymbolScope, receiver: SymbolScope, language: string): SymbolEvidenceEntry | null {
   const range: [number, number] = [node.startPosition.row + 1, node.endPosition.row + 1];
   // TypeScript parameter properties have both parameter-binding and class-
   // member roles. Their declaration target is the indexed receiver scope.
@@ -31,7 +35,8 @@ export function declarationGap(node: Node, scope: SymbolScope, receiver: SymbolS
   if (OPAQUE_DECLARATIONS.has(node.type)) return { kind: null, scope: UNKNOWN_SCOPE, name: null,
     lineRange: range, reason: `Declaration expansion is not verified: ${node.type}` };
   const name = declarationKey(node);
-  if (!name || HANDLED_NAMES.has(node.type) || NON_DECLARATION_NAMES.has(node.type)) return null;
+  if (!name || HANDLED_NAMES.has(node.type) || isClassNode(node.type, language) || NON_DECLARATION_NAMES.has(node.type)
+    || language === "java" && JAVA_NON_DECLARATION_NAMES.has(node.type)) return null;
   return { kind: null, scope, name: declarationName(name), lineRange: range,
     reason: `Declaration surface is not covered: ${node.type}` };
 }
