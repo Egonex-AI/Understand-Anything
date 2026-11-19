@@ -76,7 +76,7 @@ Point `/understand-knowledge` at a [Karpathy-pattern LLM wiki](https://gist.gith
     </td>
     <td width="50%" valign="top">
       <h3>🔍 Fuzzy & Semantic Search</h3>
-      <p>Find anything by name or by meaning. Search "which parts handle auth?" and get relevant results across the graph.</p>
+      <p>Hybrid search (BM25 + typo tolerance + concept matching) that finds nodes by meaning, not just exact words, and shows <em>why</em> each result matched. Search "which parts handle auth?" and get relevant results across the graph.</p>
     </td>
   </tr>
   <tr>

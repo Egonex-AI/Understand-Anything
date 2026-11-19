@@ -17,6 +17,10 @@
       "types": "./dist/types.d.ts",
       "default": "./dist/types.js"
     },
+    "./semantic": {
+      "types": "./dist/semantic/index.d.ts",
+      "default": "./dist/semantic/index.js"
+    },
     "./schema": {
       "types": "./dist/schema.d.ts",
       "default": "./dist/schema.js"
