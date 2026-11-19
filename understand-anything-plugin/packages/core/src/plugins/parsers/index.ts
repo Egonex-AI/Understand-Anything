@@ -10,6 +10,7 @@ export { ProtobufParser } from "./protobuf-parser.js";
 export { TerraformParser } from "./terraform-parser.js";
 export { MakefileParser } from "./makefile-parser.js";
 export { ShellParser } from "./shell-parser.js";
+export { findClosingBrace, countBracesPerLine } from "./brace-matcher.js";
 
 import type { PluginRegistry } from "../registry.js";
 import { MarkdownParser } from "./markdown-parser.js";
