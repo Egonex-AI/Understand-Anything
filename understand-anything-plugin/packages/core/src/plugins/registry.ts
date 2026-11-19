@@ -40,8 +40,8 @@ export class PluginRegistry {
     return this.languageMap.get(language) ?? null;
   }
 
-  getPluginForFile(filePath: string): AnalyzerPlugin | null {
-    const langConfig = this.languageRegistry.getForFile(filePath);
+  getPluginForFile(filePath: string, content?: string): AnalyzerPlugin | null {
+    const langConfig = this.languageRegistry.getForFile(filePath, content);
     if (!langConfig) return null;
     return this.getPluginForLanguage(langConfig.id);
   }
@@ -49,24 +49,24 @@ export class PluginRegistry {
   /**
    * Get the language id for a file path using the language registry.
    */
-  getLanguageForFile(filePath: string): string | null {
-    return this.languageRegistry.getForFile(filePath)?.id ?? null;
+  getLanguageForFile(filePath: string, content?: string): string | null {
+    return this.languageRegistry.getForFile(filePath, content)?.id ?? null;
   }
 
   analyzeFile(filePath: string, content: string): StructuralAnalysis | null {
-    const plugin = this.getPluginForFile(filePath);
+    const plugin = this.getPluginForFile(filePath, content);
     if (!plugin) return null;
     return plugin.analyzeFile(filePath, content);
   }
 
   resolveImports(filePath: string, content: string): ImportResolution[] | null {
-    const plugin = this.getPluginForFile(filePath);
+    const plugin = this.getPluginForFile(filePath, content);
     if (!plugin || !plugin.resolveImports) return null;
     return plugin.resolveImports(filePath, content);
   }
 
   extractCallGraph(filePath: string, content: string): CallGraphEntry[] | null {
-    const plugin = this.getPluginForFile(filePath);
+    const plugin = this.getPluginForFile(filePath, content);
     if (!plugin?.extractCallGraph) return null;
     return plugin.extractCallGraph(filePath, content);
   }
@@ -80,7 +80,7 @@ export class PluginRegistry {
     filePath: string,
     content: string,
   ): { structure: StructuralAnalysis; callGraph: CallGraphEntry[] } | null {
-    const plugin = this.getPluginForFile(filePath);
+    const plugin = this.getPluginForFile(filePath, content);
     if (!plugin?.analyzeFileFull) return null;
     return plugin.analyzeFileFull(filePath, content);
   }

@@ -4,6 +4,7 @@ export const pythonConfig = {
   id: "python",
   displayName: "Python",
   extensions: [".py", ".pyi"],
+  interpreters: ["python", "python2", "python3"],
   treeSitter: {
     wasmPackage: "tree-sitter-python",
     wasmFile: "tree-sitter-python.wasm",

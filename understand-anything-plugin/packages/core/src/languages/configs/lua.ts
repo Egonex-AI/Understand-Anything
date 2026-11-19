@@ -4,6 +4,7 @@ export const luaConfig = {
   id: "lua",
   displayName: "Lua",
   extensions: [".lua"],
+  interpreters: ["lua"],
   concepts: [
     "tables",
     "metatables",

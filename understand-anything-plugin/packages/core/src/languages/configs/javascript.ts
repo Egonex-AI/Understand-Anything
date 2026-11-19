@@ -4,6 +4,7 @@ export const javascriptConfig = {
   id: "javascript",
   displayName: "JavaScript",
   extensions: [".js", ".jsx", ".mjs", ".cjs"],
+  interpreters: ["node", "nodejs"],
   treeSitter: {
     wasmPackage: "tree-sitter-javascript",
     wasmFile: "tree-sitter-javascript.wasm",

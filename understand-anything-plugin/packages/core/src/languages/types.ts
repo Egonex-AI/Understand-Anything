@@ -28,6 +28,7 @@ export const LanguageConfigSchema = z.object({
   displayName: z.string().min(1),
   extensions: z.array(z.string()),
   filenames: z.array(z.string()).optional(),
+  interpreters: z.array(z.string()).optional(),
   treeSitter: TreeSitterConfigSchema.optional(),
   concepts: z.array(z.string()),
   filePatterns: FilePatternConfigSchema,
