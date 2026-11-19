@@ -1613,5 +1613,37 @@ class TestIncrementalEdgeCandidates(unittest.TestCase):
         }])
 
 
+class ApplyImportReviewTests(unittest.TestCase):
+    """C# import review: false hits are removed, missed edges added, all recorded."""
+
+    def test_removes_false_hits_and_adds_missed(self) -> None:
+        import json
+        import tempfile
+
+        files = ["A.cs", "B.cs", "C.cs"]
+        assembled = {
+            "nodes": [{"id": f"file:{f}", "type": "file"} for f in files],
+            "edges": [
+                {"source": "file:A.cs", "target": "file:B.cs", "type": "imports"},
+                {"source": "file:A.cs", "target": "file:B.cs", "type": "calls"},
+            ],
+        }
+        batches = [{"nodes": [], "edges": [], "importReview": {
+            "A.cs": {"falseHits": ["B.cs"], "missed": [{"path": "C.cs", "why": "extension method"},
+                                                        {"path": "Nope.cs"}]},
+        }}]
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d) / "import-review.json"
+            mbg.apply_import_review(assembled, batches, out)
+            record = json.loads(out.read_text(encoding="utf-8"))
+
+        pairs = {(e["source"], e["target"], e["type"]) for e in assembled["edges"]}
+        self.assertNotIn(("file:A.cs", "file:B.cs", "imports"), pairs)
+        self.assertIn(("file:A.cs", "file:B.cs", "calls"), pairs)
+        self.assertIn(("file:A.cs", "file:C.cs", "imports"), pairs)
+        self.assertEqual((record["removed"], record["added"]), (1, 1))
+        self.assertEqual([m["applied"] for m in record["missed"]], [True, False])
+
+
 if __name__ == "__main__":
     unittest.main()

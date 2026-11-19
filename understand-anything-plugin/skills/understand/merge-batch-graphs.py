@@ -1149,6 +1149,63 @@ def recover_imports_from_scan(
     return recovered, lines
 
 
+# ── C# import review ──────────────────────────────────────────────────────
+
+def apply_import_review(
+    assembled: dict[str, Any],
+    batches: list[dict[str, Any]],
+    review_path: Path,
+) -> list[str]:
+    """Apply the file-analyzers' `importReview` verdicts on deterministic
+    C# type-reference imports: drop reported false hits, add reported missed
+    dependencies (marked `addedByReview`). Runs AFTER importMap recovery so a
+    removed false hit is not re-added. Every verdict, applied or not, is
+    written to `review_path` so the deterministic rule's precision and recall
+    can be measured."""
+    file_ids = {n.get("id", "") for n in assembled["nodes"] if n.get("type") == "file"}
+    false_hits: list[dict[str, str]] = []
+    missed: list[dict[str, str]] = []
+    for batch in batches:
+        review = batch.get("importReview")
+        if not isinstance(review, dict):
+            continue
+        for src_path, verdict in review.items():
+            if not isinstance(verdict, dict):
+                continue
+            for tgt in verdict.get("falseHits") or []:
+                if isinstance(tgt, str):
+                    false_hits.append({"source": src_path, "target": tgt})
+            for m in verdict.get("missed") or []:
+                tgt = m.get("path") if isinstance(m, dict) else m
+                if isinstance(tgt, str):
+                    missed.append({"source": src_path, "target": tgt,
+                                   "why": m.get("why", "") if isinstance(m, dict) else ""})
+
+    drop = {(f"file:{f['source']}", f"file:{f['target']}") for f in false_hits}
+    before = len(assembled["edges"])
+    assembled["edges"] = [
+        e for e in assembled["edges"]
+        if not (e.get("type") == "imports" and (e.get("source"), e.get("target")) in drop)
+    ]
+    removed = before - len(assembled["edges"])
+
+    existing = {(e.get("source"), e.get("target")) for e in assembled["edges"] if e.get("type") == "imports"}
+    added = 0
+    for m in missed:
+        s, t = f"file:{m['source']}", f"file:{m['target']}"
+        m["applied"] = s in file_ids and t in file_ids and s != t and (s, t) not in existing
+        if m["applied"]:
+            assembled["edges"].append({"source": s, "target": t, "type": "imports",
+                                       "direction": "forward", "weight": 0.7, "addedByReview": True})
+            existing.add((s, t))
+            added += 1
+
+    review_path.write_text(json.dumps({"falseHits": false_hits, "missed": missed,
+                                       "removed": removed, "added": added}, indent=2), encoding="utf-8")
+    return [f"  {len(false_hits)} false hits reported, {removed} imports edges removed; "
+            f"{len(missed)} missed reported, {added} added ({review_path.name})"]
+
+
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -1331,6 +1388,11 @@ def main() -> None:
         report.append("")
         report.append("Imports edge recovery:")
         report.extend(recovery_report)
+
+    review_report = apply_import_review(assembled, batches, intermediate_dir / "import-review.json")
+    report.append("")
+    report.append("Import review:")
+    report.extend(review_report)
 
     # Print report
     print("", file=sys.stderr)
