@@ -230,6 +230,13 @@ export class CppExtractor implements LanguageExtractor {
           this.extractFunctionDef(node, functions, exports, methodsByClass);
           break;
 
+        case "preproc_ifdef":
+        case "preproc_if":
+        case "preproc_else":
+        case "preproc_elif":
+          this.walkTopLevel(node, functions, classes, imports, exports, methodsByClass);
+          break;
+
         case "namespace_definition": {
           // Recurse into namespace body (declaration_list)
           const body = findChild(node, "declaration_list");
