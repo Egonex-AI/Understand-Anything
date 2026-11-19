@@ -528,6 +528,182 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     expect(result.output.importMap['src/app.ts']).toContain('lib/thing.ts');
   });
 
+  it('resolves re-export sources of barrel files', () => {
+    projectRoot = setupTree({
+      'src/index.ts':
+        `export * from './2024.01.01.init.migration';\n` +
+        `export * as math from './math';\n` +
+        `export { greet } from './greet';\n`,
+      'src/2024.01.01.init.migration.ts': `export class Init {}\n`,
+      'src/math.ts': `export const add = (a: number, b: number) => a + b;\n`,
+      'src/greet.ts': `export const greet = () => 'hi';\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'src/index.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/2024.01.01.init.migration.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/math.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/greet.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.ts']).toEqual([
+      'src/2024.01.01.init.migration.ts',
+      'src/greet.ts',
+      'src/math.ts',
+    ]);
+  });
+
+  it('applies paths inherited through tsconfig extends (Nx-style base config)', () => {
+    // Nx keeps every alias in a root tsconfig.base.json; package tsconfigs
+    // only `extends` it. Inherited targets anchor at the base config's dir.
+    projectRoot = setupTree({
+      'tsconfig.base.json': JSON.stringify({
+        compilerOptions: {
+          paths: { '@acme/ui/*': ['./libs/ui/src/lib/*/index.ts'] },
+        },
+      }),
+      'apps/web/tsconfig.json': JSON.stringify({
+        extends: '../../tsconfig.base.json',
+        compilerOptions: { jsx: 'react-jsx' },
+      }),
+      'apps/web/src/page.tsx': `import { Button } from '@acme/ui/button';\nexport const Page = Button;\n`,
+      'libs/ui/src/lib/button/index.ts': `export const Button = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.base.json', language: 'json', fileCategory: 'config' },
+        { path: 'apps/web/tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'apps/web/src/page.tsx', language: 'typescript', fileCategory: 'code' },
+        { path: 'libs/ui/src/lib/button/index.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['apps/web/src/page.tsx']).toEqual([
+      'libs/ui/src/lib/button/index.ts',
+    ]);
+  });
+
+  it('lets a child tsconfig replace inherited paths and honours an inherited baseUrl', () => {
+    projectRoot = setupTree({
+      'tsconfig.base.json': JSON.stringify({
+        compilerOptions: { baseUrl: 'src', paths: { '@old/*': ['old/*'] } },
+      }),
+      'tsconfig.json': JSON.stringify({
+        extends: './tsconfig.base',
+        compilerOptions: { paths: { '@new/*': ['new/*'] } },
+      }),
+      'src/app.ts': `import { a } from '@new/a';\nimport { b } from '@old/b';\nexport const c = a + b;\n`,
+      'src/new/a.ts': `export const a = 1;\n`,
+      'src/old/b.ts': `export const b = 2;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/new/a.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/old/b.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // Child `paths` replace the base's wholesale; targets resolve against the
+    // base's `baseUrl` ("src", anchored at the base config's directory).
+    expect(result.output.importMap['src/app.ts']).toEqual(['src/new/a.ts']);
+  });
+
+  it('resolves inherited aliases from a base config above the scanned package', () => {
+    // Scanning one package of a monorepo: the alias base lives outside the
+    // project root but its targets point back into the package.
+    const repoRoot = setupTree({
+      'tsconfig.base.json': JSON.stringify({
+        compilerOptions: {
+          paths: {
+            '@acme/ui/*': ['./packages/ui/src/*'],
+            '@acme/other': ['./packages/other/src/index.ts'],
+          },
+        },
+      }),
+      'packages/ui/tsconfig.json': JSON.stringify({ extends: '../../tsconfig.base.json' }),
+      'packages/ui/src/app.ts':
+        `import { x } from '@acme/ui/x';\nimport { o } from '@acme/other';\nexport const y = x + o;\n`,
+      'packages/ui/src/x.ts': `export const x = 1;\n`,
+      'packages/other/src/index.ts': `export const o = 2;\n`,
+    });
+    projectRoot = repoRoot;
+    const packageRoot = join(repoRoot, 'packages/ui');
+
+    const result = runScript(packageRoot, {
+      projectRoot: packageRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/x.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    // The sibling package is outside the project root and stays external.
+    expect(result.output.importMap['src/app.ts']).toEqual(['src/x.ts']);
+  });
+
+  it('warns and keeps own paths when an extends target is missing', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({
+        extends: './missing.json',
+        compilerOptions: { paths: { '@/*': ['src/*'] } },
+      }),
+      'src/app.ts': `import { a } from '@/a';\nexport const b = a;\n`,
+      'src/a.ts': `export const a = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/a.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(/extends \.\/missing\.json, which was not found/);
+    expect(result.output.importMap['src/app.ts']).toEqual(['src/a.ts']);
+  });
+
+  it('stops on an extends cycle and still applies the paths it reached', () => {
+    projectRoot = setupTree({
+      'tsconfig.json': JSON.stringify({ extends: './tsconfig.base.json' }),
+      'tsconfig.base.json': JSON.stringify({
+        extends: './tsconfig.json',
+        compilerOptions: { paths: { '@/*': ['src/*'] } },
+      }),
+      'src/app.ts': `import { a } from '@/a';\nexport const b = a;\n`,
+      'src/a.ts': `export const a = 1;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        { path: 'tsconfig.json', language: 'json', fileCategory: 'config' },
+        { path: 'src/app.ts', language: 'typescript', fileCategory: 'code' },
+        { path: 'src/a.ts', language: 'typescript', fileCategory: 'code' },
+      ],
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toMatch(/extends \.\/tsconfig\.json forms a cycle/);
+    expect(result.output.importMap['src/app.ts']).toEqual(['src/a.ts']);
+  });
+
   // ── #294: NodeNext / ESM TypeScript `.js → .ts` rewrite ────────────────
   //
   // Under `moduleResolution: NodeNext`, TypeScript does NOT rewrite import
