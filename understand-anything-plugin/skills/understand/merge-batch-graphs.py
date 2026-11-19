@@ -55,6 +55,16 @@ _PROJECT_PREFIX_RE = re.compile(
     r"^[^:]+:(" + "|".join(re.escape(p) for p in VALID_NODE_PREFIXES) + r"):(.+)$"
 )
 
+# `fileCategory` values from the project scanner. These are NOT node ID
+# prefixes, but file-analyzers occasionally emit `<category>:<path>` for file
+# nodes (e.g. "script:auto-heal-playbook.sh" for a shell script). Without this
+# set the project-prefix stripper treats the category as a project name and
+# rewrites the ID to "script:auto-heal-playbook.sh", which is then re-prefixed
+# into the permanently broken "file:script:auto-heal-playbook.sh".
+FILE_CATEGORIES = {
+    "code", "config", "docs", "doc", "infra", "data", "script", "markup",
+}
+
 # node.type → canonical ID prefix
 TYPE_TO_PREFIX: dict[str, str] = {
     "file": "file",
@@ -240,6 +250,22 @@ def normalize_node_id(node_id: str, node: dict[str, Any]) -> str:
         if nid.startswith(double):
             nid = nid[len(prefix) + 1:]
             break
+
+    # Repair/avoid a fileCategory masquerading as a prefix, e.g.
+    # "file:script:scripts/foo.sh". Two shapes:
+    #   a) "<valid-prefix>:<category>:<path>"  -> already-corrupted, strip category
+    #   b) "<category>:<path>"                 -> strip category, re-prefix below
+    # Both converge to a form whose lead segment is a VALID_NODE_PREFIX, so a
+    # second pass is a no-op (idempotent).
+    # When a leading VALID prefix is present, rebuild it from node.type rather
+    # than trusting it: a file-analyzer may have written "file:config:x.json"
+    # for an actual config node, and keeping "file:" would mislabel the type.
+    parts = nid.split(":", 2)
+    if len(parts) >= 3 and parts[0] in VALID_NODE_PREFIXES and parts[1] in FILE_CATEGORIES:
+        correct_prefix = TYPE_TO_PREFIX.get(node.get("type", "file"), "file")
+        nid = f"{correct_prefix}:{parts[2]}"
+    elif len(parts) >= 2 and parts[0] in FILE_CATEGORIES:
+        nid = parts[1] if len(parts) == 2 else f"{parts[1]}:{parts[2]}"
 
     # Strip project-name prefix: "my-project:file:src/foo.ts" → "file:src/foo.ts"
     # Pattern: <word>:<valid-prefix>:<path>
