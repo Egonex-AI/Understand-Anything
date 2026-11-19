@@ -29,7 +29,7 @@ export default function SearchBar() {
   const navigateToNodeInLayer = useDashboardStore((s) => s.navigateToNodeInLayer);
   const searchMode = useDashboardStore((s) => s.searchMode);
   const setSearchMode = useDashboardStore((s) => s.setSearchMode);
-  const { t } = useI18n();
+  const { t, localeKey } = useI18n();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,7 +134,9 @@ export default function SearchBar() {
         </div>
         {searchQuery.trim() && (
           <span className="hidden sm:inline text-xs text-text-muted shrink-0">
-            {searchResults.length} {t.search.result}{searchResults.length !== 1 ? "s" : ""}{" "}
+            {searchResults.length} {t.search.result}
+            {/* English-only plural suffix; other locales do not inflect this noun with "s". */}
+            {localeKey === "en" && searchResults.length !== 1 ? "s" : ""}{" "}
             <span className="text-text-muted">({searchMode})</span>
           </span>
         )}
