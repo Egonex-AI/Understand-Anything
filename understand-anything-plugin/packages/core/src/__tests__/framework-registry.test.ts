@@ -106,9 +106,9 @@ describe("FrameworkRegistry", () => {
   });
 
   describe("createDefault", () => {
-    it("registers all 10 built-in framework configs", () => {
+    it("registers all 11 built-in framework configs", () => {
       const registry = FrameworkRegistry.createDefault();
-      expect(registry.getAllFrameworks()).toHaveLength(10);
+      expect(registry.getAllFrameworks()).toHaveLength(11);
     });
 
     it("includes frameworks for multiple languages", () => {
