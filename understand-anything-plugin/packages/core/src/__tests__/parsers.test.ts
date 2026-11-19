@@ -492,6 +492,244 @@ describe("SQLParser edge cases", () => {
     expect(result.definitions).toBeDefined();
     expect(result.definitions!.some(d => d.name === "active" && d.kind === "view")).toBe(true);
   });
+
+  it("keeps the schema in schema-qualified names", () => {
+    const content = `CREATE TABLE public.users (id INT, name TEXT);
+CREATE VIEW reporting.active AS SELECT 1;
+CREATE INDEX public.idx_name ON public.users (name);`;
+    const defs = parser.analyzeFile("schema.sql", content).definitions!;
+    expect(defs.map(d => [d.kind, d.name])).toEqual([
+      ["table", "public.users"],
+      ["view", "reporting.active"],
+      ["index", "public.idx_name"],
+    ]);
+    expect(defs[0].fields).toEqual(["id", "name"]);
+  });
+
+  it("strips every quoting style from qualified names", () => {
+    const content = `CREATE TABLE "public"."users" (id INT);
+CREATE TABLE \`shop\`.\`items\` (id INT);
+CREATE TABLE [dbo].[Order Lines] (id INT);`;
+    const names = parser.analyzeFile("schema.sql", content).definitions!.map(d => d.name);
+    expect(names).toEqual(["public.users", "shop.items", "dbo.Order Lines"]);
+  });
+
+  it.each([
+    ["CREATE PROCEDURE get_user() BEGIN SELECT 1; END;", "procedure", "get_user"],
+    ["CREATE PROC dbo.GetUser AS SELECT 1;", "procedure", "dbo.GetUser"],
+    ["CREATE OR ALTER PROCEDURE [dbo].[GetUser] AS SELECT 1;", "procedure", "dbo.GetUser"],
+    ["CREATE OR REPLACE PROCEDURE app.sync() LANGUAGE plpgsql AS $$ BEGIN END; $$;", "procedure", "app.sync"],
+    ["CREATE DEFINER=`root`@`localhost` PROCEDURE `shop`.`refund`() BEGIN END;", "procedure", "shop.refund"],
+    ["CREATE PROCEDURE IF NOT EXISTS cleanup() BEGIN END;", "procedure", "cleanup"],
+    ["CREATE FUNCTION add_one(a INT) RETURNS INT RETURN a + 1;", "function", "add_one"],
+    ["CREATE OR REPLACE FUNCTION public.touch() RETURNS trigger AS $$ BEGIN END; $$ LANGUAGE plpgsql;", "function", "public.touch"],
+    ["CREATE TRIGGER audit AFTER INSERT ON users FOR EACH ROW EXECUTE FUNCTION touch();", "trigger", "audit"],
+    ["CREATE OR REPLACE TRIGGER app.audit BEFORE UPDATE ON app.users FOR EACH ROW BEGIN END;", "trigger", "app.audit"],
+    ["CREATE CONSTRAINT TRIGGER chk AFTER INSERT ON users FOR EACH ROW EXECUTE FUNCTION f();", "trigger", "chk"],
+    ["CREATE TEMP TRIGGER IF NOT EXISTS t1 AFTER DELETE ON users BEGIN SELECT 1; END;", "trigger", "t1"],
+  ])("extracts %s", (content, kind, name) => {
+    const defs = parser.analyzeFile("routines.sql", content).definitions!;
+    expect(defs.filter(d => d.kind === kind).map(d => d.name)).toEqual([name]);
+  });
+
+  it("spans routine bodies up to the next top-level statement", () => {
+    const content = `CREATE PROCEDURE a()
+BEGIN
+  SELECT 1;
+END;
+
+CREATE TRIGGER b AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+  SELECT 2;
+END;
+`;
+    const defs = parser.analyzeFile("routines.sql", content).definitions!;
+    expect(defs.map(d => [d.name, d.lineRange])).toEqual([
+      ["a", [1, 4]],
+      ["b", [6, 10]],
+    ]);
+  });
+
+  it("stops at a DELIMITER or GO line", () => {
+    const content = `DELIMITER //
+CREATE PROCEDURE a()
+BEGIN
+  SELECT 1;
+END//
+DELIMITER ;
+CREATE PROCEDURE b() AS SELECT 2
+GO
+SELECT 3;`;
+    const defs = parser.analyzeFile("routines.sql", content).definitions!;
+    expect(defs.map(d => [d.name, d.lineRange])).toEqual([
+      ["a", [2, 5]],
+      ["b", [7, 7]],
+    ]);
+  });
+
+  const summarize = (content: string) =>
+    parser.analyzeFile("x.sql", content).definitions!.map(d => `${d.kind}:${d.name}@${d.lineRange.join("-")}`);
+
+  it("ignores definitions inside comments", () => {
+    const content = `-- CREATE TABLE old1 (id INT);
+/* CREATE TRIGGER old2 AFTER INSERT ON t
+   CREATE PROCEDURE old3() BEGIN END; */
+# CREATE VIEW old4 AS SELECT 1;
+CREATE TABLE real (id INT);`;
+    expect(summarize(content)).toEqual(["table:real@5-5"]);
+  });
+
+  it("ignores definitions inside string literals", () => {
+    const content = `INSERT INTO log VALUES ('CREATE TABLE fake1 (id INT);');
+INSERT INTO log VALUES ('it''s CREATE TABLE fake2 (id INT);');
+INSERT INTO log VALUES ('it\\'s CREATE TABLE fake3 (id INT);');
+INSERT INTO log VALUES ('-- not a comment');
+CREATE TABLE real (id INT);`;
+    expect(summarize(content)).toEqual(["table:real@5-5"]);
+  });
+
+  it("does not read comment markers inside quoted identifiers", () => {
+    expect(summarize('CREATE TABLE "a--b" (id INT);\nCREATE TABLE c (id INT);').map(s => s.split("@")[0]))
+      .toEqual(["table:a--b", "table:c"]);
+  });
+
+  it("ignores comments and strings when listing columns", () => {
+    const content = `CREATE TABLE t (
+  id INT, -- first, primary
+  /* legacy, unused */
+  note TEXT DEFAULT 'a, b);',
+  age INT
+);`;
+    expect(parser.analyzeFile("x.sql", content).definitions![0]).toMatchObject({
+      fields: ["id", "note", "age"],
+      lineRange: [1, 6],
+    });
+  });
+
+  it("excludes statements inside a routine body", () => {
+    const content = `CREATE PROCEDURE a()
+BEGIN
+  CREATE TABLE inner_table (id INT);
+  CREATE INDEX inner_idx ON inner_table (id);
+CREATE VIEW unindented AS SELECT 1;
+END;
+CREATE TABLE after_routine (id INT);`;
+    expect(summarize(content)).toEqual(["table:after_routine@7-7", "procedure:a@1-6"]);
+  });
+
+  it("treats dollar-quoted and single-quoted bodies as part of the routine", () => {
+    const content = `CREATE FUNCTION a() RETURNS void AS $body$
+BEGIN
+  CREATE TABLE inner1 (id INT);
+END;
+$body$ LANGUAGE plpgsql;
+CREATE FUNCTION b() RETURNS void AS '
+  CREATE TABLE inner2 (id INT);
+' LANGUAGE sql;
+CREATE TABLE after_routines (id INT);`;
+    expect(summarize(content)).toEqual([
+      "table:after_routines@9-9",
+      "function:a@1-5",
+      "function:b@6-8",
+    ]);
+  });
+
+  it("handles a MySQL DELIMITER $$ script", () => {
+    const content = `DELIMITER $$
+CREATE PROCEDURE a()
+BEGIN
+  CREATE TEMPORARY TABLE x (id INT);
+  CREATE TABLE y (id INT);
+END$$
+CREATE TRIGGER b BEFORE INSERT ON t FOR EACH ROW
+BEGIN
+  SET NEW.a = 1;
+END$$
+DELIMITER ;
+CREATE TABLE after_routines (id INT);`;
+    expect(summarize(content)).toEqual([
+      "table:after_routines@12-12",
+      "procedure:a@2-6",
+      "trigger:b@7-10",
+    ]);
+  });
+
+  it("handles T-SQL batches, transactions and TRY/CATCH", () => {
+    const content = `CREATE PROC a AS
+  SELECT 1;
+  SELECT 2;
+GO
+CREATE PROC b AS
+BEGIN
+  BEGIN TRY
+    BEGIN TRANSACTION;
+    CREATE TABLE inner_table (id INT);
+    COMMIT;
+  END TRY
+  BEGIN CATCH
+    ROLLBACK;
+  END CATCH
+END
+GO
+CREATE TABLE after_routines (id INT);
+GO`;
+    expect(summarize(content)).toEqual([
+      "table:after_routines@17-17",
+      "procedure:a@1-3",
+      "procedure:b@5-15",
+    ]);
+  });
+
+  it("does not end a routine at nested block keywords", () => {
+    const content = `CREATE PROCEDURE a()
+BEGIN
+  IF x THEN
+    SELECT CASE WHEN y THEN 1 ELSE 2 END;
+  END IF;
+  CASE z WHEN 1 THEN SELECT 1; END CASE;
+  my_loop: LOOP
+    LEAVE my_loop;
+  END LOOP;
+  BEGIN
+    SELECT 1;
+  END;
+END;
+SELECT 2;`;
+    expect(summarize(content)).toEqual(["procedure:a@1-13"]);
+  });
+
+  it("does not end a routine at keywords in comments or strings", () => {
+    const content = `CREATE PROCEDURE a()
+BEGIN
+  -- END;
+  SELECT 'END;';
+END;`;
+    expect(summarize(content)).toEqual(["procedure:a@1-5"]);
+  });
+
+  it("keeps an Oracle declaration section inside the routine", () => {
+    const content = `CREATE OR REPLACE PROCEDURE a AS
+  v_count INT;
+  v_name VARCHAR2(10);
+BEGIN
+  SELECT 1;
+END;
+/
+CREATE TABLE after_routine (id INT);`;
+    expect(summarize(content)).toEqual(["table:after_routine@8-8", "procedure:a@1-6"]);
+  });
+
+  it("ends a block-less routine at its first semicolon", () => {
+    const content = `CREATE TRIGGER a BEFORE INSERT ON t FOR EACH ROW SET NEW.b = 1;
+CREATE TABLE after_routine (id INT);`;
+    expect(summarize(content)).toEqual(["table:after_routine@2-2", "trigger:a@1-1"]);
+  });
+
+  it("handles CRLF line endings", () => {
+    const content = "CREATE PROC a AS\r\n  SELECT 1;\r\nGO\r\n-- CREATE TABLE old (id INT);\r\nCREATE TABLE b (id INT);\r\n";
+    expect(summarize(content)).toEqual(["table:b@5-5", "procedure:a@1-2"]);
+  });
 });
 
 describe("GraphQLParser edge cases", () => {

@@ -107,10 +107,44 @@ function isStatic(node: TreeSitterNode): boolean {
 }
 
 /**
+ * Find the function_declarator under a declarator, looking through the
+ * pointer/reference wrappers of return types like `char *dup(...)`.
+ */
+function findFunctionDeclarator(node: TreeSitterNode): TreeSitterNode | null {
+  if (node.type === "function_declarator") return node;
+  if (node.type === "pointer_declarator" || node.type === "reference_declarator") {
+    for (let i = 0; i < node.childCount; i++) {
+      const child = node.child(i);
+      const found = child ? findFunctionDeclarator(child) : null;
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Like findFunctionDeclarator, but for a body-less declaration, which can also declare a
+ * function pointer: its declarator is `(*name)` rather than a name, so it is rejected.
+ */
+function findPrototypeDeclarator(node: TreeSitterNode): TreeSitterNode | null {
+  const funcDecl = findFunctionDeclarator(node);
+  const nameType = funcDecl?.childForFieldName("declarator")?.type;
+  return nameType === "identifier" || nameType === "qualified_identifier" ? funcDecl : null;
+}
+
+/** A `declaration` node together with one of the prototypes it declares. */
+interface Prototype {
+  node: TreeSitterNode;
+  funcDecl: TreeSitterNode;
+}
+
+/**
  * C/C++ extractor for tree-sitter structural analysis and call graph extraction.
  *
  * Handles:
  * - Free functions (function_definition)
+ * - Function prototypes (declaration), unless the same file defines the function
+ * - Preprocessor conditionals and extern "C" blocks, which wrap most headers
  * - Classes (class_specifier) with methods, properties, and access specifiers
  * - Structs (struct_specifier) with fields
  * - #include directives mapped to imports
@@ -132,8 +166,10 @@ export class CppExtractor implements LanguageExtractor {
 
     // Track methods associated with classes via out-of-class definitions
     const methodsByClass = new Map<string, string[]>();
+    const prototypes: Prototype[] = [];
 
-    this.walkTopLevel(rootNode, functions, classes, imports, exports, methodsByClass);
+    this.walkTopLevel(rootNode, functions, classes, imports, exports, methodsByClass, prototypes);
+    this.addPrototypes(prototypes, functions, exports, methodsByClass);
 
     // Attach out-of-class methods to their corresponding classes
     for (const cls of classes) {
@@ -198,8 +234,8 @@ export class CppExtractor implements LanguageExtractor {
   // ---- Private helpers ----
 
   /**
-   * Walk top-level declarations. Recurses into namespace_definition bodies
-   * to find nested declarations.
+   * Walk top-level declarations. Recurses into namespace_definition bodies,
+   * preprocessor conditionals and extern "C" blocks to find nested declarations.
    */
   private walkTopLevel(
     parentNode: TreeSitterNode,
@@ -208,6 +244,7 @@ export class CppExtractor implements LanguageExtractor {
     imports: StructuralAnalysis["imports"],
     exports: StructuralAnalysis["exports"],
     methodsByClass: Map<string, string[]>,
+    prototypes: Prototype[],
   ): void {
     for (let i = 0; i < parentNode.childCount; i++) {
       const node = parentNode.child(i);
@@ -234,10 +271,21 @@ export class CppExtractor implements LanguageExtractor {
           // Recurse into namespace body (declaration_list)
           const body = findChild(node, "declaration_list");
           if (body) {
-            this.walkTopLevel(body, functions, classes, imports, exports, methodsByClass);
+            this.walkTopLevel(body, functions, classes, imports, exports, methodsByClass, prototypes);
           }
           break;
         }
+
+        // Transparent wrappers: their children are ordinary top-level declarations
+        case "preproc_ifdef":
+        case "preproc_if":
+        case "preproc_elif":
+        case "preproc_elifdef":
+        case "preproc_else":
+        case "linkage_specification":
+        case "declaration_list":
+          this.walkTopLevel(node, functions, classes, imports, exports, methodsByClass, prototypes);
+          break;
 
         case "declaration": {
           // A top-level ";" terminated statement — could be a class/struct with a trailing ;
@@ -251,8 +299,56 @@ export class CppExtractor implements LanguageExtractor {
           if (innerStruct) {
             this.extractClassOrStruct(innerStruct, "struct", classes, functions, exports);
           }
+          for (let j = 0; j < node.childCount; j++) {
+            const child = node.child(j);
+            const funcDecl = child ? findPrototypeDeclarator(child) : null;
+            if (funcDecl) prototypes.push({ node, funcDecl });
+          }
           break;
         }
+      }
+    }
+  }
+
+  /**
+   * Add prototypes to the functions array once all definitions are known: a definition
+   * elsewhere in the file wins over its prototype, whichever comes first, and a prototype
+   * repeated across #if branches yields one entry.
+   */
+  private addPrototypes(
+    prototypes: Prototype[],
+    functions: StructuralAnalysis["functions"],
+    exports: StructuralAnalysis["exports"],
+    methodsByClass: Map<string, string[]>,
+  ): void {
+    const seen = new Set(functions.map((fn) => `${fn.owner}::${fn.name}`));
+
+    for (const { node, funcDecl } of prototypes) {
+      const info = extractFuncDeclName(funcDecl);
+      if (!info) continue;
+
+      const owner = info.qualifier ?? "";
+      const key = `${owner}::${info.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      functions.push({
+        name: info.name,
+        owner,
+        lineRange: [node.startPosition.row + 1, node.endPosition.row + 1],
+        params: extractParams(funcDecl.childForFieldName("parameters")),
+        returnType: extractReturnType(node),
+      });
+
+      if (info.qualifier) {
+        if (!methodsByClass.has(info.qualifier)) {
+          methodsByClass.set(info.qualifier, []);
+        }
+        methodsByClass.get(info.qualifier)!.push(info.name);
+      }
+
+      if (!isStatic(node)) {
+        exports.push({ name: info.name, lineNumber: node.startPosition.row + 1 });
       }
     }
   }
@@ -263,9 +359,10 @@ export class CppExtractor implements LanguageExtractor {
    */
   private extractFunctionName(node: TreeSitterNode): string | null {
     const declNode = node.childForFieldName("declarator");
-    if (!declNode || declNode.type !== "function_declarator") return null;
+    const funcDecl = declNode ? findFunctionDeclarator(declNode) : null;
+    if (!funcDecl) return null;
 
-    const info = extractFuncDeclName(declNode);
+    const info = extractFuncDeclName(funcDecl);
     return info ? info.name : null;
   }
 
@@ -371,8 +468,9 @@ export class CppExtractor implements LanguageExtractor {
 
         if (member.type === "function_definition") {
           // Inline method definition
-          const funcDecl = member.childForFieldName("declarator");
-          if (funcDecl && funcDecl.type === "function_declarator") {
+          const declNode = member.childForFieldName("declarator");
+          const funcDecl = declNode ? findFunctionDeclarator(declNode) : null;
+          if (funcDecl) {
             const info = extractFuncDeclName(funcDecl);
             if (info) {
               methods.push(info.name);
@@ -435,8 +533,9 @@ export class CppExtractor implements LanguageExtractor {
     exports: StructuralAnalysis["exports"],
     methodsByClass: Map<string, string[]>,
   ): void {
-    const funcDecl = node.childForFieldName("declarator");
-    if (!funcDecl || funcDecl.type !== "function_declarator") return;
+    const declNode = node.childForFieldName("declarator");
+    const funcDecl = declNode ? findFunctionDeclarator(declNode) : null;
+    if (!funcDecl) return;
 
     const info = extractFuncDeclName(funcDecl);
     if (!info) return;
