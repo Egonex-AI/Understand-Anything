@@ -298,7 +298,7 @@ The full tool reference and examples for other clients are in [`understand-anyth
 | VS Code + GitHub Copilot | ✅ Supported | Auto-discovery |
 | Copilot CLI | ✅ Supported | Plugin install |
 | Codex | ✅ Supported | `install.sh codex` |
-| OpenCode | ✅ Supported | `install.sh opencode` |
+| OpenCode | ⚠️ Structural-only — [see notes](docs/platforms/opencode.md) | `install.sh opencode` |
 | OpenClaw | ✅ Supported | `install.sh openclaw` |
 | Antigravity | ✅ Supported | `install.sh antigravity` |
 | Gemini CLI | ✅ Supported | `install.sh gemini` |
@@ -312,6 +312,8 @@ The full tool reference and examples for other clients are in [`understand-anyth
 | Kiro CLI / IDE | ✅ Supported | `install.sh kiro` |
 | Devin | ✅ Supported | `devin plugins install` or `install.sh devin` |
 
+
+> **OpenCode note:** the plugin installs and the deterministic scripts run, but OpenCode (≤ 1.15.11) does not implement Claude Code's `Task` tool, so the LLM subagent phases (file summaries, architecture, tour, review) are skipped. You get a **structural-only** graph — file nodes + import edges. See [`docs/platforms/opencode.md`](docs/platforms/opencode.md) for the manual activation procedure.
 
 ---
 
