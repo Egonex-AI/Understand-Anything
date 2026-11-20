@@ -8,6 +8,7 @@ export interface PortalNodeData extends Record<string, unknown> {
   targetLayerName: string;
   connectionCount: number;
   layerColorIndex: number;
+  externalFileNames?: string[];
   onNavigate: (layerId: string) => void;
 }
 
@@ -50,6 +51,24 @@ function PortalNode({
         <div className="text-[10px] text-text-muted mt-1 pl-4">
           {data.connectionCount} connection{data.connectionCount !== 1 ? "s" : ""}
         </div>
+        {data.externalFileNames && data.externalFileNames.length > 0 && (
+          <div className="mt-1.5 pl-4 flex flex-col gap-0.5">
+            {data.externalFileNames.slice(0, 6).map((n) => (
+              <div
+                key={n}
+                className="text-[10px] text-text-secondary truncate leading-tight"
+                title={n}
+              >
+                · {n}
+              </div>
+            ))}
+            {data.externalFileNames.length > 6 && (
+              <div className="text-[10px] text-text-muted leading-tight">
+                +{data.externalFileNames.length - 6} more
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <Handle
