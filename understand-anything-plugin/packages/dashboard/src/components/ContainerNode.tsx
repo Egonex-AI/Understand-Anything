@@ -24,9 +24,9 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
   const borderColor = data.isDiffAffected
     ? "var(--color-diff-changed)"
     : data.isExpanded || data.isFocusedViaChild
-      ? "rgba(212,165,116,0.6)"
-      : "rgba(212,165,116,0.25)";
-  const borderWidth = data.isExpanded || data.isFocusedViaChild ? 1.5 : 1;
+      ? "rgba(212,165,116,0.85)"
+      : "rgba(212,165,116,0.55)";
+  const borderWidth = 1.5;
 
   const labelDimmed = data.name === "~";
   const labelText = labelDimmed ? "(root)" : data.name;
@@ -46,7 +46,9 @@ function ContainerNodeComponent({ data, width, height }: NodeProps<ContainerFlow
       style={{
         width,
         height,
-        background: "rgba(255,255,255,0.02)",
+        background: data.isExpanded
+          ? "rgba(255,255,255,0.04)"
+          : "rgba(212,165,116,0.06)",
         border: `${borderWidth}px solid ${borderColor}`,
         position: "relative",
       }}
