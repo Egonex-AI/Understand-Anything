@@ -373,6 +373,18 @@ describe("ProtobufParser", () => {
     expect(result.definitions![0].fields).toContain("emails");
   });
 
+  it("extracts map<> fields", () => {
+    const content = `message Config {
+  string name = 1;
+  map<string, int32> scores = 2;
+  map<string, Endpoint> endpoints = 3;
+}`;
+    const result = parser.analyzeFile("config.proto", content);
+    expect(result.definitions![0].fields).toContain("name");
+    expect(result.definitions![0].fields).toContain("scores");
+    expect(result.definitions![0].fields).toContain("endpoints");
+  });
+
   it("extracts enum definitions", () => {
     const content = "enum Status {\n  UNKNOWN = 0;\n  ACTIVE = 1;\n  INACTIVE = 2;\n}";
     const result = parser.analyzeFile("status.proto", content);

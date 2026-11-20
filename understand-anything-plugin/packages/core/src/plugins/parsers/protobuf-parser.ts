@@ -97,7 +97,11 @@ export class ProtobufParser implements AnalyzerPlugin {
     const closeBrace = this.findClosingBrace(afterMsg);
     const body = afterMsg.slice(openBrace + 1, closeBrace);
 
-    const fieldRegex = /^\s*(?:repeated\s+|optional\s+|required\s+|map<[^>]+>\s+)?\w+\s+(\w+)\s*=/gm;
+    // `map<K, V>` is itself the field type, not a qualifier before a type, so
+    // it belongs in the type position (alongside `\w+`) — not in the optional
+    // qualifier group, where it left a trailing `<type> <name> =` the rest of
+    // the pattern could not satisfy, silently dropping every map field.
+    const fieldRegex = /^\s*(?:repeated\s+|optional\s+|required\s+)?(?:map<[^>]+>|\w+)\s+(\w+)\s*=/gm;
     let match;
     while ((match = fieldRegex.exec(body)) !== null) {
       fields.push(match[1]);
