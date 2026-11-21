@@ -387,6 +387,11 @@ const server = createServer((req, res) => {
 function listen(attemptPort, attemptsLeft) {
   server.once("error", (err) => {
     if (err.code === "EADDRINUSE" && !portExplicit && attemptsLeft > 0) {
+      // server.listen(port, host, cb) registers cb with once("listening"), and a
+      // failed bind leaves it attached. Drop it before retrying, or every failed
+      // attempt's callback fires on the eventual successful bind (duplicate
+      // banners, one browser tab per attempt).
+      server.removeAllListeners("listening");
       listen(attemptPort + 1, attemptsLeft - 1);
     } else {
       console.error(`Error: could not bind 127.0.0.1:${attemptPort} — ${err.message}`);
