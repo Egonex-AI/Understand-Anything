@@ -10,7 +10,20 @@ import { findChild, findChildren, getStringValue } from "./base-extractor.js";
  * is no `public` / `private` keyword to inspect — only the leading character.
  */
 function isExported(name: string): boolean {
-  return !name.startsWith("_");
+  return name.split(".").every((segment) => !segment.startsWith("_"));
+}
+
+function findFollowingBody(parent: TreeSitterNode, index: number): TreeSitterNode | null {
+  for (let i = index + 1; i < parent.childCount; i++) {
+    const sibling = parent.child(i);
+    if (!sibling) continue;
+    if (sibling.type === "function_body") return sibling;
+    if (!sibling.isNamed || sibling.type === "comment" || sibling.type === "documentation_comment") {
+      continue;
+    }
+    break;
+  }
+  return null;
 }
 
 /**
@@ -144,13 +157,15 @@ function pushMethod(
   methods: string[],
   functions: StructuralAnalysis["functions"],
   exports: StructuralAnalysis["exports"],
+  endLine = declNode.endPosition.row + 1,
+  isConstructor = false,
 ): void {
   methods.push(name);
   functions.push({
     name,
-    lineRange: [declNode.startPosition.row + 1, declNode.endPosition.row + 1],
+    lineRange: [declNode.startPosition.row + 1, endLine],
     params: extractParams(sig),
-    returnType: extractReturnType(sig),
+    returnType: isConstructor ? undefined : extractReturnType(sig),
   });
   if (isExported(name)) {
     exports.push({ name, lineNumber: declNode.startPosition.row + 1 });
@@ -185,10 +200,17 @@ function uriText(uriNode: TreeSitterNode): string | null {
  * so it is skipped; the loop stops at the first identifier).
  */
 function constructorName(sig: TreeSitterNode): string | null {
-  const ids = findChildren(sig, "identifier");
+  const container = findChild(sig, "qualified") ?? sig;
+  const ids: string[] = [];
+  for (let i = 0; i < container.childCount; i++) {
+    const child = container.child(i);
+    if (!child) continue;
+    if (child.type === "formal_parameter_list") break;
+    if (child.type === "identifier") ids.push(child.text);
+  }
   if (ids.length === 0) return null;
-  if (ids.length === 1) return ids[0].text;
-  return `${ids[0].text}.${ids[1].text}`;
+  if (ids.length === 1) return ids[0];
+  return `${ids[0]}.${ids[1]}`;
 }
 
 /**
@@ -213,12 +235,14 @@ function collectClassBody(
     if (!member) continue;
 
     if (member.type === "method_signature") {
-      // Factory constructor lives inside method_signature.
-      const factory = findChild(member, "factory_constructor_signature");
-      if (factory) {
-        const name = constructorName(factory);
+      const endLine = (findFollowingBody(body, i) ?? member).endPosition.row + 1;
+      const ctor =
+        findChild(member, "constructor_signature") ??
+        findChild(member, "factory_constructor_signature");
+      if (ctor) {
+        const name = constructorName(ctor);
         if (name) {
-          pushMethod(member, factory, name, methods, functions, exports);
+          pushMethod(member, ctor, name, methods, functions, exports, endLine, true);
         }
         continue;
       }
@@ -227,7 +251,7 @@ function collectClassBody(
       const getter = findChild(member, "getter_signature");
       if (getter) {
         const name = extractFunctionName(getter);
-        if (name) pushMethod(member, getter, name, methods, functions, exports);
+        if (name) pushMethod(member, getter, name, methods, functions, exports, endLine);
         continue;
       }
       // Setter (`set value(int x)`) — wrapped in method_signature with a
@@ -236,7 +260,7 @@ function collectClassBody(
       const setter = findChild(member, "setter_signature");
       if (setter) {
         const name = extractFunctionName(setter);
-        if (name) pushMethod(member, setter, name, methods, functions, exports);
+        if (name) pushMethod(member, setter, name, methods, functions, exports, endLine);
         continue;
       }
       // Concrete method: `method_signature > function_signature`.
@@ -244,14 +268,16 @@ function collectClassBody(
       if (!inner) continue;
       const name = extractFunctionName(inner);
       if (!name) continue;
-      pushMethod(member, inner, name, methods, functions, exports);
+      pushMethod(member, inner, name, methods, functions, exports, endLine);
     } else if (member.type === "declaration") {
-      // Regular constructor: `declaration > constructor_signature`.
-      const ctor = findChild(member, "constructor_signature");
+      const ctor =
+        findChild(member, "constructor_signature") ??
+        findChild(member, "constant_constructor_signature") ??
+        findChild(member, "redirecting_factory_constructor_signature");
       if (ctor) {
         const name = constructorName(ctor);
         if (name) {
-          pushMethod(member, ctor, name, methods, functions, exports);
+          pushMethod(member, ctor, name, methods, functions, exports, member.endPosition.row + 1, true);
         }
         continue;
       }
@@ -315,9 +341,11 @@ export class DartExtractor implements LanguageExtractor {
       if (!node) continue;
 
       switch (node.type) {
-        case "function_signature":
-          this.extractTopLevelFunction(node, functions, exports);
+        case "function_signature": {
+          const endLine = (findFollowingBody(rootNode, i) ?? node).endPosition.row + 1;
+          this.extractTopLevelFunction(node, functions, exports, endLine);
           break;
+        }
         case "class_definition":
           this.extractClassLikeDeclaration(node, "class_body", classes, functions, exports);
           break;
@@ -345,12 +373,13 @@ export class DartExtractor implements LanguageExtractor {
     sig: TreeSitterNode,
     functions: StructuralAnalysis["functions"],
     exports: StructuralAnalysis["exports"],
+    endLine = sig.endPosition.row + 1,
   ): void {
     const name = extractFunctionName(sig);
     if (!name) return;
     functions.push({
       name,
-      lineRange: [sig.startPosition.row + 1, sig.endPosition.row + 1],
+      lineRange: [sig.startPosition.row + 1, endLine],
       params: extractParams(sig),
       returnType: extractReturnType(sig),
     });

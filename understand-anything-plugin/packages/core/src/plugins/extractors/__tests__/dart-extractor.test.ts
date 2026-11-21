@@ -312,6 +312,169 @@ describe("DartExtractor", () => {
       tree.delete();
       parser.delete();
     });
+
+    it("extracts unnamed and named constructors with bodies and spans the full body", () => {
+      const { tree, parser, root } = parse(`class Foo {
+  int x;
+  Foo(this.x) {
+    validate(x);
+  }
+  Foo.withInit(int a) : x = a {
+    setup(a);
+  }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual(expect.arrayContaining(["Foo", "Foo.withInit"]));
+      const unnamed = result.functions.find((f) => f.name === "Foo");
+      expect(unnamed).toEqual({
+        name: "Foo",
+        lineRange: [3, 5],
+        params: ["x"],
+        returnType: undefined,
+      });
+      const named = result.functions.find((f) => f.name === "Foo.withInit");
+      expect(named).toEqual({
+        name: "Foo.withInit",
+        lineRange: [6, 8],
+        params: ["a"],
+        returnType: undefined,
+      });
+      expect(result.exports.map((e) => e.name)).toEqual(
+        expect.arrayContaining(["Foo", "Foo.withInit"]),
+      );
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts const unnamed and named constructors without a spurious return type", () => {
+      const { tree, parser, root } = parse(`class Widget {
+  final String title;
+  const Widget({super.key, required this.title});
+  const Widget.named(this.title);
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual(expect.arrayContaining(["Widget", "Widget.named"]));
+      const unnamed = result.functions.find((f) => f.name === "Widget");
+      expect(unnamed).toEqual({
+        name: "Widget",
+        lineRange: [3, 3],
+        params: ["key", "title"],
+        returnType: undefined,
+      });
+      const named = result.functions.find((f) => f.name === "Widget.named");
+      expect(named).toEqual({
+        name: "Widget.named",
+        lineRange: [4, 4],
+        params: ["title"],
+        returnType: undefined,
+      });
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts redirecting factory constructors", () => {
+      const { tree, parser, root } = parse(`class Widget {
+  factory Widget(String t) = _SubWidget;
+  const factory Widget.redir(String t) = _SubWidget.from;
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual(expect.arrayContaining(["Widget", "Widget.redir"]));
+      const unnamed = result.functions.find((f) => f.name === "Widget");
+      expect(unnamed).toEqual({
+        name: "Widget",
+        lineRange: [2, 2],
+        params: ["t"],
+        returnType: undefined,
+      });
+      const redir = result.functions.find((f) => f.name === "Widget.redir");
+      expect(redir).toEqual({
+        name: "Widget.redir",
+        lineRange: [3, 3],
+        params: ["t"],
+        returnType: undefined,
+      });
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not export private named constructors", () => {
+      const { tree, parser, root } = parse(`class Foo {
+  Foo._internal() {
+    init();
+  }
+  const Foo._hidden();
+  Foo._bodyless();
+  Foo.publicCtor();
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes[0].methods).toEqual(
+        expect.arrayContaining(["Foo._internal", "Foo._hidden", "Foo._bodyless", "Foo.publicCtor"]),
+      );
+      const exported = result.exports.map((e) => e.name);
+      expect(exported).toContain("Foo.publicCtor");
+      expect(exported).not.toContain("Foo._internal");
+      expect(exported).not.toContain("Foo._hidden");
+      expect(exported).not.toContain("Foo._bodyless");
+      tree.delete();
+      parser.delete();
+    });
+  });
+
+  describe("extractStructure - line ranges", () => {
+    it("includes the sibling function_body in lineRange for top-level functions and class members", () => {
+      const { tree, parser, root } = parse(`int add(int a, int b) {
+  final sum = a + b;
+  return sum;
+}
+
+class Counter {
+  int _v = 0;
+  int get value {
+    return _v;
+  }
+  set value(int next) {
+    _v = next;
+  }
+  void increment() {
+    _v++;
+  }
+  factory Counter.zero() {
+    return Counter();
+  }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.find((f) => f.name === "add")?.lineRange).toEqual([1, 4]);
+      expect(result.functions.find((f) => f.name === "value" && f.params.length === 0)?.lineRange).toEqual([8, 10]);
+      expect(result.functions.find((f) => f.name === "value" && f.params.length === 1)?.lineRange).toEqual([11, 13]);
+      expect(result.functions.find((f) => f.name === "increment")?.lineRange).toEqual([14, 16]);
+      expect(result.functions.find((f) => f.name === "Counter.zero")?.lineRange).toEqual([17, 19]);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not attach a following function's body to a bodyless external declaration", () => {
+      const { tree, parser, root } = parse(`external void nativeFn();
+void realFn() {
+  work();
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.find((f) => f.name === "nativeFn")?.lineRange).toEqual([1, 1]);
+      expect(result.functions.find((f) => f.name === "realFn")?.lineRange).toEqual([2, 4]);
+      tree.delete();
+      parser.delete();
+    });
   });
 
   describe("extractStructure - mixins", () => {
