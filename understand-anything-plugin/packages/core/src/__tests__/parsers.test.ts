@@ -180,6 +180,49 @@ describe("JSONConfigParser", () => {
     const result = parser.analyzeFile("config.jsonc", content);
     expect(result.sections!.map((s) => s.name)).toEqual(["url", "note"]);
   });
+
+  it("computes accurate line ranges when nested keys, string values, or comments reuse a top-level key name", () => {
+    const content = [
+      "{",
+      '  // Configure "types" and "scripts" below',
+      '  "description": "Mentions \\"scripts\\" in a value",',
+      '  "exports": {',
+      '    ".": {',
+      '      "types": "./dist/index.d.ts"',
+      "    }",
+      "  },",
+      '  "types": "./dist/index.d.ts",',
+      '  "scripts": {',
+      '    "build": "tsc"',
+      "  }",
+      "}",
+    ].join("\n");
+    const result = parser.analyzeFile("package.json", content);
+    expect(result.sections).toEqual([
+      { name: "description", level: 1, lineRange: [3, 3] },
+      { name: "exports", level: 1, lineRange: [4, 8] },
+      { name: "types", level: 1, lineRange: [9, 9] },
+      { name: "scripts", level: 1, lineRange: [10, 12] },
+    ]);
+  });
+
+  it("handles minified single-line JSON without inverted or zero line ranges", () => {
+    const result = parser.analyzeFile("minified.json", '{"a":1,"b":{"c":2},"d":[3,4]}');
+    expect(result.sections).toEqual([
+      { name: "a", level: 1, lineRange: [1, 1] },
+      { name: "b", level: 1, lineRange: [1, 1] },
+      { name: "d", level: 1, lineRange: [1, 1] },
+    ]);
+  });
+
+  it("extracts top-level keys with comma-bracket sequences and unicode escapes", () => {
+    const content = '{\n  "a, ]": "[x, ]",\n  "\\u0062": 2\n}';
+    const result = parser.analyzeFile("special.json", content);
+    expect(result.sections).toEqual([
+      { name: "a, ]", level: 1, lineRange: [2, 2] },
+      { name: "b", level: 1, lineRange: [3, 3] },
+    ]);
+  });
 });
 
 describe("stripJsoncSyntax", () => {
@@ -207,6 +250,17 @@ describe("stripJsoncSyntax", () => {
   it("leaves plain JSON unchanged", () => {
     const plain = '{"a": 1, "b": [2, 3]}';
     expect(stripJsoncSyntax(plain)).toBe(plain);
+  });
+
+  it("preserves comma-before-closing-delimiter sequences inside string literals", () => {
+    const input = '{"pattern": "[a-z, ]", "fmt": "{a,}", "a, ]": 1}';
+    expect(stripJsoncSyntax(input)).toBe(input);
+    expect(stripJsoncSyntax('{"pattern": "[a-z, ]",}')).toBe('{"pattern": "[a-z, ]"}');
+  });
+
+  it("strips trailing commas separated from closing delimiters by comments", () => {
+    const input = '{\n  "a": 1, // trailing\n  "b": [1, /* note */ ],\n}';
+    expect(JSON.parse(stripJsoncSyntax(input))).toEqual({ a: 1, b: [1] });
   });
 });
 
