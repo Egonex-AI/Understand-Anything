@@ -1,9 +1,35 @@
 import type { AnalyzerPlugin, StructuralAnalysis, SectionInfo, ReferenceResolution } from "../../types.js";
 
+function isTrailingComma(content: string, commaIndex: number): boolean {
+  let j = commaIndex + 1;
+  const n = content.length;
+  while (j < n) {
+    const c = content[j];
+    if (c === " " || c === "\t" || c === "\r" || c === "\n") {
+      j++;
+      continue;
+    }
+    if (c === "/" && content[j + 1] === "/") {
+      j += 2;
+      while (j < n && content[j] !== "\n") j++;
+      continue;
+    }
+    if (c === "/" && content[j + 1] === "*") {
+      j += 2;
+      while (j < n && !(content[j] === "*" && content[j + 1] === "/")) j++;
+      j += 2;
+      continue;
+    }
+    return c === "}" || c === "]";
+  }
+  return false;
+}
+
 /**
  * Strip JSONC syntax (line comments, block comments, trailing commas) so the
  * result can be passed to the standard `JSON.parse`. Preserves string contents
- * verbatim — comment-like sequences inside strings are not removed.
+ * verbatim — comment-like sequences and comma-bracket patterns inside strings
+ * are not removed.
  *
  * Plain JSON passes through unchanged (no `//`, `/* *​/`, or trailing commas
  * to remove).
@@ -50,12 +76,135 @@ export function stripJsoncSyntax(content: string): string {
       continue;
     }
 
+    if (ch === "," && isTrailingComma(content, i)) {
+      i++;
+      continue;
+    }
+
     out += ch;
     i++;
   }
 
-  // Remove trailing commas before } or ] (allowing whitespace between)
-  return out.replace(/,(\s*[}\]])/g, "$1");
+  return out;
+}
+
+function extractTopLevelSections(content: string): SectionInfo[] {
+  const byKey = new Map<string, SectionInfo>();
+  let line = 1;
+  let depth = 0;
+  let expectKey = false;
+  let current: { name: string; startLine: number; endLine: number } | null = null;
+
+  const commit = () => {
+    if (!current) return;
+    const existing = byKey.get(current.name);
+    if (existing) {
+      existing.lineRange = [current.startLine, current.endLine];
+    } else {
+      byKey.set(current.name, {
+        name: current.name,
+        level: 1,
+        lineRange: [current.startLine, current.endLine],
+      });
+    }
+    current = null;
+  };
+
+  let i = 0;
+  const n = content.length;
+  while (i < n) {
+    const ch = content[i];
+    const next = content[i + 1];
+
+    if (ch === "\n") {
+      line++;
+      i++;
+      continue;
+    }
+    if (ch === " " || ch === "\t" || ch === "\r") {
+      i++;
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      i += 2;
+      while (i < n && content[i] !== "\n") i++;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < n && !(content[i] === "*" && content[i + 1] === "/")) {
+        if (content[i] === "\n") line++;
+        i++;
+      }
+      i += 2;
+      continue;
+    }
+
+    if (ch === '"') {
+      const start = i;
+      const startLine = line;
+      i++;
+      while (i < n) {
+        const c = content[i];
+        if (c === "\\" && i + 1 < n) {
+          if (content[i + 1] === "\n") line++;
+          i += 2;
+          continue;
+        }
+        if (c === "\n") line++;
+        i++;
+        if (c === '"') break;
+      }
+      if (depth === 1 && expectKey) {
+        const name = JSON.parse(content.slice(start, i)) as string;
+        current = { name, startLine, endLine: line };
+        expectKey = false;
+      } else if (current) {
+        current.endLine = line;
+      }
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") {
+      if (depth === 0 && ch === "{") {
+        depth = 1;
+        expectKey = true;
+      } else {
+        depth++;
+        if (current) current.endLine = line;
+      }
+      i++;
+      continue;
+    }
+
+    if (ch === "}" || ch === "]") {
+      if (depth === 1 && ch === "}") {
+        commit();
+        break;
+      }
+      depth--;
+      if (current) current.endLine = line;
+      i++;
+      continue;
+    }
+
+    if (ch === "," && depth === 1) {
+      commit();
+      expectKey = true;
+      i++;
+      continue;
+    }
+
+    if (ch === ":" && depth === 1 && current && !expectKey) {
+      i++;
+      continue;
+    }
+
+    if (current) current.endLine = line;
+    i++;
+  }
+
+  return [...byKey.values()];
 }
 
 /**
@@ -104,33 +253,14 @@ export class JSONConfigParser implements AnalyzerPlugin {
   }
 
   private extractSections(content: string): SectionInfo[] {
-    const sections: SectionInfo[] = [];
     try {
       const doc = JSON.parse(stripJsoncSyntax(content));
       if (doc && typeof doc === "object" && !Array.isArray(doc)) {
-        // Use the original content (with comments) for line-number lookup so
-        // section line numbers match what the user sees in the source file.
-        const lines = content.split("\n");
-        for (const key of Object.keys(doc)) {
-          const escapedKey = JSON.stringify(key);
-          const lineIdx = lines.findIndex((l) => l.includes(escapedKey));
-          if (lineIdx !== -1) {
-            sections.push({
-              name: key,
-              level: 1,
-              lineRange: [lineIdx + 1, lineIdx + 1],
-            });
-          }
-        }
-        // Fix lineRange end
-        for (let i = 0; i < sections.length; i++) {
-          const next = sections[i + 1];
-          sections[i].lineRange[1] = next ? next.lineRange[0] - 1 : lines.length;
-        }
+        return extractTopLevelSections(content);
       }
     } catch (err) {
       console.warn(`[json-parser] Failed to parse JSON: ${err instanceof Error ? err.message : String(err)}`);
     }
-    return sections;
+    return [];
   }
 }
