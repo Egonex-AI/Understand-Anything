@@ -88,6 +88,8 @@ function extractScopedPath(node: TreeSitterNode): { path: string; name: string }
  *   trait's `methods` array.
  * - Exports are determined by the `pub` visibility modifier.
  * - Enum variants are extracted as `properties` of the enum class entry.
+ * - Items inside inline `mod foo { ... }` blocks are flattened into the
+ *   file's analysis; they are exported only when the module itself is `pub`.
  */
 export class RustExtractor implements LanguageExtractor {
   readonly languageIds = ["rust"];
@@ -129,6 +131,21 @@ export class RustExtractor implements LanguageExtractor {
         case "use_declaration":
           this.extractUseDeclaration(node, imports);
           break;
+
+        case "mod_item": {
+          // An inline `mod foo { ... }` nests its items in a declaration_list;
+          // `mod foo;` has no body and points at another file, so it is skipped.
+          const body = findChild(node, "declaration_list");
+          if (!body) break;
+          const inner = this.extractStructure(body);
+          functions.push(...inner.functions);
+          classes.push(...inner.classes);
+          imports.push(...inner.imports);
+          // A `pub` item in a private module (e.g. `mod tests`) is not visible
+          // outside this file's module, so only a `pub` module exports items.
+          if (isPublic(node)) exports.push(...inner.exports);
+          break;
+        }
       }
     }
 

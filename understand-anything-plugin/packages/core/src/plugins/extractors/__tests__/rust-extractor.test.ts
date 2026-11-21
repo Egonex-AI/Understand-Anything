@@ -499,6 +499,91 @@ pub fn check_port(port: u16) -> bool {
 
   // ---- Call Graph ----
 
+  describe("extractStructure - inline modules", () => {
+    it("extracts items declared inside an inline `mod` block", () => {
+      const { tree, parser, root } = parse(`pub mod config {
+    use std::env;
+
+    pub struct Config {
+        pub port: u16,
+    }
+
+    impl Config {
+        pub fn load() -> Config {
+            Config { port: 8080 }
+        }
+    }
+
+    pub fn default_port() -> u16 {
+        8080
+    }
+}
+`);
+      expect(root.hasError).toBe(false);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions.map((f) => [f.name, f.owner])).toEqual([
+        ["load", "Config"],
+        ["default_port", ""],
+      ]);
+      const config = result.classes.find((c) => c.name === "Config");
+      expect(config).toBeDefined();
+      expect(config!.properties).toEqual(["port"]);
+      expect(config!.methods).toEqual(["load"]);
+      expect(result.imports.map((i) => [i.source, i.specifiers])).toEqual([["std", ["env"]]]);
+      expect(result.exports.map((e) => e.name).sort()).toEqual(
+        ["Config", "default_port", "load"],
+      );
+      tree.delete();
+      parser.delete();
+    });
+
+    it("recurses into nested modules", () => {
+      const { tree, parser, root } = parse(`pub mod outer {
+    pub mod inner {
+        pub fn deep() {}
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+      expect(result.functions.map((f) => f.name)).toEqual(["deep"]);
+      expect(result.exports.map((e) => e.name)).toEqual(["deep"]);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not export pub items of a private module", () => {
+      const { tree, parser, root } = parse(`fn run() {}
+
+#[cfg(test)]
+mod tests {
+    pub fn helper() {}
+
+    #[test]
+    fn it_works() {}
+}
+`);
+      const result = extractor.extractStructure(root);
+      expect(result.functions.map((f) => f.name)).toEqual(["run", "helper", "it_works"]);
+      expect(result.exports).toEqual([]);
+      tree.delete();
+      parser.delete();
+    });
+
+    it("ignores `mod foo;` file declarations", () => {
+      const { tree, parser, root } = parse(`pub mod config;
+mod util;
+
+pub fn main() {}
+`);
+      const result = extractor.extractStructure(root);
+      expect(result.functions.map((f) => f.name)).toEqual(["main"]);
+      expect(result.classes).toEqual([]);
+      tree.delete();
+      parser.delete();
+    });
+  });
+
   describe("extractCallGraph", () => {
     it("extracts simple function calls", () => {
       const { tree, parser, root } = parse(`
