@@ -1,0 +1,28 @@
+{
+  "name": "understand-anything",
+  "version": "2.9.8",
+  "description": "AI-powered codebase understanding — analyze, visualize, and explain any project",
+  "author": {
+    "name": "Egonex",
+    "url": "https://github.com/Egonex-AI"
+  },
+  "homepage": "https://github.com/Egonex-AI/Understand-Anything",
+  "repository": "https://github.com/Egonex-AI/Understand-Anything",
+  "license": "MIT",
+  "keywords": [
+    "codebase-analysis",
+    "knowledge-graph",
+    "architecture",
+    "onboarding",
+    "dashboard"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Understand Anything",
+    "shortDescription": "Analyze, visualize, and explain any codebase with a knowledge graph.",
+    "category": "Coding",
+    "developerName": "Egonex",
+    "websiteUrl": "https://understand-anything.com",
+    "logo": "./assets/icon.png"
+  }
+}
