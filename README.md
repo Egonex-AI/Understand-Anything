@@ -185,6 +185,28 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 
 Understand-Anything works across multiple AI coding platforms.
 
+### Install as an agent plugin
+
+This repo ships an agent-agnostic marketplace at [`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json) pointing at `./understand-anything-plugin`.
+
+**Generic:** clone the repo (or point your agent at `Egonex-AI/Understand-Anything`), add the marketplace, then install `understand-anything`.
+
+**Codex:**
+
+```bash
+codex plugin marketplace add Egonex-AI/Understand-Anything
+codex plugin add understand-anything@understand-anything
+```
+
+Local checkout: `codex plugin marketplace add /path/to/Understand-Anything`.
+
+**Claude Code:**
+
+```bash
+/plugin marketplace add Egonex-AI/Understand-Anything
+/plugin install understand-anything
+```
+
 ### Claude Code (Native)
 
 ```bash
