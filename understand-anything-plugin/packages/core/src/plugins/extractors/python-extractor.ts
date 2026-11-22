@@ -313,15 +313,14 @@ export class PythonExtractor implements LanguageExtractor {
       specifiers.push(dn.text);
     }
 
-    // Collect aliased imports: `from foo import bar as baz`
+    // Collect aliased imports: `from foo import bar as baz` records `bar`.
+    // The alias only renames the binding; the import map probes the imported
+    // name as a submodule of `foo`, as it does without `as` (#806).
     const aliasedImports = findChildren(node, "aliased_import");
     for (const ai of aliasedImports) {
-      // The alias identifier follows the `as` keyword
-      const alias = ai.children.find(
-        (c) => c.type === "identifier",
-      );
-      if (alias) {
-        specifiers.push(alias.text);
+      const name = ai.childForFieldName("name");
+      if (name) {
+        specifiers.push(name.text);
       }
     }
 

@@ -325,7 +325,9 @@ from foo import bar as baz
 
       expect(result.imports).toHaveLength(1);
       expect(result.imports[0].source).toBe("foo");
-      expect(result.imports[0].specifiers).toEqual(["baz"]);
+      // The imported name, not the local alias: the import map probes it as
+      // a submodule of `foo` (#806).
+      expect(result.imports[0].specifiers).toEqual(["bar"]);
 
       tree.delete();
       parser.delete();

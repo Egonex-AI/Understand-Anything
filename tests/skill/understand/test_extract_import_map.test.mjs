@@ -713,6 +713,41 @@ describe('extract-import-map.mjs — Python resolver', () => {
     ]);
   });
 
+  it('resolves the submodule of `from pkg import submodule as alias` (#806)', () => {
+    projectRoot = setupTree({
+      'app/__init__.py': '',
+      'app/routes/__init__.py': `from . import desk\n`,
+      'app/routes/desk.py': `def handler():\n    return 1\n`,
+      'app/routes/feed.py': `def handler():\n    return 2\n`,
+      'main.py': `from app.routes import desk as desk_routes\n`,
+      'app/routes/both.py': `from . import desk as d, feed\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        'app/__init__.py',
+        'app/routes/__init__.py',
+        'app/routes/desk.py',
+        'app/routes/feed.py',
+        'main.py',
+        'app/routes/both.py',
+      ].map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status).toBe(0);
+    // The `as` clause only renames the binding: the edge still goes to the
+    // submodule, exactly as `from app.routes import desk` resolves.
+    expect(result.output.importMap['main.py']).toEqual([
+      'app/routes/__init__.py',
+      'app/routes/desk.py',
+    ]);
+    expect(result.output.importMap['app/routes/both.py']).toEqual([
+      'app/routes/desk.py',
+      'app/routes/feed.py',
+    ]);
+  });
+
   it('falls back to the package __init__.py for `from . import NAME` / `from .. import NAME` (#727)', () => {
     projectRoot = setupTree({
       'pkg/__init__.py': `class BaseAnalyzer:\n    pass\n`,
