@@ -185,21 +185,21 @@ describe("JSONConfigParser", () => {
     const content = [
       "{",
       '  "description": "mentions target",',
-      "  /* before the nested key */",
+      '  /* "target" before the nested key */',
       '  "nested": {',
       '    "target": 1',
       "  },",
       '  "\\u0074arget": 2,',
       '  "last": { "target": 3 }',
       "}",
-    ].join("\n");
+    ].join("\n") + "\n";
 
     const result = parser.analyzeFile("config.jsonc", content);
     expect(result.sections).toEqual([
-      { name: "description", level: 1, lineRange: [2, 3] },
+      { name: "description", level: 1, lineRange: [2, 2] },
       { name: "nested", level: 1, lineRange: [4, 6] },
       { name: "target", level: 1, lineRange: [7, 7] },
-      { name: "last", level: 1, lineRange: [8, 9] },
+      { name: "last", level: 1, lineRange: [8, 8] },
     ]);
   });
 
@@ -211,11 +211,19 @@ describe("JSONConfigParser", () => {
       [1, 1],
     ]);
   });
+
+  it("handles JSONC with CR line endings", () => {
+    const result = parser.analyzeFile("config.jsonc", '{\r// comment\r"a": 1\r}');
+    expect(result.sections).toEqual([
+      { name: "a", level: 1, lineRange: [3, 3] },
+    ]);
+  });
 });
 
 describe("stripJsoncSyntax", () => {
   it("strips line comments", () => {
     expect(stripJsoncSyntax('{"a": 1} // tail')).toBe('{"a": 1} ');
+    expect(stripJsoncSyntax('{\r// comment\r"a": 1\r}')).toBe('{\r\r"a": 1\r}');
   });
 
   it("strips block comments", () => {

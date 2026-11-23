@@ -38,7 +38,7 @@ export function stripJsoncSyntax(content: string): string {
     // Line comment
     if (ch === "/" && next === "/") {
       i += 2;
-      while (i < n && content[i] !== "\n") i++;
+      while (i < n && content[i] !== "\n" && content[i] !== "\r") i++;
       continue;
     }
 
@@ -149,16 +149,11 @@ export class JSONConfigParser implements AnalyzerPlugin {
           seen.add(name);
           return true;
         });
-        const totalLines = content.split("\n").length;
-        for (let i = 0; i < entries.length; i++) {
-          const next = entries[i + 1];
+        for (const entry of entries) {
           sections.push({
-            name: entries[i].name,
+            name: entry.name,
             level: 1,
-            lineRange: [
-              entries[i].line,
-              next ? Math.max(entries[i].line, next.line - 1) : totalLines,
-            ],
+            lineRange: [entry.line, entry.endLine],
           });
         }
       }
@@ -169,9 +164,11 @@ export class JSONConfigParser implements AnalyzerPlugin {
   }
 }
 
-function findTopLevelJsonKeys(content: string): Array<{ name: string; line: number }> {
-  const entries: Array<{ name: string; line: number }> = [];
+function findTopLevelJsonKeys(content: string): Array<{ name: string; line: number; endLine: number }> {
+  const entries: Array<{ name: string; line: number; endLine: number }> = [];
   const stack: string[] = [];
+  let activeEntry: (typeof entries)[number] | undefined;
+  let lastSignificantLine = 1;
   let line = 1;
   let i = 0;
 
@@ -181,14 +178,19 @@ function findTopLevelJsonKeys(content: string): Array<{ name: string; line: numb
 
     if (ch === "/" && next === "/") {
       i += 2;
-      while (i < content.length && content[i] !== "\n") i++;
+      while (i < content.length && content[i] !== "\n" && content[i] !== "\r") i++;
       continue;
     }
 
     if (ch === "/" && next === "*") {
       i += 2;
       while (i < content.length && !(content[i] === "*" && content[i + 1] === "/")) {
-        if (content[i] === "\n") line++;
+        if (content[i] === "\r") {
+          line++;
+          if (content[i + 1] === "\n") i++;
+        } else if (content[i] === "\n") {
+          line++;
+        }
         i++;
       }
       i += 2;
@@ -237,20 +239,40 @@ function findTopLevelJsonKeys(content: string): Array<{ name: string; line: numb
       }
 
       if (stack.length === 1 && stack[0] === "{" && content[nextIndex] === ":") {
-        entries.push({
+        activeEntry = {
           name: JSON.parse(content.slice(start, i)) as string,
           line: startLine,
-        });
+          endLine: startLine,
+        };
+        entries.push(activeEntry);
+      } else {
+        lastSignificantLine = line;
       }
       continue;
     }
 
     if (ch === "{" || ch === "[") {
       stack.push(ch);
+      lastSignificantLine = line;
+    } else if (ch === ",") {
+      if (stack.length === 1 && activeEntry) {
+        activeEntry.endLine = lastSignificantLine;
+        activeEntry = undefined;
+      }
     } else if (ch === "}" || ch === "]") {
+      if (stack.length === 1 && activeEntry) {
+        activeEntry.endLine = lastSignificantLine;
+        activeEntry = undefined;
+      }
       stack.pop();
+      lastSignificantLine = line;
+    } else if (ch === "\r") {
+      line++;
+      if (next === "\n") i++;
     } else if (ch === "\n") {
       line++;
+    } else if (!/\s/.test(ch) && ch !== ":") {
+      lastSignificantLine = line;
     }
     i++;
   }
