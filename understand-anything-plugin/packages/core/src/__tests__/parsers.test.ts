@@ -180,11 +180,50 @@ describe("JSONConfigParser", () => {
     const result = parser.analyzeFile("config.jsonc", content);
     expect(result.sections!.map((s) => s.name)).toEqual(["url", "note"]);
   });
+
+  it("uses top-level keys to calculate non-inverted section ranges", () => {
+    const content = [
+      "{",
+      '  "description": "mentions target",',
+      '  /* "target" before the nested key */',
+      '  "nested": {',
+      '    "target": 1',
+      "  },",
+      '  "\\u0074arget": 2,',
+      '  "last": { "target": 3 }',
+      "}",
+    ].join("\n") + "\n";
+
+    const result = parser.analyzeFile("config.jsonc", content);
+    expect(result.sections).toEqual([
+      { name: "description", level: 1, lineRange: [2, 2] },
+      { name: "nested", level: 1, lineRange: [4, 6] },
+      { name: "target", level: 1, lineRange: [7, 7] },
+      { name: "last", level: 1, lineRange: [8, 8] },
+    ]);
+  });
+
+  it("keeps valid ranges for minified JSON", () => {
+    const result = parser.analyzeFile("minified.json", '{"a":1,"b":{"c":2},"d":[3,4]}');
+    expect(result.sections!.map((section) => section.lineRange)).toEqual([
+      [1, 1],
+      [1, 1],
+      [1, 1],
+    ]);
+  });
+
+  it("handles JSONC with CR line endings", () => {
+    const result = parser.analyzeFile("config.jsonc", '{\r// comment\r"a": 1\r}');
+    expect(result.sections).toEqual([
+      { name: "a", level: 1, lineRange: [3, 3] },
+    ]);
+  });
 });
 
 describe("stripJsoncSyntax", () => {
   it("strips line comments", () => {
     expect(stripJsoncSyntax('{"a": 1} // tail')).toBe('{"a": 1} ');
+    expect(stripJsoncSyntax('{\r// comment\r"a": 1\r}')).toBe('{\r\r"a": 1\r}');
   });
 
   it("strips block comments", () => {
@@ -194,6 +233,11 @@ describe("stripJsoncSyntax", () => {
   it("strips trailing commas before } and ]", () => {
     expect(stripJsoncSyntax('{"a": 1,}')).toBe('{"a": 1}');
     expect(stripJsoncSyntax('[1, 2,]')).toBe('[1, 2]');
+  });
+
+  it("does not strip trailing-comma-like sequences inside strings", () => {
+    const input = '{"pattern": "[a-z, ]", "fmt": "{a,}", "a, ]": 1}';
+    expect(stripJsoncSyntax(input)).toBe(input);
   });
 
   it("does not strip // inside strings", () => {
