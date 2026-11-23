@@ -32,7 +32,7 @@ Each source transition is checked independently from publication mechanics.
 | Syntax | JS/TS/JSX/TSX methods/properties/TypeScript parameter properties/class expressions/assignments/property APIs; Ruby accessors/alias declarations/method installers; Python attributes/installers; Go/Rust/C++ receiver extraction |
 | Negative evidence | unrelated string, parameter, normal read/call; static installer for another symbol; another owner's accessor |
 | Invalid evidence | unsupported parser/coverage adapter, parse recovery/error, empty extraction, missing evidence version/coverage profile, ambiguous old mapping |
-| Publication | 20-to-1 omission; equal counts; merge/direct-finalize refusal; retry success/failure; stable prepare baseline; stale shards; deleted/excluded files; both data directories; current edge endpoint reuse |
+| Publication | 20-to-1 omission; equal counts; merge/direct-finalize refusal; retry success/failure; stable prepare baseline; stale shards; deleted/excluded files; both data directories; current edge endpoint reuse; inbound edges from files that are not reanalyzed (kept, retargeted, dropped, endpoint reuse) |
 
 Tests must assert positive and negative outcomes for each recognizer rather than only adding the latest reported failure. Existing publication tests continue to verify actual persisted bytes and fresh edge identities. Full Linux/Windows CI and one overall Codex review follow the integrated local matrix.
 

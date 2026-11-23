@@ -387,6 +387,9 @@ export async function validateIncrementalSymbols(projectRoot, { graph, intermedi
       const candidates = [
         ...(currentCandidates?.edges ?? []).map(edge => ({ edge, saved: false })),
         ...(hasRetry ? retry.inboundEdgeCandidates : []).map(edge => ({ edge, saved: true })),
+        // Old edges from files that were not reanalyzed into files that were.
+        ...baseline.files.flatMap(file => file.inboundEdges ?? [])
+          .map(edge => ({ edge, saved: false, inbound: true })),
       ];
       if (candidates.length || hasRetry) {
         const ids = new Set(graph.nodes.map(node => node.id));
@@ -415,9 +418,11 @@ export async function validateIncrementalSymbols(projectRoot, { graph, intermedi
             currentBindings.set(node.id, match);
           }
         }
-        const endpoint = (id, saved) => {
+        const endpoint = (id, saved, inbound) => {
           if (saved && currentBindings.has(id)) return currentBindings.get(id);
-          if (!saved && ids.has(id)) return id;
+          // An old inbound edge names an old symbol ID, which the current
+          // analysis may have reused for a different symbol.
+          if (!saved && !inbound && ids.has(id)) return id;
           if (baselineBindings.has(id)) return baselineBindings.get(id);
           return ids.has(id) ? id : null;
         };
@@ -425,23 +430,27 @@ export async function validateIncrementalSymbols(projectRoot, { graph, intermedi
         const existing = new Map(graph.edges.map((edge, index) => [edgeKey(edge), index]));
         report.reconciledCurrentEdges = 0;
         report.droppedCurrentEdges = [];
+        report.reconciledInboundEdges = 0;
+        report.droppedInboundEdges = [];
         report.idReplacements = [...replacements].map(([oldId, newId]) => ({ oldId, newId }));
         report.currentIdBindings = [...currentBindings].map(([oldId, newId]) => ({ oldId, newId }));
-        for (const { edge: candidate, saved } of candidates) {
+        for (const { edge: candidate, saved, inbound } of candidates) {
           const edge = {
             ...candidate,
-            source: endpoint(candidate.source, saved),
-            target: endpoint(candidate.target, saved),
+            source: endpoint(candidate.source, saved, inbound),
+            target: endpoint(candidate.target, saved, inbound),
           };
           if (!ids.has(edge.source) || !ids.has(edge.target)) {
-            report.droppedCurrentEdges.push({ source: candidate.source, target: candidate.target, type: candidate.type });
+            (inbound ? report.droppedInboundEdges : report.droppedCurrentEdges)
+              .push({ source: candidate.source, target: candidate.target, type: candidate.type });
           } else {
             const index = existing.get(edgeKey(edge));
             if (index === undefined) {
               existing.set(edgeKey(edge), graph.edges.length);
               graph.edges.push(edge);
-              report.reconciledCurrentEdges++;
-            } else if (Number(edge.weight) > Number(graph.edges[index].weight)) {
+              if (inbound) report.reconciledInboundEdges++;
+              else report.reconciledCurrentEdges++;
+            } else if (!inbound && Number(edge.weight) > Number(graph.edges[index].weight)) {
               graph.edges[index] = edge;
               report.reconciledCurrentEdges++;
             }
@@ -449,7 +458,7 @@ export async function validateIncrementalSymbols(projectRoot, { graph, intermedi
         }
         // Merge's earlier dangling-edge cleanup cannot see semantic ID aliases.
         // Save the reconciled candidate before architecture/tour consumers run.
-        if (graphFromDisk && report.reconciledCurrentEdges > 0) {
+        if (graphFromDisk && report.reconciledCurrentEdges + report.reconciledInboundEdges > 0) {
           atomicWriteJson(join(intermediateDir, 'assembled-graph.json'), graph);
         }
         report.graphHash = createHash('sha256').update(JSON.stringify(graph)).digest('hex');
@@ -473,6 +482,10 @@ export function formatSymbolReport(report) {
   if (report.reconciledCurrentEdges) lines.push(`  Reconciled ${report.reconciledCurrentEdges} current edge(s)`);
   for (const edge of report.droppedCurrentEdges ?? []) {
     lines.push(`  Dropped current edge with unresolved endpoint: ${JSON.stringify(edge)}`);
+  }
+  if (report.reconciledInboundEdges) lines.push(`  Kept ${report.reconciledInboundEdges} inbound edge(s) from files that were not reanalyzed`);
+  for (const edge of report.droppedInboundEdges ?? []) {
+    lines.push(`  Dropped inbound edge with unresolved endpoint: ${JSON.stringify(edge)}`);
   }
   lines.push(report.ok ? 'Symbol validation passed' : 'Symbol validation blocked publication; baseline not advanced');
   return lines.join('\n');

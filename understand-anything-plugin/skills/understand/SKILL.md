@@ -217,7 +217,7 @@ Determine whether to run a full analysis or incremental update.
    - `$UA_DIR/intermediate/scan-result.json`
    - `$UA_DIR/intermediate/changed-files.json`
    - `$UA_DIR/intermediate/batch-existing.json` for partial/architecture updates
-   - `$UA_DIR/intermediate/incremental-symbol-baseline.json`, the previous node inventory for reanalyzed files, bound to the base/head commits
+   - `$UA_DIR/intermediate/incremental-symbol-baseline.json`, the previous node inventory for reanalyzed files and the previous edges into them from other files, bound to the base/head commits
 
    Read `incremental-plan.json` and store its `action`, `filesToReanalyze`, `deletedFiles`, `rerunArchitecture`, and `rerunTour` values. Follow this gate:
 
@@ -418,6 +418,8 @@ The merge combines `batch-existing.json` with any fresh batch output. Its import
 **Symbol-loss gate and one targeted retry:** Merge invokes `validate-incremental-symbols.mjs`. Read `incremental-symbol-report.json`: it reports per-file before/after counts and missing node IDs/names even when counts stay equal. Missing functions, classes, and methods (including `classes[].methods`) are classified against base/current source with the same strict parser. Only confirmed source deletions are allowed; still-present and unknown symbols block publication.
 
 Before dropping dangling endpoints, merge records normalized edge candidates from fresh batches in `incremental-edge-candidates.json`, bound to the base/head commits. Every successful validation reconciles their source and target IDs against accepted symbol replacements, including first-pass updates that need no retry. Retry also preserves these alongside surviving current edges, so an edge to the initially omitted symbol can be restored after repair. Edges from `batch-existing.json` are not collected as fresh evidence.
+
+No analyzer revisits a file that is not reanalyzed, so its previous edges into reanalyzed files (such as `calls` or `documents`) are kept as `inboundEdges` in `incremental-symbol-baseline.json` rather than in `batch-existing.json`. Every successful validation maps their targets through the accepted symbol replacements, never through an old ID the current analysis reused, adds them only where the candidate lacks the same edge, and drops those whose target no longer exists. `imports` edges are excluded because the refreshed `importMap` rebuilds them.
 
 Candidate endpoints use the current analysis's node and ownership descriptors before any baseline alias is applied: an ID reused by a different current symbol must keep its current meaning. During repair, incoming edges are deferred outside the ordinary retained batch until those original HEAD descriptors can be matched against replacement nodes, so temporary ID reuse cannot create a false edge during merge.
 
