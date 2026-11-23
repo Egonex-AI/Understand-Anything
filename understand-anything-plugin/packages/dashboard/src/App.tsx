@@ -218,7 +218,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   useEffect(() => {
     fetch(dataUrl("diff-overlay.json", accessToken))
       .then((res) => {
-        if (!res.ok) return null;
+        if (!res.ok || res.status === 204) return null;
         return res.json();
       })
       .then((data: unknown) => {
@@ -242,7 +242,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   useEffect(() => {
     fetch(dataUrl("domain-graph.json", accessToken))
       .then((res) => {
-        if (!res.ok) return null;
+        if (!res.ok || res.status === 204) return null;
         return res.json();
       })
       .then((data: unknown) => {

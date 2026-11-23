@@ -422,7 +422,8 @@ export function createDataEndpointsMiddleware(
     }
 
     // No matching file found on disk.
-    res.statusCode = 404;
+    res.statusCode =
+      pathname === "/diff-overlay.json" || pathname === "/domain-graph.json" ? 204 : 404;
     if (pathname === "/knowledge-graph.json") {
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ error: "No knowledge graph found. Run /understand first." }));

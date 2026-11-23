@@ -226,7 +226,8 @@ function serveGraphJson(res, fileName) {
   if (fileName === "knowledge-graph.json") {
     sendJson(res, 404, { error: "No knowledge graph found. Run /understand first." });
   } else {
-    res.statusCode = 404;
+    res.statusCode =
+      fileName === "diff-overlay.json" || fileName === "domain-graph.json" ? 204 : 404;
     res.end();
   }
 }
