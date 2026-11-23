@@ -221,7 +221,7 @@ function findTopLevelJsonKeys(content: string): Array<{ name: string; line: numb
         }
         if (content[nextIndex] === "/" && content[nextIndex + 1] === "/") {
           nextIndex += 2;
-          while (nextIndex < content.length && content[nextIndex] !== "\n") nextIndex++;
+          while (nextIndex < content.length && content[nextIndex] !== "\n" && content[nextIndex] !== "\r") nextIndex++;
           continue;
         }
         if (content[nextIndex] === "/" && content[nextIndex + 1] === "*") {
