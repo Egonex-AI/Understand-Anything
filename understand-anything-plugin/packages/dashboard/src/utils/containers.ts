@@ -237,6 +237,7 @@ function projectOntoBasis(
     projected.set(containerId, ids);
   }
 
+  const basisNodesById = new Map(basis.nodes.map((node) => [node.id, node]));
   let containers = [...projected.entries()].map(([containerId, ids]) => {
     const basisContainer = basisContainerById.get(containerId)!;
     let name = basisContainer.name;
@@ -246,7 +247,7 @@ function projectOntoBasis(
       ids.length > 1 &&
       name.startsWith(`${clusterLabel} `)
     ) {
-      const fileNode = basis.nodes.find((n) => n.id === basisContainer.nodeIds[0]);
+      const fileNode = basisNodesById.get(basisContainer.nodeIds[0]);
       if (fileNode) name = fileNode.name;
     }
     return { ...basisContainer, name, nodeIds: ids };
