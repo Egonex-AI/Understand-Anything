@@ -29,6 +29,7 @@ export default function SearchBar() {
   const navigateToNodeInLayer = useDashboardStore((s) => s.navigateToNodeInLayer);
   const searchMode = useDashboardStore((s) => s.searchMode);
   const setSearchMode = useDashboardStore((s) => s.setSearchMode);
+  const semanticAvailable = useDashboardStore((s) => s.semanticEngine !== null);
   const { t } = useI18n();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -123,11 +124,17 @@ export default function SearchBar() {
           </button>
           <button
             onClick={() => setSearchMode("semantic")}
+            disabled={!semanticAvailable}
+            title={
+              semanticAvailable
+                ? undefined
+                : "Semantic search needs an indexed graph — load a project first."
+            }
             className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
               searchMode === "semantic"
                 ? "bg-accent/20 text-accent"
                 : "text-text-muted hover:text-text-secondary"
-            }`}
+            } disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-text-muted`}
           >
             {t.search.semantic}
           </button>
