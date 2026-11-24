@@ -1,0 +1,2168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Understand-Anything — Pipeline reference</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --panel-2: #1c2030;
+    --panel-3: #232838;
+    --text: #d7dae3;
+    --muted: #8a91a3;
+    --accent: #d4a574;
+    --blue: #8fb8d6;
+    --purple: #b48ec8;
+    --orange: #d9a161;
+    --cyan: #7ab8a5;
+    --green: #6cb46b;
+    --red: #d97461;
+    --yellow: #d4c574;
+    --border: #262b3a;
+    --border-strong: #3a4054;
+    --code-bg: #0b0d12;
+    --hl: rgba(212, 165, 116, 0.18);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    font-size: 15px;
+  }
+
+  /* ─── Header ────────────────────────────────────────────────── */
+  header {
+    background: linear-gradient(180deg, var(--panel-2) 0%, var(--bg) 100%);
+    padding: 48px 32px 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-inner { max-width: 1280px; margin: 0 auto; }
+  h1 {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-weight: 400;
+    font-size: 44px;
+    margin: 0 0 6px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  .lede { color: var(--muted); font-size: 17px; margin: 0 0 12px; max-width: 800px; }
+  .meta-strip {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 14px;
+  }
+  .meta-strip strong { color: var(--text); font-weight: 600; }
+
+  /* ─── Sticky nav ────────────────────────────────────────────── */
+  nav.tabbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border-strong);
+    padding: 10px 32px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 7px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s ease;
+  }
+  .tab-btn:hover { color: var(--text); border-color: var(--border-strong); }
+  .tab-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .nav-spacer { flex: 1; }
+  .search-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 240px;
+  }
+  .search-box:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .nav-actions { display: flex; gap: 6px; }
+  .nav-actions button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 11.5px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .nav-actions button:hover { color: var(--text); border-color: var(--border-strong); }
+
+  /* ─── Main layout ───────────────────────────────────────────── */
+  main { max-width: 1280px; margin: 0 auto; padding: 32px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  h2.section-title {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-weight: 400;
+    font-size: 32px;
+    margin: 0 0 14px;
+    color: var(--accent);
+  }
+  .section-lede { color: var(--muted); font-size: 15px; margin: 0 0 24px; max-width: 800px; }
+
+  /* ─── Pipeline SVG diagram ──────────────────────────────────── */
+  .diagram-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 0 0 32px;
+    overflow-x: auto;
+  }
+  .diagram-title {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    margin: 0 0 12px;
+  }
+  svg.pipeline { display: block; min-width: 100%; }
+  .node-box { cursor: pointer; transition: opacity 0.2s ease; }
+  .node-box:hover { opacity: 0.85; }
+  .node-box rect { stroke-width: 1.5; }
+  .node-box text { fill: var(--bg); font-family: inherit; pointer-events: none; }
+  .node-box text.num { font-size: 11px; font-weight: 700; opacity: 0.6; }
+  .node-box text.title { font-size: 13px; font-weight: 600; }
+  .node-box text.desc { font-size: 10.5px; opacity: 0.8; }
+  .arrow line { stroke: var(--border-strong); stroke-width: 1.5; }
+  .arrow polygon { fill: var(--border-strong); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; font-size: 11.5px; color: var(--muted); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-chip { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* ─── Phase cards ───────────────────────────────────────────── */
+  .phase-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 22px 26px;
+    margin: 0 0 18px;
+    scroll-margin-top: 80px;
+  }
+  .phase-card.highlighted { box-shadow: 0 0 0 2px var(--accent); animation: pulse 1.2s ease-out; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--accent); }
+    50% { box-shadow: 0 0 0 4px var(--accent); }
+  }
+  .phase-card.blue { border-left-color: var(--blue); }
+  .phase-card.purple { border-left-color: var(--purple); }
+  .phase-card.orange { border-left-color: var(--orange); }
+  .phase-card.cyan { border-left-color: var(--cyan); }
+  .phase-card.green { border-left-color: var(--green); }
+  .phase-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+  .phase-num {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    flex-shrink: 0;
+  }
+  .phase-title {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-size: 24px;
+    color: var(--accent);
+    margin: 0;
+    flex: 1;
+  }
+  .copy-link {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .phase-card:hover .copy-link { opacity: 1; }
+  .copy-link:hover { color: var(--text); border-color: var(--border-strong); }
+  .phase-summary {
+    color: var(--text);
+    font-size: 14.5px;
+    margin: 0 0 16px;
+    opacity: 0.85;
+  }
+
+  /* ─── Step (details/summary) ────────────────────────────────── */
+  details.step {
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    margin: 8px 0;
+    background: var(--panel-2);
+    overflow: hidden;
+  }
+  details.step[open] { border-color: var(--border-strong); }
+  details.step summary {
+    cursor: pointer;
+    padding: 11px 16px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    user-select: none;
+  }
+  details.step summary::-webkit-details-marker { display: none; }
+  details.step summary::before {
+    content: "▸";
+    color: var(--muted);
+    font-size: 11px;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+  details.step[open] summary::before { transform: rotate(90deg); }
+  .step-num {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--code-bg);
+    padding: 1px 7px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+  }
+  .step-mech {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+  }
+  .step-mech.orch { background: rgba(143, 184, 214, 0.15); color: var(--blue); border: 1px solid rgba(143, 184, 214, 0.3); }
+  .step-mech.script { background: rgba(180, 142, 200, 0.15); color: var(--purple); border: 1px solid rgba(180, 142, 200, 0.3); }
+  .step-mech.agent { background: rgba(217, 161, 97, 0.15); color: var(--orange); border: 1px solid rgba(217, 161, 97, 0.3); }
+  .step-mech.scriptagent { background: rgba(122, 184, 165, 0.15); color: var(--cyan); border: 1px solid rgba(122, 184, 165, 0.3); }
+  .step-content {
+    padding: 4px 16px 18px 42px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .step-desc { font-size: 13.5px; margin: 14px 0 16px; color: var(--text); opacity: 0.9; }
+  .step-desc code { font-size: 12.5px; }
+
+  /* ─── I/O grid ──────────────────────────────────────────────── */
+  .io-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 0;
+  }
+  @media (max-width: 720px) { .io-grid { grid-template-columns: 1fr; } }
+  .io-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 12px 14px;
+  }
+  .io-block h4 {
+    margin: 0 0 8px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    font-weight: 600;
+  }
+  .io-block.in h4 { color: var(--blue); }
+  .io-block.out h4 { color: var(--green); }
+  .io-block.calls h4 { color: var(--orange); }
+  .io-block ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 12.5px;
+  }
+  .io-block li {
+    padding: 2px 0;
+    line-height: 1.5;
+    color: var(--text);
+    opacity: 0.92;
+  }
+  .io-block li code { font-size: 11.5px; }
+  .io-block li .tag {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-right: 4px;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  /* ─── Generic content ───────────────────────────────────────── */
+  code {
+    background: var(--code-bg);
+    color: #e6c898;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    margin: 10px 0;
+  }
+  pre code { background: transparent; padding: 0; color: var(--text); }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 14px 0;
+    font-size: 13px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 9px 11px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--panel-2); font-weight: 600; color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { background: var(--panel); }
+  td code { font-size: 12px; }
+  ul.normal { padding-left: 22px; margin: 8px 0 14px; }
+  ul.normal li { margin-bottom: 4px; }
+  h3.sub {
+    font-size: 18px;
+    margin: 32px 0 12px;
+    color: var(--blue);
+    font-weight: 600;
+  }
+  h4.sub {
+    font-size: 13px;
+    margin: 18px 0 6px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .callout {
+    background: rgba(217, 116, 97, 0.06);
+    border: 1px solid rgba(217, 116, 97, 0.3);
+    border-left: 3px solid var(--red);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    font-size: 13.5px;
+  }
+  .callout-title {
+    color: var(--red);
+    font-weight: 600;
+    margin: 0 0 6px;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .note {
+    background: rgba(143, 184, 214, 0.06);
+    border: 1px solid rgba(143, 184, 214, 0.2);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 13.5px;
+    color: var(--text);
+    opacity: 0.9;
+  }
+  .footer { color: var(--muted); font-size: 12px; margin: 80px 0 32px; text-align: center; padding-top: 32px; border-top: 1px solid var(--border); }
+
+  /* Search-no-match: hide cards whose text doesn't match the filter */
+  .phase-card.hidden, .file-row.hidden, .script-row.hidden { display: none; }
+  mark.searchhit {
+    background: var(--hl);
+    color: var(--accent);
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1>Understand-Anything Pipeline</h1>
+    <p class="lede">Interactive walkthrough of <code>/understand</code> (seven phases), the auto-update hook (four phases), and every input and output along the way. Each step expands to show what it reads, what it writes, and which subagent or bundled script does the work.</p>
+    <div class="meta-strip">
+      <span><strong>Scope:</strong> <code>skills/understand</code> + <code>hooks/auto-update-prompt.md</code></span>
+      <span><strong>Sources:</strong> <code>skills/understand/SKILL.md</code>, <code>hooks/auto-update-prompt.md</code>, <code>agents/*.md</code></span>
+      <span><strong>Tip:</strong> click a node in the diagrams to jump; use the search box to filter steps.</span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabbar">
+  <button class="tab-btn active" data-section="main-pipeline">Main pipeline</button>
+  <button class="tab-btn" data-section="auto-update">Auto-update hook</button>
+  <button class="tab-btn" data-section="files">Files produced</button>
+  <button class="tab-btn" data-section="scripts">Scripts &amp; agents</button>
+  <button class="tab-btn" data-section="failures">Failure modes</button>
+  <button class="tab-btn" data-section="tunables">Tunables</button>
+  <span class="nav-spacer"></span>
+  <input type="search" class="search-box" id="search" placeholder="Search step, file, agent…" aria-label="Search">
+  <div class="nav-actions">
+    <button id="expand-all">Expand all</button>
+    <button id="collapse-all">Collapse all</button>
+  </div>
+</nav>
+
+<main>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ███████████████  MAIN PIPELINE  ████████████████████████████ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="section active" id="main-pipeline">
+  <h2 class="section-title">/understand — main pipeline</h2>
+  <p class="section-lede">Seven numbered phases plus a fractional 0.5. Phases 1, 3, 4, 5, and the optional <code>--review</code> path of 6 dispatch LLM subagents; phases 0, 0.5, 2 (merge), 6 (default), and 7 run bundled scripts deterministically. Click a phase node to jump.</p>
+
+  <div class="diagram-wrap">
+    <p class="diagram-title">Pipeline overview — click any phase</p>
+    <svg class="pipeline" viewBox="0 0 1240 130" xmlns="http://www.w3.org/2000/svg">
+      <!-- Define arrowhead -->
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <polygon points="0,0 7,3 0,6" fill="#3a4054" />
+        </marker>
+      </defs>
+
+      <!-- Phase 0 -->
+      <g class="node-box" data-target="phase-0" transform="translate(10, 30)">
+        <rect width="115" height="70" rx="6" fill="#8fb8d6"></rect>
+        <text class="num" x="10" y="22">PHASE 0</text>
+        <text class="title" x="10" y="42">Pre-flight</text>
+        <text class="desc" x="10" y="58">PROJECT_ROOT, plugin</text>
+      </g>
+      <!-- Phase 0.5 -->
+      <g class="node-box" data-target="phase-05" transform="translate(140, 30)">
+        <rect width="105" height="70" rx="6" fill="#8fb8d6"></rect>
+        <text class="num" x="10" y="22">PHASE 0.5</text>
+        <text class="title" x="10" y="42">Ignore</text>
+        <text class="desc" x="10" y="58">.understandignore</text>
+      </g>
+      <!-- Phase 1 -->
+      <g class="node-box" data-target="phase-1" transform="translate(260, 30)">
+        <rect width="105" height="70" rx="6" fill="#b48ec8"></rect>
+        <text class="num" x="10" y="22">PHASE 1</text>
+        <text class="title" x="10" y="42">SCAN</text>
+        <text class="desc" x="10" y="58">scan-result.json</text>
+      </g>
+      <!-- Phase 2 -->
+      <g class="node-box" data-target="phase-2" transform="translate(380, 30)">
+        <rect width="115" height="70" rx="6" fill="#d9a161"></rect>
+        <text class="num" x="10" y="22">PHASE 2</text>
+        <text class="title" x="10" y="42">ANALYZE</text>
+        <text class="desc" x="10" y="58">batch-N.json × N</text>
+      </g>
+      <!-- Phase 3 -->
+      <g class="node-box" data-target="phase-3" transform="translate(510, 30)">
+        <rect width="115" height="70" rx="6" fill="#7ab8a5"></rect>
+        <text class="num" x="10" y="22">PHASE 3</text>
+        <text class="title" x="10" y="42">ASSEMBLE</text>
+        <text class="desc" x="10" y="58">review notes</text>
+      </g>
+      <!-- Phase 4 -->
+      <g class="node-box" data-target="phase-4" transform="translate(640, 30)">
+        <rect width="115" height="70" rx="6" fill="#d9a161"></rect>
+        <text class="num" x="10" y="22">PHASE 4</text>
+        <text class="title" x="10" y="42">ARCHITECT</text>
+        <text class="desc" x="10" y="58">layers.json</text>
+      </g>
+      <!-- Phase 5 -->
+      <g class="node-box" data-target="phase-5" transform="translate(770, 30)">
+        <rect width="115" height="70" rx="6" fill="#d9a161"></rect>
+        <text class="num" x="10" y="22">PHASE 5</text>
+        <text class="title" x="10" y="42">TOUR</text>
+        <text class="desc" x="10" y="58">tour.json</text>
+      </g>
+      <!-- Phase 6 -->
+      <g class="node-box" data-target="phase-6" transform="translate(900, 30)">
+        <rect width="115" height="70" rx="6" fill="#7ab8a5"></rect>
+        <text class="num" x="10" y="22">PHASE 6</text>
+        <text class="title" x="10" y="42">VALIDATE</text>
+        <text class="desc" x="10" y="58">review.json</text>
+      </g>
+      <!-- Phase 7 -->
+      <g class="node-box" data-target="phase-7" transform="translate(1030, 30)">
+        <rect width="200" height="70" rx="6" fill="#6cb46b"></rect>
+        <text class="num" x="10" y="22">PHASE 7</text>
+        <text class="title" x="10" y="42">SAVE</text>
+        <text class="desc" x="10" y="58">graph + fingerprints + meta</text>
+      </g>
+
+      <!-- Arrows -->
+      <g class="arrow">
+        <line x1="125" y1="65" x2="140" y2="65" marker-end="url(#arr)"/>
+        <line x1="245" y1="65" x2="260" y2="65" marker-end="url(#arr)"/>
+        <line x1="365" y1="65" x2="380" y2="65" marker-end="url(#arr)"/>
+        <line x1="495" y1="65" x2="510" y2="65" marker-end="url(#arr)"/>
+        <line x1="625" y1="65" x2="640" y2="65" marker-end="url(#arr)"/>
+        <line x1="755" y1="65" x2="770" y2="65" marker-end="url(#arr)"/>
+        <line x1="885" y1="65" x2="900" y2="65" marker-end="url(#arr)"/>
+        <line x1="1015" y1="65" x2="1030" y2="65" marker-end="url(#arr)"/>
+      </g>
+    </svg>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-chip" style="background: #8fb8d6"></span>preflight / config</div>
+      <div class="legend-item"><span class="legend-chip" style="background: #b48ec8"></span>discovery</div>
+      <div class="legend-item"><span class="legend-chip" style="background: #d9a161"></span>LLM-heavy analysis</div>
+      <div class="legend-item"><span class="legend-chip" style="background: #7ab8a5"></span>review / validate</div>
+      <div class="legend-item"><span class="legend-chip" style="background: #6cb46b"></span>persist</div>
+    </div>
+  </div>
+
+  <!-- ─── Phase 0 ──────────────────────────────────────────── -->
+  <div class="phase-card blue" id="phase-0">
+    <div class="phase-header">
+      <span class="phase-num">Phase 0</span>
+      <h3 class="phase-title">Pre-flight</h3>
+      <button class="copy-link" data-anchor="phase-0">copy link</button>
+    </div>
+    <p class="phase-summary">Resolve the project root, build the plugin if needed, capture project context, and choose between a full rebuild and an incremental update.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.1</span>
+        <span class="step-title">Resolve <code>PROJECT_ROOT</code></span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Parse <code>$ARGUMENTS</code> for a non-flag directory path, fall back to cwd. Verify the path exists. <strong>Worktree redirect:</strong> if the path is inside a git worktree (not the main checkout), redirect to the main repo root — worktrees are ephemeral and <code>.understand-anything/</code> would be destroyed on session end (issue #133).</p>
+        <div class="io-grid">
+          <div class="io-block in">
+            <h4>Reads</h4>
+            <ul>
+              <li><span class="tag">arg</span><code>$ARGUMENTS</code></li>
+              <li><span class="tag">env</span>cwd</li>
+              <li><span class="tag">env</span><code>UNDERSTAND_NO_WORKTREE_REDIRECT</code></li>
+              <li><span class="tag">git</span><code>--git-dir</code>, <code>--git-common-dir</code></li>
+            </ul>
+          </div>
+          <div class="io-block out">
+            <h4>Sets</h4>
+            <ul>
+              <li><span class="tag">var</span><code>$PROJECT_ROOT</code> (abs path)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.2</span>
+        <span class="step-title">Locate <code>PLUGIN_ROOT</code> and build core if missing</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Search a candidate list of install paths (Claude, Copilot, Codex, opencode, pi, plain clone). Validate by checking for <code>package.json</code> + <code>pnpm-workspace.yaml</code>. If <code>packages/core/dist/index.js</code> is missing, run <code>pnpm install</code> and <code>pnpm --filter @understand-anything/core build</code>.</p>
+        <div class="io-grid">
+          <div class="io-block in">
+            <h4>Reads</h4>
+            <ul>
+              <li><span class="tag">env</span><code>CLAUDE_PLUGIN_ROOT</code></li>
+              <li><span class="tag">fs</span><code>~/.agents/skills/understand</code> (symlink)</li>
+              <li><span class="tag">fs</span><code>~/.copilot/skills/understand</code> (symlink)</li>
+              <li><span class="tag">fs</span><code>~/.understand-anything-plugin/</code></li>
+              <li><span class="tag">fs</span><code>~/.codex/...</code>, <code>~/.opencode/...</code>, <code>~/.pi/...</code></li>
+              <li><span class="tag">fs</span><code>$PLUGIN_ROOT/packages/core/dist/index.js</code></li>
+            </ul>
+          </div>
+          <div class="io-block out">
+            <h4>Sets / Writes</h4>
+            <ul>
+              <li><span class="tag">var</span><code>$PLUGIN_ROOT</code></li>
+              <li><span class="tag">fs</span><code>$PLUGIN_ROOT/packages/core/dist/</code> (if built)</li>
+              <li><span class="tag">fs</span><code>$PLUGIN_ROOT/node_modules/</code> (if installed)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.3</span>
+        <span class="step-title">Capture current commit hash</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Single git invocation. Used to compare against <code>meta.json</code>'s stored hash in step 0.6.</p>
+        <div class="io-grid">
+          <div class="io-block in">
+            <h4>Reads</h4>
+            <ul><li><span class="tag">git</span><code>git rev-parse HEAD</code></li></ul>
+          </div>
+          <div class="io-block out">
+            <h4>Sets</h4>
+            <ul><li><span class="tag">var</span><code>$COMMIT_HASH</code></li></ul>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.4</span>
+        <span class="step-title">Create intermediate + temp directories</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Idempotent. These dirs are wiped at Phase 7 step 7.5 once analysis completes.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul><li><span class="tag">var</span><code>$PROJECT_ROOT</code></li></ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">dir</span><code>.understand-anything/intermediate/</code></li>
+            <li><span class="tag">dir</span><code>.understand-anything/tmp/</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.5</span>
+        <span class="step-title">Apply <code>--auto-update</code> / <code>--no-auto-update</code> flag</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Persists the preference into <code>config.json</code>. Analysis still proceeds regardless of the flag; the flag affects future hook behavior.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul><li><span class="tag">arg</span><code>$ARGUMENTS</code></li></ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul><li><span class="tag">file</span><code>.understand-anything/config.json</code> → <code>autoUpdate: true|false</code></li></ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.6</span>
+        <span class="step-title">Apply <code>--language</code> flag and load language directive</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Normalize ISO 639-1 codes and friendly names (<code>chinese</code> → <code>zh</code>, etc.). Persist to <code>config.json</code>. Build a reusable <code>$LANGUAGE_DIRECTIVE</code> string that gets injected into every downstream subagent prompt.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">arg</span><code>--language &lt;lang&gt;</code></li>
+            <li><span class="tag">file</span><code>config.json</code> (existing <code>outputLanguage</code>)</li>
+          </ul></div>
+          <div class="io-block out"><h4>Sets / Writes</h4><ul>
+            <li><span class="tag">var</span><code>$OUTPUT_LANGUAGE</code> (default <code>en</code>)</li>
+            <li><span class="tag">var</span><code>$LANGUAGE_DIRECTIVE</code></li>
+            <li><span class="tag">file</span><code>config.json</code> merged</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.7</span>
+        <span class="step-title">Merge subdomain graphs (if any)</span>
+        <span class="step-mech script">bundled script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">List <code>*knowledge-graph*.json</code> files in <code>.understand-anything/</code> excluding the main one. If subdomain graphs exist (e.g. <code>frontend-knowledge-graph.json</code>, <code>backend-knowledge-graph.json</code>), run the merge script.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>python &lt;SKILL_DIR&gt;/merge-subdomain-graphs.py $PROJECT_ROOT</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">glob</span><code>.understand-anything/*knowledge-graph*.json</code></li>
+            <li><span class="tag">file</span>existing <code>knowledge-graph.json</code> (as base)</li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>knowledge-graph.json</code> (deduplicated merge)</li>
+          </ul></div>
+          <div class="io-block out"><h4>Reports</h4><ul><li>Merge summary to stderr (counts of dedup'd nodes/edges)</li></ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.8</span>
+        <span class="step-title">Read prior graph + meta; choose analysis path</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">The decision gate. Determines whether to run all seven phases, the incremental path, the review-only path, or skip entirely.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>knowledge-graph.json</code></li>
+            <li><span class="tag">file</span><code>meta.json</code> (for <code>gitCommitHash</code>)</li>
+            <li><span class="tag">var</span><code>$COMMIT_HASH</code></li>
+            <li><span class="tag">arg</span><code>--full</code>, <code>--review</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Sets</h4><ul>
+            <li><span class="tag">decision</span>FULL / INCREMENTAL / REVIEW_ONLY / SKIP</li>
+            <li><span class="tag">var</span><code>$CHANGED_FILES</code> (incremental only) — from <code>git diff &lt;lastHash&gt;..HEAD --name-only</code></li>
+          </ul></div>
+        </div>
+        <table>
+          <thead><tr><th>Condition</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><code>--full</code> in args</td><td>FULL — run all phases</td></tr>
+            <tr><td>no existing graph or meta</td><td>FULL</td></tr>
+            <tr><td><code>--review</code> + unchanged commit</td><td>REVIEW_ONLY — jump to Phase 6 step 3</td></tr>
+            <tr><td>existing graph + unchanged commit</td><td>Ask the user (a) full / (b) review / (c) skip</td></tr>
+            <tr><td>existing graph + changed files</td><td>INCREMENTAL — re-analyze changed only</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.9</span>
+        <span class="step-title">Collect project context for subagent injection</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Capture README, the package manifest, a shallow directory tree, and detect the project's entry point. These become prompt fragments appended to project-scanner, tour-builder, and architecture-analyzer dispatches.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>README.md</code> / <code>.rst</code> / <code>readme.md</code> (first 3000 chars)</li>
+            <li><span class="tag">file</span><code>package.json</code> / <code>pyproject.toml</code> / <code>Cargo.toml</code> / <code>go.mod</code> / <code>pom.xml</code></li>
+            <li><span class="tag">cmd</span><code>find $PROJECT_ROOT -maxdepth 2 -type f ...</code></li>
+            <li><span class="tag">heuristic</span>entry-point probe (<code>src/index.ts</code>, <code>main.py</code>, <code>main.go</code>, …)</li>
+          </ul></div>
+          <div class="io-block out"><h4>Sets</h4><ul>
+            <li><span class="tag">var</span><code>$README_CONTENT</code></li>
+            <li><span class="tag">var</span><code>$MANIFEST_CONTENT</code></li>
+            <li><span class="tag">var</span><code>$DIR_TREE</code></li>
+            <li><span class="tag">var</span><code>$ENTRY_POINT</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 0.5 ────────────────────────────────────────── -->
+  <div class="phase-card blue" id="phase-05">
+    <div class="phase-header">
+      <span class="phase-num">Phase 0.5</span>
+      <h3 class="phase-title">Ignore configuration</h3>
+      <button class="copy-link" data-anchor="phase-05">copy link</button>
+    </div>
+    <p class="phase-summary">Generate or confirm <code>.understandignore</code> patterns before scanning. Pauses for user confirmation either way.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.5.1</span>
+        <span class="step-title">Check for existing <code>.understandignore</code></span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/.understandignore</code> (existence)</li>
+          </ul></div>
+          <div class="io-block out"><h4>Sets</h4><ul>
+            <li>Decision: generate / use-existing</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.5.2</span>
+        <span class="step-title">Generate starter <code>.understandignore</code> (if absent)</span>
+        <span class="step-mech script">inline node script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Inline Node.js one-liner reads <code>.gitignore</code> patterns, deduplicates against a built-in defaults list (<code>node_modules/</code>, <code>dist/</code>, <code>.git/</code>, lockfiles, binaries, etc.), and detects common test/docs directories. Writes a commented file where every pattern is opt-in.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>.gitignore</code></li>
+            <li><span class="tag">fs</span>presence of <code>__tests__</code>, <code>tests/</code>, <code>docs/</code>, <code>examples/</code>, <code>scripts/</code>, <code>migrations/</code>, <code>.storybook/</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/.understandignore</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">0.5.3</span>
+        <span class="step-title">Wait for user confirmation</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Prompt-mediated pause. Skill reports the generated/existing file and waits. Tell Claude "proceed without confirmation" in the invocation to skip.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 1 ──────────────────────────────────────────── -->
+  <div class="phase-card purple" id="phase-1">
+    <div class="phase-header">
+      <span class="phase-num">Phase 1</span>
+      <h3 class="phase-title">SCAN — project inventory</h3>
+      <button class="copy-link" data-anchor="phase-1">copy link</button>
+    </div>
+    <p class="phase-summary">Single dispatch of the <code>project-scanner</code> subagent, which runs bundled scripts to enumerate files, detect languages and frameworks, count lines, and build the import map.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">1.1</span>
+        <span class="step-title">Dispatch <code>project-scanner</code> agent</span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Orchestrator builds the dispatch prompt with <code>$README_CONTENT</code>, <code>$MANIFEST_CONTENT</code>, and <code>$LANGUAGE_DIRECTIVE</code> appended.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><span class="tag">agent</span><code>agents/project-scanner.md</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Provides to agent</h4><ul>
+            <li><code>$PROJECT_ROOT</code></li>
+            <li><code>$README_CONTENT</code></li>
+            <li><code>$MANIFEST_CONTENT</code></li>
+            <li><code>$LANGUAGE_DIRECTIVE</code></li>
+            <li>output path: <code>intermediate/scan-result.json</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">1.2</span>
+        <span class="step-title">Subagent: discovery + categorization</span>
+        <span class="step-mech scriptagent">subagent + script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Subagent writes a discovery script (or invokes <code>scan-project.mjs</code> in current builds). Enumerates files via <code>git ls-files -z</code> when available, falling back to recursive walk. Applies default + <code>.understandignore</code> exclusions. Categorizes each file into <code>code / config / docs / infra / data / script / markup</code>.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>node &lt;SKILL_DIR&gt;/scan-project.mjs $PROJECT_ROOT $OUT</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">cmd</span><code>git ls-files -z</code> (or walker fallback)</li>
+            <li><span class="tag">file</span>every source file (for line count)</li>
+            <li><span class="tag">file</span><code>.understandignore</code>, defaults</li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Reports</h4><ul>
+            <li>files list with <code>{path, sizeLines, language, fileCategory}</code></li>
+            <li>detected languages, frameworks</li>
+            <li>complexity estimate</li>
+            <li><code>filteredByIgnore</code> count</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">1.3</span>
+        <span class="step-title">Subagent: build import map</span>
+        <span class="step-mech scriptagent">subagent + script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Per language, resolve relative imports for every code file. External package imports are dropped. The resulting map enables Phase 2 to construct cross-file batch context.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>node &lt;SKILL_DIR&gt;/extract-import-map.mjs ...</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span>every <code>fileCategory === "code"</code> file's source</li>
+            <li><span class="tag">file</span><code>tsconfig.json</code> (for TS path aliases)</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">1.4</span>
+        <span class="step-title">Write <code>scan-result.json</code> and return</span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Subagent writes a single artifact summarising the scan. Orchestrator reads it, stores <code>importMap</code> as <code>$IMPORT_MAP</code> for Phase 2 batch construction.</p>
+        <div class="io-grid">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/scan-result.json</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Orchestrator sets</h4><ul>
+            <li><code>$IMPORT_MAP</code>, <code>$FILE_LIST</code> with fileCategory</li>
+          </ul></div>
+        </div>
+        <div class="note"><strong>&gt;100-file gate:</strong> orchestrator pauses for user confirmation if the scan returned more than 100 files. Prompt-mediated.</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 2 ──────────────────────────────────────────── -->
+  <div class="phase-card orange" id="phase-2">
+    <div class="phase-header">
+      <span class="phase-num">Phase 2</span>
+      <h3 class="phase-title">ANALYZE — per-file node + edge extraction</h3>
+      <button class="copy-link" data-anchor="phase-2">copy link</button>
+    </div>
+    <p class="phase-summary">The longest phase. Files are batched (semantic grouping via Louvain communities), <code>file-analyzer</code> subagents run in parallel waves, and a Python script merges + normalizes all batch outputs into one assembled graph.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">2.1</span>
+        <span class="step-title">Compute batches</span>
+        <span class="step-mech script">bundled script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Group files into batches of ~20–30 using Louvain community detection over the import graph, so related files end up in the same batch. Non-code files (Dockerfile + docker-compose, CI configs, etc.) are bundled together to enable cross-file edges.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>node &lt;SKILL_DIR&gt;/compute-batches.mjs</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/scan-result.json</code></li>
+            <li><span class="tag">var</span><code>$IMPORT_MAP</code></li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li>batch plan (in memory or temp file)</li>
+            <li>per-batch <code>batchImportData</code> (neighbor symbols)</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">2.2</span>
+        <span class="step-title">Dispatch <code>file-analyzer</code> subagents (up to 5 concurrent)</span>
+        <span class="step-mech agent">LLM subagent ×N</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">For each batch, build a prompt including <code>batchImportData</code> + the file list with categories. Run up to 5 subagents at once; for N batches that's ⌈N/5⌉ sequential waves. Most of the wall-clock time for a large repo lives here.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><span class="tag">agent</span><code>agents/file-analyzer.md</code> × N</li>
+          </ul></div>
+          <div class="io-block in"><h4>Provides to each agent</h4><ul>
+            <li>batch index + total batches</li>
+            <li><code>batchImportData</code> (pre-resolved imports)</li>
+            <li>files in batch with <code>{path, sizeLines, language, fileCategory}</code></li>
+            <li>project name, languages, <code>$LANGUAGE_DIRECTIVE</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">2.3</span>
+        <span class="step-title">Each subagent: structural extraction</span>
+        <span class="step-mech scriptagent">subagent + script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">The file-analyzer invokes <code>extract-structure.mjs</code> per file — tree-sitter parses the source and emits functions, classes, imports, exports. The agent then synthesizes <code>GraphNode</code> objects (with summaries, tags, complexity, languageNotes) and <code>GraphEdge</code> objects for that file.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>node &lt;SKILL_DIR&gt;/extract-structure.mjs</code> per file</li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li>each file's source code</li>
+            <li>tree-sitter WASM grammars (via <code>web-tree-sitter</code>)</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">2.4</span>
+        <span class="step-title">Subagent: write batch output</span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block out"><h4>Writes (per batch)</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/batch-&lt;N&gt;.json</code> with <code>{nodes: [], edges: []}</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">2.5</span>
+        <span class="step-title">Merge + normalize batches</span>
+        <span class="step-mech script">bundled script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">After all batches return, a Python script reads every <code>batch-*.json</code> and produces one normalized graph. In one pass:</p>
+        <ul class="normal">
+          <li>Combines all nodes/edges across batches</li>
+          <li>Normalizes node IDs (strips double prefixes, project-name prefixes, adds missing prefixes)</li>
+          <li>Normalizes complexity values (<code>low</code>→<code>simple</code>, <code>medium</code>→<code>moderate</code>, <code>high</code>→<code>complex</code>)</li>
+          <li>Rewrites edge refs to match corrected IDs</li>
+          <li>Deduplicates nodes by ID, edges by <code>(source, target, type)</code></li>
+          <li>Drops dangling edges referencing missing nodes</li>
+          <li>Runs the <code>tested_by</code> linker (canonicalizes test-coverage edges, flips inverted ones, adds path-convention pairings, tags production nodes as <code>tested</code>)</li>
+        </ul>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>python &lt;SKILL_DIR&gt;/merge-batch-graphs.py $PROJECT_ROOT</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">glob</span><code>intermediate/batch-*.json</code></li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/assembled-graph.json</code></li>
+            <li><span class="tag">stderr</span>warnings (appended to <code>$PHASE_WARNINGS</code>)</li>
+          </ul></div>
+        </div>
+        <div class="note"><strong>Incremental path:</strong> orchestrator first removes old nodes whose <code>filePath</code> matches a changed file and writes them as <code>batch-existing.json</code>. The merge script then combines them with fresh batches the same way.</div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 3 ──────────────────────────────────────────── -->
+  <div class="phase-card cyan" id="phase-3">
+    <div class="phase-header">
+      <span class="phase-num">Phase 3</span>
+      <h3 class="phase-title">ASSEMBLE REVIEW</h3>
+      <button class="copy-link" data-anchor="phase-3">copy link</button>
+    </div>
+    <p class="phase-summary">A reviewer subagent reads the merged graph and cross-validates it against the import map, looking for missing cross-batch edges or obvious correctness issues.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">3.1</span>
+        <span class="step-title">Dispatch <code>assemble-reviewer</code></span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul><li><code>agents/assemble-reviewer.md</code></li></ul></div>
+          <div class="io-block in"><h4>Provides</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/assembled-graph.json</code></li>
+            <li><span class="tag">glob</span><code>intermediate/batch-*.json</code></li>
+            <li>merge script stderr output</li>
+            <li><code>$IMPORT_MAP</code> for cross-batch edge verification</li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/assemble-review.json</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Orchestrator does</h4><ul>
+            <li>append notes to <code>$PHASE_WARNINGS</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 4 ──────────────────────────────────────────── -->
+  <div class="phase-card orange" id="phase-4">
+    <div class="phase-header">
+      <span class="phase-num">Phase 4</span>
+      <h3 class="phase-title">ARCHITECTURE — layer assignment</h3>
+      <button class="copy-link" data-anchor="phase-4">copy link</button>
+    </div>
+    <p class="phase-summary">Identify architectural layers and assign every file-level node to exactly one layer. Each file-level node must end up in a layer.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">4.1</span>
+        <span class="step-title">Build language + framework + locale context</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">For each detected language, read <code>./languages/&lt;language-id&gt;.md</code>. For each framework, read <code>./frameworks/&lt;framework-id&gt;.md</code>. If <code>$OUTPUT_LANGUAGE != en</code>, read <code>./locales/&lt;lang&gt;.md</code>. These get appended to the agent prompt.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">glob</span><code>skills/understand/languages/*.md</code></li>
+            <li><span class="tag">glob</span><code>skills/understand/frameworks/*.md</code></li>
+            <li><span class="tag">glob</span><code>skills/understand/locales/*.md</code> (if non-en)</li>
+          </ul></div>
+          <div class="io-block out"><h4>Sets</h4><ul>
+            <li>combined prompt template (in memory)</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">4.2</span>
+        <span class="step-title">Dispatch <code>architecture-analyzer</code></span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Single agent dispatch with the full file-level node list, all import edges, all other edges, and the directory tree. This is one of the two prompt-heavy phases (along with Phase 5).</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul><li><code>agents/architecture-analyzer.md</code></li></ul></div>
+          <div class="io-block in"><h4>Provides</h4><ul>
+            <li>all file-level nodes (id, type, name, filePath, summary, tags) — code + non-code</li>
+            <li>all import edges</li>
+            <li>all other edges (configures, documents, deploys, triggers, …)</li>
+            <li>directory tree</li>
+            <li>frameworks detected</li>
+            <li>language / framework / locale contexts (from 4.1)</li>
+            <li>previous layers (incremental only — for naming consistency)</li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/layers.json</code></li>
+          </ul></div>
+        </div>
+        <div class="callout">
+          <p class="callout-title">Context-window hot spot</p>
+          On large repos this agent's prompt can be heavy — the full file-level node set is materialized into a single prompt. Phase 4 (with Phase 5) is the most common context-overflow point in the pipeline.
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">4.3</span>
+        <span class="step-title">Normalize <code>layers.json</code></span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Five-step normalization:</p>
+        <ol>
+          <li>Unwrap envelope: <code>{layers: [...]}</code> → <code>[...]</code></li>
+          <li>Rename legacy <code>nodes</code> field → <code>nodeIds</code>; extract <code>.id</code> from object entries</li>
+          <li>Synthesize missing IDs as <code>layer:&lt;kebab-case-name&gt;</code></li>
+          <li>Convert raw file paths to typed IDs (<code>file:&lt;path&gt;</code>, <code>config:&lt;path&gt;</code>, etc.)</li>
+          <li>Drop dangling <code>nodeIds</code> entries</li>
+        </ol>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul><li><span class="tag">file</span><code>intermediate/layers.json</code></li></ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul><li><span class="tag">file</span><code>intermediate/layers.json</code> (normalized in place)</li></ul></div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 5 ──────────────────────────────────────────── -->
+  <div class="phase-card orange" id="phase-5">
+    <div class="phase-header">
+      <span class="phase-num">Phase 5</span>
+      <h3 class="phase-title">TOUR — guided learning path</h3>
+      <button class="copy-link" data-anchor="phase-5">copy link</button>
+    </div>
+    <p class="phase-summary">Build a sequence of "tour steps" that walks a new reader through the codebase, starting from the entry point and aligning with the README narrative.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">5.1</span>
+        <span class="step-title">Dispatch <code>tour-builder</code></span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul><li><code>agents/tour-builder.md</code></li></ul></div>
+          <div class="io-block in"><h4>Provides</h4><ul>
+            <li>all file-level nodes (no function/class nodes)</li>
+            <li>layers (id, name, description; no nodeIds)</li>
+            <li>all edges (every type)</li>
+            <li><code>$README_CONTENT</code></li>
+            <li><code>$ENTRY_POINT</code></li>
+            <li><code>$LANGUAGE_DIRECTIVE</code></li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/tour.json</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">5.2</span>
+        <span class="step-title">Normalize <code>tour.json</code></span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Five-step normalization mirroring 4.3:</p>
+        <ol>
+          <li>Unwrap <code>{steps: [...]}</code> → <code>[...]</code></li>
+          <li>Rename legacy <code>nodesToInspect</code> → <code>nodeIds</code>; <code>whyItMatters</code> → <code>description</code></li>
+          <li>Convert raw file paths to typed IDs</li>
+          <li>Drop dangling refs</li>
+          <li>Sort by <code>order</code></li>
+        </ol>
+        <p class="step-desc">Preserves optional <code>languageLesson</code>.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 6 ──────────────────────────────────────────── -->
+  <div class="phase-card cyan" id="phase-6">
+    <div class="phase-header">
+      <span class="phase-num">Phase 6</span>
+      <h3 class="phase-title">REVIEW — validation</h3>
+      <button class="copy-link" data-anchor="phase-6">copy link</button>
+    </div>
+    <p class="phase-summary">Assemble the full <code>KnowledgeGraph</code> JSON and validate it. Two paths: deterministic inline check (default) or full LLM reviewer (<code>--review</code> flag).</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">6.1</span>
+        <span class="step-title">Assemble final graph JSON</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Compose <code>{version, project, nodes, edges, layers, tour}</code> from the intermediate files.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/assembled-graph.json</code></li>
+            <li><span class="tag">file</span><code>intermediate/layers.json</code></li>
+            <li><span class="tag">file</span><code>intermediate/tour.json</code></li>
+            <li><span class="tag">var</span><code>$COMMIT_HASH</code>, project metadata</li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/assembled-graph.json</code> (rewritten with full structure)</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">6.2a</span>
+        <span class="step-title">Default path: deterministic inline validator</span>
+        <span class="step-mech script">inline node script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Orchestrator writes a one-off Node.js validator to <code>tmp/ua-inline-validate.cjs</code> and executes it. Checks node IDs unique, edge refs resolve, every file-level node lives in exactly one layer, tour refs exist, etc.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>node tmp/ua-inline-validate.cjs &lt;graph&gt; &lt;output&gt;</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/review.json</code> with <code>{issues, warnings, stats}</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">6.2b</span>
+        <span class="step-title"><code>--review</code> path: LLM graph-reviewer</span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Dispatched only when <code>--review</code> is in <code>$ARGUMENTS</code>. Cross-validates graph against Phase 1 scan inventory — flags files in scan that have no corresponding node, or nodes referring to files not in scan.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul><li><code>agents/graph-reviewer.md</code></li></ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul><li><span class="tag">file</span><code>intermediate/review.json</code></li></ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">6.3</span>
+        <span class="step-title">Apply automated fixes</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">If <code>issues</code> is non-empty: drop dangling edges, fill empty fields (<code>tags</code> → <code>["untagged"]</code>, <code>summary</code> → <code>"No summary available"</code>), remove nodes with invalid types. Re-run validator once. If issues persist, save anyway with warnings and skip dashboard auto-launch.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- ─── Phase 7 ──────────────────────────────────────────── -->
+  <div class="phase-card green" id="phase-7">
+    <div class="phase-header">
+      <span class="phase-num">Phase 7</span>
+      <h3 class="phase-title">SAVE — persist + baseline</h3>
+      <button class="copy-link" data-anchor="phase-7">copy link</button>
+    </div>
+    <p class="phase-summary">Write the final graph, generate the fingerprint baseline, persist metadata, clean up intermediates. <strong>Step ordering is critical:</strong> meta.json must not be written until fingerprints.json succeeds.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.1</span>
+        <span class="step-title">Write <code>knowledge-graph.json</code></span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul><li><span class="tag">var</span>final assembled graph (in memory)</li></ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul><li><span class="tag">file</span><code>.understand-anything/knowledge-graph.json</code></li></ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.2</span>
+        <span class="step-title">Build fingerprint-input.json</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Heredoc-write a JSON file with <code>{projectRoot, sourceFilePaths, gitCommitHash}</code> for the fingerprint script to consume.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">var</span>source file paths from Phase 1</li>
+            <li><span class="tag">var</span><code>$COMMIT_HASH</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/fingerprint-input.json</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.3</span>
+        <span class="step-title">Generate fingerprint baseline</span>
+        <span class="step-mech script">bundled script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Tree-sitter extracts functions, classes, imports, exports per source file. Writes the structural baseline used by every subsequent auto-update.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li><code>node &lt;SKILL_DIR&gt;/build-fingerprints.mjs &lt;input.json&gt;</code></li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/fingerprint-input.json</code></li>
+            <li><span class="tag">file</span>every source file (for hash + structural extraction)</li>
+            <li><span class="tag">module</span><code>@understand-anything/core</code> (TreeSitterPlugin)</li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/fingerprints.json</code></li>
+            <li><span class="tag">stdout</span><code>Fingerprints baseline: &lt;N&gt; files</code></li>
+          </ul></div>
+        </div>
+        <div class="callout">
+          <p class="callout-title">Critical — must succeed before step 7.4</p>
+          SKILL.md instructs: if the script exits non-zero or stdout doesn't contain <code>Fingerprints baseline:</code>, abort Phase 7 and do not proceed to step 7.4. Otherwise <code>meta.json</code> advances without a valid baseline and every subsequent auto-update sees "no fingerprint" for every file, classifying them STRUCTURAL → permanent <code>FULL_UPDATE</code> cascade (issue #152 family).
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.4</span>
+        <span class="step-title">Write <code>meta.json</code></span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Only after step 7.3 succeeded. Records the current commit hash, timestamp, version, and analyzed file count.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">var</span><code>$COMMIT_HASH</code></li>
+            <li><span class="tag">var</span>analyzedFiles count</li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/meta.json</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.5</span>
+        <span class="step-title">Clean up intermediates</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block out"><h4>Removes</h4><ul>
+            <li><span class="tag">dir</span><code>.understand-anything/intermediate/</code></li>
+            <li><span class="tag">dir</span><code>.understand-anything/tmp/</code></li>
+          </ul></div>
+        </div>
+        <div class="note"><strong>Interrupted runs leak.</strong> If Phase 7 errored before this step, <code>intermediate/</code> survives. The next <code>/understand --full</code> will scan back into it because <code>.understand-anything/</code> isn't in <code>DEFAULT_IGNORE_PATTERNS</code> — see <a href="#failures">failure modes</a>.</div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.6</span>
+        <span class="step-title">Report summary</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Print: project name, files analyzed by fileCategory, nodes by type, edges by type, layers, tour step count, warnings, output paths.</p>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">7.7</span>
+        <span class="step-title">Auto-launch dashboard (conditional)</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Invokes the <code>/understand-dashboard</code> skill, but only if final validation passed after normalization. If validation failed, dashboard launch is skipped and the user is told.</p>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ███████████████  AUTO-UPDATE HOOK  █████████████████████████ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="section" id="auto-update">
+  <h2 class="section-title">Auto-update hook</h2>
+  <p class="section-lede">Triggered by the <code>PostToolUse</code> hook on <code>git commit/merge/cherry-pick/rebase</code>, and by <code>SessionStart</code> when <code>meta.json</code>'s commit hash differs from <code>HEAD</code>. Requires <code>autoUpdate: true</code> in <code>config.json</code>. Goal: zero LLM tokens when changes are cosmetic.</p>
+
+  <div class="diagram-wrap">
+    <p class="diagram-title">Decision flow — click any phase</p>
+    <svg class="pipeline" viewBox="0 0 1240 380" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <polygon points="0,0 7,3 0,6" fill="#3a4054" />
+        </marker>
+      </defs>
+
+      <!-- Trigger -->
+      <g transform="translate(10, 20)">
+        <rect width="200" height="60" rx="6" fill="none" stroke="#8a91a3" stroke-dasharray="4,4" stroke-width="1.5"></rect>
+        <text x="100" y="30" text-anchor="middle" fill="#8a91a3" font-size="11" font-family="JetBrains Mono, monospace">TRIGGER</text>
+        <text x="100" y="50" text-anchor="middle" fill="#d7dae3" font-size="13">git commit / merge / rebase</text>
+      </g>
+
+      <!-- Phase 0 -->
+      <g class="node-box" data-target="au-phase-0" transform="translate(250, 20)">
+        <rect width="180" height="60" rx="6" fill="#8fb8d6"></rect>
+        <text class="num" x="12" y="22">AU PHASE 0</text>
+        <text class="title" x="12" y="42">Preflight + filter</text>
+      </g>
+
+      <!-- Phase 1 -->
+      <g class="node-box" data-target="au-phase-1" transform="translate(470, 20)">
+        <rect width="220" height="60" rx="6" fill="#b48ec8"></rect>
+        <text class="num" x="12" y="22">AU PHASE 1</text>
+        <text class="title" x="12" y="42">Fingerprint check (0 tokens)</text>
+      </g>
+
+      <!-- Classification box (lower) -->
+      <g transform="translate(470, 110)">
+        <rect width="700" height="200" rx="6" fill="#1c2030" stroke="#3a4054"></rect>
+        <text x="14" y="22" fill="#8a91a3" font-size="11" font-family="JetBrains Mono, monospace">PER-FILE CLASSIFICATION</text>
+
+        <!-- 4 classes -->
+        <rect x="14" y="36" width="155" height="36" rx="4" fill="#6cb46b"></rect>
+        <text x="92" y="58" text-anchor="middle" fill="#0f1115" font-size="12" font-weight="600">NONE / COSMETIC</text>
+
+        <rect x="184" y="36" width="155" height="36" rx="4" fill="#d4c574"></rect>
+        <text x="262" y="58" text-anchor="middle" fill="#0f1115" font-size="12" font-weight="600">≤10 structural</text>
+
+        <rect x="354" y="36" width="155" height="36" rx="4" fill="#d9a161"></rect>
+        <text x="432" y="58" text-anchor="middle" fill="#0f1115" font-size="12" font-weight="600">new dirs / &gt;10</text>
+
+        <rect x="524" y="36" width="155" height="36" rx="4" fill="#d97461"></rect>
+        <text x="602" y="58" text-anchor="middle" fill="#0f1115" font-size="12" font-weight="600">&gt;30 or &gt;50% graph</text>
+
+        <!-- Arrows down -->
+        <line x1="92" y1="80" x2="92" y2="110" stroke="#3a4054" marker-end="url(#arr2)"/>
+        <line x1="262" y1="80" x2="262" y2="110" stroke="#3a4054" marker-end="url(#arr2)"/>
+        <line x1="432" y1="80" x2="432" y2="110" stroke="#3a4054" marker-end="url(#arr2)"/>
+        <line x1="602" y1="80" x2="602" y2="110" stroke="#3a4054" marker-end="url(#arr2)"/>
+
+        <!-- Action labels -->
+        <text x="92" y="135" text-anchor="middle" fill="#6cb46b" font-size="12" font-weight="600" font-family="JetBrains Mono, monospace">SKIP</text>
+        <text x="92" y="155" text-anchor="middle" fill="#d7dae3" font-size="11">bump meta.json</text>
+        <text x="92" y="170" text-anchor="middle" fill="#d7dae3" font-size="11">stop</text>
+
+        <text x="262" y="135" text-anchor="middle" fill="#d4c574" font-size="12" font-weight="600" font-family="JetBrains Mono, monospace">PARTIAL_UPDATE</text>
+        <text x="262" y="155" text-anchor="middle" fill="#d7dae3" font-size="11">re-analyze only,</text>
+        <text x="262" y="170" text-anchor="middle" fill="#d7dae3" font-size="11">lite layer update</text>
+
+        <text x="432" y="135" text-anchor="middle" fill="#d9a161" font-size="12" font-weight="600" font-family="JetBrains Mono, monospace">ARCHITECTURE_UPDATE</text>
+        <text x="432" y="155" text-anchor="middle" fill="#d7dae3" font-size="11">re-analyze +</text>
+        <text x="432" y="170" text-anchor="middle" fill="#d7dae3" font-size="11">re-run architect</text>
+
+        <text x="602" y="135" text-anchor="middle" fill="#d97461" font-size="12" font-weight="600" font-family="JetBrains Mono, monospace">FULL_UPDATE</text>
+        <text x="602" y="155" text-anchor="middle" fill="#d7dae3" font-size="11">recommend</text>
+        <text x="602" y="170" text-anchor="middle" fill="#d7dae3" font-size="11">/understand --full</text>
+      </g>
+
+      <!-- Phase 2 -->
+      <g class="node-box" data-target="au-phase-2" transform="translate(730, 20)">
+        <rect width="220" height="60" rx="6" fill="#d9a161"></rect>
+        <text class="num" x="12" y="22">AU PHASE 2</text>
+        <text class="title" x="12" y="42">Targeted re-analysis</text>
+      </g>
+
+      <!-- Phase 3 -->
+      <g class="node-box" data-target="au-phase-3" transform="translate(990, 20)">
+        <rect width="240" height="60" rx="6" fill="#6cb46b"></rect>
+        <text class="num" x="12" y="22">AU PHASE 3</text>
+        <text class="title" x="12" y="42">Save + LOAD-PATCH-SAVE fp</text>
+      </g>
+
+      <g class="arrow">
+        <line x1="210" y1="50" x2="250" y2="50" marker-end="url(#arr2)"/>
+        <line x1="430" y1="50" x2="470" y2="50" marker-end="url(#arr2)"/>
+        <line x1="690" y1="50" x2="730" y2="50" marker-end="url(#arr2)"/>
+        <line x1="950" y1="50" x2="990" y2="50" marker-end="url(#arr2)"/>
+      </g>
+
+      <!-- Footnote: how flow gets to phase 2 -->
+      <text x="690" y="345" text-anchor="middle" fill="#8a91a3" font-size="11" font-style="italic">PARTIAL_UPDATE / ARCHITECTURE_UPDATE → Phase 2; SKIP and FULL_UPDATE exit before Phase 2</text>
+    </svg>
+  </div>
+
+  <!-- Phase 0 -->
+  <div class="phase-card blue" id="au-phase-0">
+    <div class="phase-header">
+      <span class="phase-num">AU Phase 0</span>
+      <h3 class="phase-title">Preflight + ignore filter</h3>
+      <button class="copy-link" data-anchor="au-phase-0">copy link</button>
+    </div>
+    <p class="phase-summary">Verify the project has been analyzed before, get the diff against the stored commit, filter to source files and apply <code>.understandignore</code>.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.0.1</span>
+        <span class="step-title">Verify prior analysis exists</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/knowledge-graph.json</code> (existence)</li>
+            <li><span class="tag">file</span><code>.understand-anything/meta.json</code> (existence + <code>gitCommitHash</code>)</li>
+          </ul></div>
+          <div class="io-block out"><h4>Outcome</h4><ul>
+            <li>If either missing → tell user to run <code>/understand</code> first, STOP</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.0.2</span>
+        <span class="step-title">Compare commit hashes</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">cmd</span><code>git rev-parse HEAD</code></li>
+            <li><span class="tag">file</span><code>meta.json</code> → <code>gitCommitHash</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Outcome</h4><ul>
+            <li>If equal → report "up to date", STOP</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.0.3</span>
+        <span class="step-title">Get changed files</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">cmd</span><code>git diff &lt;lastCommitHash&gt;..HEAD --name-only</code></li>
+          </ul></div>
+          <div class="io-block out"><h4>Sets</h4><ul>
+            <li><code>$CHANGED_FILES</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.0.4</span>
+        <span class="step-title">Filter to source extensions</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Keep only files matching <code>.ts/.tsx/.js/.jsx/.py/.go/.rs/.java/.rb/.cpp/.c/.h/.cs/.swift/.kt/.php</code>. If empty after this filter → just bump meta.json and stop.</p>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.0.5</span>
+        <span class="step-title">Apply <code>.understandignore</code> exclusions</span>
+        <span class="step-mech script">inline node script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Without this step, files in user-excluded paths (migrations, vendored code, tests) get counted as structural changes and can spuriously escalate to <code>FULL_UPDATE</code> (this gap was issue #153, fixed in 2.7.x).</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul>
+            <li>Inline <code>ignore-filter.mjs</code> using <code>createIgnoreFilter</code> from core</li>
+          </ul></div>
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/.understandignore</code></li>
+            <li><span class="tag">file</span><code>$PROJECT_ROOT/.understandignore</code></li>
+            <li><span class="tag">file</span><code>intermediate/changed-files-pre.json</code></li>
+          </ul></div>
+        </div>
+        <div class="io-grid" style="margin-top: 12px;">
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/changed-files.json</code> → <code>{kept, removed, total}</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Phase 1 -->
+  <div class="phase-card purple" id="au-phase-1">
+    <div class="phase-header">
+      <span class="phase-num">AU Phase 1</span>
+      <h3 class="phase-title">Structural fingerprint check — zero LLM tokens</h3>
+      <button class="copy-link" data-anchor="au-phase-1">copy link</button>
+    </div>
+    <p class="phase-summary">A Node script compares each changed file against its stored fingerprint and classifies the overall change into one of four buckets.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.1.1</span>
+        <span class="step-title">Per-file classification</span>
+        <span class="step-mech script">inline node script</span>
+      </summary>
+      <div class="step-content">
+        <table>
+          <thead><tr><th>Comparison</th><th>Class</th></tr></thead>
+          <tbody>
+            <tr><td>SHA-256 of file content matches stored hash</td><td><code style="color: var(--green)">NONE</code> — skip entirely</td></tr>
+            <tr><td>Hash differs, regex-extracted functions / classes / imports / exports identical</td><td><code style="color: var(--yellow)">COSMETIC</code></td></tr>
+            <tr><td>Hash differs, structural elements differ</td><td><code style="color: var(--orange)">STRUCTURAL</code></td></tr>
+            <tr><td>File new (not in fingerprints.json)</td><td><code style="color: var(--orange)">STRUCTURAL</code></td></tr>
+            <tr><td>File deleted (in fingerprints, missing on disk)</td><td><code style="color: var(--orange)">STRUCTURAL</code></td></tr>
+          </tbody>
+        </table>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/fingerprints.json</code></li>
+            <li>each changed file's source</li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/change-analysis.json</code></li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.1.2</span>
+        <span class="step-title">Aggregate decision</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <table>
+          <thead><tr><th>Condition</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>All NONE / COSMETIC</td><td><code style="color: var(--green)">SKIP</code> — bump meta.json, STOP</td></tr>
+            <tr><td>Some STRUCTURAL, ≤10 files, same dirs</td><td><code style="color: var(--yellow)">PARTIAL_UPDATE</code> → Phase 2</td></tr>
+            <tr><td>New/deleted dirs or &gt;10 structural files</td><td><code style="color: var(--orange)">ARCHITECTURE_UPDATE</code> → Phase 2 + flag</td></tr>
+            <tr><td>&gt;30 structural files or &gt;50% of graph</td><td><code style="color: var(--red)">FULL_UPDATE</code> — recommend manual <code>/understand --full</code>, STOP</td></tr>
+          </tbody>
+        </table>
+        <p class="step-desc"><strong>Why this gate:</strong> the hook silently aborting on FULL_UPDATE is intentional — escalating from auto-update would burn lots of tokens without user consent.</p>
+      </div>
+    </details>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="phase-card orange" id="au-phase-2">
+    <div class="phase-header">
+      <span class="phase-num">AU Phase 2</span>
+      <h3 class="phase-title">Targeted re-analysis</h3>
+      <button class="copy-link" data-anchor="au-phase-2">copy link</button>
+    </div>
+    <p class="phase-summary">Only this phase costs LLM tokens. Dispatches <code>file-analyzer</code> subagents on just the structurally-changed files, then surgically merges results into the existing graph.</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.2.1</span>
+        <span class="step-title">Read existing graph + batch the changed files</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">≤10 files: one batch. Otherwise batches of 5–10.</p>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>.understand-anything/knowledge-graph.json</code></li>
+            <li><code>$CHANGED_FILES</code> (structural only)</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.2.2</span>
+        <span class="step-title">Dispatch <code>file-analyzer</code> on changed files only</span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Reuses the same agent definition as the full pipeline's Phase 2, with an explicit instruction not to invent nodes for files outside the batch.</p>
+        <div class="io-grid">
+          <div class="io-block calls"><h4>Calls</h4><ul><li><code>agents/file-analyzer.md</code></li></ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>intermediate/batch-&lt;N&gt;.json</code> per batch</li>
+          </ul></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.2.3</span>
+        <span class="step-title">Surgical merge into existing graph</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <ul class="normal">
+          <li>Remove old nodes whose <code>filePath</code> matches any reanalyzed file or any deleted file</li>
+          <li>Remove edges referencing removed nodes</li>
+          <li>Add new nodes/edges from the fresh batches</li>
+          <li>Deduplicate nodes by ID, edges by <code>(source, target, type)</code></li>
+          <li>Drop any remaining dangling edges</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="phase-card green" id="au-phase-3">
+    <div class="phase-header">
+      <span class="phase-num">AU Phase 3</span>
+      <h3 class="phase-title">Conditional architecture + save</h3>
+      <button class="copy-link" data-anchor="au-phase-3">copy link</button>
+    </div>
+    <p class="phase-summary">Update layers as needed, save the graph, update meta, and most importantly <strong>LOAD-PATCH-SAVE</strong> the fingerprints (don't overwrite).</p>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.3a</span>
+        <span class="step-title">Architecture update (ARCHITECTURE_UPDATE only)</span>
+        <span class="step-mech agent">LLM subagent</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">Re-dispatch <code>architecture-analyzer</code> with previous layer definitions injected for naming consistency.</p>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.3b</span>
+        <span class="step-title">Lite layer update (PARTIAL_UPDATE only)</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <ul class="normal">
+          <li>For new files: assign to the most likely existing layer by directory path match</li>
+          <li>For deleted files: remove their IDs from layer <code>nodeIds</code></li>
+          <li>Remove any layer that ends up empty</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.3c</span>
+        <span class="step-title">Lite validation</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <ul class="normal">
+          <li>Drop dangling edge refs</li>
+          <li>Drop dangling layer <code>nodeIds</code></li>
+          <li>Ensure every file node lives in exactly one layer (catch-all if missing)</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.3d</span>
+        <span class="step-title">Save graph + meta + LOAD-PATCH-SAVE fingerprints</span>
+        <span class="step-mech script">inline node script</span>
+      </summary>
+      <div class="step-content">
+        <p class="step-desc">The most subtle step. Inline script must:</p>
+        <ol>
+          <li><strong>LOAD ALL</strong> existing entries from <code>fingerprints.json</code>. Never skip.</li>
+          <li><strong>PATCH</strong> only re-analyzed paths (compute new hash + structural elements).</li>
+          <li><strong>REMOVE</strong> entries for deleted files.</li>
+          <li><strong>SAVE ALL</strong> entries back as one dict.</li>
+          <li><strong>GUARD:</strong> if <code>fingerprints.json</code> existed and was non-empty but loaded as <code>{}</code>, abort — silent load failure would otherwise clobber the whole baseline (the issue #152 reproduction).</li>
+        </ol>
+        <div class="io-grid">
+          <div class="io-block in"><h4>Reads</h4><ul>
+            <li><span class="tag">file</span><code>fingerprints.json</code> (entire dict)</li>
+            <li>each reanalyzed file's source</li>
+          </ul></div>
+          <div class="io-block out"><h4>Writes</h4><ul>
+            <li><span class="tag">file</span><code>knowledge-graph.json</code></li>
+            <li><span class="tag">file</span><code>meta.json</code></li>
+            <li><span class="tag">file</span><code>fingerprints.json</code> (full dict, not just patched subset)</li>
+          </ul></div>
+        </div>
+        <div class="callout">
+          <p class="callout-title">LOAD-PATCH-SAVE invariant</p>
+          The original #152 reproduction wrote only the freshly-computed batch entries to <code>fingerprints.json</code>, discarding everything else. The next auto-update saw all those as "new", classified them STRUCTURAL, and escalated to <code>FULL_UPDATE</code> forever. The 2.7.3 fix made the LOAD-PATCH-SAVE script explicit and added the <code>existedAndNonEmpty &amp;&amp; before === 0</code> guard.
+        </div>
+      </div>
+    </details>
+
+    <details class="step">
+      <summary>
+        <span class="step-num">AU.3e</span>
+        <span class="step-title">Clean up intermediates and report</span>
+        <span class="step-mech orch">orchestrator</span>
+      </summary>
+      <div class="step-content">
+        <div class="io-grid">
+          <div class="io-block out"><h4>Removes</h4><ul><li><span class="tag">dir</span><code>intermediate/</code></li></ul></div>
+        </div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ███████████████  FILES PRODUCED  ███████████████████████████ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="section" id="files">
+  <h2 class="section-title">Files produced</h2>
+  <p class="section-lede">Every file written under <code>.understand-anything/</code>, who produces it, and when it's deleted (if ever).</p>
+
+  <h3 class="sub">Persistent files (survive between runs)</h3>
+  <table>
+    <thead><tr><th>Path</th><th>Producer</th><th>Purpose</th><th>Lifetime</th></tr></thead>
+    <tbody>
+      <tr class="file-row"><td><code>.understand-anything/knowledge-graph.json</code></td><td>Phase 7.1 + AU.3d</td><td>The final graph — what the dashboard renders</td><td>Until next full run</td></tr>
+      <tr class="file-row"><td><code>.understand-anything/fingerprints.json</code></td><td>Phase 7.3 (full) + AU.3d (LOAD-PATCH-SAVE)</td><td>Per-file SHA-256 + structural signatures; baseline for next auto-update</td><td>Persistent; patched per auto-update</td></tr>
+      <tr class="file-row"><td><code>.understand-anything/meta.json</code></td><td>Phase 7.4 + AU.3d</td><td>Current commit hash, timestamp, version, file count</td><td>Overwritten each run</td></tr>
+      <tr class="file-row"><td><code>.understand-anything/.understandignore</code></td><td>Phase 0.5.2 (generated) or user-authored</td><td>Patterns to exclude from analysis (gitignore syntax)</td><td>User-managed</td></tr>
+      <tr class="file-row"><td><code>.understand-anything/config.json</code></td><td>Phase 0.5 + Phase 0.6</td><td><code>autoUpdate</code>, <code>outputLanguage</code></td><td>User-managed</td></tr>
+      <tr class="file-row"><td><code>.understand-anything/domain-graph.json</code></td><td><code>/understand-domain</code> (separate skill)</td><td>Optional business-domain layer rendered as separate dashboard view</td><td>Separate skill lifecycle</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Transient files (cleaned up at Phase 7.5)</h3>
+  <table>
+    <thead><tr><th>Path</th><th>Producer</th><th>Consumer</th></tr></thead>
+    <tbody>
+      <tr class="file-row"><td><code>intermediate/scan-result.json</code></td><td>Phase 1.4</td><td>Phase 2.1 (batch compute), Phase 7.2 (fingerprint input)</td></tr>
+      <tr class="file-row"><td><code>intermediate/batch-&lt;N&gt;.json</code></td><td>Phase 2.4 (one per batch) + AU.2.2</td><td>Phase 2.5 merge script</td></tr>
+      <tr class="file-row"><td><code>intermediate/batch-existing.json</code></td><td>Incremental Phase 2 (pruned old)</td><td>Phase 2.5 merge script</td></tr>
+      <tr class="file-row"><td><code>intermediate/assembled-graph.json</code></td><td>Phase 2.5 + Phase 6.1</td><td>Phase 3.1, Phase 6.2</td></tr>
+      <tr class="file-row"><td><code>intermediate/assemble-review.json</code></td><td>Phase 3.1</td><td>Orchestrator (appends to warnings)</td></tr>
+      <tr class="file-row"><td><code>intermediate/layers.json</code></td><td>Phase 4.2</td><td>Phase 4.3 normalize, Phase 6.1</td></tr>
+      <tr class="file-row"><td><code>intermediate/tour.json</code></td><td>Phase 5.1</td><td>Phase 5.2 normalize, Phase 6.1</td></tr>
+      <tr class="file-row"><td><code>intermediate/review.json</code></td><td>Phase 6.2a / 6.2b</td><td>Phase 6.3 fix application</td></tr>
+      <tr class="file-row"><td><code>intermediate/fingerprint-input.json</code></td><td>Phase 7.2</td><td>Phase 7.3 build-fingerprints.mjs</td></tr>
+      <tr class="file-row"><td><code>intermediate/changed-files-pre.json</code></td><td>AU.0.5 (raw diff filter)</td><td>AU.0.5 ignore-filter script</td></tr>
+      <tr class="file-row"><td><code>intermediate/changed-files.json</code></td><td>AU.0.5 (post-ignore)</td><td>AU.1.1 fingerprint check</td></tr>
+      <tr class="file-row"><td><code>intermediate/change-analysis.json</code></td><td>AU.1.1</td><td>AU.1.2 decision gate</td></tr>
+      <tr class="file-row"><td><code>tmp/ua-*.{js,cjs,mjs}</code></td><td>Various phases (inline scripts the orchestrator writes)</td><td>Phase 6.2a validator etc.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ███████████████  SCRIPTS + AGENTS  █████████████████████████ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="section" id="scripts">
+  <h2 class="section-title">Scripts and agents</h2>
+  <p class="section-lede">Bundled subprocess scripts (no LLM cost) and dispatched LLM subagents.</p>
+
+  <h3 class="sub">Bundled scripts</h3>
+  <table>
+    <thead><tr><th>Script</th><th>Used by</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr class="script-row"><td><code>scan-project.mjs</code></td><td>Phase 1.2</td><td>Discover files, detect languages/frameworks, categorize, count lines</td></tr>
+      <tr class="script-row"><td><code>extract-import-map.mjs</code></td><td>Phase 1.3</td><td>Per-language relative-import resolution (TS path aliases, Python relative imports, etc.)</td></tr>
+      <tr class="script-row"><td><code>compute-batches.mjs</code></td><td>Phase 2.1</td><td>Semantically group files via Louvain community detection on the import graph; produce <code>neighborMap</code> with symbols</td></tr>
+      <tr class="script-row"><td><code>extract-structure.mjs</code></td><td>Phase 2.3 (called from file-analyzer)</td><td>Tree-sitter pass to extract functions, classes, imports, exports</td></tr>
+      <tr class="script-row"><td><code>merge-batch-graphs.py</code></td><td>Phase 2.5</td><td>Merge all <code>batch-*.json</code>, normalize IDs, dedup, run <code>tested_by</code> linker</td></tr>
+      <tr class="script-row"><td><code>merge-subdomain-graphs.py</code></td><td>Phase 0.7</td><td>Merge subdomain knowledge graphs (e.g. frontend + backend) into one</td></tr>
+      <tr class="script-row"><td><code>build-fingerprints.mjs</code></td><td>Phase 7.3</td><td>Generate the structural-fingerprint baseline via tree-sitter</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">LLM-dispatched agents</h3>
+  <table>
+    <thead><tr><th>Agent</th><th>Used by</th><th>Produces</th></tr></thead>
+    <tbody>
+      <tr class="script-row"><td><code>project-scanner</code></td><td>Phase 1.1</td><td><code>scan-result.json</code></td></tr>
+      <tr class="script-row"><td><code>file-analyzer</code></td><td>Phase 2.2 + AU.2.2</td><td><code>batch-N.json</code> per batch</td></tr>
+      <tr class="script-row"><td><code>assemble-reviewer</code></td><td>Phase 3.1</td><td><code>assemble-review.json</code></td></tr>
+      <tr class="script-row"><td><code>architecture-analyzer</code></td><td>Phase 4.2 + AU.3a</td><td><code>layers.json</code></td></tr>
+      <tr class="script-row"><td><code>tour-builder</code></td><td>Phase 5.1</td><td><code>tour.json</code></td></tr>
+      <tr class="script-row"><td><code>graph-reviewer</code></td><td>Phase 6.2b (only with <code>--review</code>)</td><td><code>review.json</code></td></tr>
+      <tr class="script-row"><td><code>domain-analyzer</code></td><td><code>/understand-domain</code> (separate skill)</td><td><code>domain-analysis.json</code> → <code>domain-graph.json</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ███████████████  FAILURE MODES  ████████████████████████████ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="section" id="failures">
+  <h2 class="section-title">Failure modes</h2>
+  <p class="section-lede">The most common ways the pipeline corrupts itself, and where to look first when something is off.</p>
+
+  <h3 class="sub">Silent fingerprints failure (issue #152 family)</h3>
+  <p><strong>Symptom:</strong> <code>meta.json</code> + <code>knowledge-graph.json</code> present, <code>fingerprints.json</code> absent. Auto-update permanently broken — every commit triggers <code>FULL_UPDATE</code> because every file has no stored fingerprint to compare against.</p>
+  <p>The 2.7.3 fix (commits <code>dd8b724</code> + <code>e7af9ae</code>) addressed the original <code>PARTIAL_UPDATE</code> overwrite case and added a prompt-level "abort Phase 7 if fingerprints fail" instruction. A residual gap remains when the orchestrator (the LLM) proceeds to write <code>meta.json</code> despite the script failing — typically because <code>node</code> isn't reachable in the non-interactive Bash subshell the skill runs in (a common environment issue with version managers like nvm/fnm/mise hooked into <code>~/.zshrc</code> instead of <code>~/.zshenv</code>).</p>
+  <p>If you see this symptom, manually invoke the bundled script against an input built from your repo's source paths — the script's actual error will tell you the underlying cause:</p>
+  <pre><code>node skills/understand/build-fingerprints.mjs /tmp/fp-input.json</code></pre>
+
+  <h3 class="sub">Intermediate-directory pollution</h3>
+  <p>If a run errors out before Phase 7.5, leftover <code>intermediate/batch-*.json</code> and related files survive. The <em>next</em> <code>/understand --full</code> walks into them because <code>.understand-anything/</code> is not in <code>DEFAULT_IGNORE_PATTERNS</code> (<code>packages/core/src/ignore-filter.ts:9</code>) — so file counts grow monotonically across runs.</p>
+  <p><strong>Workaround:</strong> add <code>.understand-anything/</code> to your <code>.understandignore</code>, or manually delete <code>intermediate/</code> between runs if a previous one failed.</p>
+
+  <h3 class="sub">Symlink resolution failure (issue #162)</h3>
+  <p>Fixed in 2.7.3. <code>extract-structure.mjs</code>'s <code>isCli</code> guard compared <code>import.meta.url</code> (resolved through symlinks) against <code>process.argv[1]</code> (preserved as symlink). When SKILL_DIR was a symlink (the default Claude Code install layout), <code>main()</code> never ran. Now uses <code>realpathSync</code> on both sides.</p>
+
+  <h3 class="sub">Subagent dispatch overhead dominates wall-clock time</h3>
+  <p>Each subagent cold-start is 30–60s regardless of payload. For 700-file repos, Phase 2 runs ~28 batches in waves of 5 — Phase 2 alone is typically 60–80% of total time. The bottleneck is LLM throughput; raising the concurrency cap (currently 5 in <code>SKILL.md</code>) gives roughly proportional speedup.</p>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- ███████████████  TUNABLES  █████████████████████████████████ -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<section class="section" id="tunables">
+  <h2 class="section-title">Tunables and options</h2>
+  <table>
+    <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td><code>--full</code></td><td>Force a full rebuild, ignoring any existing graph and skipping the Phase 0.8 decision question</td></tr>
+      <tr><td><code>--auto-update</code></td><td>Enable commit-triggered auto-update (writes <code>autoUpdate: true</code> to <code>config.json</code>); analysis still proceeds normally</td></tr>
+      <tr><td><code>--no-auto-update</code></td><td>Disable auto-update</td></tr>
+      <tr><td><code>--review</code></td><td>Run the full LLM graph-reviewer in Phase 6 instead of the inline deterministic validator</td></tr>
+      <tr><td><code>--language &lt;lang&gt;</code></td><td>Generate all textual content (summaries, descriptions, tags, titles) in the specified language. ISO 639-1 codes or friendly names accepted. Stored in <code>config.json</code> for cross-run consistency.</td></tr>
+      <tr><td>positional path</td><td>Analyze the given directory instead of cwd (e.g. <code>/understand ../other-project</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Persistent config</h3>
+  <ul class="normal">
+    <li><code>.understand-anything/config.json</code> — <code>autoUpdate</code> (boolean), <code>outputLanguage</code> (string)</li>
+    <li><code>UNDERSTAND_NO_WORKTREE_REDIRECT=1</code> — opt out of the worktree-to-main-checkout redirect in Phase 0.1</li>
+    <li><code>CLAUDE_PLUGIN_ROOT</code> — explicit plugin root path (set by Claude Code automatically)</li>
+  </ul>
+</section>
+
+<p class="footer">Reference compiled from <code>skills/understand/SKILL.md</code>, <code>hooks/auto-update-prompt.md</code>, and <code>agents/*.md</code>. Updates should mirror SKILL changes.</p>
+
+</main>
+
+<script>
+(function() {
+  // ── Tab switcher ──────────────────────────────────────────
+  const tabs = document.querySelectorAll('.tab-btn');
+  const sections = document.querySelectorAll('section.section');
+  function showSection(id) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.section === id));
+    sections.forEach(s => s.classList.toggle('active', s.id === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => showSection(tab.dataset.section));
+  });
+
+  // ── SVG node clicks → scroll to phase ─────────────────────
+  document.querySelectorAll('svg .node-box').forEach(node => {
+    node.addEventListener('click', () => {
+      const targetId = node.dataset.target;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      // If target is in a non-active section, switch tab first
+      const section = target.closest('section.section');
+      if (section && !section.classList.contains('active')) {
+        showSection(section.id);
+      }
+      setTimeout(() => {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.classList.add('highlighted');
+        setTimeout(() => target.classList.remove('highlighted'), 1500);
+      }, 50);
+    });
+  });
+
+  // ── Expand / collapse all ─────────────────────────────────
+  document.getElementById('expand-all').addEventListener('click', () => {
+    document.querySelectorAll('section.active details.step').forEach(d => d.open = true);
+  });
+  document.getElementById('collapse-all').addEventListener('click', () => {
+    document.querySelectorAll('section.active details.step').forEach(d => d.open = false);
+  });
+
+  // ── Copy link buttons ─────────────────────────────────────
+  document.querySelectorAll('.copy-link').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const anchor = btn.dataset.anchor;
+      const url = window.location.origin + window.location.pathname + '#' + anchor;
+      try {
+        await navigator.clipboard.writeText(url);
+        const orig = btn.textContent;
+        btn.textContent = 'copied';
+        setTimeout(() => btn.textContent = orig, 1200);
+      } catch (err) {
+        // Fallback
+        window.location.hash = anchor;
+      }
+    });
+  });
+
+  // ── Search / filter ───────────────────────────────────────
+  const search = document.getElementById('search');
+  search.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    // Clear previous highlights
+    document.querySelectorAll('mark.searchhit').forEach(m => {
+      const parent = m.parentNode;
+      parent.replaceChild(document.createTextNode(m.textContent), m);
+      parent.normalize();
+    });
+
+    if (!q) {
+      // Reset visibility
+      document.querySelectorAll('.phase-card, .file-row, .script-row').forEach(el => {
+        el.classList.remove('hidden');
+      });
+      document.querySelectorAll('details.step').forEach(d => d.open = false);
+      return;
+    }
+
+    // Phase cards in the active section
+    document.querySelectorAll('section.active .phase-card').forEach(card => {
+      const text = card.textContent.toLowerCase();
+      const match = text.includes(q);
+      card.classList.toggle('hidden', !match);
+      if (match) {
+        // Auto-open details that match
+        card.querySelectorAll('details.step').forEach(d => {
+          const stepText = d.textContent.toLowerCase();
+          d.open = stepText.includes(q);
+        });
+      }
+    });
+
+    // Tables in active section
+    document.querySelectorAll('section.active .file-row, section.active .script-row').forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.classList.toggle('hidden', !text.includes(q));
+    });
+
+    // Highlight matches (simple text-node walk; skip in code/pre for safety)
+    function highlight(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const idx = node.nodeValue.toLowerCase().indexOf(q);
+        if (idx !== -1) {
+          const before = node.nodeValue.slice(0, idx);
+          const match = node.nodeValue.slice(idx, idx + q.length);
+          const after = node.nodeValue.slice(idx + q.length);
+          const mark = document.createElement('mark');
+          mark.className = 'searchhit';
+          mark.textContent = match;
+          const frag = document.createDocumentFragment();
+          if (before) frag.appendChild(document.createTextNode(before));
+          frag.appendChild(mark);
+          if (after) frag.appendChild(document.createTextNode(after));
+          node.parentNode.replaceChild(frag, node);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE
+                 && !['SCRIPT', 'STYLE', 'MARK', 'INPUT', 'BUTTON'].includes(node.tagName)) {
+        // Walk children; copy to array since we're mutating
+        Array.from(node.childNodes).forEach(highlight);
+      }
+    }
+    document.querySelectorAll('section.active .phase-card:not(.hidden), section.active table').forEach(highlight);
+  });
+
+  // ── Open the phase if URL has a hash on load ──────────────
+  window.addEventListener('load', () => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const target = document.getElementById(hash);
+    if (!target) return;
+    const section = target.closest('section.section');
+    if (section && section.id !== 'main-pipeline') {
+      showSection(section.id);
+    }
+    setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.classList.add('highlighted');
+      setTimeout(() => target.classList.remove('highlighted'), 1500);
+    }, 200);
+  });
+})();
+</script>
+
+</body>
+</html>
