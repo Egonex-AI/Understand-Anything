@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { deriveContainers } from "../containers";
 import type { GraphNode, GraphEdge } from "@understand-anything/core/types";
 
-function node(id: string, filePath?: string): GraphNode {
+function node(id: string, filePath?: string, type: GraphNode["type"] = "file"): GraphNode {
   return {
     id,
-    type: "file",
+    type,
     name: id,
     filePath,
     summary: "",
@@ -190,5 +190,89 @@ describe("deriveContainers — container labels", () => {
       { name: "Renamed", nodeIds: ["a", "b"] },
     ]);
     expect(containers.map((c) => c.name).sort()).toEqual(["auth", "cart"]);
+  });
+});
+
+describe("deriveContainers — reference basis projection", () => {
+  const basisNodes = Array.from({ length: 10 }, (_, i) =>
+    node(`n${i}`, `services/n${i}.go`),
+  );
+  const basisEdges: GraphEdge[] = [];
+  for (const group of [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]) {
+    for (const i of group) {
+      for (const j of group) {
+        if (i !== j) {
+          basisEdges.push({
+            source: `n${i}`,
+            target: `n${j}`,
+            type: "calls",
+          } as GraphEdge);
+        }
+      }
+    }
+  }
+
+  it("projects class nodes onto their file community", () => {
+    const visible = [
+      ...basisNodes.slice(0, 3),
+      node("c0", "services/n0.go", "class"),
+      node("c1", "services/n1.go", "class"),
+    ];
+    const { containers } = deriveContainers(
+      visible,
+      [],
+      [{ name: "Billing", nodeIds: basisNodes.slice(0, 5).map((n) => n.id) }],
+      "Cluster",
+      { nodes: basisNodes, edges: basisEdges },
+    );
+    expect(containers).toHaveLength(1);
+    expect(containers[0].name).toBe("Billing");
+    expect([...containers[0].nodeIds].sort()).toEqual(["c0", "c1", "n0", "n1", "n2"]);
+  });
+
+  it("keeps focus subsets grouped by the reference", () => {
+    const visible = basisNodes.slice(0, 2);
+    const { containers } = deriveContainers(
+      visible,
+      [],
+      [{ name: "Billing", nodeIds: basisNodes.slice(0, 5).map((n) => n.id) }],
+      "Cluster",
+      { nodes: basisNodes, edges: basisEdges },
+    );
+    expect(containers).toHaveLength(1);
+    expect(containers[0].name).toBe("Billing");
+    expect(containers[0].nodeIds.sort()).toEqual(["n0", "n1"]);
+  });
+
+  it("leaves nodes outside the reference ungrouped", () => {
+    const outside = node("outside", "other/outside.go");
+    const visible = [basisNodes[0], outside];
+    const { containers, ungrouped } = deriveContainers(
+      visible,
+      [],
+      [],
+      "Cluster",
+      { nodes: basisNodes, edges: basisEdges },
+    );
+    expect(ungrouped).toContain("outside");
+    expect(containers.every((c) => !c.nodeIds.includes("outside"))).toBe(true);
+  });
+
+  it("uses the file name for a projected basis-singleton community", () => {
+    const singleFile = node("only", "only.go");
+    const onlyClass = node("only-class", "only.go", "class");
+    const sibling = node("sibling", "sibling.go");
+    const siblingClass = node("sibling-class", "sibling.go", "class");
+    const basis = [singleFile, sibling];
+    const visible = [singleFile, onlyClass, sibling, siblingClass];
+    const { containers } = deriveContainers(
+      visible,
+      [],
+      [],
+      "Cluster",
+      { nodes: basis, edges: [] },
+    );
+    const onlyContainer = containers.find((c) => c.nodeIds.includes("only-class"));
+    expect(onlyContainer?.name).toBe("only");
   });
 });

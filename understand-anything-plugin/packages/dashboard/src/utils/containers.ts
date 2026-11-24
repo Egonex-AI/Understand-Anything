@@ -17,6 +17,11 @@ export interface DeriveResult {
   ungrouped: string[];
 }
 
+export interface ContainerBasis {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
 const MIN_BUCKET_COUNT = 2;
 const MAX_CONCENTRATION = 0.7;
 const MIN_NODES_FOR_SUPPRESSION = 3;
@@ -130,15 +135,12 @@ function applyLabels(
   );
 }
 
-export function deriveContainers(
+function buildContainers(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  labels: ContainerLabel[] = [],
-): DeriveResult {
-  if (nodes.length === 0) {
-    return { containers: [], ungrouped: [] };
-  }
-
+  labels: ContainerLabel[],
+  clusterLabel: string,
+): DerivedContainer[] {
   const { groups, rooted } = groupByFolder(nodes);
 
   const useCommunity = shouldFallbackToCommunity(groups, rooted, nodes.length);
@@ -160,7 +162,9 @@ export function deriveContainers(
       id: `container:cluster-${cid}`,
       // A-Z for the first 26, then numeric. Avoids `String.fromCharCode(65+i)`
       // wrapping into `[`, `\`, `]` ... once the cluster count exceeds 26.
-      name: i < 26 ? `Cluster ${String.fromCharCode(65 + i)}` : `Cluster ${i + 1}`,
+      name: i < 26
+        ? `${clusterLabel} ${String.fromCharCode(65 + i)}`
+        : `${clusterLabel} ${i + 1}`,
       nodeIds: ids,
       strategy: "community" as const,
     }));
@@ -181,11 +185,77 @@ export function deriveContainers(
       });
     }
   }
+  return containers;
+}
+
+function projectOntoBasis(
+  nodes: GraphNode[],
+  labels: ContainerLabel[],
+  clusterLabel: string,
+  basis: ContainerBasis,
+): DeriveResult {
+  if (nodes.length === 0) {
+    return { containers: [], ungrouped: [] };
+  }
+
+  const basisContainers = buildContainers(
+    basis.nodes,
+    basis.edges,
+    labels,
+    clusterLabel,
+  );
+  const basisNodeToContainer = new Map<string, string>();
+  const basisContainerById = new Map<string, DerivedContainer>();
+  for (const container of basisContainers) {
+    basisContainerById.set(container.id, container);
+    for (const id of container.nodeIds) basisNodeToContainer.set(id, container.id);
+  }
+
+  const filePathToFileId = new Map<string, string>();
+  for (const basisNode of basis.nodes) {
+    if (basisNode.type === "file" && basisNode.filePath) {
+      filePathToFileId.set(basisNode.filePath, basisNode.id);
+    }
+  }
+
+  const projected = new Map<string, string[]>();
+  const ungrouped: string[] = [];
+  for (const node of nodes) {
+    let containerId: string | undefined;
+    if (basisNodeToContainer.has(node.id)) {
+      containerId = basisNodeToContainer.get(node.id);
+    } else if ((node.type === "class" || node.type === "function") && node.filePath) {
+      const fileId = filePathToFileId.get(node.filePath);
+      if (fileId) containerId = basisNodeToContainer.get(fileId);
+    }
+    if (!containerId) {
+      ungrouped.push(node.id);
+      continue;
+    }
+    const ids = projected.get(containerId) ?? [];
+    ids.push(node.id);
+    projected.set(containerId, ids);
+  }
+
+  const basisNodesById = new Map(basis.nodes.map((node) => [node.id, node]));
+  let containers = [...projected.entries()].map(([containerId, ids]) => {
+    const basisContainer = basisContainerById.get(containerId)!;
+    let name = basisContainer.name;
+    if (
+      basisContainer.strategy === "community" &&
+      basisContainer.nodeIds.length === 1 &&
+      ids.length > 1 &&
+      name.startsWith(`${clusterLabel} `)
+    ) {
+      const fileNode = basisNodesById.get(basisContainer.nodeIds[0]);
+      if (fileNode) name = fileNode.name;
+    }
+    return { ...basisContainer, name, nodeIds: ids };
+  });
 
   // Suppress single-child containers (their child becomes ungrouped).
   // Skip suppression for tiny layers — with so few nodes, even single-item
   // boxes carry useful folder context that shouldn't be discarded.
-  const ungrouped: string[] = [];
   if (nodes.length >= MIN_NODES_FOR_SUPPRESSION) {
     containers = containers.filter((c) => {
       if (c.nodeIds.length === 1) {
@@ -197,4 +267,40 @@ export function deriveContainers(
   }
 
   return { containers, ungrouped };
+}
+
+export function deriveContainers(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  labels: ContainerLabel[] = [],
+  clusterLabelOrBasis: string | ContainerBasis = "Cluster",
+  basisArg?: ContainerBasis,
+): DeriveResult {
+  if (nodes.length === 0) {
+    return { containers: [], ungrouped: [] };
+  }
+
+  const clusterLabel =
+    typeof clusterLabelOrBasis === "string" ? clusterLabelOrBasis : "Cluster";
+  const basis =
+    typeof clusterLabelOrBasis === "string"
+      ? basisArg
+      : clusterLabelOrBasis;
+  if (basis && basis.nodes.length > 0) {
+    return projectOntoBasis(nodes, labels, clusterLabel, basis);
+  }
+
+  const containers = buildContainers(nodes, edges, labels, clusterLabel);
+  const ungrouped: string[] = [];
+  let visibleContainers = containers;
+  if (nodes.length >= MIN_NODES_FOR_SUPPRESSION) {
+    visibleContainers = containers.filter((c) => {
+      if (c.nodeIds.length === 1) {
+        ungrouped.push(c.nodeIds[0]);
+        return false;
+      }
+      return true;
+    });
+  }
+  return { containers: visibleContainers, ungrouped };
 }
