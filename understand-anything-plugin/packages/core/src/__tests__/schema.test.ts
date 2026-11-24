@@ -66,6 +66,42 @@ describe("schema validation", () => {
     expect(result.issues).toEqual([]);
   });
 
+  it.each([
+    ["codebase", "codebase"],
+    ["knowledge", "knowledge"],
+    ["bogus", undefined],
+    [undefined, undefined],
+  ] as const)("carries kind=%j through validation as %j", (input, expected) => {
+    const graph = structuredClone(validGraph);
+    if (input === undefined) {
+      delete (graph as any).kind;
+    } else {
+      (graph as any).kind = input;
+    }
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.kind).toBe(expected);
+  });
+
+  it("emits an auto-corrected issue when kind is out of enum", () => {
+    const graph = structuredClone(validGraph);
+    (graph as any).kind = "bogus";
+
+    const result = validateGraph(graph);
+    expect(result.success).toBe(true);
+    expect(result.data!.kind).toBeUndefined();
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({ level: "auto-corrected", category: "out-of-range", path: "kind" })
+    );
+  });
+
+  it("does not emit a kind issue when kind is omitted", () => {
+    const result = validateGraph(validGraph);
+    expect(result.success).toBe(true);
+    expect(result.issues).toEqual([]);
+  });
+
   it("rejects graph with missing required fields", () => {
     const incomplete = { version: "1.0.0" };
     const result = validateGraph(incomplete);
