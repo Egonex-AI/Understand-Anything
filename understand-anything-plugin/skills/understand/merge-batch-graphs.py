@@ -352,7 +352,7 @@ def is_test_path(path: str) -> bool:
     # JS/TS family: the test marker is an infix on the stem (foo.test.ts has
     # stem "foo.test", ext ".ts"), not a prefix/suffix on the stem itself.
     if ext in _JS_TS_TEST_EXTS:
-        return stem.endswith(".test") or stem.endswith(".spec")
+        return stem.endswith((".test", ".spec", ".test-d", ".spec-d"))
 
     if ext in _TEST_DIRECTORY_EXTENSIONS and any(
         segment.lower() == "tests" for segment in _path_segments(path)[:-1]
@@ -374,8 +374,8 @@ def is_test_path(path: str) -> bool:
 
 def _strip_test_infix(stem: str) -> str | None:
     """For a JS/TS-family stem like `foo.test` or `foo.spec`, strip the
-    trailing `.test` / `.spec`. Returns None if no infix is present."""
-    for infix in (".test", ".spec"):
+    trailing `.test` / `.spec` / `.test-d` / `.spec-d`. Returns None if no infix is present."""
+    for infix in (".test-d", ".spec-d", ".test", ".spec"):
         if stem.endswith(infix):
             return stem[: -len(infix)]
     return None
