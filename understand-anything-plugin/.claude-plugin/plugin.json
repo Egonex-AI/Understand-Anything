@@ -14,5 +14,7 @@
     "architecture",
     "onboarding",
     "dashboard"
-  ]
+  ],
+  "skills": "./skills/",
+  "agents": "./agents/"
 }
