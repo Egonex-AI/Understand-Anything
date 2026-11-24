@@ -28,7 +28,7 @@ export function detectCommunities(
     g.addEdge(e.source, e.target);
   }
   // graphology-communities-louvain returns Record<nodeId, communityId>
-  const result = louvain(g) as Record<string, number>;
+  const result = louvain(g, { randomWalk: false }) as Record<string, number>;
   const map = new Map<string, number>();
   for (const id of nodeIds) {
     map.set(id, result[id] ?? -1);

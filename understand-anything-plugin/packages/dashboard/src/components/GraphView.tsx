@@ -496,10 +496,22 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     }
 
     // Derive containers + bucket edges
+    const basisNodes = graph.nodes.filter(
+      (n) =>
+        layerNodeIds.has(n.id) &&
+        n.type === "file" &&
+        allVisibleTypes.has(n.type),
+    );
+    const basisIds = new Set(basisNodes.map((n) => n.id));
+    const basisEdges = graph.edges.filter(
+      (e) => basisIds.has(e.source) && basisIds.has(e.target),
+    );
     const { containers, ungrouped } = deriveContainers(
       filteredGraphNodes,
       filteredGraphEdges,
       activeLayer.containerLabels,
+      "Cluster",
+      { nodes: basisNodes, edges: basisEdges },
     );
     const ungroupedSet = new Set(ungrouped);
     const nodeToContainer = new Map<string, string>();
