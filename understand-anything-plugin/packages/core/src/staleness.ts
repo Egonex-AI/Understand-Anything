@@ -367,10 +367,19 @@ export function getChangedFiles(
   lastCommitHash: string,
 ): string[] {
   try {
-    const output = execFileSync("git", ["diff", `${lastCommitHash}..HEAD`, "--name-only"], {
-      cwd: projectDir,
-      encoding: "utf-8",
-    });
+    const commit = execFileSync(
+      "git",
+      ["rev-parse", "--verify", "--end-of-options", `${lastCommitHash}^{commit}`],
+      { cwd: projectDir, encoding: "utf-8" },
+    ).trim();
+    const output = execFileSync(
+      "git",
+      ["diff", "--name-only", "--end-of-options", `${commit}..HEAD`],
+      {
+        cwd: projectDir,
+        encoding: "utf-8",
+      },
+    );
     return parseChangedFiles(output);
   } catch {
     return [];
