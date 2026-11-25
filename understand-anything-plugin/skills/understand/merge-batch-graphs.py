@@ -119,7 +119,7 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ".scala": ((), ("Spec", "Suite", "Test", "Tests")),
     ".cs": ((), ("Test", "Tests")),
     ".swift": ((), ("Tests", "Test", "Spec")),
-    ".rs": (("test_",), ("_test",)),
+    ".rs": (("test_",), ("_test", "_tests")),
     ".rb": (("test_",), ("_test", "_spec")),
     ".php": ((), ("Test",)),
     ".c": (("test_",), ("_test",)),
@@ -134,6 +134,8 @@ _TEST_DIRECTORY_EXTENSIONS: frozenset[str] = frozenset({".swift", ".rs", ".php"}
 
 _EXACT_TEST_STEMS: dict[str, frozenset[str]] = {
     ".rb": frozenset({"spec_helper"}),
+    # Rust's out-of-line unit-test module: `#[cfg(test)] mod tests;`.
+    ".rs": frozenset({"tests"}),
 }
 
 
@@ -575,6 +577,31 @@ def production_candidates(test_path: str) -> list[str]:
                                 _join(mirror_dir, f"{base_stem}.cs"),
                             )
                 break
+
+    # ── Rust ──────────────────────────────────────────────────────────
+    # In-crate unit-test modules sit next to the file that declares them:
+    # `foo/tests.rs` from `foo/mod.rs` or `foo.rs` (`#[cfg(test)] mod tests;`),
+    # or from `lib.rs`/`main.rs` at a crate root; `bar_tests.rs` from `bar.rs`
+    # (`#[path = "bar_tests.rs"] mod tests;`). Integration tests under `tests/`
+    # exercise the crate's public API, not one file, so they get no candidate.
+    elif ext == ".rs" and not any(seg.lower() == "tests" for seg in dir_segs):
+        if stem == "tests":
+            module = dir_segs[-1] if dir_segs else ""
+            _add_unique(candidates, _join(dir_path, "mod.rs"))
+            if module:
+                _add_unique(candidates, _join("/".join(dir_segs[:-1]), f"{module}.rs"))
+            _add_unique(candidates, _join(dir_path, "lib.rs"))
+            _add_unique(candidates, _join(dir_path, "main.rs"))
+        else:
+            base_stem = None
+            if stem.startswith("test_"):
+                base_stem = stem[len("test_"):]
+            for suffix in ("_tests", "_test"):
+                if base_stem is None and stem.endswith(suffix):
+                    base_stem = stem[: -len(suffix)]
+            if base_stem:
+                _add_unique(candidates, _join(dir_path, f"{base_stem}.rs"))
+                _add_unique(candidates, _join(dir_path, f"{base_stem}/mod.rs"))
 
     # ── C/C++ ─────────────────────────────────────────────────────────
     elif ext in {".c", ".cpp", ".cc"}:

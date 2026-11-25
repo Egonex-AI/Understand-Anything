@@ -163,6 +163,17 @@ class IsTestPathTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
 
+    def test_rust_in_crate_test_modules(self) -> None:
+        # #815: `#[cfg(test)] mod tests;` lives in `tests.rs`, and
+        # `#[path = "bar_tests.rs"] mod tests;` in `bar_tests.rs`.
+        for path in ["src/foo/tests.rs", "src/tests.rs", "src/foo_tests.rs", "src/foo/bar_tests.rs"]:
+            with self.subTest(path=path):
+                self.assertTrue(mbg.is_test_path(path), f"{path} should be a test")
+        # Only the exact `tests` stem and the `_tests` suffix count.
+        for path in ["src/contests.rs", "src/tests_util.rs"]:
+            with self.subTest(path=path):
+                self.assertFalse(mbg.is_test_path(path), f"{path} is production")
+
     def test_ruby_test_files(self) -> None:
         for path in [
             "test/user_test.rb",
@@ -348,6 +359,34 @@ class ProductionCandidatesTests(unittest.TestCase):
         self.assertEqual(cands[0], "tests/foo/X.ts")
         self.assertIn("src/foo/X.ts", cands)
         self.assertLess(cands.index("tests/foo/X.ts"), cands.index("src/foo/X.ts"))
+
+
+class RustProductionCandidatesTests(unittest.TestCase):
+    """#815: in-crate Rust test modules pair with the file that declares them."""
+
+    def test_tests_rs_pairs_with_its_module(self) -> None:
+        self.assertEqual(
+            mbg.production_candidates("src/foo/tests.rs"),
+            ["src/foo/mod.rs", "src/foo.rs", "src/foo/lib.rs", "src/foo/main.rs"],
+        )
+        # At a crate root the declaring file is lib.rs or main.rs.
+        root_cands = mbg.production_candidates("src/tests.rs")
+        self.assertIn("src/lib.rs", root_cands)
+        self.assertIn("src/main.rs", root_cands)
+
+    def test_suffixed_and_prefixed_modules_pair_with_their_sibling(self) -> None:
+        for test_path, prod in [
+            ("src/foo/bar_tests.rs", "src/foo/bar.rs"),
+            ("src/foo_test.rs", "src/foo.rs"),
+            ("src/test_foo.rs", "src/foo.rs"),
+        ]:
+            with self.subTest(path=test_path):
+                cands = mbg.production_candidates(test_path)
+                self.assertEqual(cands[0], prod)
+                self.assertIn(prod[: -len(".rs")] + "/mod.rs", cands)
+
+    def test_integration_tests_have_no_candidate(self) -> None:
+        self.assertEqual(mbg.production_candidates("tests/parser.rs"), [])
 
 
 # ── link_tests (end-to-end) ───────────────────────────────────────────────
@@ -583,6 +622,39 @@ class LinkTestsTests(unittest.TestCase):
         tested_by_edges = [e for e in edges if e["type"] == "tested_by"]
         self.assertEqual(len(tested_by_edges), 1)
         self.assertEqual(tested_by_edges[0]["description"], "original")
+
+    def test_keeps_rust_edges_to_in_crate_test_modules(self) -> None:
+        # #815: these edges were read as production ↔ production and dropped.
+        nodes_by_id = {
+            "file:src/foo/mod.rs": _file_node("src/foo/mod.rs"),
+            "file:src/foo/tests.rs": _file_node("src/foo/tests.rs"),
+            "file:src/bar.rs": _file_node("src/bar.rs"),
+            "file:src/bar_tests.rs": _file_node("src/bar_tests.rs"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:src/foo/mod.rs",
+                "target": "file:src/foo/tests.rs",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.8,
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual(dropped, 0)
+        self.assertEqual(swapped, 0)
+        self.assertEqual(added, 1)
+        self.assertEqual(tagged, 2)
+        pairs = sorted((e["source"], e["target"]) for e in edges if e["type"] == "tested_by")
+        self.assertEqual(
+            pairs,
+            [
+                ("file:src/bar.rs", "file:src/bar_tests.rs"),
+                ("file:src/foo/mod.rs", "file:src/foo/tests.rs"),
+            ],
+        )
 
     def test_drops_test_to_test_edge(self) -> None:
         # An LLM edge between two test files has no recoverable meaning.
