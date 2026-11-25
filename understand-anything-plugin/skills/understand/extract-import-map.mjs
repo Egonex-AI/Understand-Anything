@@ -855,6 +855,11 @@ function applyTsAlias(target, wildcard) {
  */
 const REQUIRE_LITERAL_RE = /\brequire\(\s*(['"])([^'"`\n]+?)\1\s*\)/g;
 
+// Dynamic import() appears in value position and in type positions
+// (`typeof import('./x')`, `import('./x').Type`). The TS extractor only emits
+// static import statements, so collect literal specifiers here as well.
+const DYNAMIC_IMPORT_LITERAL_RE = /\bimport\(\s*(['"])([^'"`\n]+?)\1\s*\)/g;
+
 /**
  * Strip JS/TS line and block comments before running text-pattern matchers.
  * Replaces with spaces (preserving offsets isn't critical here, but keeping
@@ -875,6 +880,17 @@ function extractRequireSources(content) {
   const stripped = stripJsLikeComments(content);
   REQUIRE_LITERAL_RE.lastIndex = 0;
   while ((m = REQUIRE_LITERAL_RE.exec(stripped)) !== null) {
+    sources.push(m[2]);
+  }
+  return sources;
+}
+
+function extractDynamicImportSources(content) {
+  const sources = [];
+  let m;
+  const stripped = stripJsLikeComments(content);
+  DYNAMIC_IMPORT_LITERAL_RE.lastIndex = 0;
+  while ((m = DYNAMIC_IMPORT_LITERAL_RE.exec(stripped)) !== null) {
     sources.push(m[2]);
   }
   return sources;
@@ -1951,7 +1967,7 @@ function resolveImport(imp, file, ctx) {
  */
 function extractExtraImportSources(file, content) {
   if (TS_JS_LANGS.has(file.language)) {
-    return extractRequireSources(content);
+    return [...extractRequireSources(content), ...extractDynamicImportSources(content)];
   }
   if (file.language === 'kotlin') {
     return extractKotlinSources(content);

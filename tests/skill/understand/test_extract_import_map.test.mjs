@@ -369,6 +369,46 @@ describe('extract-import-map.mjs — TypeScript / JavaScript resolver', () => {
     ]);
   });
 
+  it('resolves dynamic import() calls in value and type positions', () => {
+    projectRoot = setupTree({
+      'src/main.ts': [
+        "import { local } from './local';",
+        "export const load = () => import('./lazy');",
+        "export type Shape = import('./types').Shape;",
+        "export let q: typeof import('./query');",
+        'export const all = [local];',
+        "// import('./commented') is not a dependency",
+      ].join('\n'),
+      'src/local.ts': 'export const local = 1;',
+      'src/lazy.ts': 'export default 1;',
+      'src/types.ts': 'export type Shape = {};',
+      'src/query.ts': 'export type Query = {};',
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        'src/main.ts',
+        'src/local.ts',
+        'src/lazy.ts',
+        'src/types.ts',
+        'src/query.ts',
+      ].map(path => ({
+        path,
+        language: 'typescript',
+        fileCategory: 'code',
+      })),
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/main.ts']).toEqual([
+      'src/lazy.ts',
+      'src/local.ts',
+      'src/query.ts',
+      'src/types.ts',
+    ]);
+  });
+
   it('resolves per-package tsconfig paths in a monorepo without cross-package leakage', () => {
     // Two pnpm-workspace packages, each carrying its own tsconfig with its
     // own `paths`. The resolver MUST dispatch per-importer to the nearest
