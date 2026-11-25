@@ -30,14 +30,14 @@ export default function LayerLegend() {
   const activeLayer = layers.find((l) => l.id === activeLayerId);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-[11px] font-medium text-text-secondary whitespace-nowrap">
         {navigationLevel === "overview"
           ? `${layers.length} ${t.layer.label}`
           : activeLayer?.name ?? t.layer.defaultName}
       </span>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {layers.map((layer, i) => {
           const color = getLayerColor(i);
           const isActive = navigationLevel === "layer-detail" && layer.id === activeLayerId;
