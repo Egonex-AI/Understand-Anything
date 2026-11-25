@@ -728,6 +728,156 @@ describe('incremental symbol publication gate', { timeout: 30_000 }, () => {
   });
 });
 
+describe('edges from unchanged files into reanalyzed files', { timeout: 30_000 }, () => {
+  const parseSource = 'export function parse(text: string) { return text.trim(); }\n';
+
+  // Only src/a.ts changes below. src/b.ts and README.md keep their old
+  // analysis, so no analyzer re-emits their edges into src/a.ts.
+  function inboundFixture(aSource, aSymbols) {
+    const fixture = setupRepository({
+      'src/a.ts': aSource,
+      'src/b.ts': "import { parse } from './a';\nexport function run(text: string) { return parse(text); }\n",
+      'src/c.ts': 'export const c = 1;\n',
+      'README.md': '# Fixture\n\nThe parser lives in src/a.ts.\n',
+    });
+    const { root } = fixture;
+    const graphPath = join(root, '.ua', 'knowledge-graph.json');
+    const graph = JSON.parse(readFileSync(graphPath, 'utf-8'));
+    const symbol = (id, name, filePath) => ({
+      id, type: 'function', name, filePath, summary: name, tags: [], complexity: 'simple',
+    });
+    const runNode = symbol('function:src/b.ts:run', 'run', 'src/b.ts');
+    const old = aSymbols.map(([id, name]) => symbol(id, name, 'src/a.ts'));
+    graph.nodes = graph.nodes.map(node => node.id === 'file:README.md'
+      ? { ...node, id: 'document:README.md', type: 'document' }
+      : node);
+    graph.nodes.push(runNode, ...old);
+    const edge = (source, target, type) => ({ source, target, type, direction: 'forward', weight: 0.8 });
+    graph.edges.push(
+      edge('file:src/b.ts', runNode.id, 'contains'),
+      ...old.map(node => edge('file:src/a.ts', node.id, 'contains')),
+      ...old.map(node => edge(runNode.id, node.id, 'calls')),
+      edge('document:README.md', 'file:src/a.ts', 'documents'),
+    );
+    writeFileSync(graphPath, JSON.stringify(graph));
+    const intermediate = join(root, '.ua', 'intermediate');
+    return {
+      ...fixture,
+      runNode,
+      fileNode: graph.nodes.find(node => node.id === 'file:src/a.ts'),
+      symbol,
+      edge,
+      read: name => JSON.parse(readFileSync(join(intermediate, name), 'utf-8')),
+      write: (name, value) => writeFileSync(join(intermediate, name), JSON.stringify(value)),
+      published: () => JSON.parse(readFileSync(graphPath, 'utf-8')),
+    };
+  }
+
+  it('keeps calls and documents edges from unchanged files after the target file is reanalyzed', () => {
+    const f = inboundFixture(parseSource, [['function:src/a.ts:parse', 'parse']]);
+    writeProjectFile(f.root, 'src/a.ts', `${parseSource}export function format(text: string) { return text; }\n`);
+    const head = commit(f.root, 'add format');
+    const { plan } = prepare(f.root, f.baseCommit);
+    expect(plan.action).toBe('PARTIAL_UPDATE');
+    expect(plan.filesToReanalyze).toEqual(['src/a.ts']);
+
+    const parse = f.symbol('function:src/a.ts:parse', 'parse', 'src/a.ts');
+    const format = f.symbol('function:src/a.ts:format', 'format', 'src/a.ts');
+    f.write('batch-1.json', {
+      nodes: [f.fileNode, parse, format],
+      edges: [parse, format].map(node => f.edge(f.fileNode.id, node.id, 'contains')),
+    });
+    run(python, [mergeScript, f.root], f.root);
+    run(process.execPath, [finalizeScript, f.root], f.root);
+
+    const graph = f.published();
+    expect(graph.project.gitCommitHash).toBe(head);
+    expect(graph.edges).toContainEqual(expect.objectContaining({
+      source: f.runNode.id, target: parse.id, type: 'calls',
+    }));
+    expect(graph.edges).toContainEqual(expect.objectContaining({
+      source: 'document:README.md', target: 'file:src/a.ts', type: 'documents',
+    }));
+    expect(graph.edges).toContainEqual(expect.objectContaining({
+      source: 'file:src/b.ts', target: 'file:src/a.ts', type: 'imports',
+    }));
+    // Imports come from the refreshed import map, never from the old graph.
+    expect(f.read('incremental-symbol-baseline.json').files[0].inboundEdges).toEqual([
+      f.edge(f.runNode.id, parse.id, 'calls'),
+      f.edge('document:README.md', 'file:src/a.ts', 'documents'),
+    ]);
+  });
+
+  it('retargets inbound edges to replacement IDs and drops those into deleted symbols', () => {
+    const f = inboundFixture(`${parseSource}export function legacy() { return 1; }\n`, [
+      ['func:src/a.ts:parse', 'parse'],
+      ['function:src/a.ts:legacy', 'legacy'],
+    ]);
+    writeProjectFile(f.root, 'src/a.ts', parseSource);
+    const head = commit(f.root, 'delete legacy');
+    prepare(f.root, f.baseCommit);
+    const parse = f.symbol('function:src/a.ts:parse', 'parse', 'src/a.ts');
+    // The current analysis restates one inbound edge; the old copy must not override it.
+    const restated = { ...f.edge('document:README.md', f.fileNode.id, 'documents'), weight: 0.5 };
+    f.write('batch-1.json', {
+      nodes: [f.fileNode, parse],
+      edges: [f.edge(f.fileNode.id, parse.id, 'contains'), restated],
+    });
+    run(python, [mergeScript, f.root], f.root);
+
+    const report = f.read('incremental-symbol-report.json');
+    expect(report.ok).toBe(true);
+    expect(report.idReplacements).toContainEqual({ oldId: 'func:src/a.ts:parse', newId: parse.id });
+    expect(report.files[0].missing).toContainEqual(expect.objectContaining({
+      id: 'function:src/a.ts:legacy', status: 'deleted',
+    }));
+    expect(report.droppedInboundEdges).toEqual([
+      { source: f.runNode.id, target: 'function:src/a.ts:legacy', type: 'calls' },
+    ]);
+    expect(f.read('assembled-graph.json').edges).toContainEqual(expect.objectContaining({
+      source: f.runNode.id, target: parse.id, type: 'calls',
+    }));
+
+    run(process.execPath, [finalizeScript, f.root], f.root);
+    const graph = f.published();
+    expect(graph.project.gitCommitHash).toBe(head);
+    expect(graph.edges.filter(edge => edge.source === f.runNode.id && edge.type === 'calls')
+      .map(edge => edge.target)).toEqual([parse.id]);
+    expect(graph.edges.filter(edge => edge.type === 'documents')).toEqual([restated]);
+  });
+
+  it('follows an accepted replacement when the old target ID now names another symbol', () => {
+    const classSource = 'export class Parser { parse(text: string) { return text.trim(); } }\n';
+    const f = inboundFixture(classSource, [['function:src/a.ts:parse', 'Parser.parse']]);
+    const parserClass = { ...f.symbol('class:src/a.ts:Parser', 'Parser', 'src/a.ts'), type: 'class' };
+    const previous = f.published();
+    previous.nodes.push(parserClass);
+    previous.edges.push(f.edge(parserClass.id, 'function:src/a.ts:parse', 'contains'));
+    writeFileSync(join(f.root, '.ua', 'knowledge-graph.json'), JSON.stringify(previous));
+    writeProjectFile(f.root, 'src/a.ts', `${classSource}${parseSource}`);
+    commit(f.root, 'add a free parse function');
+    prepare(f.root, f.baseCommit);
+    // The method moves to a new ID and a new free function takes its old one.
+    const method = f.symbol('function:src/a.ts:Parser.parse', 'Parser.parse', 'src/a.ts');
+    const free = f.symbol('function:src/a.ts:parse', 'parse', 'src/a.ts');
+    f.write('batch-1.json', {
+      nodes: [f.fileNode, parserClass, method, free],
+      edges: [
+        f.edge(f.fileNode.id, parserClass.id, 'contains'),
+        f.edge(parserClass.id, method.id, 'contains'),
+        f.edge(f.fileNode.id, free.id, 'contains'),
+      ],
+    });
+    run(python, [mergeScript, f.root], f.root);
+    expect(f.read('incremental-symbol-report.json').idReplacements)
+      .toContainEqual({ oldId: 'function:src/a.ts:parse', newId: method.id });
+
+    run(process.execPath, [finalizeScript, f.root], f.root);
+    expect(f.published().edges.filter(edge => edge.source === f.runNode.id && edge.type === 'calls')
+      .map(edge => edge.target)).toEqual([method.id]);
+  });
+});
+
 describe('prepare-incremental.mjs', { timeout: 30_000 }, () => {
   it('refreshes imports in the same run and only schedules the structural source', () => {
     const { root, baseCommit } = setupRepository({

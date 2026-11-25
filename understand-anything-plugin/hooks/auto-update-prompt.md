@@ -69,6 +69,8 @@ Merge runs `validate-incremental-symbols.mjs`, comparing the preserved old symbo
 
 Merge also preserves normalized dangling edge candidates from fresh batches in `incremental-edge-candidates.json` before discarding unresolved endpoints. Every successful validation reconciles both endpoint IDs, including first-pass updates without a retry and repairs where omitted symbols return. This evidence excludes `batch-existing.json` and is cleared by fresh preparation.
 
+Previous edges from files that are not reanalyzed into reanalyzed files, other than `imports`, are kept as `inboundEdges` in `incremental-symbol-baseline.json`. Every successful validation maps their targets through accepted symbol replacements, adds them only where the candidate lacks the same edge, and drops those whose target no longer exists.
+
 Current endpoint descriptors take precedence over baseline aliases when IDs are reused. Repair defers incoming edges outside the retained batch until their original HEAD identities are matched, preventing a reused ID from attaching an old current-analysis reference to a different symbol.
 
 If the report has `unresolvedFiles`, prepare one targeted symbol retry:
