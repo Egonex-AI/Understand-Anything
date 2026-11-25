@@ -92,6 +92,35 @@ end
       parser.delete();
     });
 
+    it("extracts keyword parameters", () => {
+      const { tree, parser, root } = parse(`
+def configure(name:, age: 30)
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].name).toBe("configure");
+      expect(result.functions[0].params).toEqual(["name:", "age:"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts mixed positional and keyword parameters", () => {
+      const { tree, parser, root } = parse(`
+def build(a, b, name:, opts: {})
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.functions).toHaveLength(1);
+      expect(result.functions[0].params).toEqual(["a", "b", "name:", "opts:"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
     it("extracts methods with no parameters", () => {
       const { tree, parser, root } = parse(`
 def noop
@@ -276,6 +305,38 @@ end
       expect(result.classes).toHaveLength(1);
       expect(result.classes[0].name).toBe("Helpers");
       expect(result.classes[0].methods).toContain("format_date");
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts classes/modules nested inside a module", () => {
+      const { tree, parser, root } = parse(`
+module Outer
+  class Inner
+    def foo
+    end
+  end
+end
+`);
+      const result = extractor.extractStructure(root);
+
+      // Order is deterministic: extractClassBody recurses into (and pushes)
+      // the nested `Inner` before the enclosing `Outer` is pushed, so the
+      // flat classes[] is [Inner, Outer], not source order. Assert exactly
+      // so an ordering change (or a regression in either direction) is caught.
+      expect(result.classes.map((c) => c.name)).toEqual(["Inner", "Outer"]);
+      expect(result.functions.some((f) => f.name === "foo")).toBe(true);
+
+      // The nested method `foo` belongs to Inner, NOT Outer. Locking this
+      // guards the most likely regression if the class/module branches were
+      // ever folded back into the method-collection path.
+      const inner = result.classes.find((c) => c.name === "Inner");
+      const outer = result.classes.find((c) => c.name === "Outer");
+      expect(inner).toBeDefined();
+      expect(outer).toBeDefined();
+      expect(inner!.methods).toContain("foo");
+      expect(outer!.methods).not.toContain("foo");
 
       tree.delete();
       parser.delete();
