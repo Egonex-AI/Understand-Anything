@@ -150,7 +150,9 @@ unlink_skills() {
       if [[ -d "$(skills_root)" ]]; then
         local skill
         while IFS= read -r skill; do
-          [[ -L "$target/$skill" ]] && rm -f "$target/$skill"
+          # `if`, not `[[ ]] && rm`: a false test as the last command would make
+          # this function return 1, and `set -e` would abort --uninstall.
+          if [[ -L "$target/$skill" ]]; then rm -f "$target/$skill"; fi
         done < <(list_skills)
       else
         # Checkout is gone — scan the target dir for stale links pointing into
@@ -165,7 +167,7 @@ unlink_skills() {
       fi
       ;;
     folder)
-      [[ -L "$target/understand-anything" ]] && rm -f "$target/understand-anything"
+      if [[ -L "$target/understand-anything" ]]; then rm -f "$target/understand-anything"; fi
       ;;
   esac
 }
