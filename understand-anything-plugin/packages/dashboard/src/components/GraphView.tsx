@@ -53,6 +53,7 @@ import {
 import { deriveContainers } from "../utils/containers";
 import type { DerivedContainer } from "../utils/containers";
 import { computeLayerStats } from "../utils/layerStats";
+import { filterNodes, filterEdges } from "../utils/filters";
 
 const nodeTypes = {
   custom: CustomNode,
@@ -61,7 +62,7 @@ const nodeTypes = {
   container: ContainerNode,
 };
 
-import type { NodeCategory } from "../store";
+import type { NodeCategory, FilterState } from "../store";
 
 /**
  * Maps each NodeType to a filter category. Must be kept in sync with core NodeType.
@@ -79,6 +80,51 @@ const NODE_TYPE_TO_CATEGORY: Record<NodeType, NodeCategory> = {
   // group under "code" — matching the runtime fallback below — to stay visible by default.
   page: "code", screen: "code", component: "code", componentSet: "code", instance: "code", token: "code",
 } as const;
+
+/**
+ * Applies both the Filter panel and the header category toggles to the
+ * structural graph before its layer/container edges are aggregated.
+ * Keeping this pure makes the two canvases use the same visibility rules.
+ */
+export function filterStructuralGraph(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  membership: Map<string, Set<string>>,
+  filters: FilterState,
+  categoryFilters: Record<NodeCategory, boolean>,
+): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  const visibleNodes = filterNodes(nodes, membership, filters).filter((node) => {
+    const category = NODE_TYPE_TO_CATEGORY[node.type as NodeType] ?? "code";
+    return categoryFilters[category] !== false;
+  });
+  const visibleIds = new Set(visibleNodes.map((node) => node.id));
+  return { nodes: visibleNodes, edges: filterEdges(edges, visibleIds, filters) };
+}
+
+/**
+ * The class view adds class/function nodes through file `contains` edges.
+ * They may not appear in graph.layers, so inherit every parent-file layer
+ * before applying the Filter panel's layer selection. Never mutate the
+ * store's precomputed membership index.
+ */
+export function inheritContainedNodeLayers(
+  membership: Map<string, Set<string>>,
+  edges: GraphEdge[],
+  parentFileIds: Set<string>,
+  expandedNodeIds: Set<string>,
+): Map<string, Set<string>> {
+  const inherited = new Map(membership);
+  for (const edge of edges) {
+    if (edge.type !== "contains" || !parentFileIds.has(edge.source) ||
+        !expandedNodeIds.has(edge.target)) continue;
+    const parentLayers = membership.get(edge.source);
+    if (!parentLayers) continue;
+    const childLayers = new Set(inherited.get(edge.target) ?? []);
+    for (const layerId of parentLayers) childLayers.add(layerId);
+    inherited.set(edge.target, childLayers);
+  }
+  return inherited;
+}
 
 /**
  * Node types rendered in the structural drill-in (layer-detail) canvas.
@@ -240,6 +286,9 @@ function useOverviewGraph() {
   const graph = useDashboardStore((s) => s.graph);
   const nodesById = useDashboardStore((s) => s.nodesById);
   const nodeIdToLayerId = useDashboardStore((s) => s.nodeIdToLayerId);
+  const nodeIdToLayerIds = useDashboardStore((s) => s.nodeIdToLayerIds);
+  const filters = useDashboardStore((s) => s.filters);
+  const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
   const searchResults = useDashboardStore((s) => s.searchResults);
   const drillIntoLayer = useDashboardStore((s) => s.drillIntoLayer);
 
@@ -250,7 +299,19 @@ function useOverviewGraph() {
     if (!graph) {
       return null;
     }
-    const layers = graph.layers ?? [];
+    const filteredGraph = filterStructuralGraph(
+      graph.nodes, graph.edges, nodeIdToLayerIds, filters, nodeTypeFilters,
+    );
+    const visibleNodeIds = new Set(filteredGraph.nodes.map((node) => node.id));
+    const nodesAreFiltered =
+      filteredGraph.nodes.length < graph.nodes.length || filters.layerIds.size > 0;
+    const layers = (graph.layers ?? [])
+      .filter((layer) => filters.layerIds.size === 0 || filters.layerIds.has(layer.id))
+      .map((layer) => ({
+        ...layer,
+        nodeIds: layer.nodeIds.filter((id) => visibleNodeIds.has(id)),
+      }))
+      .filter((layer) => !nodesAreFiltered || layer.nodeIds.length > 0);
     if (layers.length === 0) {
       return null;
     }
@@ -262,7 +323,7 @@ function useOverviewGraph() {
     if (searchResults.length > 0) {
       for (const result of searchResults) {
         const lid = nodeIdToLayerId.get(result.nodeId);
-        if (lid) {
+        if (lid && visibleNodeIds.has(result.nodeId)) {
           searchMatchByLayer.set(lid, (searchMatchByLayer.get(lid) ?? 0) + 1);
         }
       }
@@ -293,7 +354,11 @@ function useOverviewGraph() {
     });
 
     // Aggregate edges between layers
-    const aggregated = aggregateLayerEdges(graph);
+    const aggregated = aggregateLayerEdges({
+      ...graph,
+      ...filteredGraph,
+      layers,
+    });
     const flowEdges: Edge[] = aggregated.map((agg, i) => ({
       id: `le-${i}`,
       source: agg.sourceLayerId,
@@ -312,7 +377,8 @@ function useOverviewGraph() {
     }
 
     return { clusterNodes, flowEdges, dims };
-  }, [graph, nodesById, nodeIdToLayerId, searchResults, drillIntoLayer]);
+  }, [graph, nodesById, nodeIdToLayerId, nodeIdToLayerIds,
+    filters, nodeTypeFilters, searchResults, drillIntoLayer]);
 
   const [overview, setOverview] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],
@@ -395,6 +461,8 @@ function useLayerDetailTopology(): LayerDetailTopology & {
 } {
   const graph = useDashboardStore((s) => s.graph);
   const nodesById = useDashboardStore((s) => s.nodesById);
+  const nodeIdToLayerIds = useDashboardStore((s) => s.nodeIdToLayerIds);
+  const filters = useDashboardStore((s) => s.filters);
   const activeLayerId = useDashboardStore((s) => s.activeLayerId);
   const selectNode = useDashboardStore((s) => s.selectNode);
   const persona = useDashboardStore((s) => s.persona);
@@ -452,32 +520,20 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       }
     }
 
-    const subFileTypes = new Set(["function", "class"]);
-    const allVisibleTypes = STRUCTURAL_VISIBLE_TYPES;
-
-    let filteredGraphNodes = graph.nodes.filter((n) => {
-      if (!expandedLayerNodeIds.has(n.id)) return false;
-      if (!allVisibleTypes.has(n.type)) return false;
-      if (persona === "non-technical" && subFileTypes.has(n.type)) return false;
-      return true;
-    });
-
-    filteredGraphNodes = filteredGraphNodes.filter((n) => {
-      const category = NODE_TYPE_TO_CATEGORY[n.type as NodeType];
-      if (!category) {
-        if (import.meta.env.DEV) {
-          console.warn(`[GraphView] Unknown node type "${n.type}" — defaulting to "code" category`);
-        }
-      }
-      const effectiveCategory = category ?? "code";
-      return nodeTypeFilters[effectiveCategory] !== false;
-    });
-
-    let filteredNodeIds = new Set(filteredGraphNodes.map((n) => n.id));
-
-    let filteredGraphEdges = graph.edges.filter(
-      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
+    const effectiveMembership = inheritContainedNodeLayers(
+      nodeIdToLayerIds, graph.edges, layerNodeIds, expandedLayerNodeIds,
     );
+    const subFileTypes = new Set(["function", "class"]);
+    const eligibleNodes = graph.nodes.filter((node) =>
+      expandedLayerNodeIds.has(node.id) &&
+      STRUCTURAL_VISIBLE_TYPES.has(node.type) &&
+      !(persona === "non-technical" && subFileTypes.has(node.type)),
+    );
+    let { nodes: filteredGraphNodes, edges: filteredGraphEdges } =
+      filterStructuralGraph(
+        eligibleNodes, graph.edges, effectiveMembership, filters, nodeTypeFilters,
+      );
+    let filteredNodeIds = new Set(filteredGraphNodes.map((node) => node.id));
 
     // Focus mode: 1-hop neighborhood within the layer
     if (focusNodeId && filteredNodeIds.has(focusNodeId)) {
@@ -619,8 +675,15 @@ function useLayerDetailTopology(): LayerDetailTopology & {
       };
     });
 
-    // Portal nodes for connected external layers (unchanged)
-    const portals = computePortals(graph, activeLayerId);
+    // Portals must respect filtered node and edge categories too;
+    // otherwise invisible relationships would remain as portal edges.
+    const portalGraph = {
+      ...graph,
+      ...filterStructuralGraph(
+        graph.nodes, graph.edges, nodeIdToLayerIds, filters, nodeTypeFilters,
+      ),
+    };
+    const portals = computePortals(portalGraph, activeLayerId);
     const layerIndexMap = new Map(graph.layers.map((l, i) => [l.id, i]));
 
     const portalNodes: PortalFlowNode[] = portals.map((portal) => ({
@@ -639,7 +702,7 @@ function useLayerDetailTopology(): LayerDetailTopology & {
     const portalEdges: Edge[] = [];
     let portalEdgeIdx = aggEdges.length;
     for (const portal of portals) {
-      const crossFiles = findCrossLayerFileNodes(graph, activeLayerId, portal.layerId);
+      const crossFiles = findCrossLayerFileNodes(portalGraph, activeLayerId, portal.layerId);
       // Dedupe by atom — multiple files in the same container hitting the
       // same portal collapse to one Stage 1 edge. Task 12 will re-route to
       // the actual file ids when the source container expands.
@@ -675,6 +738,8 @@ function useLayerDetailTopology(): LayerDetailTopology & {
   }, [
     graph,
     nodesById,
+    nodeIdToLayerIds,
+    filters,
     activeLayerId,
     persona,
     diffMode,
