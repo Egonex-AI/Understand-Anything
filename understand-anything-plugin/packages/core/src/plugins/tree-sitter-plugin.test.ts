@@ -378,6 +378,27 @@ export class Greeter {
       expect(strict.symbolEvidence?.coverage.gaps).toContainEqual(expect.objectContaining({ scope: { kind: "class", name: "A" }, name: "callback" }));
     });
 
+    it("binds a multiline exported arrow to its direct declarator's file scope", () => {
+      const code = "export const keep =\n  (value: number): number => value;\n";
+      const strict = plugin.analyzeFileStrict("test.ts", code);
+      expect(strict.status).toBe("succeeded");
+      const structural = strict.structure?.functions.find(fn => fn.name === "keep");
+      expect(structural?.lineRange).toEqual([1, 2]);
+      expect(strict.symbolEvidence?.functions).toContainEqual({
+        name: "keep", scope: { kind: "file" }, lineRange: [1, 2],
+      });
+      expect(strict.symbolEvidence?.coverage.gaps.some(gap => gap.name === "keep")).toBe(false);
+    });
+
+    it("retains scoped evidence for same-line duplicate declarations", () => {
+      const strict = plugin.analyzeFileStrict("test.js", "function f() {} function f() {}");
+      expect(strict.status).toBe("succeeded");
+      expect(strict.symbolEvidence?.functions.filter(fn => fn.name === "f")).toEqual([
+        { name: "f", scope: { kind: "file" }, lineRange: [1, 1] },
+        { name: "f", scope: { kind: "file" }, lineRange: [1, 1] },
+      ]);
+    });
+
     it.each(["test.js", "test.jsx", "test.ts", "test.tsx"])("exposes unresolved computed and escaped names in %s", (filePath) => {
       for (const code of [
         'class A { ["r" + "un"]() {} keep() {} }',
