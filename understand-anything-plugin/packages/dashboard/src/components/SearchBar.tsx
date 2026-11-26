@@ -148,6 +148,7 @@ export default function SearchBar() {
             if (!node) return null;
 
             const relevance = Math.round((1 - result.score) * 100);
+            const reasons = searchMode === "semantic" ? result.reasons : undefined;
             const badgeColor = typeBadgeColors[node.type] ?? typeBadgeColors.file;
 
             return (
@@ -164,9 +165,19 @@ export default function SearchBar() {
                   {node.type}
                 </span>
 
-                {/* Node name */}
-                <span className="text-sm text-text-primary truncate flex-1">
-                  {node.name}
+                {/* Node name (+ why it matched, in semantic mode) */}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm text-text-primary truncate">
+                    {node.name}
+                  </span>
+                  {reasons && reasons.length > 0 && (
+                    <span
+                      className="block text-[10px] text-text-muted truncate"
+                      data-testid="search-reasons"
+                    >
+                      {reasons.join(" · ")}
+                    </span>
+                  )}
                 </span>
 
                 {/* Relevance bar */}

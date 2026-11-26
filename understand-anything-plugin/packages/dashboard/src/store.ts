@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { SearchEngine } from "@understand-anything/core/search";
 import type { SearchResult } from "@understand-anything/core/search";
+import { HybridSearchEngine } from "@understand-anything/core/semantic";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import type {
   GraphNode,
@@ -95,6 +96,22 @@ function buildGraphIndexes(graph: KnowledgeGraph): {
   return { nodesById, nodeIdToLayerId, nodeIdToLayerIds };
 }
 
+/**
+ * Run a query on the engine matching the selected mode. "semantic" uses the hybrid
+ * engine (BM25 + concept/vector + fuzzy + graph-aware ranking, with match reasons);
+ * "fuzzy" is the original name/summary/tag fuzzy search. Falls back to fuzzy when
+ * the hybrid engine is unavailable.
+ */
+export function runSearch(
+  fuzzy: SearchEngine,
+  hybrid: HybridSearchEngine | null,
+  mode: "fuzzy" | "semantic",
+  query: string,
+): Array<SearchResult & { reasons?: string[] }> {
+  if (mode === "semantic" && hybrid) return hybrid.search(query);
+  return fuzzy.search(query);
+}
+
 /** Maximum number of entries in the sidebar navigation history. */
 const MAX_HISTORY = 50;
 
@@ -108,8 +125,11 @@ interface DashboardStore {
   nodeIdToLayerIds: Map<string, Set<string>>;
   selectedNodeId: string | null;
   searchQuery: string;
-  searchResults: SearchResult[];
+  /** `reasons` is only present for semantic-mode results (why the node matched). */
+  searchResults: Array<SearchResult & { reasons?: string[] }>;
   searchEngine: SearchEngine | null;
+  /** Hybrid (BM25 + semantic + fuzzy + graph-aware) engine backing "semantic" mode. */
+  hybridEngine: HybridSearchEngine | null;
   searchMode: "fuzzy" | "semantic";
   setSearchMode: (mode: "fuzzy" | "semantic") => void;
 
@@ -296,7 +316,8 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   searchQuery: "",
   searchResults: [],
   searchEngine: null,
-  searchMode: "fuzzy",
+  hybridEngine: null,
+  searchMode: "semantic",
 
   navigationLevel: "overview",
   activeLayerId: null,
@@ -365,8 +386,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
 
   setGraph: (graph) => {
     const searchEngine = new SearchEngine(graph.nodes);
+    const hybridEngine = new HybridSearchEngine(graph.nodes, graph.edges);
     const query = get().searchQuery;
-    const searchResults = query.trim() ? searchEngine.search(query) : [];
+    const searchResults = query.trim()
+      ? runSearch(searchEngine, hybridEngine, get().searchMode, query)
+      : [];
     const { viewMode, domainGraph, activeDomainId } = get();
     // Preserve domain view if a domain graph is already loaded
     const keepDomainView = viewMode === "domain" && domainGraph !== null;
@@ -377,6 +401,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       nodeIdToLayerId,
       nodeIdToLayerIds,
       searchEngine,
+      hybridEngine,
       searchResults,
       navigationLevel: "overview",
       activeLayerId: null,
@@ -529,19 +554,22 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       expandedContainers: new Set(),
       pendingFocusContainer: null,
     }),
-  setSearchMode: (mode) => set({ searchMode: mode }),
+  setSearchMode: (mode) => {
+    // Re-run the current query so the result list matches the newly selected engine.
+    const { searchEngine, hybridEngine, searchQuery } = get();
+    const searchResults =
+      searchEngine && searchQuery.trim()
+        ? runSearch(searchEngine, hybridEngine, mode, searchQuery)
+        : [];
+    set({ searchMode: mode, searchResults });
+  },
   setSearchQuery: (query) => {
-    const engine = get().searchEngine;
-    const mode = get().searchMode;
-    if (!engine || !query.trim()) {
+    const { searchEngine, hybridEngine, searchMode } = get();
+    if (!searchEngine || !query.trim()) {
       set({ searchQuery: query, searchResults: [] });
       return;
     }
-    // Currently both modes use the same fuzzy engine
-    // When embeddings are available, "semantic" mode will use SemanticSearchEngine
-    void mode;
-    const searchResults = engine.search(query);
-    set({ searchQuery: query, searchResults });
+    set({ searchQuery: query, searchResults: runSearch(searchEngine, hybridEngine, searchMode, query) });
   },
 
   setPersona: (persona) =>
