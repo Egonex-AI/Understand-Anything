@@ -943,3 +943,40 @@ describe('scan-project.mjs — output schema invariants', () => {
     expect(paths).toEqual(['!bang.ts', '0.ts', '_under.ts', 'a.ts', 'ä.ts']);
   });
 });
+
+describe('scan-project.mjs — Puppet module files', () => {
+  let projectRoot;
+
+  afterEach(() => {
+    if (projectRoot) {
+      rmSync(projectRoot, { recursive: true, force: true });
+      projectRoot = null;
+    }
+  });
+
+  it('maps .pp to puppet/code and templates to erb/epp with markup category', () => {
+    projectRoot = setupTree({
+      'metadata.json': '{"name": "acme-web"}\n',
+      'manifests/site.pp': "node 'default' { include web }\n",
+      'modules/web/manifests/init.pp': 'class web {\n}\n',
+      'modules/web/lib/puppet/functions/my_greet.rb': 'Puppet::Functions.create_function(:my_greet) do\nend\n',
+      'modules/web/lib/puppet/type/my_type.rb': 'Puppet::Type.newtype(:my_type) do\nend\n',
+      'modules/web/templates/index.epp': '<%- | String $name | -%>\n<%= $name %>\n',
+      'modules/web/templates/banner.erb': 'banner <%= @x %>\n',
+    });
+    const r = runScript(projectRoot);
+
+    expect(r.status, r.stderr).toBe(0);
+    expect(byPath(r.output, 'manifests/site.pp').language).toBe('puppet');
+    expect(byPath(r.output, 'manifests/site.pp').fileCategory).toBe('code');
+    expect(byPath(r.output, 'modules/web/manifests/init.pp').language).toBe('puppet');
+    expect(byPath(r.output, 'modules/web/manifests/init.pp').fileCategory).toBe('code');
+    // Ruby glue keeps the ruby language (already supported).
+    expect(byPath(r.output, 'modules/web/lib/puppet/functions/my_greet.rb').language).toBe('ruby');
+    // Templates: markup-grade — language ids assigned, no structure expected.
+    expect(byPath(r.output, 'modules/web/templates/index.epp').language).toBe('epp');
+    expect(byPath(r.output, 'modules/web/templates/index.epp').fileCategory).toBe('markup');
+    expect(byPath(r.output, 'modules/web/templates/banner.erb').language).toBe('erb');
+    expect(byPath(r.output, 'modules/web/templates/banner.erb').fileCategory).toBe('markup');
+  });
+});
