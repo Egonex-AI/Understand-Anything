@@ -85,6 +85,29 @@ afterEach(() => {
   process.chdir(originalCwd);
 });
 
+describe("optional dashboard graph data", () => {
+  it.each(["diff-overlay.json", "domain-graph.json"])(
+    "uses an empty response only when %s is absent",
+    async (fileName) => {
+      const baseUrl = await startServer("test-token");
+      const request = () => requestJson(baseUrl, `/${fileName}?token=test-token`);
+      expect(await request()).toEqual({ status: 204, body: "" });
+
+      const data = { nodes: [], edges: [] };
+      writeProjectFile(projectA, `.ua/${fileName}`, JSON.stringify(data));
+      const result = await request();
+      expect(result.status).toBe(200);
+      expect(JSON.parse(result.body)).toEqual(data);
+    },
+  );
+
+  it("keeps a missing knowledge graph as a 404", async () => {
+    const baseUrl = await startServer("test-token");
+    const result = await requestJson(baseUrl, "/knowledge-graph.json?token=test-token");
+    expect(result.status).toBe(404);
+  });
+});
+
 describe("dashboard /code-lessons.json project scoping", () => {
   it("returns 404 when the selected project has no lessons (no cross-project leak)", async () => {
     // Project A: graph present, lessons absent. Project B (the cwd fallback
