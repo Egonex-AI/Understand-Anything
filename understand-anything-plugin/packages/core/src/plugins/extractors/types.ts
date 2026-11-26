@@ -16,4 +16,11 @@ export interface LanguageExtractor {
 
   /** Extract caller→callee relationships from the root AST node */
   extractCallGraph(rootNode: TreeSitterNode): CallGraphEntry[];
+
+  /**
+   * Optional workaround for known grammar misparses. Given the first parse,
+   * return a rewritten source to parse instead, or null to keep the tree.
+   * The rewrite must keep every line and column position unchanged.
+   */
+  reparseSource?(rootNode: TreeSitterNode, content: string): string | null;
 }

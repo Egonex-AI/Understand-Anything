@@ -183,6 +183,48 @@ function collectPrimaryConstructorProperties(
 export class KotlinExtractor implements LanguageExtractor {
   readonly languageIds = ["kotlin"];
 
+  /**
+   * tree-sitter-kotlin 1.1.0 misreads a top-level function with two or more
+   * annotations, a modifier and an empty parameter list, such as the usual
+   * Compose preview:
+   *
+   *   @Preview
+   *   @Composable
+   *   private fun GreetingPreview() { ... }
+   *
+   * When another declaration follows, it parses this as an annotated
+   * `private fun GreetingPreview() {...}` expression, so the function is
+   * lost. One annotation parses correctly, so blank out every annotation
+   * after the first (newlines kept, so positions don't move) and re-parse.
+   */
+  reparseSource(rootNode: TreeSitterNode, content: string): string | null {
+    const spans: Array<[number, number]> = [];
+    for (const node of rootNode.namedChildren) {
+      if (node.type !== "annotated_expression") continue;
+      const annotations: TreeSitterNode[] = [];
+      let current: TreeSitterNode | null = node;
+      while (current?.type === "annotated_expression") {
+        const annotation = findChild(current, "annotation");
+        if (annotation) annotations.push(annotation);
+        current = current.namedChild(current.namedChildCount - 1);
+      }
+      if (annotations.length < 2 || !current) continue;
+      if (!/^(?:[a-z]+\s+)+fun\b/.test(current.text)) continue;
+      for (const annotation of annotations.slice(1)) {
+        spans.push([annotation.startIndex, annotation.endIndex]);
+      }
+    }
+    if (spans.length === 0) return null;
+
+    let rewritten = "";
+    let last = 0;
+    for (const [start, end] of spans) {
+      rewritten += content.slice(last, start) + content.slice(start, end).replace(/[^\r\n]/g, " ");
+      last = end;
+    }
+    return rewritten + content.slice(last);
+  }
+
   extractStructure(rootNode: TreeSitterNode): StructuralAnalysis {
     const functions: StructuralAnalysis["functions"] = [];
     const classes: StructuralAnalysis["classes"] = [];
