@@ -1881,6 +1881,37 @@ describe('extract-import-map.mjs — regex comment-strip resilience', () => {
     expect(result.output.importMap['src/index.js']).not.toContain('src/alsofake.js');
   });
 
+  it('JS comment markers inside string literals do not hide require() calls', () => {
+    projectRoot = setupTree({
+      'src/index.js':
+        `const files = glob.sync('**/*.js');\n` +
+        `const a = require('./a');\n` +
+        `const url = "http://example.com"; const b = require('./b');\n` +
+        'const tpl = `/*`;\n' +
+        `const c = require('./c');\n` +
+        `/* require('./fake'); */\n` +
+        `module.exports = [a, b, c, files, url, tpl];\n`,
+      'src/a.js': `module.exports = 1;\n`,
+      'src/b.js': `module.exports = 2;\n`,
+      'src/c.js': `module.exports = 3;\n`,
+      'src/fake.js': `module.exports = 4;\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: ['src/index.js', 'src/a.js', 'src/b.js', 'src/c.js', 'src/fake.js'].map(
+        path => ({ path, language: 'javascript', fileCategory: 'code' }),
+      ),
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['src/index.js']).toEqual([
+      'src/a.js',
+      'src/b.js',
+      'src/c.js',
+    ]);
+  });
+
   it('Ruby require inside a # line comment is NOT picked up', () => {
     projectRoot = setupTree({
       'app.rb':
