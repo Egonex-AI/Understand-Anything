@@ -35,6 +35,108 @@ describe("CSharpExtractor", () => {
     expect(extractor.languageIds).toEqual(["csharp"]);
   });
 
+  describe("preprocessor declaration wrappers", () => {
+    it("discovers declarations in every top-level branch without choosing an active branch", () => {
+      const { tree, parser, root } = parse(`#if FEATURE
+namespace FeatureNamespace { public class Feature { public void Execute() {} } }
+#elif OTHER
+namespace OtherNamespace { public struct Other { public void Run() {} } }
+#else
+namespace FallbackNamespace { public record Fallback { public void Stop() {} } }
+#endif
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map(cls => cls.name)).toEqual(["Feature", "Other", "Fallback"]);
+      expect(result.functions.map(fn => fn.name)).toEqual(["Execute", "Run", "Stop"]);
+      expect(new Set(result.classes.map(cls => cls.lineRange.join(":"))).size).toBe(3);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("extracts a shared namespace body after the Mono.Options conditional namespace header", () => {
+      const { tree, parser, root } = parse(`#if NDESK_OPTIONS
+namespace NDesk.Options
+#else
+namespace Mono.Options
+#endif
+{
+    public class OptionSet {
+        public void Parse() {}
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      // The grammar recovers this valid C# form with an ERROR at #endif.
+      // The recoverable declarations must still be discovered exactly once.
+      expect(result.classes).toMatchObject([{ name: "OptionSet", lineRange: [7, 9], methods: ["Parse"] }]);
+      expect(result.classes).toHaveLength(1);
+      expect(result.functions).toMatchObject([{ name: "Parse", lineRange: [8, 8] }]);
+      expect(result.functions).toHaveLength(1);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("finds conditional using directives and class members without duplicating ordinary members", () => {
+      const { tree, parser, root } = parse(`#if LINQ
+using System.Linq;
+#endif
+namespace App {
+#if COLLECTIONS
+    using System.Collections.Generic;
+#endif
+    public class Service {
+#if FEATURE
+        public Service() {}
+        public void Enabled() {}
+#else
+        public void Disabled() {}
+#endif
+        public void Always() {}
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports.map(imp => imp.source)).toEqual(["System.Linq", "System.Collections.Generic"]);
+      expect(result.functions.map(fn => fn.name)).toEqual(["Service", "Enabled", "Disabled", "Always"]);
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].methods).toEqual(["Service", "Enabled", "Disabled", "Always"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("keeps nested types separate from their containing type, including conditional nested types", () => {
+      const { tree, parser, root } = parse(`namespace App {
+    public class Outer {
+        public void OuterMethod() {}
+        private class Inner { public Inner() {} public void InnerMethod() {} }
+#if FEATURE
+        public struct NestedStruct { public void StructMethod() {} }
+        public record NestedRecord { public void RecordMethod() {} }
+        public interface INested { void Contract(); }
+#endif
+    }
+}
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.classes.map(cls => cls.name).sort()).toEqual(["INested", "Inner", "NestedRecord", "NestedStruct", "Outer"]);
+      expect(result.classes.find(cls => cls.name === "Outer")?.methods).toEqual(["OuterMethod"]);
+      expect(result.classes.find(cls => cls.name === "Inner")?.methods).toEqual(["Inner", "InnerMethod"]);
+      expect(result.classes.find(cls => cls.name === "INested")?.methods).toEqual(["Contract"]);
+      expect(result.functions.map(fn => fn.name)).toEqual(["OuterMethod", "Inner", "InnerMethod", "StructMethod", "RecordMethod"]);
+      expect(new Set(result.functions.map(fn => fn.lineRange.join(":"))).size).toBe(4);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
+
   // ---- Methods/Constructors (mapped to functions) ----
 
   describe("extractStructure - functions (methods & constructors)", () => {
