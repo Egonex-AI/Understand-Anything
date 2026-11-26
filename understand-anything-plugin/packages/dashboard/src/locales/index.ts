@@ -5,8 +5,9 @@ import ja from "./ja";
 import ko from "./ko";
 import ru from "./ru";
 import vi from "./vi";
+import tr from "./tr";
 
-export type LocaleKey = "en" | "zh" | "zh-TW" | "ja" | "ko" | "ru" | "vi";
+export type LocaleKey = "en" | "zh" | "zh-TW" | "ja" | "ko" | "ru" | "vi" | "tr";
 export type Locale = typeof en;
 
 export const locales: Record<LocaleKey, Locale> = {
@@ -17,6 +18,7 @@ export const locales: Record<LocaleKey, Locale> = {
   ko,
   ru,
   vi,
+  tr,
 };
 
 export function getLocale(key: LocaleKey): Locale {
@@ -32,7 +34,8 @@ export function resolveLocaleKey(lang: string | undefined): LocaleKey {
   if (normalized === "ko" || normalized === "korean") return "ko";
   if (normalized === "ru" || normalized === "russian" || normalized === "ru-ru") return "ru";
   if (normalized === "vi" || normalized === "vietnamese" || normalized === "vi-vn") return "vi";
+  if (normalized === "tr" || normalized === "turkish" || normalized === "tr-tr" || normalized === "türkçe") return "tr";
   return "en";
 }
 
-export { en, zh, zhTW as "zh-TW", ja, ko, ru, vi };
+export { en, zh, zhTW as "zh-TW", ja, ko, ru, vi, tr };

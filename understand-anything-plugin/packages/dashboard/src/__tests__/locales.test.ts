@@ -22,6 +22,16 @@ describe("resolveLocaleKey", () => {
     expect(resolveLocaleKey("Vietnamese")).toBe("vi");
   });
 
+  it("resolves Turkish codes and friendly names", () => {
+    expect(resolveLocaleKey("tr")).toBe("tr");
+    expect(resolveLocaleKey("TR")).toBe("tr");
+    expect(resolveLocaleKey("tr-TR")).toBe("tr");
+    expect(resolveLocaleKey("tr_tr")).toBe("tr");
+    expect(resolveLocaleKey("turkish")).toBe("tr");
+    expect(resolveLocaleKey("Turkish")).toBe("tr");
+    expect(resolveLocaleKey("Türkçe")).toBe("tr");
+  });
+
   it("falls back to English for unknown languages", () => {
     expect(resolveLocaleKey("xx")).toBe("en");
     expect(resolveLocaleKey(undefined)).toBe("en");
@@ -34,11 +44,20 @@ describe("locales", () => {
     expect(locales.vi.onboarding.steps).toHaveLength(locales.en.onboarding.steps.length);
   });
 
+  it("exposes a Turkish locale with the English key shape", () => {
+    expect(keyShape(locales.tr)).toEqual(keyShape(locales.en));
+    expect(locales.tr.onboarding.steps).toHaveLength(locales.en.onboarding.steps.length);
+  });
+
   it("lists every locale in the record", () => {
-    expect(Object.keys(locales).sort()).toEqual(["en", "ja", "ko", "ru", "vi", "zh", "zh-TW"]);
+    expect(Object.keys(locales).sort()).toEqual(["en", "ja", "ko", "ru", "tr", "vi", "zh", "zh-TW"]);
   });
 
   it("returns the Vietnamese locale via getLocale", () => {
     expect(getLocale("vi")).toBe(locales.vi);
+  });
+
+  it("returns the Turkish locale via getLocale", () => {
+    expect(getLocale("tr")).toBe(locales.tr);
   });
 });

@@ -156,3 +156,42 @@ describe("SearchEngine", () => {
     expect(results.length).toBe(1);
   });
 });
+
+describe("SearchEngine — Turkish dotted/dotless I", () => {
+  const trNodes: GraphNode[] = [
+    makeNode({
+      id: "validator",
+      name: "request-validator.ts",
+      summary: "İstek gövdesini doğrulayan middleware'i tanımlar.",
+      tags: ["middleware"],
+    }),
+    makeNode({
+      id: "sensor",
+      name: "light.ts",
+      summary: "IŞIK sensöründen gelen verileri işler.",
+      tags: ["utility"],
+    }),
+    makeNode({
+      id: "list",
+      name: "list.ts",
+      summary: "Ürün listesini sıralar.",
+      tags: ["utility"],
+    }),
+  ];
+  const engine = new SearchEngine(trNodes);
+
+  it("matches a capital İ when the query is typed in lowercase", () => {
+    expect(engine.search("istek")[0]?.nodeId).toBe("validator");
+    expect(engine.search("İstek")[0]?.nodeId).toBe("validator");
+    expect(engine.search("ISTEK")[0]?.nodeId).toBe("validator");
+  });
+
+  it("matches an uppercase I against a typed dotless ı", () => {
+    expect(engine.search("ışık")[0]?.nodeId).toBe("sensor");
+    expect(engine.search("Işık")[0]?.nodeId).toBe("sensor");
+  });
+
+  it("still matches other Turkish letters exactly", () => {
+    expect(engine.search("sıralar")[0]?.nodeId).toBe("list");
+  });
+});
