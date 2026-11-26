@@ -918,6 +918,103 @@ describe('extract-import-map.mjs — Python resolver', () => {
       'src/svc_a/helpers.py',
     );
   });
+
+  it('resolves absolute imports from tests/ across Python src-layout roots (#816)', () => {
+    projectRoot = setupTree({
+      'pkg/src/mymod/__init__.py': '',
+      'pkg/src/mymod/core.py': `def answer():\n    return 42\n`,
+      'pkg/src/mymod/other.py': `from mymod.core import answer\n`,
+      'pkg/tests/test_core.py': `from mymod.core import answer\n`,
+      'pkg/tests/conftest.py': `from mymod import core\n`,
+      'other_pkg/src/mymod/__init__.py': '',
+      'other_pkg/src/mymod/core.py': `def answer():\n    return 99\n`,
+      'other_pkg/tests/unit/test_core.py': `from mymod.core import answer\n`,
+      // Project directory itself named `src` containing its own `src/` layout root.
+      'components/src/src/mymod/__init__.py': '',
+      'components/src/src/mymod/core.py': `def answer():\n    return 7\n`,
+      'components/src/tests/test_core.py': `from mymod.core import answer\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        'pkg/src/mymod/__init__.py',
+        'pkg/src/mymod/core.py',
+        'pkg/src/mymod/other.py',
+        'pkg/tests/test_core.py',
+        'pkg/tests/conftest.py',
+        'other_pkg/src/mymod/__init__.py',
+        'other_pkg/src/mymod/core.py',
+        'other_pkg/tests/unit/test_core.py',
+        'components/src/src/mymod/__init__.py',
+        'components/src/src/mymod/core.py',
+        'components/src/tests/test_core.py',
+      ].map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['pkg/src/mymod/other.py']).toEqual([
+      'pkg/src/mymod/core.py',
+    ]);
+    expect(result.output.importMap['pkg/tests/test_core.py']).toEqual([
+      'pkg/src/mymod/core.py',
+    ]);
+    expect(result.output.importMap['pkg/tests/conftest.py']).toEqual([
+      'pkg/src/mymod/__init__.py',
+      'pkg/src/mymod/core.py',
+    ]);
+    // Importer-scope precedence: each sub-package resolves to its own sibling
+    // src/ root rather than leaking across packages.
+    expect(result.output.importMap['other_pkg/tests/unit/test_core.py']).toEqual([
+      'other_pkg/src/mymod/core.py',
+    ]);
+    expect(result.output.importMap['components/src/tests/test_core.py']).toEqual([
+      'components/src/src/mymod/core.py',
+    ]);
+  });
+
+  it('keeps direct ancestor precedence ahead of sibling src/ (#816)', () => {
+    projectRoot = setupTree({
+      'svc/helper.py': `VALUE = "direct"\n`,
+      'svc/src/helper.py': `VALUE = "src"\n`,
+      'svc/tests/test_precedence.py': `import helper\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        'svc/helper.py',
+        'svc/src/helper.py',
+        'svc/tests/test_precedence.py',
+      ].map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status).toBe(0);
+    // Direct ancestor `svc/helper.py` wins over sibling `svc/src/helper.py`.
+    expect(result.output.importMap['svc/tests/test_precedence.py']).toEqual([
+      'svc/helper.py',
+    ]);
+  });
+
+  it('does not treat a Python package directory named src/ (with __init__.py) as a src-layout root (#816)', () => {
+    projectRoot = setupTree({
+      'src/__init__.py': '',
+      'src/config.py': `DEBUG = True\n`,
+      'tests/test_external.py': `import config\n`,
+    });
+
+    const result = runScript(projectRoot, {
+      projectRoot,
+      files: [
+        'src/__init__.py',
+        'src/config.py',
+        'tests/test_external.py',
+      ].map(path => ({ path, language: 'python', fileCategory: 'code' })),
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.output.importMap['tests/test_external.py']).toEqual([]);
+  });
 });
 
 describe('extract-import-map.mjs — Go resolver', () => {

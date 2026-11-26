@@ -1030,6 +1030,16 @@ export function resolvePythonImport(rawImport, specifiers, file, ctx) {
     const candidateModule = rootParts.concat(tailSegments);
     const matches = resolvePythonProbe(candidateModule, specifiers, ctx);
     if (matches.length > 0) return matches;
+
+    // PEP 517 / setuptools src-layout: probe `<ancestor>/src` as a sibling
+    // Python root unless that `src/` directory is itself a Python package
+    // (`src/__init__.py` present).
+    const srcParts = rootParts.concat('src');
+    const srcInit = `${srcParts.join('/')}/__init__.py`;
+    if (!ctx.fileSet.has(srcInit)) {
+      const srcMatches = resolvePythonProbe(srcParts.concat(tailSegments), specifiers, ctx);
+      if (srcMatches.length > 0) return srcMatches;
+    }
   }
   return [];
 }
