@@ -131,6 +131,9 @@ class IsTestPathTests(unittest.TestCase):
         self.assertTrue(mbg.is_test_path("tests/test_bar.py"))
         self.assertTrue(mbg.is_test_path("bar_test.py"))
         self.assertTrue(mbg.is_test_path("test_bar.py"))
+        self.assertTrue(mbg.is_test_path("conftest.py"))
+        self.assertTrue(mbg.is_test_path("backend/tests/integration/conftest.py"))
+        self.assertFalse(mbg.is_test_path("backend/src/conftest_helper.py"))
 
     def test_java_test_files(self) -> None:
         self.assertTrue(mbg.is_test_path("src/test/java/com/foo/BarTest.java"))
@@ -928,6 +931,59 @@ class LinkTestsTests(unittest.TestCase):
         self.assertIn("tested", nodes_by_id["file:src/shippingservice/main.go"]["tags"])
         self.assertIn("tested", nodes_by_id["file:src/shippingservice/tracker.go"]["tags"])
         self.assertNotIn("tested", nodes_by_id["file:src/shippingservice/quote.go"]["tags"])
+
+    def test_python_conftest_tested_by_edges_preserved_and_canonicalized(self) -> None:
+        # #816: pytest conftest.py files are test infrastructure. Pass 1 must
+        # preserve prod → conftest edges (and swap inverted conftest → prod
+        # edges) while dropping test ↔ conftest pairs and avoiding bogus Pass 2
+        # filename supplements for conftest.py.
+        nodes_by_id = {
+            "file:backend/src/pkg/config.py": _file_node("backend/src/pkg/config.py"),
+            "file:backend/src/pkg/service.py": _file_node("backend/src/pkg/service.py"),
+            "file:backend/tests/integration/conftest.py": _file_node("backend/tests/integration/conftest.py"),
+            "file:backend/tests/integration/test_service.py": _file_node("backend/tests/integration/test_service.py"),
+        }
+        edges: list[dict[str, Any]] = [
+            {
+                "source": "file:backend/src/pkg/config.py",
+                "target": "file:backend/tests/integration/conftest.py",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.7,
+            },
+            {
+                "source": "file:backend/tests/integration/conftest.py",
+                "target": "file:backend/src/pkg/service.py",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.8,
+            },
+            {
+                "source": "file:backend/tests/integration/test_service.py",
+                "target": "file:backend/tests/integration/conftest.py",
+                "type": "tested_by",
+                "direction": "forward",
+                "weight": 0.5,
+            },
+        ]
+
+        added, dropped, tagged, swapped = mbg.link_tests(nodes_by_id, edges)
+
+        self.assertEqual(added, 0)
+        self.assertEqual(dropped, 1)  # test_service.py → conftest.py is test↔test
+        self.assertEqual(swapped, 1)  # conftest.py → service.py swapped to canonical
+        self.assertEqual(tagged, 2)
+        kept = sorted(
+            (e["source"], e["target"]) for e in edges if e["type"] == "tested_by"
+        )
+        self.assertEqual(
+            kept,
+            [
+                ("file:backend/src/pkg/config.py", "file:backend/tests/integration/conftest.py"),
+                ("file:backend/src/pkg/service.py", "file:backend/tests/integration/conftest.py"),
+            ],
+        )
+        self.assertEqual(mbg.production_candidates("backend/tests/integration/conftest.py"), [])
 
     def test_unrelated_edges_pass_through(self) -> None:
         nodes_by_id = {

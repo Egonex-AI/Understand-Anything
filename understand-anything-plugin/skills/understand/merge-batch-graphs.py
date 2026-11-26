@@ -133,6 +133,8 @@ _TEST_NAME_PATTERNS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 _TEST_DIRECTORY_EXTENSIONS: frozenset[str] = frozenset({".swift", ".rs", ".php"})
 
 _EXACT_TEST_STEMS: dict[str, frozenset[str]] = {
+    # pytest fixture and hook configuration modules (auto-discovered by basename).
+    ".py": frozenset({"conftest"}),
     ".rb": frozenset({"spec_helper"}),
     # Rust's out-of-line unit-test module: `#[cfg(test)] mod tests;`.
     ".rs": frozenset({"tests"}),
