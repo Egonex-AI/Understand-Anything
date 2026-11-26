@@ -857,22 +857,49 @@ const REQUIRE_LITERAL_RE = /\brequire\(\s*(['"])([^'"`\n]+?)\1\s*\)/g;
 
 /**
  * Strip JS/TS line and block comments before running text-pattern matchers.
- * Replaces with spaces (preserving offsets isn't critical here, but keeping
- * roughly the same length avoids surprising the matcher with collapsed
- * whitespace). Does not attempt to honor string contents — that's fine for
- * the narrow patterns we run (`require('...')`, etc.) because the same
- * comment-or-not heuristic applies uniformly to all matched literals.
+ * Line comments keep their newline; an unterminated block comment is kept.
+ *
+ * `quotes` lists the characters that open a string literal. Inside one, `//`
+ * and `/*` are text, so a glob or a URL in a string does not swallow the
+ * code after it. `'` and `"` strings end at a newline; backtick strings
+ * may span lines. With no quotes, string contents are not honored.
  */
-function stripJsLikeComments(content) {
-  return content
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/[^\n]*/g, '');
+function stripJsLikeComments(content, quotes = '') {
+  let out = '';
+  let quote = null;
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (quote) {
+      out += ch;
+      if (ch === '\\' && i + 1 < content.length) out += content[++i];
+      else if (ch === quote || (ch === '\n' && quote !== '`')) quote = null;
+      continue;
+    }
+    if (quotes.includes(ch)) {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (ch === '/' && content[i + 1] === '/') {
+      while (i + 1 < content.length && content[i + 1] !== '\n') i++;
+      continue;
+    }
+    if (ch === '/' && content[i + 1] === '*') {
+      const end = content.indexOf('*/', i + 2);
+      if (end !== -1) {
+        i = end + 1;
+        continue;
+      }
+    }
+    out += ch;
+  }
+  return out;
 }
 
 function extractRequireSources(content) {
   const sources = [];
   let m;
-  const stripped = stripJsLikeComments(content);
+  const stripped = stripJsLikeComments(content, `'"\``);
   REQUIRE_LITERAL_RE.lastIndex = 0;
   while ((m = REQUIRE_LITERAL_RE.exec(stripped)) !== null) {
     sources.push(m[2]);
