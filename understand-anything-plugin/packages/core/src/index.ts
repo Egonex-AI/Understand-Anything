@@ -12,6 +12,7 @@ export {
 } from "./schema.js";
 export { TreeSitterPlugin } from "./plugins/tree-sitter-plugin.js";
 export type { LanguageExtractor } from "./plugins/extractors/types.js";
+export { FILE_SCOPE_CALLER } from "./plugins/extractors/types.js";
 export { builtinExtractors } from "./plugins/extractors/index.js";
 export { GraphBuilder } from "./analyzer/graph-builder.js";
 export {

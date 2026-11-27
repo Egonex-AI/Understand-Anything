@@ -1,5 +1,6 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
+import { FILE_SCOPE_CALLER } from "./types.js";
 import { getStringValue } from "./base-extractor.js";
 
 /**
@@ -169,9 +170,12 @@ export class TypeScriptExtractor implements LanguageExtractor {
 
       if (node.type === "call_expression") {
         const callee = node.childForFieldName("function");
-        if (callee && functionStack.length > 0) {
+        if (callee) {
           entries.push({
-            caller: functionStack[functionStack.length - 1],
+            caller:
+              functionStack.length > 0
+                ? functionStack[functionStack.length - 1]
+                : FILE_SCOPE_CALLER,
             callee: callee.text,
             lineNumber: node.startPosition.row + 1,
           });
