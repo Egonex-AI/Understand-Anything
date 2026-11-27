@@ -236,3 +236,64 @@ describe('incremental symbol matching', () => {
     expect(result.missing[0].status).toBe('unknown');
   });
 });
+
+describe('overload groups bound by one graph node (#822)', () => {
+  const path = 'src/Foo.cs';
+  const fileNode = { id: `file:${path}`, type: 'file', name: 'Foo.cs', filePath: path };
+  // Analyzers typically emit one file-owned node per overloaded name.
+  const fileOwned = nodes => ({
+    filePath: path,
+    nodes: [fileNode, ...nodes],
+    edges: nodes.map(item => ({ source: fileNode.id, target: item.id, type: 'contains' })),
+  });
+  const run = (lineRange, id = `function:${path}:Run`) => ({ id, type: 'function', name: 'Run', filePath: path, lineRange });
+  const csharp = (...members) => parser.analyzeFileStrict(path,
+    `public class Foo\n{\n${members.map(member => `    public void ${member}\n    {\n    }\n`).join('\n')}}\n`);
+  const overloads = () => csharp('Run(int id)', 'Run(string key)');
+  const check = (oldNodes, newNodes, after = csharp('Run(int id)', 'Run(string key)', 'Extra()')) =>
+    compareFileSymbols(fileOwned(oldNodes), fileOwned(newNodes), overloads(), after);
+
+  it('parses C# overloads as one owned source identity', () => {
+    const before = overloads();
+    expect(before.status).toBe('succeeded');
+    expect(before.symbolEvidence?.version).toBe(2);
+    expect(before.structure.functions.map(fn => fn.name)).toEqual(['Run', 'Run']);
+  });
+
+  it('preserves an unchanged node when the overloads are still declared', () => {
+    expect(check([run([3, 5])], [run([3, 5])]).missing).toEqual([]);
+  });
+
+  it('preserves a node whose line range spans every overload', () => {
+    expect(check([run([3, 9])], [run([3, 13])]).missing).toEqual([]);
+  });
+
+  it('preserves the group when only some overloads remain', () => {
+    expect(check([run([3, 5])], [run([3, 5])], csharp('Run(int id)', 'Extra()')).missing).toEqual([]);
+  });
+
+  it('reports a replacement when the group node changes ID', () => {
+    const result = check([run([3, 5])], [run([3, 5], `function:${path}:Foo.Run`)]);
+    expect(result.missing).toEqual([]);
+    expect(result.replacements).toEqual([{ oldId: `function:${path}:Run`, newId: `function:${path}:Foo.Run` }]);
+  });
+
+  it('stays unknown when every overload was removed', () => {
+    const result = check([run([3, 5])], [], csharp('Extra()'));
+    expect(result.missing).toEqual([expect.objectContaining({ status: 'unknown' })]);
+  });
+
+  it('stays unknown when the new graph has no node for the group', () => {
+    expect(check([run([3, 5])], []).missing).toEqual([expect.objectContaining({ status: 'unknown' })]);
+  });
+
+  it('stays unknown when two new nodes compete for the group', () => {
+    const result = check([run([3, 5])], [run([3, 5], 'function:a'), run([7, 9], 'function:b')]);
+    expect(result.missing).toEqual([expect.objectContaining({ status: 'unknown' })]);
+  });
+
+  it('stays unknown when two old nodes compete for the group', () => {
+    const result = check([run([3, 5], 'function:a'), run([7, 9], 'function:b')], [run([3, 5])]);
+    expect(result.missing.map(entry => entry.status)).toEqual(['unknown', 'unknown']);
+  });
+});
