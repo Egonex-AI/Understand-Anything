@@ -29,12 +29,24 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
      exit 1
    fi
 
-   if [ -d "$PROJECT_DIR/.understand-anything" ]; then
-     UA_DIR="$PROJECT_DIR/.understand-anything"
-   else
-     UA_DIR="$PROJECT_DIR/.ua"
+   ua_dir_for() { [ -d "$1/.understand-anything" ] && echo "$1/.understand-anything" || echo "$1/.ua"; }
+   UA_DIR=$(ua_dir_for "$PROJECT_DIR")
+   if [ ! -f "$UA_DIR/knowledge-graph.json" ] && [ "${UNDERSTAND_NO_WORKTREE_REDIRECT:-0}" != "1" ]; then
+     COMMON_ABS=$(cd "$PROJECT_DIR" && cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)
+     GIT_ABS=$(cd "$PROJECT_DIR" && cd "$(git rev-parse --git-dir 2>/dev/null)" 2>/dev/null && pwd -P)
+     if [ -n "$COMMON_ABS" ] && [ "$COMMON_ABS" != "$GIT_ABS" ]; then
+       PREFIX=$(cd "$PROJECT_DIR" && git rev-parse --show-prefix); MAIN_DIR="$(dirname "$COMMON_ABS")${PREFIX:+/${PREFIX%/}}"
+       MAIN_UA=$(ua_dir_for "$MAIN_DIR")
+       if [ -f "$MAIN_UA/knowledge-graph.json" ]; then
+         echo "[understand-dashboard] Worktree has no graph; using main checkout graph at $MAIN_UA"
+         PROJECT_DIR=$(cd "$MAIN_DIR" && pwd -P)
+         UA_DIR="$MAIN_UA"
+       fi
+     fi
    fi
    ```
+
+   When running inside a git worktree that has no graph of its own, this falls back to the main checkout's graph, because `/understand` redirects its output there.
 
 2. Check that `$UA_DIR/knowledge-graph.json` exists in the project directory. If not, tell the user:
    ```
