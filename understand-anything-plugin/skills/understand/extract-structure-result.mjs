@@ -133,7 +133,7 @@ export function analyzeFileWithOutcomes(registry, file, content) {
   const wantsCallGraph =
     file.fileCategory === 'code' || file.fileCategory === 'script';
   const selectedPlugin = typeof registry.getPluginForFile === 'function'
-    ? registry.getPluginForFile(file.path)
+    ? registry.getPluginForFile(file.path, content)
     : registry;
 
   if (selectedPlugin === null) {

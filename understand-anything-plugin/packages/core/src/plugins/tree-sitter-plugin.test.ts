@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { TreeSitterPlugin } from "./tree-sitter-plugin.js";
+import { builtinLanguageConfigs } from "../languages/configs/index.js";
 
 describe("TreeSitterPlugin", () => {
   let plugin: TreeSitterPlugin;
@@ -416,4 +417,19 @@ export class Greeter {
       expect(plugin.languages).toContain("javascript");
     });
   });
+
+  describe("extensionless scripts", () => {
+    it("parses a Python script by its shebang", async () => {
+      const python = new TreeSitterPlugin(builtinLanguageConfigs.filter((c) => c.id === "python"));
+      await python.init();
+      const code = "#!/usr/bin/env python3\nimport json\n\ndef main():\n    return helper()\n\ndef helper():\n    return json.dumps({})\n";
+
+      const { structure, callGraph } = python.analyzeFileFull("bin/tool", code);
+
+      expect(structure.functions.map((f) => f.name)).toEqual(["main", "helper"]);
+      expect(callGraph).toContainEqual(expect.objectContaining({ caller: "main", callee: "helper" }));
+      expect(python.analyzeFile("bin/tool", "import json\n").functions).toEqual([]);
+    });
+  });
 });
+
