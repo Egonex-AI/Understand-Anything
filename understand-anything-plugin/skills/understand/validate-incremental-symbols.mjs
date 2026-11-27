@@ -175,7 +175,7 @@ function hasPreservedIdentity(node, previous, current, sameRevision = false) {
   return true;
 }
 
-function resolveSymbol(node, graph, symbols) {
+function matchCandidates(node, graph, symbols) {
   const kind = symbolKind(node);
   const names = nodeNames(node);
   let candidates = symbols.filter(symbol => symbol.kind === kind && (
@@ -187,6 +187,20 @@ function resolveSymbol(node, graph, symbols) {
   if (qualified.length) candidates = qualified;
   const owners = classOwners(node, graph).map(parent => qualifiedName(parent.name));
   if (owners.length) candidates = candidates.filter(symbol => symbol.owner !== null && owners.includes(qualifiedName(symbol.owner)));
+  return candidates;
+}
+
+// The single source identity a node names, without using lines to pick among
+// same-key declarations (overloads). Null when owners are unknown or keys differ.
+function identityKey(node, graph, symbols) {
+  const candidates = matchCandidates(node, graph, symbols);
+  if (!candidates.length || candidates.some(symbol => symbol.owner === null)) return null;
+  const keys = new Set(candidates.map(symbolKey));
+  return keys.size === 1 ? [...keys][0] : null;
+}
+
+function resolveSymbol(node, graph, symbols) {
+  let candidates = matchCandidates(node, graph, symbols);
   // Lines locate ownership within one revision only; they are never identity
   // across revisions. Do not use lines to guess among overloads/same-name classes.
   if (candidates.length > 1 && Array.isArray(node.lineRange)) {
@@ -204,22 +218,53 @@ export function compareFileSymbols(previous, current, baseEvidence, headEvidence
   const headSource = sourceSymbols(headEvidence);
   const oldMappings = oldSymbols.map(node => resolveSymbol(node, previous, baseSource));
   const newMappings = newSymbols.map(node => resolveSymbol(node, current, headSource));
+  const oldKeys = oldSymbols.map(node => identityKey(node, previous, baseSource));
+  const newKeys = newSymbols.map(node => identityKey(node, current, headSource));
   const missing = [];
   const replacements = [];
   const evidenceValid = validSupplement(baseEvidence) && validSupplement(headEvidence);
+  const unstableSpelling = symbol => [symbol.name, symbol.owner].some(name => name.includes('\\') || name.includes('`')
+    || name.startsWith('@') || name.startsWith('r#') || name.normalize('NFKC') !== name);
+  // Overloads share one source identity, so they never map uniquely. The group
+  // is preserved only when exactly one old node and exactly one new node stand
+  // for that identity (no other node binds to it, even by line location) and
+  // the current source still declares it. Competing bindings and removed
+  // overload groups fall through and stay unknown.
+  const overloadGroupMatch = index => {
+    const key = oldKeys[index];
+    if (!key || !evidenceValid || baseEvidence.status !== 'succeeded' || headEvidence.status !== 'succeeded') return null;
+    const declarations = baseSource.filter(symbol => symbolKey(symbol) === key);
+    const representative = declarations[0];
+    if (declarations.length < 2 || representative.kind !== 'callable' || unstableSpelling(representative)
+      || (baseEvidence.language === 'cpp' && representative.name.includes('::'))) return null;
+    if (ambiguousOwner(representative, baseSource) || ambiguousOwner(representative, headSource)) return null;
+    if (!headSource.some(symbol => symbolKey(symbol) === key)) return null;
+    const bindsTo = (keys, mappings) => keys.flatMap((candidate, position) =>
+      candidate === key || (mappings[position] && symbolKey(mappings[position]) === key) ? [position] : []);
+    const oldBindings = bindsTo(oldKeys, oldMappings);
+    const newBindings = bindsTo(newKeys, newMappings);
+    if (oldBindings.length !== 1 || oldBindings[0] !== index || newBindings.length !== 1) return null;
+    return newBindings[0];
+  };
   for (let index = 0; index < oldSymbols.length; index++) {
     const node = oldSymbols[index];
     if (hasPreservedIdentity(node, previous, current, sameRevision)) continue;
     const entry = { id: node.id, name: node.name, type: node.type, status: 'unknown', reason: '' };
     const old = oldMappings[index];
+    const groupMatch = overloadGroupMatch(index);
+    if (groupMatch !== null) {
+      if (newSymbols[groupMatch].id !== node.id) {
+        replacements.push({ oldId: node.id, newId: newSymbols[groupMatch].id });
+      }
+      continue;
+    }
     if (baseEvidence?.status === 'succeeded' && headEvidence?.status === 'succeeded' && !evidenceValid) {
       entry.reason = 'Strict parser lacks valid scoped symbol evidence; rebuild the core package';
     } else if (!old || baseEvidence?.status !== 'succeeded' || headEvidence?.status !== 'succeeded') {
       entry.reason = 'Old symbol cannot be mapped uniquely, or source parsing is unavailable/failed';
     } else if (baseEvidence.language === 'cpp' && old.name.includes('::')) {
       entry.reason = 'Compound C++ qualification does not establish a verified receiver identity';
-    } else if ([old.name, old.owner].some(name => name.includes('\\') || name.includes('`') || name.startsWith('@')
-      || name.startsWith('r#') || name.normalize('NFKC') !== name)) {
+    } else if (unstableSpelling(old)) {
       entry.reason = 'Old source spelling does not establish a stable name or owner';
     } else if (oldMappings.filter(symbol => symbol && symbolKey(symbol) === symbolKey(old)).length !== 1
       || baseSource.filter(symbol => symbolKey(symbol) === symbolKey(old)).length !== 1) {
