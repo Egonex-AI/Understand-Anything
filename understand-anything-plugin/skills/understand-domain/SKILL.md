@@ -48,49 +48,15 @@ UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .und
 ```
 This keeps the legacy `.understand-anything/` directory when it already exists (existing projects keep working with no migration) and uses the new `.ua/` otherwise. Because each phase may run in a fresh shell, carry `$UA_DIR` forward like `$PROJECT_ROOT`, re-resolving it with the line above if a later command block needs it.
 
-**Important:** do **not** assume the plugin root is simply two directories above the skill path string. In many installations `~/.agents/skills/understand-domain` is a symlink into the real plugin checkout. Prefer runtime-provided plugin roots first (for Claude), then fall back to universal symlinks, skill symlink resolution, and common clone-based install paths.
-
-Resolve the plugin root like this. Substitute `<SKILL_DIR>` with this skill's directory (the base directory your platform reported when loading this skill) — this is how plugin installs with no fixed location, such as Devin's, are found:
+Resolve the physical directory of the loaded skill. Never fall back to another installation.
 
 ```bash
-SKILL_DIR_RELATIVE=$(cd -P "<SKILL_DIR>" 2>/dev/null && cd ../.. && pwd || echo "")
-SKILL_REAL=$(realpath ~/.agents/skills/understand-domain 2>/dev/null || readlink -f ~/.agents/skills/understand-domain 2>/dev/null || echo "")
-SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-domain 2>/dev/null || readlink -f ~/.copilot/skills/understand-domain 2>/dev/null || echo "")
-COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+PLUGIN_ROOT=$(cd -P "<SKILL_DIR>" && cd ../.. && pwd -P) || exit 1
 
-PLUGIN_ROOT=""
-for candidate in \
-  "${CLAUDE_PLUGIN_ROOT}" \
-  "${DEVIN_PLUGIN_ROOT}" \
-  "$SKILL_DIR_RELATIVE" \
-  "$HOME/.understand-anything-plugin" \
-  "$SELF_RELATIVE" \
-  "$COPILOT_SELF_RELATIVE" \
-  "$HOME/.codex/understand-anything/understand-anything-plugin" \
-  "$HOME/.opencode/understand-anything/understand-anything-plugin" \
-  "$HOME/.pi/understand-anything/understand-anything-plugin" \
-  "$HOME/understand-anything/understand-anything-plugin"; do
-  if [ -n "$candidate" ] && [ -f "$candidate/package.json" ] && [ -f "$candidate/pnpm-workspace.yaml" ]; then
-    PLUGIN_ROOT="$candidate"
-    break
-  fi
-done
-
-if [ -z "$PLUGIN_ROOT" ]; then
-  echo "Error: Cannot find the understand-anything plugin root."
-  echo "Checked:"
-  echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
-  echo "  - ${DEVIN_PLUGIN_ROOT:-<unset DEVIN_PLUGIN_ROOT>}"
-  echo "  - ${SKILL_DIR_RELATIVE:-<unresolved path derived from the skill directory>}"
-  echo "  - $HOME/.understand-anything-plugin"
-  echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-domain>}"
-  echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-domain>}"
-  echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
-  echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
-  echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
-  echo "  - $HOME/understand-anything/understand-anything-plugin"
-  echo "Make sure the plugin is installed correctly."
+if [ ! -f "$PLUGIN_ROOT/package.json" ] ||
+   [ ! -d "$PLUGIN_ROOT/skills" ] ||
+   [ ! -d "$PLUGIN_ROOT/agents" ]; then
+  echo "Error: Invalid local plugin root." >&2
   exit 1
 fi
 ```

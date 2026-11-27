@@ -14,9 +14,14 @@ function downloadBlob(blob: Blob, filename: string) {
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    a.click();
+  } finally {
+    a.remove();
+    window.setTimeout(() => {
+      URL.revokeObjectURL(url);
+    }, 1000);
+  }
 }
 
 export default function ExportMenu() {

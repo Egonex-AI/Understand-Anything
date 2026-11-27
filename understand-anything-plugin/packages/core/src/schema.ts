@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Disable dynamic code generation for strict CSP compatibility.
+z.config({ jitless: true });
+
 // Edge types (38 values across 9 categories)
 export const EdgeTypeSchema = z.enum([
   "imports", "exports", "contains", "inherits", "implements",  // Structural

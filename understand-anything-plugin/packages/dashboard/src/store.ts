@@ -795,3 +795,12 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   clearLayoutIssues: () => set({ layoutIssues: [] }),
 }));
 
+
+
+/** Clear project data and UI state when authentication is invalidated. */
+export function resetDashboardSession(): void {
+  useDashboardStore.setState(
+    useDashboardStore.getInitialState(),
+    true,
+  );
+}

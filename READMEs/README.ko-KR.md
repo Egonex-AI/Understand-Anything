@@ -103,14 +103,13 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 
 ## 🚀 빠른 시작
 
-### 1. 플러그인 설치
+### 1. Secure installation
 
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
+Understand Secure requires a locally prepared, independently approved release.
 
-> **로컬 모델을 사용하시나요?** 개인정보 보호나 엔터프라이즈 환경에서는 [Ollama](https://docs.ollama.com/integrations) 같은 로컬 모델 제공자를 사용하도록 플랫폼을 설정하세요 — 통합 가이드를 따라 모델 제공자를 변경할 수 있습니다.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
+
+Automatic installation and updates are disabled.
 
 ### 2. 코드베이스 분석
 
@@ -168,8 +167,6 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 # 언제든 다시 실행 — 기본값은 증분 업데이트(변경된 파일만 재분석)
 /understand
 
-# post-commit 훅을 설치해 매 커밋마다 자동 증분 업데이트
-/understand --auto-update
 
 # 거대한 모노레포라면 하위 디렉터리로 범위 제한
 /understand src/frontend
@@ -177,97 +174,11 @@ Understand Anything은 [Claude Code Plugin](https://code.claude.com/docs/en/plug
 
 ---
 
-## 🌐 멀티 플랫폼 설치
+## Secure multi-platform installation
 
-Understand-Anything은 다양한 AI 코딩 플랫폼에서 사용할 수 있습니다.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
 
-### Claude Code (네이티브)
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
-
-### 한 줄 설치 (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
-# 플랫폼 이름을 직접 전달하여 프롬프트를 건너뛸 수도 있습니다:
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
-```
-
-설치 스크립트는 저장소를 `~/.understand-anything/repo`에 클론하고 선택한 플랫폼에 맞는 심볼릭 링크를 생성합니다. 설치 후 CLI 또는 IDE를 재시작하세요.
-
-> **스킬 호출 방식 안내:** 호출 접두사는 플랫폼마다 다릅니다. 대부분의 플랫폼은 슬래시 명령(`/understand`)을 사용하지만, **Codex는 `$`를 사용합니다** — `/understand`가 아니라 `$understand`를 입력하세요. 두 접두사 모두 인식되지 않으면 *"understand 스킬로 이 프로젝트를 분석해 줘"* 처럼 자연어로 요청하면 됩니다.
-
-- 지원되는 `<platform>` 값: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
-- 이후 업데이트: `./install.sh --update`
-- 제거: `./install.sh --uninstall <platform>`
-
-### Cursor
-
-이 저장소를 클론하면 Cursor가 `.cursor-plugin/plugin.json`을 통해 플러그인을 자동으로 인식합니다. 수동 설치가 필요 없습니다. 클론 후 Cursor에서 열기만 하면 됩니다.
-
-자동 인식이 되지 않으면 수동으로 설치하세요: **Cursor Settings → Plugins**를 열고 검색란에 `https://github.com/Egonex-AI/Understand-Anything`를 붙여넣은 뒤 추가하세요.
-
-### VS Code + GitHub Copilot
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything@understand-anything
-```
-
-GitHub Copilot(v1.108+)이 설치된 VS Code는 `.copilot-plugin/plugin.json`을 통해 플러그인을 자동으로 인식합니다. 수동 설치가 필요 없습니다. 클론 후 VS Code에서 열기만 하면 됩니다.
-
-모든 프로젝트에서 사용하는 개인 스킬로 설치하려면 위 `install.sh`를 `vscode` 플랫폼으로 실행하세요.
-
-### Copilot CLI
-
-```bash
-copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
-```
-
-### Kiro CLI / IDE
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
-```
-
-설치 후:
-- **Kiro CLI**: `kiro-cli chat --agent understand "이 프로젝트를 분석해줘"`
-- **Kiro IDE**: 스킬이 `~/.kiro/skills/`에 심볼릭 링크로 연결되고 `understand` 에이전트가 `~/.kiro/agents/understand.json`에 작성되므로, IDE를 재시작하면 둘 다 사용할 수 있습니다.
-
-모든 프로젝트에서 사용하는 개인 스킬로 설치하려면 위 `install.sh`를 `kiro` 플랫폼으로 실행하세요.
-
-### 플랫폼 호환성
-
-| 플랫폼 | 상태 | 설치 방법 |
-|----------|--------|----------------|
-| Claude Code | ✅ 네이티브 | 플러그인 마켓플레이스 |
-| Cursor | ✅ 지원 | 자동 인식 |
-| VS Code + GitHub Copilot | ✅ 지원 | 자동 인식 |
-| Copilot CLI | ✅ 지원 | 플러그인 설치 |
-| Codex | ✅ 지원 | `install.sh codex` |
-| OpenCode | ✅ 지원 | `install.sh opencode` |
-| OpenClaw | ✅ 지원 | `install.sh openclaw` |
-| Antigravity | ✅ 지원 | `install.sh antigravity` |
-| Gemini CLI | ✅ 지원 | `install.sh gemini` |
-| Pi Agent | ✅ 지원 | `install.sh pi` |
-| Vibe CLI | ✅ 지원 | `install.sh vibe` |
-| Hermes | ✅ 지원 | `install.sh hermes` |
-| Cline | ✅ 지원 | `install.sh cline` |
-| KIMI CLI | ✅ 지원 | `install.sh kimi` |
-| Trae | ✅ 지원 | `install.sh trae` |
-| Nanobot | ✅ 지원 | `install.sh nanobot` |
-| Kiro CLI / IDE | ✅ 지원 | `install.sh kiro` |
-
----
+Hooks and integrations require explicit review.
 
 ## 📦 팀과 그래프 공유하기
 
@@ -282,7 +193,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 .ua/diff-overlay.json
 ```
 
-**최신 상태 유지:** `/understand --auto-update` 를 활성화하면 post-commit 훅이 그래프를 증분 업데이트하여 각 커밋마다 일치하는 그래프가 유지됩니다. 또는 릴리스 전에 `/understand` 를 수동으로 다시 실행하세요.
+**Keep the graph fresh:** Re-run `/understand` manually.
 
 **대용량 그래프 (10 MB 이상):** **git-lfs** 로 추적합니다.
 
@@ -297,10 +208,10 @@ git add .gitattributes .ua/
 그래프를 한 번 생성해 커밋해두면, 팀의 누구나 명령어 하나로 열 수 있습니다. Claude Code 도, LLM 도, API 키도 필요 없으며, Node.js(>= 18)만 있으면 됩니다:
 
 ```bash
-npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+node packages/viewer/bin/viewer.mjs /path/to/analyzed/project --no-open
 ```
 
-터미널에 토큰이 포함된 URL(`http://127.0.0.1:5173/?token=…`)이 출력되고, 완전한 인터랙티브 대시보드가 브라우저에서 열립니다. 프로젝트 디렉터리(기본값: 현재 디렉터리)에는 커밋된 데이터 디렉터리(`.ua/`, 또는 레거시 `.understand-anything/`)가 있어야 합니다. 모든 것은 로컬 디스크에서 읽기 전용으로 제공되며, LLM 호출도 없고 데이터가 사용자의 컴퓨터를 벗어나지 않습니다.
+Run the viewer from the approved local plugin directory. Open the URL printed in your terminal. Never share session credentials with AI agents.
 
 저장소를 클론해서 작업 중이라면 `pnpm install && pnpm --filter @understand-anything/core build` 후 `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard` 를 실행하면 Vite 개발 서버를 통해 같은 결과를 얻을 수 있습니다.
 

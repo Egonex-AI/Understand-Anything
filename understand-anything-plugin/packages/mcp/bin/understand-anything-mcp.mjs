@@ -51,15 +51,47 @@ const { version: SERVER_VERSION } = JSON.parse(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function resolveProjectRoot(projectPath) {
-  const raw = projectPath ?? process.env.DEVIN_PROJECT_DIR ?? process.cwd();
-  const resolved = path.resolve(raw);
-  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
-    throw new Error(`Project directory not found: ${resolved}`);
+function canonicalProjectRoot(raw) {
+  const resolved = fs.realpathSync(path.resolve(raw));
+
+  if (!fs.statSync(resolved).isDirectory()) {
+    throw new Error("Invalid project directory");
   }
-  // Canonicalise symlinks (e.g. macOS /tmp → /private/tmp) so the root is
-  // stable as a dashboard session key and in reported paths.
-  return fs.realpathSync(resolved);
+
+  return resolved;
+}
+
+const AUTHORIZED_PROJECT_ROOT = canonicalProjectRoot(
+  process.env.UNDERSTAND_PROJECT_ROOT ??
+  process.env.DEVIN_PROJECT_DIR ??
+  process.cwd(),
+);
+
+// Enforce the effective authorization boundary for Core Git operations.
+process.env.UNDERSTAND_PROJECT_ROOT = AUTHORIZED_PROJECT_ROOT;
+
+function resolveProjectRoot(projectPath) {
+  const resolved = canonicalProjectRoot(
+    path.resolve(
+      AUTHORIZED_PROJECT_ROOT,
+      projectPath ?? ".",
+    ),
+  );
+
+  const relative = path.relative(
+    AUTHORIZED_PROJECT_ROOT,
+    resolved,
+  );
+
+  if (
+    path.isAbsolute(relative) ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`)
+  ) {
+    throw new Error("Project path outside authorized root");
+  }
+
+  return resolved;
 }
 
 function textResult(text) {
@@ -155,74 +187,114 @@ for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
 }
 process.stdin.on("close", () => process.exit(0));
 
+const pendingDashboards = new Map();
+const MAX_DASHBOARDS = 4;
+const MAX_STARTUP_OUTPUT = 8192;
+
 function startDashboard(root, port) {
-  const key = `${root}::${port ?? "auto"}`;
+  const key = `${root}::${port ?? 0}`;
   const existing = dashboards.get(key);
-  if (existing && existing.child.exitCode === null && !existing.child.killed) {
+
+  if (existing && existing.child.exitCode === null &&
+      !existing.child.killed) {
     return Promise.resolve(existing.url);
   }
 
-  return new Promise((resolvePromise, rejectPromise) => {
+  const pending = pendingDashboards.get(key);
+  if (pending) return pending;
+
+  if (viewers.size >= MAX_DASHBOARDS) {
+    return Promise.reject(new Error("Dashboard session limit reached."));
+  }
+
+  const startup = new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(
       process.execPath,
-      [VIEWER_BIN, root, "--port", String(port ?? 0), "--no-open"],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      [VIEWER_BIN, root, "--port", String(port ?? 0), "--private"],
+      {
+        shell: false,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "ignore"],
+      },
     );
+
     viewers.add(child);
 
     let stdout = "";
-    let stderr = "";
     let settled = false;
 
     const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      child.kill();
-      rejectPromise(
-        new Error(
-          `Dashboard did not report a URL within ${DASHBOARD_TIMEOUT_MS / 1000}s.` +
-            (stderr.trim() ? `\nViewer stderr:\n${stderr.trim()}` : ""),
-        ),
-      );
+      fail("Dashboard startup timed out.");
     }, DASHBOARD_TIMEOUT_MS);
 
-    // Keep draining both pipes after startup so the viewer never blocks on a
-    // full pipe, but stop buffering once the URL has been reported.
+    function fail(message) {
+      if (settled) return;
+
+      settled = true;
+      clearTimeout(timer);
+      stdout = "";
+      child.kill();
+      rejectPromise(new Error(message));
+    }
+
     child.stdout.on("data", (chunk) => {
       if (settled) return;
-      stdout += chunk.toString();
-      const match = stdout.match(/Dashboard URL:\s*(\S+)/);
-      if (match) {
-        settled = true;
-        clearTimeout(timer);
-        dashboards.set(key, { url: match[1], child });
-        resolvePromise(match[1]);
+
+      if (Buffer.byteLength(stdout) + chunk.length >
+          MAX_STARTUP_OUTPUT) {
+        fail("Dashboard startup output exceeded its limit.");
+        return;
       }
-    });
-    child.stderr.on("data", (chunk) => {
-      if (!settled) stderr += chunk.toString();
-    });
-    child.on("error", (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      rejectPromise(err);
-    });
-    child.on("exit", (code) => {
-      viewers.delete(child);
-      if (dashboards.get(key)?.child === child) dashboards.delete(key);
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      rejectPromise(
-        new Error(
-          `Viewer exited (code ${code}) before reporting a URL.` +
-            (stderr.trim() ? `\nViewer stderr:\n${stderr.trim()}` : "") +
-            (stdout.trim() ? `\nViewer stdout:\n${stdout.trim()}` : ""),
+
+      stdout += chunk.toString();
+
+      const match = stdout.match(
+        new RegExp(
+          String.raw`^Dashboard ready: http://127\.0\.0\.1:(\d{1,5})/\r?\n`,
+          "m",
         ),
       );
+
+      if (!match) return;
+
+      const boundPort = Number(match[1]);
+
+      if (boundPort < 1 || boundPort > 65535) {
+        fail("Invalid dashboard port.");
+        return;
+      }
+
+      const url = `http://127.0.0.1:${boundPort}/`;
+
+      settled = true;
+      clearTimeout(timer);
+      stdout = "";
+
+      dashboards.set(key, { url, child });
+      resolvePromise(url);
+    });
+
+    child.on("error", () => {
+      fail("Unable to launch the local viewer.");
+    });
+
+    child.on("close", () => {
+      viewers.delete(child);
+
+      if (dashboards.get(key)?.child === child) {
+        dashboards.delete(key);
+      }
+
+      fail("Viewer stopped before becoming ready.");
     });
   });
+
+  const tracked = startup.finally(() => {
+    pendingDashboards.delete(key);
+  });
+
+  pendingDashboards.set(key, tracked);
+  return tracked;
 }
 
 // ── MCP server ─────────────────────────────────────────────────────────────
@@ -247,7 +319,7 @@ const projectPathParam = z
   .string()
   .optional()
   .describe(
-    "Project directory. Defaults to DEVIN_PROJECT_DIR or the server's working directory.",
+    "Project directory within the authorized root. Defaults to UNDERSTAND_PROJECT_ROOT, DEVIN_PROJECT_DIR, or the server's working directory.",
   );
 
 server.registerTool(
@@ -451,9 +523,8 @@ server.registerTool(
   {
     title: "Understand Anything: dashboard",
     description:
-      "Launch the interactive knowledge-graph dashboard for a project and return " +
-      "its access-token URL. The server keeps running in the background; reuse it " +
-      "for the rest of the session. Share the full URL (including ?token=) with the user.",
+      "Launch the local knowledge-graph dashboard using private browser access. " +
+      "Reuse the viewer during the MCP session. Access credentials are never returned.",
     inputSchema: {
       projectPath: projectPathParam,
       port: z
@@ -486,8 +557,9 @@ server.registerTool(
           `Dashboard is running at ${url}`,
           `Viewing: ${path.join(resolveUaDir(root), "knowledge-graph.json")}`,
           "",
-          "Share the full URL including the ?token= parameter — without it the dashboard",
-          "shows an access-token gate. The dashboard stays up for the rest of this session.",
+          "Browser opening was requested locally.",
+          "Access credentials are not returned to the agent.",
+          "The dashboard stays up for the rest of this session.",
         ].join("\n"),
       );
     } catch (err) {

@@ -129,3 +129,6 @@ export {
   type IgnoreFilter,
 } from "./ignore-filter.js";
 export { generateStarterIgnoreFile } from "./ignore-generator.js";
+
+export { createSafeGitEnv } from "./security/git-env.js";
+export { validateGitRepository } from "./security/git-preflight.js";

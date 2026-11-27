@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { GraphNode, KnowledgeGraph } from "@understand-anything/core/types";
-import { useDashboardStore } from "../store";
+import { useDashboardStore, resetDashboardSession } from "../store";
 
 function node(id: string): GraphNode {
   return {
@@ -104,6 +104,49 @@ describe("store layer navigation container cache resets", () => {
     useDashboardStore.getState().goBackNode();
 
     expect(useDashboardStore.getState().activeLayerId).toBe("layer:b");
+    expectContainerStateCleared();
+  });
+});
+
+
+describe("dashboard session isolation", () => {
+  it("clears project data and navigation state", () => {
+    useDashboardStore.getState().setGraph(graph());
+    useDashboardStore.getState().navigateToNodeInLayer("a1");
+    useDashboardStore.getState().setDiffOverlay(["a1"], ["b1"]);
+
+    seedContainerState();
+
+    expect(useDashboardStore.getState().nodesById.size).toBe(4);
+    expect(useDashboardStore.getState().changedNodeIds.size).toBe(1);
+
+    resetDashboardSession();
+
+    const state = useDashboardStore.getState();
+
+    expect(state.nodesById.size).toBe(0);
+    expect(state.nodeIdToLayerId.size).toBe(0);
+    expect(state.nodeIdToLayerIds.size).toBe(0);
+    expect(state.changedNodeIds.size).toBe(0);
+    expect(state.affectedNodeIds.size).toBe(0);
+
+    expectContainerStateCleared();
+    expect(state).toEqual(useDashboardStore.getInitialState());
+  });
+
+  it("preserves store functionality after a session reset", () => {
+    useDashboardStore.getState().setGraph(graph());
+
+    resetDashboardSession();
+    resetDashboardSession();
+
+    useDashboardStore.getState().setGraph(graph());
+
+    expect(useDashboardStore.getState().nodesById.size).toBe(4);
+
+    resetDashboardSession();
+
+    expect(useDashboardStore.getState().nodesById.size).toBe(0);
     expectContainerStateCleared();
   });
 });

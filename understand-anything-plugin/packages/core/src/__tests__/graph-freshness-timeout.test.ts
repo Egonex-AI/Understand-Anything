@@ -4,6 +4,10 @@ const { execFileMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
 }));
 
+vi.mock("../security/git-preflight.js", () => ({
+  validateGitRepository: vi.fn(),
+}));
+
 vi.mock("child_process", async () => {
   const actual = await vi.importActual<typeof import("child_process")>(
     "child_process",

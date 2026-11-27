@@ -19,3 +19,5 @@ venv/
 *.pyo
 Thumbs.db
 *.tgz
+
+.ua/

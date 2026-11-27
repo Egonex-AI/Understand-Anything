@@ -88,11 +88,20 @@ async function startDashboardServer(accessToken: string): Promise<string> {
   return `http://127.0.0.1:${address.port}`;
 }
 
-function requestJson(baseUrl: string, requestPath: string): Promise<HttpResult> {
+function requestJson(
+  baseUrl: string,
+  requestPath: string,
+  token?: string,
+): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
     const request = httpRequest(
       `${baseUrl}${requestPath}`,
-      { agent: false },
+      {
+        agent: false,
+        headers: token
+          ? { Authorization: `Bearer ${token}` }
+          : {},
+      },
       (response) => {
         const chunks: Buffer[] = [];
         response.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -171,7 +180,7 @@ describe(
 
         const response = await requestJson(
           baseUrl,
-          "/staleness.json?token=test-token",
+          "/staleness.json", "test-token",
         );
 
         expect(response.status).toBe(200);
@@ -201,7 +210,7 @@ describe(
 
       const response = await requestJson(
         baseUrl,
-        "/staleness.json?token=test-token",
+        "/staleness.json", "test-token",
       );
       expect(isDashboardFreshnessReport(response.body)).toBe(true);
       expect(response).toMatchObject({
@@ -229,7 +238,7 @@ describe(
       const baseUrl = await startDashboardServer("test-token");
 
       await expect(
-        requestJson(baseUrl, "/staleness.json?token=test-token"),
+        requestJson(baseUrl, "/staleness.json", "test-token"),
       ).resolves.toEqual({
         status: 404,
         body: { error: "No knowledge graph found. Run /understand first." },
@@ -246,7 +255,7 @@ describe(
       const baseUrl = await startDashboardServer("test-token");
 
       await expect(
-        requestJson(baseUrl, "/staleness.json?token=test-token"),
+        requestJson(baseUrl, "/staleness.json", "test-token"),
       ).resolves.toEqual({
         status: 500,
         body: { error: "Failed to read graph file" },
@@ -264,7 +273,7 @@ describe(
       const baseUrl = await startDashboardServer("test-token");
 
       await expect(
-        requestJson(baseUrl, "/staleness.json?token=test-token"),
+        requestJson(baseUrl, "/staleness.json", "test-token"),
       ).resolves.toEqual({
         status: 500,
         body: { error: "Failed to read graph file" },

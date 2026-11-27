@@ -104,14 +104,13 @@ Trỏ `/understand-knowledge` vào một [wiki LLM kiểu Karpathy](https://gist
 
 ## 🚀 Bắt đầu nhanh
 
-### 1. Cài đặt plugin
+### 1. Secure installation
 
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
+Understand Secure requires a locally prepared, independently approved release.
 
-> **Dùng model cục bộ?** Vì lý do riêng tư hoặc cho doanh nghiệp, hãy trỏ nền tảng của bạn tới một nhà cung cấp model cục bộ như [Ollama](https://docs.ollama.com/integrations) — làm theo hướng dẫn tích hợp của họ để đổi nhà cung cấp model.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
+
+Automatic installation and updates are disabled.
 
 ### 2. Phân tích codebase của bạn
 
@@ -171,8 +170,6 @@ Một dashboard web tương tác hiện ra với codebase được trực quan h
 # Chạy lại bất kỳ lúc nào — mặc định tăng dần (chỉ phân tích lại các tệp đã thay đổi)
 /understand
 
-# Tự động cập nhật sau mỗi commit qua post-commit hook
-/understand --auto-update
 
 # Giới hạn phạm vi vào một thư mục con (cho monorepo lớn)
 /understand src/frontend
@@ -180,104 +177,11 @@ Một dashboard web tương tác hiện ra với codebase được trực quan h
 
 ---
 
-## 🌐 Cài đặt đa nền tảng
+## Secure multi-platform installation
 
-Understand-Anything hoạt động trên nhiều nền tảng AI coding.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
 
-### Claude Code (Bản địa)
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
-
-
-### Cài đặt một dòng (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
-
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
-# hoặc bỏ qua lời nhắc bằng cách truyền nền tảng:
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
-```
-
-Trình cài đặt clone repo vào `~/.understand-anything/repo` và tạo symlink phù hợp cho nền tảng đã chọn. Khởi động lại CLI/IDE sau đó.
-
-> **Lưu ý về cách gọi skill:** tiền tố gọi khác nhau tùy nền tảng. Hầu hết nền tảng dùng slash command (`/understand`), nhưng **Codex dùng `$`** — gõ `$understand`, không phải `/understand`. Nếu nền tảng của bạn không nhận cả hai tiền tố, chỉ cần hỏi bằng ngôn ngữ tự nhiên: *"Use the understand skill to analyze this project."*
-
-- Các giá trị `<platform>` được hỗ trợ: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
-- Cập nhật sau:
-  - macOS / Linux: `./install.sh --update`
-  - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Update`
-- Gỡ cài đặt:
-  - macOS / Linux: `./install.sh --uninstall <platform>`
-  - Windows: `& "$HOME/.understand-anything/repo/install.ps1" -Uninstall <platform>`
-
-### Cursor
-
-Cursor tự động phát hiện plugin qua `.cursor-plugin/plugin.json` khi repo này được clone. Không cần cài đặt thủ công — chỉ cần clone và mở trong Cursor.
-
-Nếu tự động phát hiện không hoạt động, hãy cài đặt thủ công: mở **Cursor Settings → Plugins**, dán `https://github.com/Egonex-AI/Understand-Anything` vào ô tìm kiếm và thêm từ đó.
-
-### VS Code + GitHub Copilot
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything@understand-anything
-```
-
-VS Code với GitHub Copilot (v1.108+) tự động phát hiện plugin qua `.copilot-plugin/plugin.json` khi repo này được clone. Không cần cài đặt thủ công — chỉ cần clone và mở trong VS Code.
-
-Để sử dụng skill cá nhân (khả dụng trên mọi dự án), chạy `install.sh` ở trên với nền tảng `vscode`.
-
-### Copilot CLI
-
-```bash
-copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
-```
-
-### Kiro CLI / IDE
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
-```
-
-Sau khi cài đặt:
-- **Kiro CLI**: `kiro-cli chat --agent understand "Analyze this project"`
-- **Kiro IDE**: các skill được symlink vào `~/.kiro/skills/` và agent `understand` được ghi vào `~/.kiro/agents/understand.json`, nên cả hai đều khả dụng sau khi khởi động lại IDE.
-
-Để sử dụng skill cá nhân (khả dụng trên mọi dự án), chạy `install.sh` ở trên với nền tảng `kiro`.
-
-### Tương thích nền tảng
-
-| Nền tảng | Trạng thái | Phương thức cài đặt |
-|----------|------------|---------------------|
-| Claude Code | ✅ Bản địa | Plugin marketplace |
-| Cursor | ✅ Hỗ trợ | Tự động phát hiện |
-| VS Code + GitHub Copilot | ✅ Hỗ trợ | Tự động phát hiện |
-| Copilot CLI | ✅ Hỗ trợ | Plugin install |
-| Codex | ✅ Hỗ trợ | `install.sh codex` |
-| OpenCode | ✅ Hỗ trợ | `install.sh opencode` |
-| OpenClaw | ✅ Hỗ trợ | `install.sh openclaw` |
-| Antigravity | ✅ Hỗ trợ | `install.sh antigravity` |
-| Gemini CLI | ✅ Hỗ trợ | `install.sh gemini` |
-| Pi Agent | ✅ Hỗ trợ | `install.sh pi` |
-| Vibe CLI | ✅ Hỗ trợ | `install.sh vibe` |
-| Hermes | ✅ Hỗ trợ | `install.sh hermes` |
-| Cline | ✅ Hỗ trợ | `install.sh cline` |
-| KIMI CLI | ✅ Hỗ trợ | `install.sh kimi` |
-| Trae | ✅ Hỗ trợ | `install.sh trae` |
-| Nanobot | ✅ Hỗ trợ | `install.sh nanobot` |
-| Kiro CLI / IDE | ✅ Hỗ trợ | `install.sh kiro` |
-
-
----
+Hooks and integrations require explicit review.
 
 ## 📦 Chia sẻ đồ thị với nhóm
 
@@ -292,7 +196,7 @@ Sau khi cài đặt:
 .ua/diff-overlay.json
 ```
 
-**Giữ nó luôn mới:** bật `/understand --auto-update` — một post-commit hook cập nhật dần đồ thị để mỗi commit luôn đi kèm đồ thị tương ứng. Hoặc chạy lại `/understand` thủ công trước các bản phát hành.
+**Keep the graph fresh:** Re-run `/understand` manually.
 
 **Đồ thị lớn (10 MB+):** theo dõi với **git-lfs**.
 
@@ -307,10 +211,10 @@ git add .gitattributes .ua/
 Khi đồ thị đã được tạo và commit, bất kỳ ai trong nhóm cũng có thể mở nó bằng một lệnh — không cần Claude Code, không cần LLM, không cần API key. Chỉ cần Node.js (>= 18):
 
 ```bash
-npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+node packages/viewer/bin/viewer.mjs /path/to/analyzed/project --no-open
 ```
 
-Terminal sẽ in ra URL kèm token (`http://127.0.0.1:5173/?token=…`) và mở dashboard tương tác đầy đủ trong trình duyệt. Thư mục dự án (mặc định: thư mục hiện tại) phải chứa thư mục dữ liệu đã commit (`.ua/`, hoặc `.understand-anything/` cũ). Mọi thứ được phục vụ chỉ đọc từ ổ đĩa cục bộ — không có lệnh gọi LLM, không có dữ liệu nào rời khỏi máy của bạn.
+Run the viewer from the approved local plugin directory. Open the URL printed in your terminal. Never share session credentials with AI agents.
 
 Đang làm việc từ bản clone? `pnpm install && pnpm --filter @understand-anything/core build`, sau đó `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard` cũng cho kết quả tương tự qua Vite dev server.
 

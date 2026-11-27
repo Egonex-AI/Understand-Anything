@@ -49,114 +49,66 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    fi
    ```
 
-3. Find the dashboard code. The dashboard is at `packages/dashboard/` relative to this plugin's root directory. Check these paths in order and use the first that exists:
-   - `${CLAUDE_PLUGIN_ROOT}/packages/dashboard/` (Claude Code runtime root, highest priority)
-   - `${DEVIN_PLUGIN_ROOT}/packages/dashboard/` (explicit override, when set)
-   - Two levels up from this skill's own directory, `<SKILL_DIR>` (the base directory your platform reported when loading this skill — covers plugin installs with no fixed location, such as Devin's)
-   - `~/.understand-anything-plugin/packages/dashboard/` (universal symlink, all installs)
-   - Two levels up from `~/.agents/skills/understand-dashboard` real path (self-relative fallback)
-   - Two levels up from `~/.copilot/skills/understand-dashboard` real path (Copilot personal skills fallback)
-   - Common clone-based install roots:
-     - `~/.codex/understand-anything/understand-anything-plugin/packages/dashboard/`
-     - `~/.opencode/understand-anything/understand-anything-plugin/packages/dashboard/`
-     - `~/.pi/understand-anything/understand-anything-plugin/packages/dashboard/`
-     - `~/understand-anything/understand-anything-plugin/packages/dashboard/`
+3. Resolve the local plugin root.
 
-   Use the Bash tool to resolve:
+Resolve the physical directory of the loaded skill. Never fall back to another installation.
+
    ```bash
-   SKILL_DIR_RELATIVE=$(cd -P "<SKILL_DIR>" 2>/dev/null && cd ../.. && pwd || echo "")
-   SKILL_REAL=$(realpath ~/.agents/skills/understand-dashboard 2>/dev/null || readlink -f ~/.agents/skills/understand-dashboard 2>/dev/null || echo "")
-   SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-   COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-dashboard 2>/dev/null || readlink -f ~/.copilot/skills/understand-dashboard 2>/dev/null || echo "")
-   COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+   PLUGIN_ROOT=$(cd -P "<SKILL_DIR>" && cd ../.. && pwd -P) || exit 1
 
-   PLUGIN_ROOT=""
-   for candidate in \
-     "${CLAUDE_PLUGIN_ROOT}" \
-     "${DEVIN_PLUGIN_ROOT}" \
-     "$SKILL_DIR_RELATIVE" \
-     "$HOME/.understand-anything-plugin" \
-     "$SELF_RELATIVE" \
-     "$COPILOT_SELF_RELATIVE" \
-     "$HOME/.codex/understand-anything/understand-anything-plugin" \
-     "$HOME/.opencode/understand-anything/understand-anything-plugin" \
-     "$HOME/.pi/understand-anything/understand-anything-plugin" \
-     "$HOME/understand-anything/understand-anything-plugin"; do
-     if [ -n "$candidate" ] && [ -d "$candidate/packages/dashboard" ]; then
-       PLUGIN_ROOT="$candidate"; break
-     fi
-   done
-
-   if [ -z "$PLUGIN_ROOT" ]; then
-     echo "Error: Cannot find the understand-anything plugin root."
-     echo "Checked:"
-     echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
-     echo "  - ${DEVIN_PLUGIN_ROOT:-<unset DEVIN_PLUGIN_ROOT>}"
-     echo "  - ${SKILL_DIR_RELATIVE:-<unresolved path derived from the skill directory>}"
-     echo "  - $HOME/.understand-anything-plugin"
-     echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-dashboard>}"
-     echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-dashboard>}"
-     echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/understand-anything/understand-anything-plugin"
-     echo "Make sure you followed the installation instructions for your platform."
+   if [ ! -f "$PLUGIN_ROOT/package.json" ] ||
+      [ ! -d "$PLUGIN_ROOT/skills" ] ||
+      [ ! -d "$PLUGIN_ROOT/agents" ]; then
+     echo "Error: Invalid local plugin root." >&2
      exit 1
    fi
-
-   DASHBOARD_DIR="$PLUGIN_ROOT/packages/dashboard"
    ```
 
-4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball; run it pinned to the installed plugin version:
+4. **Verify the approved local viewer.**
+
    ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
-   PLUGIN_VERSION=$(node -p "require('$PLUGIN_ROOT/package.json').version")
-   VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
-   npx --yes "$VIEWER_URL" "$PROJECT_DIR"
-   ```
-   Run this in the background. It prints the same `🔑  Dashboard URL` line as the dev server:
-   - If the line appears, **skip steps 5-6** and continue at step 7.
-   - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
+   : "${PLUGIN_ROOT:?Plugin root required}"
+   : "${PROJECT_DIR:?Project directory required}"
 
-5. Fallback: install dependencies and build if needed:
+   VIEWER_DIR="$PLUGIN_ROOT/packages/viewer"
+
+   if [ ! -f "$VIEWER_DIR/bin/viewer.mjs" ] ||
+      [ ! -f "$VIEWER_DIR/dist/index.html" ] ||
+      [ ! -f "$VIEWER_DIR/bin/dist/staleness.js" ]; then
+     echo "Error: Approved local viewer is not built." >&2
+     exit 1
+   fi
+   ```
+
+   Do not download, install, update, or build software
+   during dashboard execution.
+
+5. Start the approved local viewer:
+
    ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   DASHBOARD_DIR="${DASHBOARD_DIR:-$PLUGIN_ROOT/packages/dashboard}"
-   cd "$DASHBOARD_DIR" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
-   ```
-   Then ensure the core package is built (the dashboard depends on it):
-   ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
+   node "$VIEWER_DIR/bin/viewer.mjs" "$PROJECT_DIR" --private
    ```
 
-6. Fallback: start the Vite dev server pointing at the project's knowledge graph:
-   ```bash
-   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
-   : "${DASHBOARD_DIR:?Run step 5 first so DASHBOARD_DIR is set}"
-   cd "$DASHBOARD_DIR" && GRAPH_DIR="$PROJECT_DIR" npx vite --host 127.0.0.1
-   ```
-   Run this in the background so the user can continue working.
+   Run this in the background.
 
-7. **Capture the access token URL from the server output.** The server (viewer or Vite) prints a line like:
-   ```
-   🔑  Dashboard URL: http://127.0.0.1:<PORT>?token=<TOKEN>
-   ```
-   Extract the full URL including the `?token=` parameter. The token is required to access the knowledge graph data — without it the dashboard will show an "Access Token Required" gate.
+6. If startup fails, report the error and stop.
+   Never fall back to a remote package or automatic installation.
 
-8. Report to the user, including the full tokenized URL:
-   ```
-   Dashboard started at http://127.0.0.1:<PORT>?token=<TOKEN>
-   Viewing: $UA_DIR/knowledge-graph.json
+7. Verify that the viewer reports a local readiness URL.
 
-   The dashboard is running in the background. Press Ctrl+C in the terminal to stop it.
-   ```
-   **Important:** Always include the `?token=` parameter in the URL you share. If you omit it, the user will be blocked by the token gate and have to manually find the token in the terminal output.
+   Expected output: Dashboard ready: http://127.0.0.1:PORT/
+
+   Never capture, request, print, or share access credentials.
+
+8. Report that the dashboard server is running and that
+   browser opening was requested locally.
+
+   If the browser does not open, ask the user to launch
+   the approved viewer directly from their own terminal.
+   Do not capture its credentials through agent tools.
 
 ## Notes
 
-- The fast path (step 4) downloads a version-pinned, self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs
-- The dashboard auto-opens in the default browser (both the viewer and Vite's `--open`)
-- If port 5173 is already in use, the next available port is picked (both paths)
-- In the fallback, the `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph
+- Only the previously prepared local viewer is supported.
+- Missing artifacts must be reported without downloading or building software.
+- Never fall back to a remote package or development server.

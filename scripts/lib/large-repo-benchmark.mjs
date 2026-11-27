@@ -1724,7 +1724,7 @@ export async function runBenchmark(options, hooks = {}) {
     error: null,
   };
 
-  let exitCode = 1;
+  let exitCode;
   try {
     const scanPath = join(artifactRoot, 'scan-result.json');
     onProgress('scan');

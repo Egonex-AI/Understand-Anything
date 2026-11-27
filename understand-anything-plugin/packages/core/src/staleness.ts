@@ -1,4 +1,6 @@
 import { execFile, execFileSync } from "child_process";
+import { createSafeGitEnv } from "./security/git-env.js";
+import { validateGitRepository } from "./security/git-preflight.js";
 import type { KnowledgeGraph, GraphNode, GraphEdge } from "./types.js";
 
 export interface StalenessResult {
@@ -91,9 +93,10 @@ function runGit(projectDir: string, args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
-      args,
+      ["--no-pager", ...args],
       {
         cwd: projectDir,
+        env: createSafeGitEnv(),
         encoding: null,
         timeout: GIT_TIMEOUT_MS,
         maxBuffer: GIT_MAX_BUFFER_BYTES,
@@ -150,6 +153,8 @@ function unknownReason(error: unknown, fallback: GraphFreshnessUnknownReason) {
 async function createProjectGitSnapshot(
   projectDir: string,
 ): Promise<ProjectGitSnapshot> {
+  validateGitRepository(projectDir);
+
   const repoRoot = parseScalar(
     await runGit(projectDir, ["rev-parse", "--show-toplevel"]),
   );
@@ -159,6 +164,8 @@ async function createProjectGitSnapshot(
   const [staged, unstaged, untracked] = await Promise.all([
     runGit(projectDir, [
       "diff",
+      "--no-ext-diff",
+      "--no-textconv",
       "--cached",
       "--name-only",
       "-z",
@@ -167,6 +174,8 @@ async function createProjectGitSnapshot(
     ]),
     runGit(projectDir, [
       "diff",
+      "--no-ext-diff",
+      "--no-textconv",
       "--name-only",
       "-z",
       "--relative",
@@ -242,6 +251,8 @@ async function evaluateGraphFreshness(
     committedFiles = parseNulDelimitedPaths(
       await runGit(snapshot.projectDir, [
         "diff",
+        "--no-ext-diff",
+        "--no-textconv",
         "--name-only",
         "-z",
         "--relative",
@@ -351,29 +362,51 @@ async function evaluateGraphFreshness(
   }
 }
 
-function parseChangedFiles(output: string): string[] {
-  return output
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
-
 /**
  * Get the list of files that changed between a given commit and HEAD.
- * Returns an empty array if there are no changes or if git encounters an error.
+ * Returns an empty array when there are no changes. Throws on validation or Git errors.
  */
 export function getChangedFiles(
   projectDir: string,
   lastCommitHash: string,
 ): string[] {
+  if (!/^[a-fA-F0-9]{4,64}$/.test(lastCommitHash)) {
+    throw new Error("Invalid Git commit hash");
+  }
+
+  validateGitRepository(projectDir);
+
   try {
-    const output = execFileSync("git", ["diff", `${lastCommitHash}..HEAD`, "--name-only"], {
-      cwd: projectDir,
-      encoding: "utf-8",
-    });
-    return parseChangedFiles(output);
-  } catch {
-    return [];
+    const output = execFileSync(
+      "git",
+      [
+        "--no-pager",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--name-only",
+        "-z",
+        "--end-of-options",
+        `${lastCommitHash}..HEAD`,
+        "--",
+      ],
+      {
+        cwd: projectDir,
+        env: createSafeGitEnv(),
+        encoding: "utf-8",
+        timeout: GIT_TIMEOUT_MS,
+        maxBuffer: GIT_MAX_BUFFER_BYTES,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    return output.split("\0").filter(Boolean);
+  } catch (error) {
+    throw Object.assign(
+      new Error("Unable to determine Git changes"),
+      { cause: error },
+    );
   }
 }
 

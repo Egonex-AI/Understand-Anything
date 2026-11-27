@@ -6,6 +6,7 @@ import type { CodeLessonSection, CodeLessons } from "@understand-anything/core/t
 import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import { normalizeCodeLessons } from "../utils/codeLessons";
+import { authFetch, subscribeAuthRejected } from "../utils/authFetch";
 
 interface CodeViewerProps {
   accessToken: string;
@@ -27,39 +28,20 @@ type SourceState =
   | { status: "loaded"; source: SourceFile; error: null }
   | { status: "error"; source: null; error: string };
 
-// Module-level cache so the sidebar and modal CodeViewer instances (and
-// repeat opens) share one /code-lessons.json fetch. Only successful loads are
-// cached — a 404 (no lessons yet) is retried on the next file open so lessons
-// generated after this page load still appear without a manual reload.
-let lessonsCache: CodeLessons | null = null;
-let lessonsPromise: Promise<CodeLessons | null> | null = null;
-
-function fetchCodeLessons(token: string): Promise<CodeLessons | null> {
-  if (lessonsCache) return Promise.resolve(lessonsCache);
-  if (!lessonsPromise) {
-    lessonsPromise = fetch(`/code-lessons.json?token=${encodeURIComponent(token)}`)
-      .then(async (res) => {
-        if (!res.ok) return null;
-        // Lessons are agent-generated — validate/drop malformed shapes before
-        // caching so one bad entry can neither crash the viewer nor discard
-        // the remaining valid entries (review #1).
-        const normalized = normalizeCodeLessons(await res.json());
-        if (normalized) {
-          lessonsCache = normalized;
-          return normalized;
-        }
-        return null;
-      })
-      .catch(() => null)
-      .finally(() => {
-        lessonsPromise = null;
-      });
-  }
-  return lessonsPromise;
+function fetchCodeLessons(
+  token: string,
+  signal: AbortSignal,
+): Promise<CodeLessons | null> {
+  return authFetch("/code-lessons.json", token, { signal })
+    .then(async (res) => {
+      if (!res.ok) return null;
+      return normalizeCodeLessons(await res.json());
+    })
+    .catch(() => null);
 }
 
-function fileContentUrl(filePath: string, token: string): string {
-  const params = new URLSearchParams({ token, path: filePath });
+function fileContentUrl(filePath: string): string {
+  const params = new URLSearchParams({ path: filePath });
   return `/file-content.json?${params.toString()}`;
 }
 
@@ -233,16 +215,24 @@ export default function CodeViewer({
 
   useEffect(() => {
     if (accessToken === "__demo__") return;
-    let cancelled = false;
-    fetchCodeLessons(accessToken).then((data) => {
-      if (!cancelled) setLessons(data);
+    const controller = new AbortController();
+    const unsubscribe = subscribeAuthRejected(
+      accessToken,
+      () => controller.abort(),
+    );
+
+    setLessons(null);
+
+    fetchCodeLessons(accessToken, controller.signal).then((data) => {
+      if (!controller.signal.aborted) setLessons(data);
     });
+
     return () => {
-      cancelled = true;
+      controller.abort();
+      unsubscribe();
     };
     // Re-run when the file path changes so lessons generated after an
-    // earlier 404 appear on the next file open (review #3). Successful
-    // loads are served from the shared cache.
+    // earlier 404 appear on the next file open.
   }, [accessToken, node?.filePath]);
 
   useEffect(() => {
@@ -261,12 +251,17 @@ export default function CodeViewer({
     }
 
     const controller = new AbortController();
+    const unsubscribe = subscribeAuthRejected(
+      accessToken,
+      () => controller.abort(),
+    );
     setState({ status: "loading", source: null, error: null });
     setLessonHighlight(null);
 
-    fetch(fileContentUrl(node.filePath, accessToken), { signal: controller.signal })
+    authFetch(fileContentUrl(node.filePath), accessToken, { signal: controller.signal })
       .then(async (res) => {
         const data = (await res.json()) as SourceFile | { error?: string };
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           throw new Error("error" in data && data.error ? data.error : "Source unavailable");
         }
@@ -281,7 +276,10 @@ export default function CodeViewer({
         });
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
   }, [accessToken, node?.filePath]);
 
   const lesson = node?.filePath ? lessons?.files[node.filePath] ?? null : null;

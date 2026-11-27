@@ -16,7 +16,7 @@ LLM-agent pipeline described below.
                                   └──────────────────────────┘           └──────────────────────────┘
                                            │ spawns (understand_dashboard)
                                            ▼
-                                  packages/viewer → http://127.0.0.1:<port>/?token=…
+                                  packages/viewer → http://127.0.0.1:<port>/
 ```
 
 ---
@@ -26,7 +26,7 @@ LLM-agent pipeline described below.
 From the **monorepo root**:
 
 ```bash
-pnpm install
+corepack pnpm install --frozen-lockfile --ignore-scripts
 pnpm --filter @understand-anything/core build    # analysis engine (dist/)
 pnpm --filter @understand-anything/skill build   # context builders (dist/)
 
@@ -54,7 +54,7 @@ node understand-anything-plugin/packages/mcp/bin/understand-anything-mcp.mjs
 There are no CLI flags. Behavior is controlled per tool call:
 
 - **Project resolution order** (every tool): `projectPath` argument →
-  `DEVIN_PROJECT_DIR` env var → the server's working directory.
+  `UNDERSTAND_PROJECT_ROOT` env var, then `DEVIN_PROJECT_DIR`, then the server's working directory.
 - Symlinked project paths (e.g. macOS `/tmp`) are canonicalized with
   `realpath` so git-relative paths line up.
 
@@ -79,8 +79,7 @@ This runs the multi-agent pipeline and writes `.ua/knowledge-graph.json`,
 
 **Option A′ — inside Devin itself:** install `understand-anything-plugin` as a
 Devin plugin (Devin loads it through its Claude-plugin compatibility). It ships
-the same pipeline as `/understand-anything:understand` plus a post-commit hook
-that keeps the graph fresh automatically — the graphs this server serves:
+the analysis pipeline. Graph refreshes must be requested explicitly. Automatic hooks are not enabled:
 
 ```bash
 devin auth login
@@ -184,9 +183,7 @@ Recommended agent flow (encoded in the server's `instructions`):
 1. `understand_status` — confirm a graph exists and is fresh.
 2. `understand_search` / `understand_explain` / `understand_diff` /
    `understand_onboard` — pull focused context.
-3. `understand_dashboard` — when the user wants the visual UI. Always share
-   the full URL including `?token=` — without it the dashboard shows an
-   access-token gate.
+3. `understand_dashboard` — when the user wants the visual UI. Never share session credentials with AI agents.
 
 ---
 
@@ -223,7 +220,7 @@ Recommended agent flow (encoded in the server's `instructions`):
 
 "Open the graph dashboard."
 → calls understand_dashboard {}
-→ Dashboard is running at http://127.0.0.1:55291/?token=448e5fe9…
+→ Dashboard is running at http://127.0.0.1:55291/
 ```
 
 ### 6.3 Raw JSON-RPC over stdio
@@ -319,7 +316,7 @@ Run: `node client.mjs`
 - **stdout is sacred.** The server never writes anything but JSON-RPC to
   stdout; diagnostics go to stderr (`[understand-anything-mcp] …`).
 - **Dashboard security** mirrors the viewer: binds to `127.0.0.1`, requires
-  the one-time `?token=`, and only serves source files listed in the graph
+  Bearer authentication, and only serves source files listed in the graph
   (≤ 1 MB, no binaries).
 - **Monorepos**: pass the subdirectory as `projectPath`; `understand_diff`
   scopes git to that directory and reports tracked and untracked changes

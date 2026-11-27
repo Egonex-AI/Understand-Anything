@@ -4,7 +4,7 @@
  * dashboard UI with nothing but Node.js. Read-only, no Claude Code, no LLM.
  *
  * Usage:
- *     understand-anything-viewer [project-dir] [--port <n>] [--no-open]
+ *     understand-anything-viewer [project-dir] [--port <n>] [--no-open] [--private]
  *
  * The project directory (default: cwd) must contain a data directory —
  * `.ua/` or legacy `.understand-anything/` — with a knowledge-graph.json
@@ -12,7 +12,7 @@
  *
  * Security model mirrors the dashboard dev server (vite.config.ts):
  *   - binds to 127.0.0.1 only
- *   - every data endpoint requires the one-time ?token= printed at startup
+ *   - every data endpoint requires a session-specific Bearer token
  *   - graph JSON is served with node filePaths relativised to the project
  *   - /file-content.json only serves files listed in the graph, capped at
  *     1 MB, never binary
@@ -27,6 +27,116 @@ import { getGraphFreshnessBatch } from "./dist/staleness.js";
 
 const DIST_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
+
+const MAX_GRAPH_FILE_BYTES = 32 * 1024 * 1024;
+const MAX_STATIC_FILE_BYTES = 32 * 1024 * 1024;
+
+function isInsideRoot(root, target) {
+  const relative = path.relative(root, target);
+
+  return (
+    relative !== ".." &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
+function readBoundedFile(root, target, maxBytes) {
+  const absolute = path.resolve(target);
+
+  if (!isInsideRoot(root, absolute) || absolute === root) {
+    throw new Error("Path outside authorized root");
+  }
+
+  const rootStat = fs.lstatSync(root);
+
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+    throw new Error("Unsafe root directory");
+  }
+
+  let current = root;
+
+  for (const component of path.relative(root, absolute).split(path.sep)) {
+    current = path.join(current, component);
+
+    if (fs.lstatSync(current).isSymbolicLink()) {
+      throw new Error("Symbolic links are not allowed");
+    }
+  }
+
+  const before = fs.lstatSync(absolute);
+
+  if (!before.isFile() || before.nlink !== 1) {
+    throw new Error("Unsafe file type");
+  }
+
+  if (before.size > maxBytes) {
+    throw new Error("File exceeds size limit");
+  }
+
+  const fd = fs.openSync(
+    absolute,
+    fs.constants.O_RDONLY |
+      (fs.constants.O_NOFOLLOW ?? 0) |
+      (fs.constants.O_NONBLOCK ?? 0),
+  );
+
+  try {
+    const stat = fs.fstatSync(fd);
+
+    if (
+      !stat.isFile() ||
+      stat.nlink !== 1 ||
+      stat.dev !== before.dev ||
+      stat.ino !== before.ino
+    ) {
+      throw new Error("File changed during validation");
+    }
+
+    if (stat.size > maxBytes) {
+      throw new Error("File exceeds size limit");
+    }
+
+    if (!isInsideRoot(root, fs.realpathSync(absolute))) {
+      throw new Error("Resolved file outside authorized root");
+    }
+
+    const buffer = Buffer.allocUnsafe(stat.size + 1);
+    let offset = 0;
+
+    while (offset < buffer.length) {
+      const count = fs.readSync(
+        fd,
+        buffer,
+        offset,
+        buffer.length - offset,
+        null,
+      );
+
+      if (count === 0) break;
+      offset += count;
+    }
+
+    if (offset > stat.size) {
+      throw new Error("File changed during reading");
+    }
+
+    return buffer.subarray(0, offset);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function readDataJson(fileName) {
+  const buffer = readBoundedFile(
+    projectRoot,
+    path.join(graphDir, fileName),
+    MAX_GRAPH_FILE_BYTES,
+  );
+
+  return JSON.parse(buffer.toString("utf8"));
+}
+
 // Legacy directory first — projects analyzed before the `.ua` rename keep
 // their existing `.understand-anything/` data.
 const UA_DIR_CANDIDATES = [".understand-anything", ".ua"];
@@ -38,6 +148,7 @@ let projectRoot = process.cwd();
 let port = 5173;
 let portExplicit = false;
 let openBrowser = true;
+let privateMode = false;
 
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -49,10 +160,12 @@ for (let i = 0; i < args.length; i++) {
       console.error("Error: --port must be an integer between 0 and 65535");
       process.exit(1);
     }
+  } else if (a === "--private") {
+    privateMode = true;
   } else if (a === "--no-open") {
     openBrowser = false;
   } else if (a === "--help" || a === "-h") {
-    console.log("Usage: understand-anything-viewer [project-dir] [--port <n>] [--no-open]");
+    console.log("Usage: understand-anything-viewer [project-dir] [--port <n>] [--no-open] [--private]");
     process.exit(0);
   } else if (!a.startsWith("-")) {
     projectRoot = path.resolve(a);
@@ -61,6 +174,13 @@ for (let i = 0; i < args.length; i++) {
     process.exit(1);
   }
 }
+
+if (privateMode && !openBrowser) {
+  console.error("Error: --private requires browser opening.");
+  process.exit(1);
+}
+
+projectRoot = fs.realpathSync(projectRoot);
 
 if (!fs.existsSync(DIST_DIR)) {
   console.error(
@@ -83,9 +203,26 @@ if (!graphDir) {
   process.exit(1);
 }
 
-const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
+const ACCESS_TOKEN = crypto.randomBytes(32).toString("hex");
 
 // ── Helpers (mirroring vite.config.ts) ────────────────────────────────────
+
+function hasValidToken(authorization, expected) {
+  if (
+    typeof authorization !== "string" ||
+    !authorization.startsWith("Bearer ")
+  ) {
+    return false;
+  }
+
+  const supplied = Buffer.from(authorization.slice(7), "utf8");
+  const required = Buffer.from(expected, "utf8");
+
+  return (
+    supplied.length === required.length &&
+    crypto.timingSafeEqual(supplied, required)
+  );
+}
 
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -95,7 +232,7 @@ function sendJson(res, statusCode, payload) {
 
 function normalizeGraphPath(filePath) {
   const rawPath = path.isAbsolute(filePath)
-    ? filePath.startsWith(projectRoot)
+    ? isInsideRoot(projectRoot, filePath)
       ? path.relative(projectRoot, filePath)
       : null
     : filePath;
@@ -117,7 +254,7 @@ function normalizeGraphPath(filePath) {
 function graphFilePathSet() {
   const allowed = new Set();
   try {
-    const raw = JSON.parse(fs.readFileSync(path.join(graphDir, "knowledge-graph.json"), "utf-8"));
+    const raw = readDataJson("knowledge-graph.json");
     for (const node of raw.nodes ?? []) {
       if (typeof node.filePath !== "string") continue;
       const normalized = normalizeGraphPath(node.filePath);
@@ -173,16 +310,22 @@ function readSourceFile(url) {
     return reject("File is not in the knowledge graph", 404);
   }
 
-  let stat;
-  try {
-    stat = fs.statSync(absoluteFile);
-  } catch {
-    return reject("File not found", 404);
-  }
-  if (!stat.isFile()) return reject("Path is not a file");
-  if (stat.size > MAX_SOURCE_FILE_BYTES) return reject("File is too large to preview", 413);
+  let buffer;
 
-  const buffer = fs.readFileSync(absoluteFile);
+  try {
+    buffer = readBoundedFile(
+      projectRoot,
+      absoluteFile,
+      MAX_SOURCE_FILE_BYTES,
+    );
+  } catch (error) {
+    if (error.message === "File exceeds size limit") {
+      return reject("File is too large to preview", 413);
+    }
+
+    return reject("File unavailable or unsafe", 404);
+  }
+
   if (buffer.includes(0)) return reject("Binary files cannot be previewed", 415);
 
   const content = buffer.toString("utf8");
@@ -202,18 +345,13 @@ function serveGraphJson(res, fileName) {
   const candidate = path.join(graphDir, fileName);
   if (fs.existsSync(candidate)) {
     try {
-      const raw = JSON.parse(fs.readFileSync(candidate, "utf-8"));
+      const raw = readDataJson(fileName);
       // Sanitise absolute node filePaths so the developer's directory
       // layout is never sent to the browser.
       if (Array.isArray(raw.nodes)) {
         raw.nodes = raw.nodes.map((node) => {
           if (typeof node.filePath !== "string") return node;
-          const abs = node.filePath;
-          const rel = abs.startsWith(projectRoot)
-            ? abs.slice(projectRoot.length).replace(/^[\\/]/, "")
-            : path.isAbsolute(abs)
-              ? path.basename(abs)
-              : abs;
+          const rel = normalizeGraphPath(node.filePath);
           return { ...node, filePath: rel };
         });
       }
@@ -232,9 +370,7 @@ function serveGraphJson(res, fileName) {
 }
 
 function readGraphMetadata(fileName) {
-  const graph = JSON.parse(
-    fs.readFileSync(path.join(graphDir, fileName), "utf-8"),
-  );
+  const graph = readDataJson(fileName);
   return {
     graphCommitHash:
       typeof graph.project?.gitCommitHash === "string"
@@ -301,7 +437,16 @@ function serveStatic(res, pathname) {
     return;
   }
   res.setHeader("Content-Type", CONTENT_TYPES[path.extname(absolute).toLowerCase()] ?? "application/octet-stream");
-  res.end(fs.readFileSync(absolute));
+  try {
+    res.end(readBoundedFile(
+      DIST_DIR,
+      absolute,
+      MAX_STATIC_FILE_BYTES,
+    ));
+  } catch {
+    res.statusCode = 404;
+    res.end("Not found");
+  }
 }
 
 // ── Server ────────────────────────────────────────────────────────────────
@@ -317,8 +462,70 @@ const PROTECTED = new Set([
   "/staleness.json",
 ]);
 
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "worker-src 'self'",
+  "object-src 'none'",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
+
 const server = createServer((req, res) => {
-  const url = new URL(req.url ?? "/", "http://127.0.0.1");
+  res.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
+
+  const address = server.address();
+
+  if (
+    !address ||
+    typeof address !== "object" ||
+    req.headers.host !== `127.0.0.1:${address.port}`
+  ) {
+    sendJson(res, 403, { error: "Invalid Host header" });
+    return;
+  }
+
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
+    sendJson(res, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  const requestTarget = req.url ?? "/";
+
+  if (
+    !requestTarget.startsWith("/") ||
+    requestTarget.startsWith("//") ||
+    requestTarget.includes("\\\\")
+  ) {
+    sendJson(res, 400, { error: "Invalid request target" });
+    return;
+  }
+
+  let url;
+
+  try {
+    url = new URL(requestTarget, "http://127.0.0.1");
+  } catch {
+    sendJson(res, 400, { error: "Invalid request URL" });
+    return;
+  }
+
   const pathname = url.pathname;
 
   if (pathname === "/staleness.json") {
@@ -330,7 +537,8 @@ const server = createServer((req, res) => {
     return;
   }
 
-  if (url.searchParams.get("token") !== ACCESS_TOKEN) {
+  if (!hasValidToken(req.headers.authorization, ACCESS_TOKEN)) {
+    res.setHeader("X-UA-Auth-Status", "invalid-token");
     sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
     return;
   }
@@ -354,7 +562,7 @@ const server = createServer((req, res) => {
     const candidate = path.join(graphDir, "config.json");
     if (fs.existsSync(candidate)) {
       try {
-        sendJson(res, 200, JSON.parse(fs.readFileSync(candidate, "utf-8")));
+        sendJson(res, 200, readDataJson(path.basename(candidate)));
       } catch {
         sendJson(res, 500, { error: "Failed to read config file" });
       }
@@ -368,7 +576,7 @@ const server = createServer((req, res) => {
     const candidate = path.join(graphDir, "code-lessons.json");
     if (fs.existsSync(candidate)) {
       try {
-        sendJson(res, 200, JSON.parse(fs.readFileSync(candidate, "utf-8")));
+        sendJson(res, 200, readDataJson(path.basename(candidate)));
       } catch {
         sendJson(res, 500, { error: "Failed to read code lessons file" });
       }
@@ -381,7 +589,11 @@ const server = createServer((req, res) => {
     return;
   }
 
-  serveGraphJson(res, pathname.slice(1));
+  try {
+    serveGraphJson(res, pathname.slice(1));
+  } catch {
+    sendJson(res, 500, { error: "Failed to read graph" });
+  }
 });
 
 function listen(attemptPort, attemptsLeft) {
@@ -401,14 +613,53 @@ function listen(attemptPort, attemptsLeft) {
   server.listen(attemptPort, "127.0.0.1", () => {
     const address = server.address();
     const boundPort = typeof address === "object" && address ? address.port : attemptPort;
-    const dashboardUrl = `http://127.0.0.1:${boundPort}/?token=${ACCESS_TOKEN}`;
-    console.log(`\n  Serving graph from ${graphDir}`);
-    console.log(`  🔑  Dashboard URL: ${dashboardUrl}\n`);
+    const dashboardUrl = `http://127.0.0.1:${boundPort}/#token=${ACCESS_TOKEN}`;
+    if (privateMode) {
+      console.log(`Dashboard ready: http://127.0.0.1:${boundPort}/`);
+    } else {
+      console.log(`\n  Serving graph from ${graphDir}`);
+      console.log(`  Dashboard URL: ${dashboardUrl}\n`);
+    }
+
     if (openBrowser) {
-      const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-      spawn(opener, [dashboardUrl], { shell: process.platform === "win32", stdio: "ignore", detached: true }).unref();
+      const opener =
+        process.platform === "darwin"
+          ? "open"
+          : process.platform === "win32"
+            ? "rundll32.exe"
+            : "xdg-open";
+
+      const openerArgs =
+        process.platform === "win32"
+          ? ["url.dll,FileProtocolHandler", dashboardUrl]
+          : [dashboardUrl];
+
+      const browser = spawn(opener, openerArgs, {
+        shell: false,
+        stdio: "ignore",
+        detached: true,
+        windowsHide: true,
+      });
+
+      browser.on("error", () => {
+        console.error("Unable to launch the local browser.");
+      });
+
+      browser.on("exit", (code) => {
+        if (code !== 0) {
+          console.error("Browser launcher did not complete successfully.");
+        }
+      });
+
+      browser.unref();
     }
   });
 }
+
+server.requestTimeout = 15_000;
+server.headersTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
+server.maxHeadersCount = 50;
+server.maxConnections = 32;
 
 listen(port, 10);

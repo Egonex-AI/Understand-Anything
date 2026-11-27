@@ -104,14 +104,13 @@ Alan görünümüne geçin ve kodunuzun gerçek iş süreçleriyle nasıl eşle�
 
 ## 🚀 Hızlı Başlangıç
 
-### 1. Eklentiyi yükle
+### 1. Secure installation
 
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
+Understand Secure requires a locally prepared, independently approved release.
 
-> **Yerel model mi kullanıyorsunuz?** Gizlilik veya kurumsal kurulumlar için platformunuzu [Ollama](https://docs.ollama.com/integrations) gibi yerel bir model sağlayıcısına yönlendirin — model sağlayıcısını değiştirmek için entegrasyon kılavuzunu izleyin.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
+
+Automatic installation and updates are disabled.
 
 ### 2. Kod tabanını analiz et
 
@@ -169,8 +168,6 @@ Kod tabanın bir grafik olarak görselleştirilmiş, mimari katmana göre renkle
 # İstediğin zaman tekrar çalıştır — varsayılan olarak artımlıdır (yalnızca değişen dosyaları analiz eder)
 /understand
 
-# Her commit'te otomatik artımlı güncelleme için post-commit kancası kur
-/understand --auto-update
 
 # Devasa monorepo'larda analizi bir alt dizinle sınırla
 /understand src/frontend
@@ -178,97 +175,11 @@ Kod tabanın bir grafik olarak görselleştirilmiş, mimari katmana göre renkle
 
 ---
 
-## 🌐 Çoklu Platform Kurulumu
+## Secure multi-platform installation
 
-Understand-Anything birden fazla AI kodlama platformunda çalışır.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
 
-### Claude Code (Yerli)
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
-
-### Tek satırlık kurulum (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
-# veya platformu doğrudan geçirerek soruyu atla:
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
-```
-
-Kurulum betiği depoyu `~/.understand-anything/repo` dizinine klonlar ve seçilen platform için uygun sembolik bağlantıları oluşturur. Sonrasında CLI/IDE'ni yeniden başlat.
-
-> **Skill çağırma hakkında not:** Çağırma öneki platforma göre değişir. Çoğu platform eğik çizgi komutları (`/understand`) kullanır, ancak **Codex `$` kullanır** — `/understand` değil, `$understand` yaz. İki önek de tanınmıyorsa doğal dille iste: *"understand skill'ini kullanarak bu projeyi analiz et."*
-
-- Desteklenen `<platform>` değerleri: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
-- Daha sonra güncelle: `./install.sh --update`
-- Kaldır: `./install.sh --uninstall <platform>`
-
-### Cursor
-
-Bu depo klonlandığında Cursor, eklentiyi `.cursor-plugin/plugin.json` aracılığıyla otomatik olarak keşfeder. Manuel kurulum gerekmez — sadece klonla ve Cursor'da aç.
-
-Otomatik keşif çalışmazsa manuel kur: **Cursor Settings → Plugins**'i aç, arama alanına `https://github.com/Egonex-AI/Understand-Anything` yapıştır ve oradan ekle.
-
-### VS Code + GitHub Copilot
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything@understand-anything
-```
-
-GitHub Copilot uzantısı (v1.108+) yüklü VS Code, `.copilot-plugin/plugin.json` aracılığıyla eklentiyi otomatik keşfeder. Manuel kurulum gerekmez — sadece klonla ve VS Code'da aç.
-
-Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıdaki `install.sh`'ı `vscode` platformuyla çalıştır.
-
-### Copilot CLI
-
-```bash
-copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
-```
-
-### Kiro CLI / IDE
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
-```
-
-Kurulumdan sonra:
-- **Kiro CLI**: `kiro-cli chat --agent understand "Bu projeyi analiz et"`
-- **Kiro IDE**: Beceriler `~/.kiro/skills/` dizinine sembolik bağlantı olarak eklenir ve `understand` ajanı `~/.kiro/agents/understand.json` dosyasına yazılır, böylece IDE'yi yeniden başlattıktan sonra her ikisi de kullanılabilir.
-
-Tüm projelerde kullanmak için kişisel beceri olarak kurmak istersen yukarıdaki `install.sh`'ı `kiro` platformuyla çalıştır.
-
-### Platform Uyumluluğu
-
-| Platform | Durum | Kurulum Yöntemi |
-|----------|--------|----------------|
-| Claude Code | ✅ Yerli | Eklenti pazarı |
-| Cursor | ✅ Destekleniyor | Otomatik keşif |
-| VS Code + GitHub Copilot | ✅ Destekleniyor | Otomatik keşif |
-| Copilot CLI | ✅ Destekleniyor | Eklenti kurulumu |
-| Codex | ✅ Destekleniyor | `install.sh codex` |
-| OpenCode | ✅ Destekleniyor | `install.sh opencode` |
-| OpenClaw | ✅ Destekleniyor | `install.sh openclaw` |
-| Antigravity | ✅ Destekleniyor | `install.sh antigravity` |
-| Gemini CLI | ✅ Destekleniyor | `install.sh gemini` |
-| Pi Agent | ✅ Destekleniyor | `install.sh pi` |
-| Vibe CLI | ✅ Destekleniyor | `install.sh vibe` |
-| Hermes | ✅ Destekleniyor | `install.sh hermes` |
-| Cline | ✅ Destekleniyor | `install.sh cline` |
-| KIMI CLI | ✅ Destekleniyor | `install.sh kimi` |
-| Trae | ✅ Destekleniyor | `install.sh trae` |
-| Nanobot | ✅ Destekleniyor | `install.sh nanobot` |
-| Kiro CLI / IDE | ✅ Destekleniyor | `install.sh kiro` |
-
----
+Hooks and integrations require explicit review.
 
 ## 📦 Grafı Ekibinizle Paylaşın
 
@@ -283,7 +194,7 @@ Graf yalnızca bir JSON dosyasıdır — **bir kez commit'leyin, ekip arkadaşla
 .ua/diff-overlay.json
 ```
 
-**Güncel tutun:** `/understand --auto-update` etkinleştirin — bir post-commit kancası grafı artımlı olarak yamalar, böylece her commit eşleşen bir grafla birlikte gelir. Veya sürümden önce `/understand` komutunu elle yeniden çalıştırın.
+**Keep the graph fresh:** Re-run `/understand` manually.
 
 **Büyük graflar (10 MB+):** **git-lfs** ile takip edin.
 
@@ -298,10 +209,10 @@ git add .gitattributes .ua/
 Graf bir kez üretilip commit'lendikten sonra, ekipteki herkes onu tek bir komutla açabilir — Claude Code yok, LLM yok, API anahtarı yok. Yalnızca Node.js (>= 18) gerekir:
 
 ```bash
-npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+node packages/viewer/bin/viewer.mjs /path/to/analyzed/project --no-open
 ```
 
-Terminal, tokenlı bir URL (`http://127.0.0.1:5173/?token=…`) yazdırır ve tam etkileşimli dashboard'u tarayıcınızda açar. Proje dizini (varsayılan: geçerli dizin), commit'lenmiş veri dizinini (`.ua/` veya eski `.understand-anything/`) içermelidir. Her şey yerel diskten salt okunur olarak sunulur — LLM çağrısı yapılmaz, hiçbir veri makinenizden çıkmaz.
+Run the viewer from the approved local plugin directory. Open the URL printed in your terminal. Never share session credentials with AI agents.
 
 Depoyu klonlayarak mı çalışıyorsunuz? `pnpm install && pnpm --filter @understand-anything/core build`, ardından `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard` aynı işi Vite geliştirme sunucusu üzerinden yapar.
 

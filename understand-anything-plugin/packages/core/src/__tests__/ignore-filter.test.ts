@@ -209,3 +209,20 @@ describe("IgnoreFilter", () => {
     });
   });
 });
+
+describe("defaults-only ignore filter", () => {
+  it("supports defaults without a project directory", () => {
+    const filter = createIgnoreFilter(null);
+
+    expect(filter.isIgnored("node_modules/package/index.js")).toBe(true);
+    expect(filter.isIgnored("src/index.ts")).toBe(false);
+  });
+
+  it("applies additional patterns without a project directory", () => {
+    const filter = createIgnoreFilter(null, ["generated/"]);
+
+    expect(filter.isIgnored("generated/output.ts")).toBe(true);
+    expect(filter.isIgnored("node_modules/package/index.js")).toBe(true);
+    expect(filter.isIgnored("src/index.ts")).toBe(false);
+  });
+});

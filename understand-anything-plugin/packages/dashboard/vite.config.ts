@@ -15,7 +15,7 @@ import {
 // Generate a one-time token when the server process starts.
 // This token is printed to the terminal and must be in the URL
 // to fetch knowledge-graph.json or diff-overlay.json.
-const ACCESS_TOKEN = process.env.UNDERSTAND_ACCESS_TOKEN || crypto.randomBytes(16).toString("hex");
+const ACCESS_TOKEN = crypto.randomBytes(32).toString("hex");
 const MAX_SOURCE_FILE_BYTES = 1024 * 1024;
 
 // Legacy directory first — projects analyzed before the `.ua` rename keep
@@ -110,6 +110,23 @@ function detectLanguage(filePath: string): string {
     yml: "yaml",
   };
   return byExt[ext] ?? "text";
+}
+
+function hasValidToken(authorization: string | undefined, expected: string): boolean {
+  if (
+    typeof authorization !== "string" ||
+    !authorization.startsWith("Bearer ")
+  ) {
+    return false;
+  }
+
+  const supplied = Buffer.from(authorization.slice(7), "utf8");
+  const required = Buffer.from(expected, "utf8");
+
+  return (
+    supplied.length === required.length &&
+    crypto.timingSafeEqual(supplied, required)
+  );
 }
 
 function sendJson(res: import("http").ServerResponse, statusCode: number, payload: unknown) {
@@ -269,7 +286,8 @@ export function createDashboardDataMiddleware(
 
     res.setHeader("Cache-Control", "no-store");
 
-    if (url.searchParams.get("token") !== accessToken) {
+    if (!hasValidToken(req.headers.authorization, accessToken)) {
+      res.setHeader("X-UA-Auth-Status", "invalid-token");
       sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
       return;
     }
@@ -307,8 +325,9 @@ export function createDataEndpointsMiddleware(
     }
 
     // FIX 3 — require the one-time token on all data endpoints.
-    // Requests without a matching ?token= get a 403.
-    if (url.searchParams.get("token") !== accessToken) {
+    // Requests without a valid Bearer token get a 403.
+    if (!hasValidToken(req.headers.authorization, accessToken)) {
+      res.setHeader("X-UA-Auth-Status", "invalid-token");
       sendJson(res, 403, { error: "Forbidden: missing or invalid token" });
       return;
     }
@@ -450,7 +469,7 @@ const config: DashboardViteConfig = {
   server: {
     host: "127.0.0.1",
     port: 5173,
-    open: `/?token=${ACCESS_TOKEN}`,
+    open: `/#token=${ACCESS_TOKEN}`,
   },
 
   resolve: {
@@ -503,7 +522,7 @@ const config: DashboardViteConfig = {
           const address = server.httpServer?.address();
           const port = typeof address === "object" && address ? address.port : 5173;
           console.log(
-            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/?token=${ACCESS_TOKEN}\n`
+            `\n  🔑  Dashboard URL: http://127.0.0.1:${port}/#token=${ACCESS_TOKEN}\n`
           );
         });
 

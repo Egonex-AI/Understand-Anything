@@ -12,7 +12,7 @@ Analyzes a Figma file and produces an interactive design knowledge graph in the 
 
 - **`FIGMA_TOKEN`** environment variable — a Figma personal access token (create one at https://www.figma.com/settings). If it is missing, STOP and tell the user:
   > Set a Figma token first: create one at figma.com/settings, then `export FIGMA_TOKEN=<token>`.
-- Node ≥ 22, pnpm ≥ 10.
+- Node ≥ 22 and an approved, prebuilt local release.
 
 > **Security:** the token is read only from the environment and travels only in the `X-Figma-Token` request header. Never write it to the graph, `meta.json`, logs, or intermediate files. This skill makes outbound calls to `api.figma.com` — unlike `/understand`, it is not fully offline. Tell the user this once.
 
@@ -20,9 +20,10 @@ Analyzes a Figma file and produces an interactive design knowledge graph in the 
 
 1. Parse `$ARGUMENTS` for a Figma URL or bare file key (the non-flag token) and an optional `--language <lang>`.
 2. Resolve `PROJECT_ROOT` to the current working directory. **Resolve the data directory `$UA_DIR`** once and reuse it for every read and write below: `UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .understand-anything || echo .ua)"` — the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`. Because each phase may run in a fresh shell, carry `$UA_DIR` forward like `$PROJECT_ROOT`, re-resolving it with the same line if a later command block needs it.
-3. Resolve `PLUGIN_ROOT` and ensure core is built (same logic as `/understand` Phase 0.1.5). If `packages/core/dist/figma/index.js` is missing, run:
+3. Resolve `PLUGIN_ROOT` and verify the approved Core artifacts (same logic as `/understand` Phase 0.1.5). If `packages/core/dist/figma/index.js` is missing, run:
    ```bash
-   cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
+   echo "Error: Core is not built. Complete the approved installation first." >&2
+   exit 1
    ```
 4. `mkdir -p $UA_DIR/intermediate`.
 

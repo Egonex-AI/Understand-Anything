@@ -25,40 +25,22 @@
     "claude-plugin"
   ],
   "main": ".opencode/plugins/understand-anything.js",
-  "packageManager": "pnpm@10.6.2+sha512.47870716bea1572b53df34ad8647b42962bc790ce2bf4562ba0f643237d7302a3d6a8ecef9e4bdfc01d23af1969aa90485d4cebb0b9638fa5ef1daef656f6c1b",
+  "packageManager": "pnpm@10.34.9+sha512.f49b5a8ea0fdedb44bb3c0c1d6575092a53c2950d95b7ad15df11f17974877a2de3a01c07e934e9b28ce716e51c09a94962c7306d09be2e1e4b18a8c8762fd32",
   "scripts": {
-    "prepare": "pnpm --filter @understand-anything/core build",
-    "build": "pnpm -r build",
+    "build": "corepack pnpm -r build",
     "test": "vitest run",
     "benchmark:large-repo": "node scripts/benchmark-large-repo.mjs",
     "dev:dashboard": "pnpm --filter @understand-anything/dashboard dev",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:core": "corepack pnpm --filter @understand-anything/core build"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "10.0.1",
     "ajv": "8.17.1",
-    "eslint": "^9.0.0",
+    "eslint": "10.15.0",
     "globals": "^17.6.0",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^3.1.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp",
-      "tree-sitter-c",
-      "tree-sitter-c-sharp",
-      "tree-sitter-cpp",
-      "tree-sitter-go",
-      "tree-sitter-java",
-      "tree-sitter-javascript",
-      "tree-sitter-php",
-      "tree-sitter-python",
-      "tree-sitter-ruby",
-      "tree-sitter-rust",
-      "tree-sitter-scala",
-      "tree-sitter-typescript"
-    ]
+    "typescript-eslint": "8.74.0",
+    "vitest": "4.1.12"
   }
 }

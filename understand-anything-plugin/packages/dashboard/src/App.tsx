@@ -1,7 +1,8 @@
+import { authFetch, subscribeAuthRejected } from "./utils/authFetch";
 import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react";
 import { validateGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
-import { useDashboardStore } from "./store";
+import { useDashboardStore, resetDashboardSession } from "./store";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
 import KnowledgeGraphView from "./components/KnowledgeGraphView";
@@ -53,8 +54,8 @@ function shouldShowOnboarding(): boolean {
   return window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) !== "1";
 }
 
-/** Resolve data file URL — in demo mode, use env var URLs; otherwise use local paths with token. */
-function dataUrl(fileName: string, token: string | null): string {
+/** Resolve data file URL — in demo mode, use env var URLs; otherwise use local paths. */
+function dataUrl(fileName: string): string {
   if (DEMO_MODE) {
     const envMap: Record<string, string | undefined> = {
       "knowledge-graph.json": import.meta.env.VITE_GRAPH_URL,
@@ -69,29 +70,63 @@ function dataUrl(fileName: string, token: string | null): string {
     const base = import.meta.env.BASE_URL || "/";
     return `${base.endsWith("/") ? base : `${base}/`}${fileName}`;
   }
-  const path = `/${fileName}`;
-  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
+  return `/${fileName}`;
 }
 
 /**
- * Resolve the access token from the URL query string or sessionStorage.
- * If found in the URL, persist to sessionStorage and strip the param from the address bar.
+ * Resolve the access token from the URL fragment or session storage.
  */
 function resolveInitialToken(): string | null {
   if (DEMO_MODE) return "__demo__";
-  const params = new URLSearchParams(window.location.search);
+
+  const params = new URLSearchParams(
+    window.location.hash.slice(1),
+  );
+
   const urlToken = params.get("token");
-  if (urlToken) {
-    sessionStorage.setItem(SESSION_TOKEN_KEY, urlToken);
-    // Clean the URL
+
+  if (urlToken !== null) {
     params.delete("token");
-    const cleanSearch = params.toString();
-    const newUrl =
-      window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "") + window.location.hash;
-    window.history.replaceState(null, "", newUrl);
-    return urlToken;
+
+    const cleanHash = params.toString();
+
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname +
+        window.location.search +
+        (cleanHash ? `#${cleanHash}` : ""),
+    );
+
+    if (/^[a-f0-9]{64}$/.test(urlToken)) {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, urlToken);
+      return urlToken;
+    }
+
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    return null;
   }
-  return sessionStorage.getItem(SESSION_TOKEN_KEY);
+
+  const stored = sessionStorage.getItem(SESSION_TOKEN_KEY);
+
+  if (stored && /^[a-f0-9]{64}$/.test(stored)) {
+    return stored;
+  }
+
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  return null;
+}
+
+function dashboardFetch(
+  resource: RequestInfo | URL,
+  token: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  if (DEMO_MODE) {
+    return fetch(resource, options);
+  }
+
+  return authFetch(resource, token, options);
 }
 
 function App() {
@@ -101,6 +136,24 @@ function App() {
     sessionStorage.setItem(SESSION_TOKEN_KEY, token);
     setAccessToken(token);
   }, []);
+
+  useEffect(() => {
+    if (DEMO_MODE || accessToken === null) return;
+
+    return subscribeAuthRejected(accessToken, () => {
+      if (
+        sessionStorage.getItem(SESSION_TOKEN_KEY) === accessToken
+      ) {
+        sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      }
+
+      resetDashboardSession();
+
+      setAccessToken(current =>
+        current === accessToken ? null : current,
+      );
+    });
+  }, [accessToken]);
 
   // In demo mode, skip token gate entirely
   if (DEMO_MODE) {
@@ -127,22 +180,44 @@ function Dashboard({ accessToken }: { accessToken: string }) {
   const [outputLanguage, setOutputLanguage] = useState<string | undefined>();
 
   useEffect(() => {
-    fetch(dataUrl("meta.json", accessToken))
+    const controller = new AbortController();
+    const unsubscribe = DEMO_MODE
+      ? () => {}
+      : subscribeAuthRejected(
+          accessToken,
+          () => controller.abort(),
+        );
+
+    dashboardFetch(dataUrl("meta.json"), accessToken, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((meta) => {
+        if (controller.signal.aborted) return;
         if (meta?.theme) setMetaTheme(meta.theme);
       })
       .catch(() => {});
-    fetch(dataUrl("config.json", accessToken))
+    dashboardFetch(dataUrl("config.json"), accessToken, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((config) => {
+        if (controller.signal.aborted) return;
         if (config?.outputLanguage) setOutputLanguage(config.outputLanguage);
       })
       .catch(() => {});
-  }, []);
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
+  }, [accessToken]);
 
   useEffect(() => {
-    fetch(dataUrl("knowledge-graph.json", accessToken))
+    const controller = new AbortController();
+    const unsubscribe = DEMO_MODE
+      ? () => {}
+      : subscribeAuthRejected(
+          accessToken,
+          () => controller.abort(),
+        );
+
+    dashboardFetch(dataUrl("knowledge-graph.json"), accessToken, { signal: controller.signal })
       .then(async (res) => {
         // Guard res.ok before parsing (matching the meta.json/config.json/
         // diff-overlay.json/domain-graph.json fetches in this file). Without
@@ -164,6 +239,7 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         return res.json();
       })
       .then((data: unknown) => {
+        if (controller.signal.aborted) return;
         const result = validateGraph(data);
         if (result.success && result.data) {
           setGraph(result.data);
@@ -188,10 +264,15 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         }
       })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         console.error("Failed to load knowledge graph:", err);
         setLoadError(`Failed to load knowledge graph: ${err instanceof Error ? err.message : String(err)}`);
       });
-  }, [setGraph]);
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
+  }, [setGraph, accessToken]);
 
   useEffect(() => {
     if (
@@ -208,20 +289,30 @@ function Dashboard({ accessToken }: { accessToken: string }) {
       target: window,
       load: (signal) =>
         requestFreshnessReport(
-          dataUrl("staleness.json", accessToken),
+          dataUrl("staleness.json"),
           signal,
+          (resource, options) => dashboardFetch(resource, accessToken, options),
         ),
       onResult: setGraphFreshness,
     });
   }, [accessToken]);
 
   useEffect(() => {
-    fetch(dataUrl("diff-overlay.json", accessToken))
+    const controller = new AbortController();
+    const unsubscribe = DEMO_MODE
+      ? () => {}
+      : subscribeAuthRejected(
+          accessToken,
+          () => controller.abort(),
+        );
+
+    dashboardFetch(dataUrl("diff-overlay.json"), accessToken, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
       })
       .then((data: unknown) => {
+        if (controller.signal.aborted) return;
         if (
           data &&
           typeof data === "object" &&
@@ -237,15 +328,28 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         }
       })
       .catch(() => {});
-  }, [setDiffOverlay]);
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
+  }, [setDiffOverlay, accessToken]);
 
   useEffect(() => {
-    fetch(dataUrl("domain-graph.json", accessToken))
+    const controller = new AbortController();
+    const unsubscribe = DEMO_MODE
+      ? () => {}
+      : subscribeAuthRejected(
+          accessToken,
+          () => controller.abort(),
+        );
+
+    dashboardFetch(dataUrl("domain-graph.json"), accessToken, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
       })
       .then((data: unknown) => {
+        if (controller.signal.aborted) return;
         if (!data) return;
         const result = validateGraph(data);
         if (result.success && result.data) {
@@ -255,7 +359,11 @@ function Dashboard({ accessToken }: { accessToken: string }) {
         }
       })
       .catch(() => {});
-  }, [setDomainGraph]);
+    return () => {
+      controller.abort();
+      unsubscribe();
+    };
+  }, [setDomainGraph, accessToken]);
 
   return (
     <I18nProvider language={outputLanguage ?? "en"}>

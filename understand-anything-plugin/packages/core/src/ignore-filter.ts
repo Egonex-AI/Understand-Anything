@@ -87,11 +87,20 @@ export interface IgnoreFilter {
  * 3. .understandignore at project root (if exists)
  * 4. CLI --exclude patterns (highest priority)
  */
-export function createIgnoreFilter(projectRoot: string, extraPatterns: string[] = []): IgnoreFilter {
+export function createIgnoreFilter(projectRoot: string | null, extraPatterns: string[] = []): IgnoreFilter {
   const ig: Ignore = ignore();
 
   // Layer 1: hardcoded defaults
   ig.add(DEFAULT_IGNORE_PATTERNS);
+
+  if (projectRoot === null) {
+    ig.add(extraPatterns);
+    return {
+      isIgnored(relativePath: string): boolean {
+        return ig.ignores(relativePath);
+      },
+    };
+  }
 
   // Layer 2: <ua-dir>/.understandignore
   const projectIgnorePath = join(resolveUaDir(projectRoot), ".understandignore");

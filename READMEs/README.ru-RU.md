@@ -104,14 +104,13 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 
 ## 🚀 Быстрый старт
 
-### 1. Установите плагин
+### 1. Secure installation
 
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
+Understand Secure requires a locally prepared, independently approved release.
 
-> **Используете локальную модель?** Для приватных или корпоративных сценариев направьте свою платформу на локального провайдера моделей, например [Ollama](https://docs.ollama.com/integrations) — следуйте его руководству по интеграции, чтобы сменить провайдера модели.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
+
+Automatic installation and updates are disabled.
 
 ### 2. Проанализируйте кодовую базу
 
@@ -169,8 +168,6 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 # Перезапускайте когда угодно — по умолчанию инкрементально (только изменённые файлы)
 /understand
 
-# Установите post-commit хук для автоматических инкрементальных обновлений
-/understand --auto-update
 
 # Огромный монорепозиторий? Ограничьте анализ подкаталогом
 /understand src/frontend
@@ -178,97 +175,11 @@ Understand Anything — это [плагин для Claude Code](https://code.cl
 
 ---
 
-## 🌐 Установка на разных платформах
+## Secure multi-platform installation
 
-Understand-Anything работает с несколькими платформами AI-разработки.
+See the [secure installation guide](../docs/security/INSTALLATION.md).
 
-### Claude Code (нативно)
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
-
-### Установка одной командой (Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro)
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
-# или передайте платформу, чтобы пропустить интерактивный выбор:
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
-```
-
-**Windows (PowerShell):**
-```powershell
-iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
-```
-
-Установщик клонирует репозиторий в `~/.understand-anything/repo` и создаёт нужные симлинки для выбранной платформы. После установки перезапустите свой CLI/IDE.
-
-> **Как вызывать skills:** префикс вызова зависит от платформы. Большинство платформ используют слэш-команды (`/understand`), но **Codex использует `$`** — вводите `$understand`, а не `/understand`. Если ни один префикс не распознаётся, просто попросите обычным языком: *«Используй skill understand, чтобы проанализировать этот проект»*.
-
-- Поддерживаемые значения `<platform>`: `gemini`, `codex`, `opencode`, `pi`, `openclaw`, `antigravity`, `vibe`, `vscode`, `hermes`, `cline`, `kimi`, `trae`, `nanobot`, `kiro`
-- Обновление: `./install.sh --update`
-- Удаление: `./install.sh --uninstall <platform>`
-
-### Cursor
-
-Cursor автоматически обнаруживает плагин через `.cursor-plugin/plugin.json` при клонировании этого репозитория. Ручная установка не требуется — просто склонируйте и откройте в Cursor.
-
-Если автообнаружение не сработало, установите вручную: откройте **Cursor Settings → Plugins**, вставьте `https://github.com/Egonex-AI/Understand-Anything` в поле поиска и добавьте оттуда.
-
-### VS Code + GitHub Copilot
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything@understand-anything
-```
-
-VS Code с GitHub Copilot (v1.108+) автоматически обнаруживает плагин через `.copilot-plugin/plugin.json` при клонировании этого репозитория. Ручная установка не требуется — просто склонируйте и откройте в VS Code.
-
-Для персональных skills (доступных во всех проектах) запустите `install.sh` выше с платформой `vscode`.
-
-### Copilot CLI
-
-```bash
-copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
-```
-
-### Kiro CLI / IDE
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
-```
-
-После установки:
-- **Kiro CLI**: `kiro-cli chat --agent understand "Проанализируй этот проект"`
-- **Kiro IDE**: skills симлинкуются в `~/.kiro/skills/`, а агент `understand` записывается в `~/.kiro/agents/understand.json`, поэтому оба становятся доступны после перезапуска IDE.
-
-Для персональных skills (доступных во всех проектах) запустите `install.sh` выше с платформой `kiro`.
-
-### Совместимость с платформами
-
-| Платформа | Статус | Способ установки |
-|----------|--------|----------------|
-| Claude Code | ✅ Нативно | Marketplace плагинов |
-| Cursor | ✅ Поддерживается | Автообнаружение |
-| VS Code + GitHub Copilot | ✅ Поддерживается | Автообнаружение |
-| Copilot CLI | ✅ Поддерживается | Установка плагина |
-| Codex | ✅ Поддерживается | `install.sh codex` |
-| OpenCode | ✅ Поддерживается | `install.sh opencode` |
-| OpenClaw | ✅ Поддерживается | `install.sh openclaw` |
-| Antigravity | ✅ Поддерживается | `install.sh antigravity` |
-| Gemini CLI | ✅ Поддерживается | `install.sh gemini` |
-| Pi Agent | ✅ Поддерживается | `install.sh pi` |
-| Vibe CLI | ✅ Поддерживается | `install.sh vibe` |
-| Hermes | ✅ Поддерживается | `install.sh hermes` |
-| Cline | ✅ Поддерживается | `install.sh cline` |
-| KIMI CLI | ✅ Поддерживается | `install.sh kimi` |
-| Trae | ✅ Поддерживается | `install.sh trae` |
-| Nanobot | ✅ Поддерживается | `install.sh nanobot` |
-| Kiro CLI / IDE | ✅ Поддерживается | `install.sh kiro` |
-
----
+Hooks and integrations require explicit review.
 
 ## 📦 Поделитесь графом с командой
 
@@ -283,7 +194,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 .ua/diff-overlay.json
 ```
 
-**Держите граф в актуальном состоянии:** включите `/understand --auto-update` — post-commit хук будет инкрементально обновлять граф, так что каждый коммит сопровождается соответствующим графом. Либо запускайте `/understand` вручную перед релизами.
+**Keep the graph fresh:** Re-run `/understand` manually.
 
 **Большие графы (10 МБ+):** храните через **git-lfs**.
 
@@ -298,10 +209,10 @@ git add .gitattributes .ua/
 Как только граф сгенерирован и закоммичен, любой участник команды может открыть его одной командой — без Claude Code, без LLM, без API-ключа. Нужен только Node.js (>= 18):
 
 ```bash
-npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+node packages/viewer/bin/viewer.mjs /path/to/analyzed/project --no-open
 ```
 
-В терминале выводится URL с токеном (`http://127.0.0.1:5173/?token=…`), и полностью интерактивная панель открывается в браузере. Каталог проекта (по умолчанию — текущий каталог) должен содержать закоммиченный каталог с данными (`.ua/` или устаревший `.understand-anything/`). Всё раздаётся только для чтения с локального диска — никаких обращений к LLM, никакие данные не покидают вашу машину.
+Run the viewer from the approved local plugin directory. Open the URL printed in your terminal. Never share session credentials with AI agents.
 
 Работаете из клона репозитория? `pnpm install && pnpm --filter @understand-anything/core build`, затем `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard` — то же самое через dev-сервер Vite.
 

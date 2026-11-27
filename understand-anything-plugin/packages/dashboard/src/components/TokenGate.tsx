@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { authFetch } from "../utils/authFetch";
 
 interface TokenGateProps {
   onTokenValid: (token: string) => void;
@@ -18,7 +19,7 @@ export default function TokenGate({ onTokenValid }: TokenGateProps) {
     setError(null);
 
     try {
-      const res = await fetch(`/knowledge-graph.json?token=${encodeURIComponent(token)}`);
+      const res = await authFetch("/knowledge-graph.json", token);
       if (res.ok) {
         onTokenValid(token);
       } else if (res.status === 403) {
@@ -50,7 +51,9 @@ export default function TokenGate({ onTokenValid }: TokenGateProps) {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
-            type="text"
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
             value={input}
             onChange={(e) => {
               setInput(e.target.value);

@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { KnowledgeGraph, GraphNode, GraphEdge } from "../types.js";
 
+vi.mock("../security/git-preflight.js", () => ({
+  validateGitRepository: vi.fn(),
+}));
+
 vi.mock("child_process", () => ({
   execFileSync: vi.fn(),
 }));
@@ -59,15 +63,39 @@ beforeEach(() => {
 
 describe("getChangedFiles", () => {
   it("returns changed file list from git diff", () => {
-    mockedExecFileSync.mockReturnValue("src/index.ts\nsrc/utils.ts\n");
+    mockedExecFileSync.mockReturnValue("src/index.ts\0src/utils.ts\0");
 
     const result = getChangedFiles("/project", "abc123");
 
     expect(result).toEqual(["src/index.ts", "src/utils.ts"]);
     expect(mockedExecFileSync).toHaveBeenCalledWith(
       "git",
-      ["diff", "abc123..HEAD", "--name-only"],
-      { cwd: "/project", encoding: "utf-8" },
+      [
+        "--no-pager",
+        "diff",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--name-only",
+        "-z",
+        "--end-of-options",
+        "abc123..HEAD",
+        "--",
+      ],
+      {
+        cwd: "/project",
+        env: expect.objectContaining({
+          GIT_CONFIG_NOSYSTEM: "1",
+          GIT_TERMINAL_PROMPT: "0",
+          GIT_OPTIONAL_LOCKS: "0",
+          GIT_NO_REPLACE_OBJECTS: "1",
+          GIT_NO_LAZY_FETCH: "1",
+        }),
+        encoding: "utf-8",
+        timeout: 5000,
+        maxBuffer: 4 * 1024 * 1024,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
     );
   });
 
@@ -79,20 +107,41 @@ describe("getChangedFiles", () => {
     expect(result).toEqual([]);
   });
 
-  it("returns empty array on git error", () => {
+  it("throws on Git errors instead of reporting no changes", () => {
     mockedExecFileSync.mockImplementation(() => {
       throw new Error("fatal: bad revision");
     });
 
-    const result = getChangedFiles("/project", "abc123");
+    expect(() => getChangedFiles("/project", "abc123")).toThrow(
+      "Unable to determine Git changes",
+    );
+  });
 
-    expect(result).toEqual([]);
+  it.each(["", "--help", "HEAD", "abc..HEAD", "xyz123"])(
+    "rejects invalid commit hash %s",
+    (hash) => {
+      expect(() => getChangedFiles("/project", hash)).toThrow(
+        "Invalid Git commit hash",
+      );
+
+      expect(mockedExecFileSync).not.toHaveBeenCalled();
+    },
+  );
+
+  it("never reports a fresh graph when Git fails", () => {
+    mockedExecFileSync.mockImplementation(() => {
+      throw new Error("Git unavailable");
+    });
+
+    expect(() => isStale("/project", "abc123")).toThrow(
+      "Unable to determine Git changes",
+    );
   });
 });
 
 describe("isStale", () => {
   it("returns stale when files have changed", () => {
-    mockedExecFileSync.mockReturnValue("src/index.ts\n");
+    mockedExecFileSync.mockReturnValue("src/index.ts\0");
 
     const result = isStale("/project", "abc123");
 

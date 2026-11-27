@@ -33,7 +33,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - Intermediate files cleaned up after graph assembly
 
 ## Key Commands
-- `pnpm install` — Install all dependencies
+- `corepack pnpm install --frozen-lockfile --ignore-scripts` — Install all dependencies
 - `pnpm --filter @understand-anything/core build` — Build the core package
 - `pnpm --filter @understand-anything/core test` — Run core tests
 - `pnpm --filter @understand-anything/skill build` — Build the plugin package
@@ -63,7 +63,7 @@ An open-source tool combining LLM intelligence + static analysis to produce inte
 - **Consumption**: the `packages/mcp` MCP server (see its README) serves the status/search/explain/diff/onboard/dashboard tools. Don't duplicate those as skills.
 
 ## Viewer Package
-`packages/viewer` serves a committed graph without Claude Code, via `npx <release-asset-url>`. Update it when (a) the dashboard UI changes — the tarball embeds the built `dist/` — or (b) the `vite.config.ts` dev-server middleware changes, which `bin/viewer.mjs` deliberately mirrors. On every release, repack (`pack:release` script) and re-upload the tarball to the GitHub release as `understand-anything-viewer.tgz` — exactly that name, the READMEs' `releases/latest/download/` URL depends on it.
+Use the standalone viewer from an approved local release. Rebuild and review artifacts before packaging. Never execute remote release assets automatically.
 
 ## Versioning
 When pushing to remote, bump the version in **all seven** of these files (keep them in sync):

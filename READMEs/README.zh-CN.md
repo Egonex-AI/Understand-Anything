@@ -103,14 +103,13 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 
 ## 🚀 快速开始
 
-### 1. 安装插件
+### 1. Secure installation
 
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
+Understand Secure requires a locally prepared, independently approved release.
 
-> **使用本地模型？** 出于隐私或企业需求，可以将你的平台指向本地模型提供方，例如 [Ollama](https://docs.ollama.com/integrations) —— 按照其集成指南更改模型提供方。
+See the [secure installation guide](../docs/security/INSTALLATION.md).
+
+Automatic installation and updates are disabled.
 
 ### 2. 分析你的代码库
 
@@ -168,8 +167,6 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 # 直接重跑即可 —— 默认增量更新，只分析变更的文件
 /understand
 
-# 安装 post-commit 钩子，每次提交自动增量更新
-/understand --auto-update
 
 # 大型 monorepo？把分析范围限定到某个子目录
 /understand src/frontend
@@ -177,97 +174,11 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 
 ---
 
-## 🌐 多平台支持
+## Secure multi-platform installation
 
-Understand-Anything 可在多个 AI 编码平台上运行。
+See the [secure installation guide](../docs/security/INSTALLATION.md).
 
-### Claude Code（原生）
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything
-```
-
-### 一行命令安装（Codex / OpenCode / OpenClaw / Antigravity / Gemini CLI / Pi Agent / Vibe CLI / VS Code Copilot / Hermes / Cline / KIMI CLI / Trae / Nanobot / Kiro）
-
-**macOS / Linux：**
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash
-# 也可以直接传入平台名跳过交互提示：
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s codex
-```
-
-**Windows（PowerShell）：**
-```powershell
-iwr -useb https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.ps1 | iex
-```
-
-安装脚本会将仓库克隆到 `~/.understand-anything/repo`，并为所选平台创建相应的符号链接。安装完成后请重启 CLI 或 IDE。
-
-> **关于技能调用方式：** 不同平台的调用前缀不同。大多数平台使用斜杠命令（`/understand`），但 **Codex 使用 `$`** —— 请输入 `$understand`，而不是 `/understand`。如果两种前缀都不被识别，直接用自然语言请求即可：*“使用 understand 技能分析这个项目”*。
-
-- 支持的 `<platform>` 取值：`gemini`、`codex`、`opencode`、`pi`、`openclaw`、`antigravity`、`vibe`、`vscode`、`hermes`、`cline`、`kimi`、`trae`、`nanobot`、`kiro`
-- 后续更新：`./install.sh --update`
-- 卸载：`./install.sh --uninstall <platform>`
-
-### Cursor
-
-克隆此仓库后，Cursor 会自动通过 `.cursor-plugin/plugin.json`文件发现插件。无需手动安装 — 只需克隆并在 Cursor 中打开即可。
-
-若自动发现未生效，可手动安装：打开 **Cursor Settings → Plugins**，在搜索框中粘贴 `https://github.com/Egonex-AI/Understand-Anything` 并添加。
-
-### VS Code + GitHub Copilot
-
-```bash
-/plugin marketplace add Egonex-AI/Understand-Anything
-/plugin install understand-anything@understand-anything
-```
-
-安装 GitHub Copilot 扩展（v1.108+）后，VS Code 会通过 `.copilot-plugin/plugin.json` 自动发现插件，克隆后直接在 VS Code 中打开即可，无需手动安装。
-
-若需要在所有项目中使用（个人技能），运行上面的 `install.sh` 并选择 `vscode` 平台即可。
-
-### Copilot CLI
-
-```bash
-copilot plugin install Egonex-AI/Understand-Anything:understand-anything-plugin
-```
-
-### Kiro CLI / IDE
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/install.sh | bash -s kiro
-```
-
-安装完成后：
-- **Kiro CLI**：`kiro-cli chat --agent understand "分析这个项目"`
-- **Kiro IDE**：技能会被符号链接到 `~/.kiro/skills/`，`understand` agent 会被写入 `~/.kiro/agents/understand.json`，重启 IDE 后两者均可使用。
-
-若需要在所有项目中使用（个人技能），运行上面的 `install.sh` 并选择 `kiro` 平台即可。
-
-### 多平台兼容
-
-| 平台 | 状态 | 安装方式 |
-|----------|--------|----------------|
-| Claude Code | ✅ 原生 | 插件市场 |
-| Cursor | ✅ 支持 | 自动发现 |
-| VS Code + GitHub Copilot | ✅ 支持 | 自动发现 |
-| Copilot CLI | ✅ 支持 | 插件安装 |
-| Codex | ✅ 支持 | `install.sh codex` |
-| OpenCode | ✅ 支持 | `install.sh opencode` |
-| OpenClaw | ✅ 支持 | `install.sh openclaw` |
-| Antigravity | ✅ 支持 | `install.sh antigravity` |
-| Gemini CLI | ✅ 支持 | `install.sh gemini` |
-| Pi Agent | ✅ 支持 | `install.sh pi` |
-| Vibe CLI | ✅ 支持 | `install.sh vibe` |
-| Hermes | ✅ 支持 | `install.sh hermes` |
-| Cline | ✅ 支持 | `install.sh cline` |
-| KIMI CLI | ✅ 支持 | `install.sh kimi` |
-| Trae | ✅ 支持 | `install.sh trae` |
-| Nanobot | ✅ 支持 | `install.sh nanobot` |
-| Kiro CLI / IDE | ✅ 支持 | `install.sh kiro` |
-
----
+Hooks and integrations require explicit review.
 
 ## 📦 与团队共享知识图谱
 
@@ -282,7 +193,7 @@ curl -fsSL https://raw.githubusercontent.com/Egonex-AI/Understand-Anything/main/
 .ua/diff-overlay.json
 ```
 
-**保持最新：** 启用 `/understand --auto-update` —— 一个 post-commit 钩子会增量更新图谱，每次提交都能得到匹配的图谱版本。也可以在发布前手动重跑 `/understand`。
+**Keep the graph fresh:** Re-run `/understand` manually.
 
 **大型图谱（10 MB 以上）：** 使用 **git-lfs** 跟踪。
 
@@ -297,10 +208,10 @@ git add .gitattributes .ua/
 图谱生成并提交后，团队中的任何人只需一条命令即可打开它 —— 无需 Claude Code，无需 LLM，无需 API 密钥，只需要 Node.js（>= 18）：
 
 ```bash
-npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/understand-anything-viewer.tgz /path/to/analyzed/project
+node packages/viewer/bin/viewer.mjs /path/to/analyzed/project --no-open
 ```
 
-终端会打印一个带令牌的 URL（`http://127.0.0.1:5173/?token=…`），并在浏览器中打开完整的交互式仪表盘。项目目录（默认：当前目录）必须包含已提交的数据目录（`.ua/`，或旧版 `.understand-anything/`）。所有内容都从本地磁盘以只读方式提供 —— 没有 LLM 调用，也不会有任何数据离开你的机器。
+Run the viewer from the approved local plugin directory. Open the URL printed in your terminal. Never share session credentials with AI agents.
 
 如果你是从克隆的仓库工作：先执行 `pnpm install && pnpm --filter @understand-anything/core build`，再运行 `GRAPH_DIR=/path/to/analyzed/project pnpm dev:dashboard`，即可通过 Vite 开发服务器实现同样的效果。
 

@@ -49,9 +49,15 @@ async function startServer(accessToken: string): Promise<string> {
 function requestJson(
   baseUrl: string,
   requestPath: string,
+  token?: string,
 ): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
-    const request = httpRequest(`${baseUrl}${requestPath}`, { agent: false }, (response) => {
+    const request = httpRequest(`${baseUrl}${requestPath}`, {
+      agent: false,
+      headers: token
+        ? { Authorization: `Bearer ${token}` }
+        : {},
+    }, (response) => {
       const chunks: Buffer[] = [];
       response.on("data", (chunk: Buffer) => chunks.push(chunk));
       response.on("end", () => {
@@ -105,7 +111,7 @@ describe("dashboard /code-lessons.json project scoping", () => {
     );
 
     const baseUrl = await startServer("test-token");
-    const result = await requestJson(baseUrl, "/code-lessons.json?token=test-token");
+    const result = await requestJson(baseUrl, "/code-lessons.json", "test-token");
     expect(result.status).toBe(404);
     expect(result.body).not.toContain("ROGUE");
   });
@@ -136,7 +142,7 @@ describe("dashboard /code-lessons.json project scoping", () => {
     );
 
     const baseUrl = await startServer("test-token");
-    const result = await requestJson(baseUrl, "/code-lessons.json?token=test-token");
+    const result = await requestJson(baseUrl, "/code-lessons.json", "test-token");
     expect(result.status).toBe(200);
     expect(result.body).toContain("PROJECT A LESSONS");
     expect(result.body).not.toContain("ROGUE");

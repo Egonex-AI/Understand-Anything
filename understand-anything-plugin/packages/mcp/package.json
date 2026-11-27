@@ -21,9 +21,9 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "@understand-anything/core": "workspace:*",
     "@understand-anything/skill": "workspace:*",
-    "zod": "^4.3.6"
+    "zod": "4.6.6"
   }
 }

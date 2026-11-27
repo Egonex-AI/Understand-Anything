@@ -602,22 +602,10 @@ function enumerateFiles(projectRoot) {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a defaults-only IgnoreFilter — same patterns as createIgnoreFilter
- * would apply, minus any user .understandignore content. We synthesize this
- * via a temp directory with no .understandignore files so the core function
- * still drives the matcher. (Re-implementing the ignore-package wiring here
- * would risk subtle behavior drift from core's matcher.)
+ * Build a defaults-only filter without filesystem access.
  */
 function buildDefaultsOnlyFilter() {
-  // Use the createIgnoreFilter with a path that we KNOW has no .understandignore.
-  // `os.tmpdir()`-based fresh dir guarantees no user patterns leak in.
-  // The directory doesn't need to exist on disk because createIgnoreFilter
-  // only checks existsSync() before reading.
-  const fakeProjectRoot = join(
-    require('node:os').tmpdir(),
-    `ua-scan-defaults-${process.pid}-${Date.now()}`,
-  );
-  return createIgnoreFilter(fakeProjectRoot);
+  return createIgnoreFilter(null);
 }
 
 /**

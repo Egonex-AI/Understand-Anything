@@ -106,7 +106,7 @@ function readJson(path, fallback = null) {
   try {
     return JSON.parse(readFileSync(path, 'utf-8'));
   } catch (error) {
-    throw new Error(`Could not parse ${path}: ${error.message}`);
+    throw new Error(`Could not parse ${path}: ${error.message}`, { cause: error });
   }
 }
 

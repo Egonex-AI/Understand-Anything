@@ -49,24 +49,31 @@ describe('skill command hardening', () => {
     expect(content).toContain('Never update `meta.json` for a generated-artifact-only commit');
   });
 
-  it('quotes dashboard cd targets and GRAPH_DIR assignment', () => {
-    const content = readRepoFile('understand-anything-plugin/skills/understand-dashboard/SKILL.md');
+  it('requires a local viewer without remote installation', () => {
+    const content = readRepoFile(
+      'understand-anything-plugin/skills/understand-dashboard/SKILL.md',
+    );
 
     expect(content).not.toMatch(/<(?:dashboard-dir|plugin-root|project-dir)>/);
     expect(content).not.toMatch(/\bcd <(?:dashboard-dir|plugin-root)>/);
     expect(content).not.toMatch(/GRAPH_DIR=<project-dir>/);
+
     expect(content).toMatch(/PROJECT_DIR=\$\(pwd -P\)/);
     expect(content).toMatch(/UA_DIR="\$PROJECT_DIR\/\.understand-anything"/);
     expect(content).toMatch(/\[ ! -f "\$UA_DIR\/knowledge-graph\.json" \]/);
-    expect(content).toMatch(/DASHBOARD_DIR="\$PLUGIN_ROOT\/packages\/dashboard"/);
-    expect(content).toMatch(/: "\$\{PLUGIN_ROOT:\?Run step 3 first so PLUGIN_ROOT is set\}"/);
-    expect(content).toMatch(/: "\$\{PROJECT_DIR:\?Run step 1 first so PROJECT_DIR is set\}"/);
-    expect(content).toMatch(/: "\$\{DASHBOARD_DIR:\?Run step 5 first so DASHBOARD_DIR is set\}"/);
-    expect(content).toMatch(/cd "\$PLUGIN_ROOT" && pnpm --filter @understand-anything\/core build/);
-    expect(content).toMatch(/cd "\$DASHBOARD_DIR" && GRAPH_DIR="\$PROJECT_DIR" npx vite/);
-    // Fast path: the viewer URL is version-pinned and both npx arguments are quoted.
-    expect(content).toMatch(/VIEWER_URL="https:\/\/github\.com\/Egonex-AI\/Understand-Anything\/releases\/download\/v\$\{PLUGIN_VERSION\}\/understand-anything-viewer\.tgz"/);
-    expect(content).toMatch(/npx --yes "\$VIEWER_URL" "\$PROJECT_DIR"/);
+
+    expect(content).toContain('VIEWER_DIR="$PLUGIN_ROOT/packages/viewer"');
+    expect(content).toContain(': "${PLUGIN_ROOT:?Plugin root required}"');
+    expect(content).toContain('node "$VIEWER_DIR/bin/viewer.mjs" "$PROJECT_DIR"');
+
+    expect(content).toContain('dist/index.html');
+    expect(content).toContain('bin/dist/staleness.js');
+
+    expect(content).not.toMatch(/\bnpx\b/);
+    expect(content).not.toMatch(/\b(?:pnpm|npm|yarn)\s+install\b/);
+    expect(content).not.toMatch(/\b(?:pnpm|npm|yarn)\s+[^\n]*\bbuild\b/);
+    expect(content).not.toMatch(/VIEWER_URL=/);
+    expect(content).not.toMatch(/\b(?:curl|wget)\s+/);
   });
 
   it('marks project-controlled context as untrusted data', () => {

@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createSafeGitEnv, validateGitRepository } from "@understand-anything/core";
 
 // Scope every query to the project directory and exclude generated analysis
 // artifacts (mirrors core's PROJECT_PATHSPEC in staleness.ts).
@@ -12,11 +13,14 @@ const PROJECT_PATHSPEC = [
 ];
 
 function gitPaths(root, args) {
-  const out = execFileSync("git", [...args, ...PROJECT_PATHSPEC], {
+  const out = execFileSync("git", ["--no-pager", ...args, ...PROJECT_PATHSPEC], {
     cwd: root,
+    env: createSafeGitEnv(),
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 32 * 1024 * 1024,
+    timeout: 5_000,
+    windowsHide: true,
   });
   return out.split("\0").filter(Boolean);
 }
@@ -28,6 +32,7 @@ function gitPaths(root, args) {
  * non-ASCII paths match graph nodes verbatim.
  */
 export function changedFiles(root, { staged, base } = {}) {
+  validateGitRepository(root);
   // Reject option-shaped refs: a leading "-" would make git parse the value
   // as a flag (e.g. --output=<file> writes the diff somewhere unexpected).
   // --end-of-options additionally stops revision parsing of flag-like input.
@@ -37,7 +42,14 @@ export function changedFiles(root, { staged, base } = {}) {
     );
   }
 
-  const diff = ["diff", "--name-only", "-z", "--relative"];
+  const diff = [
+    "diff",
+    "--no-ext-diff",
+    "--no-textconv",
+    "--name-only",
+    "-z",
+    "--relative",
+  ];
   const files = gitPaths(
     root,
     base
