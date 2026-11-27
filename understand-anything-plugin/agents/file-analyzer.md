@@ -300,6 +300,11 @@ For every code file in this batch:
 
 The `batchImportData` values contain only resolved project-internal paths — external packages have already been filtered out, so every path is safe to emit. Do NOT attempt to re-resolve imports from source. Do NOT skip imports because the target lives in another batch (cross-batch references are explicitly allowed for `imports` edges, since the project-scanner already verified the path exists).
 
+**Import review (C# files only).** For C#, `batchImportData` is built from type references (a file names a type declared in another file whose namespace it can see), not from `using` lines. That rule has two known gaps, and you are reading the file anyway, so check it:
+- **falseHits:** a listed path whose types this file does not actually use. Typical cause: the name only appears as a member, parameter or variable name (`Placement Placement`, `.Id`) and refers to something else, or two visible namespaces declare the same type name and only one is meant.
+- **missed:** another project file this file clearly depends on that is not listed. Typical cause: extension methods called without naming their static class, `var` inference from a factory, or reflection/string type names.
+Report them in a top-level `importReview` object in your batch JSON, keyed by file path, only for files with something to report: `"importReview": { "Src/A.cs": { "falseHits": ["Src/B.cs"], "missed": [{ "path": "Src/C.cs", "why": "calls the C.Normalize extension method" }] } }`. Every path must be a real project file. Still emit an `imports` edge for EVERY listed path (the 1:1 rule below stays); the merge step removes confirmed false hits and adds missed edges, and records both in `intermediate/import-review.json`. Only report what you can point to in the code; when unsure, report nothing.
+
 **Self-check before writing the batch JSON:** sum `batchImportData[file].length` across every code file in your batch. The number of `imports` edges in your output MUST equal that sum. If it doesn't, you dropped some during enumeration — go back and add them. (A deterministic post-processing pass in `merge-batch-graphs.py` will recover anything you still miss, but it is your job to get this right at emission time so the recovery report stays empty.)
 
 **Non-code edge creation guidance:**
