@@ -2,7 +2,7 @@ import type { StructuralAnalysis } from "../types.js";
 import { COVERAGE_LANGUAGES, declarationGap } from "./symbol-coverage.js";
 import type { TreeSitterNode as Node } from "./extractors/types.js";
 import { classExpression, declarationKey, declarationName, identifier, literal, unescaped, unwrap } from "./symbol-ast.js";
-import { buildSymbolScopes, CLASS_NODES, FUNCTION_NODES, FILE_SCOPE, UNKNOWN_SCOPE, namedScope,
+import { buildSymbolScopes, FUNCTION_NODES, FILE_SCOPE, UNKNOWN_SCOPE, isClassNode, namedScope,
   type SymbolScope } from "./symbol-scopes.js";
 
 /** Runtime possibilities and declaration coverage use explicit scope kinds. */
@@ -30,6 +30,9 @@ const JS_INSTALLERS = new Set(["defineProperty", "defineProperties", "__defineGe
 const PY_INSTALLERS = new Set(["setattr", "__setattr__", "new_class"]);
 const JS_EVALUATORS = new Set(["eval", "Function"]);
 const PY_EVALUATORS = new Set(["eval", "exec"]);
+// Lombok annotations that generate methods or constructors at compile time.
+const LOMBOK = new Set(["Getter", "Setter", "Data", "Value", "Builder", "SuperBuilder", "With", "Wither", "ToString",
+  "EqualsAndHashCode", "AllArgsConstructor", "NoArgsConstructor", "RequiredArgsConstructor", "Delegate"]);
 
 function member(node: Node | null): { object: Node | null; name: string | null } | null {
   node = unwrap(node);
@@ -72,6 +75,17 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
     const pending = [node];
     while (pending.length) { const item = pending.pop()!; handledReferences.add(item.id); pending.push(...item.namedChildren); }
   };
+  // Only member-generating annotations resolved to Lombok count: `@Slf4j` or
+  // `@NonNull` add no methods, and Spring's `@Value` is not Lombok.
+  const lombokImports = new Set<string>();
+  let lombokWildcard = false;
+  if (language === "java") for (const child of root.namedChildren) {
+    if (child.type !== "import_declaration") continue;
+    const path = child.namedChildren.find(part => ["identifier", "scoped_identifier"].includes(part.type))?.text ?? "";
+    if (path !== "lombok" && !path.startsWith("lombok.")) continue;
+    if (child.namedChildren.some(part => part.type === "asterisk")) lombokWildcard = true;
+    else lombokImports.add(path.slice(path.lastIndexOf(".") + 1));
+  }
   const targetOwner = (target: Node | null, context: Node): SymbolScope => {
     target = unwrap(target);
     const name = identifier(target);
@@ -97,13 +111,14 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
   };
   const visit = (node: Node) => {
     const owner = scopes.declaration(node);
-    const gap = declarationGap(node, owner, scopes.receiver(node));
+    const gap = declarationGap(node, owner, scopes.receiver(node), language);
     if (gap) coverage.gaps.push(gap);
     const declared = declarationKey(node);
     const declaredName = declared?.type === "computed_property_name" ? literal(declared.namedChildren[0]) : declarationName(declared);
     const objectMethod = isJS && node.type === "method_definition" && node.parent?.type === "object";
     const localDeclaration = owner.kind === "local";
-    if (node !== root && CLASS_NODES.has(node.type)) {
+    const classNode = isClassNode(node.type, language);
+    if (node !== root && classNode) {
       const target = scopes.classTarget(node);
       const classScope = target.kind === "class" ? FILE_SCOPE : target;
       const className = classExpression(node) ? target.kind === "class" ? target.name : null : declaredName;
@@ -143,10 +158,10 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
     // Escaped/opaque declaration spellings cannot establish absence. Ordinary
     // identifiers, references and string literals do not imply declarations.
     if (declared && !objectMethod && !localDeclaration && !classExpression(node)
-      && (CLASS_NODES.has(node.type) || FUNCTION_NODES.has(node.type))
+      && (classNode || FUNCTION_NODES.has(node.type))
       && declaredName === null) {
-      cover(declared, CLASS_NODES.has(node.type) ? FILE_SCOPE : owner, null, "Unresolved declaration name",
-        CLASS_NODES.has(node.type) ? "class" : "callable");
+      cover(declared, classNode ? FILE_SCOPE : owner, null, "Unresolved declaration name",
+        classNode ? "class" : "callable");
     }
     if (owner.kind === "unknown" && !objectMethod && !localDeclaration && FUNCTION_NODES.has(node.type) && declaredName !== null) {
       cover(node, UNKNOWN_SCOPE, declaredName, "Unresolved declaring type");
@@ -180,6 +195,15 @@ export function collectSymbolEvidence(root: Node, structure: StructuralAnalysis,
         }
       };
       if (target) inspect(target);
+    }
+    if (language === "java" && ["marker_annotation", "annotation"].includes(node.type)) {
+      const name = node.childForFieldName("name")?.text ?? "";
+      const declaration = node.parent?.type === "modifiers" ? node.parent.parent : null;
+      const fromLombok = name.startsWith("lombok.") || lombokImports.has(name) || lombokWildcard && !name.includes(".");
+      if (declaration && fromLombok && LOMBOK.has(name.slice(name.lastIndexOf(".") + 1))) {
+        add(node, isClassNode(declaration.type, language) ? scopes.classTarget(declaration) : scopes.declaration(declaration),
+          null, "Lombok may generate members at compile time");
+      }
     }
     if (isRuby && node.type === "alias" && declared?.type !== "global_variable") {
       add(node, owner, declarationName(declared), "Ruby alias declaration");
