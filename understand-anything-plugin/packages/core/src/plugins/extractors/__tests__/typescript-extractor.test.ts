@@ -85,4 +85,43 @@ describe("TypeScriptExtractor", () => {
       parser.delete();
     });
   });
+
+  // ---- Re-exports ----
+
+  describe("extractStructure - re-exports", () => {
+    it("records every re-export form as an import of its source module", () => {
+      const { tree, parser, root } = parse(`export * from "./all";
+export * as ns from "./namespaced";
+export { a, b as c } from "./named";
+export type { T } from "./types";
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([
+        { source: "./all", specifiers: ["*"], lineNumber: 1 },
+        { source: "./namespaced", specifiers: ["* as ns"], lineNumber: 2 },
+        { source: "./named", specifiers: ["a", "c"], lineNumber: 3 },
+        { source: "./types", specifiers: ["T"], lineNumber: 4 },
+      ]);
+      // Named re-exports stay visible as exports of the barrel.
+      expect(result.exports.map((e) => e.name)).toEqual(["a", "c", "T"]);
+
+      tree.delete();
+      parser.delete();
+    });
+
+    it("does not treat local exports as imports", () => {
+      const { tree, parser, root } = parse(`const local = 1;
+export { local };
+export const value = "./not-a-module";
+export default "./also-not-a-module";
+`);
+      const result = extractor.extractStructure(root);
+
+      expect(result.imports).toEqual([]);
+
+      tree.delete();
+      parser.delete();
+    });
+  });
 });
