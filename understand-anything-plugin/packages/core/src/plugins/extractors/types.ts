@@ -1,5 +1,11 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 
+/**
+ * Synthetic caller used for calls made outside any named function
+ * (module/file scope). Consumers map it to the file node itself.
+ */
+export const FILE_SCOPE_CALLER = "<file>";
+
 // Re-export the tree-sitter Node type for use by extractors
 export type TreeSitterNode = import("web-tree-sitter").Node;
 

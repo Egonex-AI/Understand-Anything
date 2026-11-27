@@ -1,5 +1,7 @@
 import type { StructuralAnalysis, CallGraphEntry } from "../../types.js";
 import type { LanguageExtractor, TreeSitterNode } from "./types.js";
+import { FILE_SCOPE_CALLER } from "./types.js";
+import { collectTopLevelSegments, type SegmentClassifier } from "./top-level-segments.js";
 import { getStringValue } from "./base-extractor.js";
 
 /**
@@ -97,6 +99,63 @@ function extractImportSpecifiers(
   return specifiers;
 }
 
+const FUNCTION_VALUES = new Set(["arrow_function", "function_expression", "function"]);
+/** Root-level node types that are already represented (symbols, imports, exports, type-only declarations). */
+const TS_HANDLED = new Set([
+  "function_declaration", "generator_function_declaration", "class_declaration",
+  "abstract_class_declaration", "import_statement", "export_statement",
+  "interface_declaration", "type_alias_declaration", "enum_declaration",
+  "ambient_declaration", "internal_module", "module", "empty_statement", "hash_bang_line",
+]);
+
+function unwrapParens(node: TreeSitterNode | null): TreeSitterNode | null {
+  while (node && node.type === "parenthesized_expression") node = node.namedChildren[0] ?? null;
+  return node;
+}
+
+function isIife(expr: TreeSitterNode | null): boolean {
+  expr = unwrapParens(expr);
+  if (!expr) return false;
+  // `!function(){}()` / `void function(){}()`
+  if (expr.type === "unary_expression") return isIife(expr.namedChildren[0] ?? null);
+  // `await (async () => {})()`
+  if (expr.type === "await_expression") return isIife(expr.namedChildren[0] ?? null);
+  if (expr.type !== "call_expression") return false;
+  const fn = unwrapParens(expr.childForFieldName("function"));
+  return !!fn && FUNCTION_VALUES.has(fn.type);
+}
+
+function isRequireMainGuard(node: TreeSitterNode): boolean {
+  const cond = node.childForFieldName("condition");
+  if (!cond) return false;
+  const text = cond.text.replace(/\s+/g, "");
+  return /require\.main(===?|!==?)module|module(===?|!==?)require\.main/.test(text);
+}
+
+const tsSegmentClassifier: SegmentClassifier = {
+  classify(node) {
+    if (TS_HANDLED.has(node.type)) return null;
+    if (node.type === "lexical_declaration" || node.type === "variable_declaration") {
+      const declarators = node.namedChildren.filter((c) => c.type === "variable_declarator");
+      const allFunctions = declarators.length > 0 && declarators.every((d) => {
+        const value = d.childForFieldName("value");
+        return !!value && FUNCTION_VALUES.has(value.type);
+      });
+      return allFunctions ? null : "config";
+    }
+    if (node.type === "if_statement" && isRequireMainGuard(node)) return "guard";
+    if (node.type === "expression_statement") {
+      const expr = node.namedChildren[0] ?? null;
+      if (isIife(expr)) return "iife";
+      if (expr && (expr.type === "assignment_expression" || expr.type === "augmented_assignment_expression")) return "config";
+    }
+    return "statement";
+  },
+  callee(node) {
+    return node.type === "call_expression" ? node.childForFieldName("function")?.text ?? null : null;
+  },
+};
+
 /**
  * TypeScript/JavaScript extractor.
  *
@@ -126,7 +185,10 @@ export class TypeScriptExtractor implements LanguageExtractor {
       );
     }
 
-    return { functions, classes, imports, exports };
+    const topLevel = collectTopLevelSegments(rootNode, tsSegmentClassifier);
+    return topLevel.length > 0
+      ? { functions, classes, imports, exports, topLevel }
+      : { functions, classes, imports, exports };
   }
 
   extractCallGraph(rootNode: TreeSitterNode): CallGraphEntry[] {
@@ -169,9 +231,12 @@ export class TypeScriptExtractor implements LanguageExtractor {
 
       if (node.type === "call_expression") {
         const callee = node.childForFieldName("function");
-        if (callee && functionStack.length > 0) {
+        if (callee) {
           entries.push({
-            caller: functionStack[functionStack.length - 1],
+            caller:
+              functionStack.length > 0
+                ? functionStack[functionStack.length - 1]
+                : FILE_SCOPE_CALLER,
             callee: callee.text,
             lineNumber: node.startPosition.row + 1,
           });
