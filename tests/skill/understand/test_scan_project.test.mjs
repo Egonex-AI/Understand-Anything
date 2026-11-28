@@ -942,4 +942,38 @@ describe('scan-project.mjs — output schema invariants', () => {
     const paths = r.output.files.map(f => f.path);
     expect(paths).toEqual(['!bang.ts', '0.ts', '_under.ts', 'a.ts', 'ä.ts']);
   });
+
+  it('lists a path once when the git index has unmerged (conflicted) entries', () => {
+    projectRoot = setupTree({
+      'conflicted.txt': '<<<<<<< ours\none\n=======\ntwo\n>>>>>>> theirs\n',
+      'clean.txt': 'clean\n',
+    });
+    // A conflicted merge leaves one index entry per stage (1 = base, 2 = ours,
+    // 3 = theirs) and `git ls-files` prints the path once per entry. Build that
+    // index directly so the test needs no commits and no git identity.
+    const blob = content => {
+      const hashed = spawnSync('git', ['hash-object', '-w', '--stdin'], {
+        cwd: projectRoot,
+        input: content,
+        encoding: 'utf-8',
+      });
+      expect(hashed.status).toBe(0);
+      return hashed.stdout.trim();
+    };
+    const stages = ['base\n', 'one\n', 'two\n']
+      .map((content, i) => `100644 ${blob(content)} ${i + 1}\tconflicted.txt\n`)
+      .join('');
+    const indexed = spawnSync('git', ['update-index', '--index-info'], {
+      cwd: projectRoot,
+      input: stages,
+      encoding: 'utf-8',
+    });
+    expect(indexed.status).toBe(0);
+
+    const r = runScript(projectRoot);
+    expect(r.status).toBe(0);
+    expect(r.output.files.map(f => f.path)).toEqual(['clean.txt', 'conflicted.txt']);
+    expect(r.output.totalFiles).toBe(2);
+    expect(r.output.stats.filesScanned).toBe(2);
+  });
 });

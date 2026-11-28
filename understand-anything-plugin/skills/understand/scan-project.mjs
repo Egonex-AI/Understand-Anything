@@ -506,11 +506,10 @@ function enumerateViaGit(projectRoot) {
   });
   if (result.status !== 0 || !result.stdout) return null;
   // Each NUL-separated chunk is one path, project-relative, already POSIX on
-  // all platforms because git emits forward slashes regardless of OS.
-  return result.stdout
-    .split('\0')
-    .filter(Boolean)
-    .map(toPosix);
+  // all platforms because git emits forward slashes regardless of OS. An
+  // unmerged (conflicted) path is printed once per index stage, so collapse
+  // repeats here; `--deduplicate` would need git >= 2.31 and fail on older ones.
+  return [...new Set(result.stdout.split('\0').filter(Boolean).map(toPosix))];
 }
 
 /**
